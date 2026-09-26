@@ -22,3 +22,9 @@ test('no launcher, a failed boot, or a boot that never reports are named', () =>
     'dsh --profile binnacle --check exited 1 without reporting `binnacle: ok`; run it to see why',
   ])
 })
+
+test('a boot that never finishes is named with what dsh says is pending, since a row waiting on a missing service keeps it alive', () => {
+  assert.deepEqual(readBoot('dsh-v0.1.7-rc.2', { ...OK, status: null, stdout: '', timedOut: true }), [
+    'dsh --profile binnacle --check did not finish in 120 s; a row waiting on a service nothing provides keeps it alive — its stderr names the row',
+  ])
+})

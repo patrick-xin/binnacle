@@ -30,6 +30,15 @@
     ]
   },
   "external": {
+    "@deepseek-ai/cordis": [
+      "host"
+    ],
+    "@deepseek-ai/dsh-agent": [
+      "host"
+    ],
+    "@deepseek-ai/dsh-agent-default-model": [
+      "host"
+    ],
     "@deepseek-ai/dsh-cmdline": [
       "host"
     ],
@@ -39,9 +48,6 @@
     ],
     "@deepseek-ai/dsh-session": [
       "facts",
-      "host"
-    ],
-    "@deepseek-ai/cordis": [
       "host"
     ],
     "@earendil-works/pi-tui": [
