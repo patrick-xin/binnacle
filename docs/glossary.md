@@ -1,42 +1,45 @@
 # Glossary
 
-Every term the code and the docs use, whose word it is, and what it means here. Use the owner's term; coin one only when no owner has it, and add it here in the same change. Why a term exists is its decision record's; this page only says what it means.
+Every term the code and the docs use, whose word it is, and what it means here. Use the owner's term; coin one only when no owner has it, and add it here in the same change. Why a term exists is its decision record's; this page only says what it means, and where a term names code, it cites it.
 
 ## Ours
 
 | Term | Means |
 | --- | --- |
-| **fact** | One session event adapted to binnacle's own type by `adapt` ([ADR 4](adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)): a prompt, context, an answer, a call, a result, or `unknown`. Facts are the only input a model or view reads. |
-| **model** | A pure fold over facts: turns, the agents tree, status. Knows no drawing. |
-| **transcript** | The model of a session as turns: `transcript(facts)` in `src/models/transcript.ts`, built by `fold`, one fact at a time. |
-| **turn** | What a person sent and everything the agent did about it, and why it ended; `turn: null` holds what the log carries before its first turn. dsh's word, grouped by us. |
-| **entry** | One thing a turn holds: a prompt, context, an answer, a tool call with its result once it has one, a result whose call is not in its turn, or an unknown fact. Steps are not entries. |
-| **view** | `(entry) → Node`: draws one kind of entry, and declares the affordances on what it drew with `offer` and `fold` nodes. |
-| **node** | What a view returns: `text`, `blank`, `stack`, `offer` (content and the affordances it offers) or `fold`; data, laid out by the ui with pi-tui. |
-| **fallback view** | The view for a kind of fact no view claims: its type in one line, and `expand` to the raw record. |
-| **layer** | One of `contract`, `facts`, `models`, `views`, `ui`, `host`; what each may import is [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
-| **contract** | The layer every other may import and that imports nothing: the vocabulary below. |
-| **ui** | The components, layout, the gesture table and UI state. |
-| **host** | The one layer that touches the terminal and the harness runtime. |
-| **affordance** | Something a person can do with a piece of content: `expand`, `choose`, `open`, `copy`, `answer`, `grant`, `dismiss`. Its policy — whether a click may invoke it — belongs to its kind ([ADR 1](adr/0001-content-offers-affordances-the-surface-owns-gestures.md)). |
+| **fact** | One session event as binnacle's own type (`binnacle:packages/binnacle/src/facts/adapt.ts#Fact`, [ADR 4](adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)). A kind no adapter reads is an `unknown` fact carrying its raw record. Facts are the only input a model or view reads. |
+| **model** | A pure fold over facts. Knows no drawing. |
+| **transcript** | The model of a session as turns (`binnacle:packages/binnacle/src/models/transcript.ts#transcript`), folded one fact at a time. |
+| **turn** | What a person sent and everything the agent did about it, and why it ended; a turn numbered `null` holds what the log carries before its first turn. dsh's word, grouped by us. |
+| **entry** | One thing a turn holds: a fact, or a tool call paired with its result once it has one (`binnacle:packages/binnacle/src/models/transcript.ts#Entry`). Steps are not entries. |
+| **view** | `(entry) → Node`: draws one kind of entry, and declares the affordances on what it drew (`binnacle:packages/binnacle/src/views/entries.ts#View`). |
+| **node** | What a view returns: data, laid out by the ui with pi-tui (`binnacle:packages/binnacle/src/ui/node.ts#Node`). |
+| **fallback view** | How an entry no view claims is drawn: its type in one line, and `expand` to the raw record. It also says what went wrong when an author's adapter or view failed. |
+| **layer** | A folder of `src`, or the module `api.ts`, and what it may import: [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
+| **contract** | The layer holding what otherwise-independent layers share. |
+| **ui** | The nodes views draw with, layout, the gesture table and UI state. |
+| **pane** | A pi-tui component that draws views and holds UI state, deterministic in what it was given ([ADR 6](adr/0006-a-pane-joins-views-to-pi-tui-and-the-host-keeps-only-what-is-impure.md)); the transcript is one. |
+| **host** | The one layer that touches the terminal and the process. |
+| **author API** | What an author may depend on: the `binnacle` service and the types its registrations take (`binnacle:packages/binnacle/src/api.ts#Registrations`). |
+| **built-in feature** | A Cordis plugin in `src/plugins` holding only what an author holds ([ADR 5](adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)). |
+| **affordance** | Something a person can do with a piece of content, such as `expand` or `grant` (`binnacle:packages/binnacle/src/contract/index.ts#affordances`). Its policy — whether a click may invoke it — belongs to its kind ([ADR 1](adr/0001-content-offers-affordances-the-surface-owns-gestures.md)). |
 | **primary affordance** | The first a region offers; what a click or the primary key invokes. |
 | **region** | A part of the screen a gesture can land on: an id, the affordances it offers, and whether it overflows. |
 | **gesture** | What a person did before it means anything: a click, the wheel, a drag, hovering, or a key resolved to a binding. |
-| **gesture table** | `meaning(gesture, under)` in `src/ui/gestures.ts`: the one place a gesture is given a meaning. |
+| **gesture table** | The one place a gesture is given a meaning (`binnacle:packages/binnacle/src/ui/gestures.ts#meaning`). |
 | **action** | What a gesture means: invoke an affordance, scroll a region, select, or move focus. |
 | **binding** | A named, rebindable key: focus movement, the primary affordance, or one affordance by kind. |
-| **registration** | What an author contributes through `ctx.binnacle`, the service the host provides: `facts(type, adapter)` reads a dsh event kind as an authored fact, `view(key, view)` draws an entry kind or an authored fact. Each is an effect of the plugin that made it. Affordances and commands, bindings and placements join with their first use ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
+| **registration** | What an author or a built-in feature contributes through `ctx.binnacle`, each an effect of the plugin that made it ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **authored fact** | A fact an author's adapter made from an event kind, named by them; drawn by the view registered under its name, or by the fallback. |
 | **placement** | Where registered content goes: a screen or a side panel. |
-| **grant** | The affordance a person gives an approval with; a key, never a click. Also, in "grants, not the tree": what a plugin is handed instead of pi-tui components. |
+| **grant** | The affordance a person gives an approval with; a key, never a click. Also, in "grants, not the tree": what a plugin is handed instead of pi-tui components, including an effect the host performs for it. |
 | **author** | An agent a person asks to customize binnacle; it registers through the same doors the built-in surface does. |
 | **seam** | A named place binnacle reaches dsh through, held by a gate ([ADR 3](adr/0003-dsh-is-reached-through-named-seams-each-held-by-a-gate.md)); in tests, the public boundary a test is written at. |
 | **gate** | A check `pnpm test` runs that refuses a class of defect: `check:*`, `lint`, `typecheck`. |
 | **reference** | A repository read and never written, fetched into `.refs/<name>` at its pin ([`references.json`](../references.json)). |
 | **pin** | The commit, and for a release line the tag, a reference is read at; packages that follow it are pinned to match. |
-| **citation** | `` `name:path` ``, naming a file in a reference, resolved at its pin. |
-| **upstream branch** | `upstream/<reference>/<version>`: a release past a pin, carried by the upstream job with the pin moved and the canary run. |
-| **canary** | The tests and the boot run against a moved pin, whose verdict the upstream branch's commit carries. |
+| **citation** | `` `name:path` ``, naming a file in a reference, resolved at its pin, or in this repository under the name `binnacle`; an optional `#symbol` must be found there. |
+| **upstream branch** | `upstream/<reference>/<version>`: a release past a pin, carried by the upstream job with the canary's verdict in its commit. |
+| **canary** | Moving a pin, then the tests and the boot, as the upstream job runs them; green, or red with the log of where it stopped. |
 
 ## dsh's
 

@@ -1,11 +1,8 @@
 /**
  * The gesture table: the one place a gesture is given a meaning.
  *
- * Every screen answers through it, so a click, the wheel or a key means the
- * same thing wherever it lands. A pointer gesture lands on the regions under
- * the pointer, innermost first; a key lands on the focused region and the
- * regions holding it.
- * @module binnacle/ui/gestures
+ * A pointer gesture lands on the regions under the pointer, innermost first;
+ * a key lands on the focused region.
  */
 
 import { affordances } from '../contract/index.ts'

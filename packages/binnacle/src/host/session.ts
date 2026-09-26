@@ -7,7 +7,6 @@
  * selection installed in `setup` (`dsh:packages/bundle/headless/src/index.ts`).
  * This is where binnacle reaches dsh's agents (ADR 3); the rest of the host
  * knows only the session it opens.
- * @module binnacle/host/session
  */
 
 import { randomUUID } from 'node:crypto'

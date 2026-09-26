@@ -2,10 +2,8 @@
  * The screen: a session's facts and the UI state, at a width, as every line
  * of the transcript and the regions on them.
  *
- * It draws the whole transcript. Windowing it, following its end, and
- * scrolling it on a wheel nothing on it claims are pi-tui's alternate
- * screen's (`pi:packages/tui/src/tui-alt-screen.ts`), never derived again.
- * @module binnacle/views/screen
+ * It draws the whole transcript, which pi-tui windows, scrolls and selects
+ * ([ADR 7](../../../../docs/adr/0007-pi-tui-windows-scrolls-and-selects-the-transcript.md)).
  */
 
 import type { Fact } from '../facts/adapt.ts'

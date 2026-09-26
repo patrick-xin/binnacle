@@ -4,7 +4,6 @@
  * A view returns a node; the ui lays it out with pi-tui at a width. So a view,
  * built-in or an author's, never holds a pi-tui component, and a change in
  * how pi-tui draws reaches every view at once.
- * @module binnacle/ui/node
  */
 
 import { affordances, describe } from '../contract/index.ts'
