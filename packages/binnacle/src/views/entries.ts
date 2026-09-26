@@ -11,8 +11,22 @@ import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
 import type { Node } from '../ui/node.ts'
 
-/** How a kind of entry is drawn: a built-in view, or one an author registered. */
-export type View = (entry: Entry) => Node
+/**
+ * How a kind of entry is drawn: a built-in view, or one an author registered.
+ *
+ * A function of its entry alone. binnacle calls it once for each entry and
+ * keeps what it returned, laying it out again at a new width or as a fold in
+ * it opens, until the entry changes (a call's result arrives), a registration
+ * comes or goes, or pi-tui invalidates the pane. Anything else it reads is
+ * read once, until its author invalidates its key.
+ * @param next - draws the entry as the view beneath this one does, for a view
+ * to build on or to leave an entry it does not claim to; it never throws, as
+ * what goes wrong beneath is drawn there.
+ */
+export type View = (entry: Entry, next: () => Node) => Node
+
+/** Authors' views, by entry kind or by the name of an authored fact, each key's oldest first: the newest draws, on what the one before it draws. */
+export type Views = ReadonlyMap<string, readonly View[]>
 
 /**
  * The text of some blocks, one paragraph each; a block binnacle cannot read is its type in brackets.
@@ -48,26 +62,45 @@ const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context
 
 /**
  * Draw one entry.
- * @param views - authors' views, by entry kind or by the name of an authored fact; one for a built-in kind replaces it.
- * @returns what it draws; the built-in drawing, saying what went wrong, when an author's view throws or returns no node binnacle can lay out, or an authored fact is named as a built-in kind.
+ * @param views - authors' views; the newest for the entry's key draws it, and one for a built-in kind builds on or replaces binnacle's.
+ * @returns what it draws. When an author's view throws or returns no node binnacle can lay out, what the view beneath it draws, saying what went wrong; when an authored fact is named as a built-in kind, the built-in drawing, saying so.
  */
-export function drawEntry(entry: Entry, views: ReadonlyMap<string, View> = new Map()): Node {
+export function drawEntry(entry: Entry, views: Views = new Map()): Node {
   if (entry.kind === 'authored' && Object.hasOwn(drawnHere, entry.fact.name)) {
     return builtIn(entry, `${entry.fact.name} is a kind binnacle draws; the adapter must give its fact another name`)
   }
-  const key = entry.kind === 'authored' ? entry.fact.name : entry.kind
-  const registered = views.get(key)
-  if (registered === undefined) return builtIn(entry)
+  const key = keyOf(entry)
+  const stack = views.get(key) ?? []
+  return drawnBy(entry, key, stack, stack.length)
+}
+
+/**
+ * The key an entry's views are registered under: its kind, or an authored fact's name.
+ */
+export function keyOf(entry: Entry): string {
+  return entry.kind === 'authored' ? entry.fact.name : entry.kind
+}
+
+/**
+ * Draw one entry with the views of its key up to a height, the topmost drawing.
+ * @param stack - the key's views, oldest first.
+ * @param height - how many of them draw; none is binnacle's own drawing.
+ * @returns what the topmost draws, or what the one beneath it draws, saying why, when it fails.
+ */
+function drawnBy(entry: Entry, key: string, stack: readonly View[], height: number): Node {
+  const view = stack[height - 1]
+  if (view === undefined) return builtIn(entry)
+  const beneath = (problem: string): Node => height === 1 ? builtIn(entry, problem) : noted(drawnBy(entry, key, stack, height - 1), problem)
   let returned: unknown
   try {
-    returned = registered(entry)
+    returned = view(entry, () => drawnBy(entry, key, stack, height - 1))
   } catch (error) {
-    return builtIn(entry, `binnacle.view(${key}) threw: ${describe(error)}`)
+    return beneath(`binnacle.view(${key}) threw: ${describe(error)}`)
   }
   try {
     return parseNode(returned)
   } catch (error) {
-    return builtIn(entry, `binnacle.view(${key}) returned no drawable node: ${describe(error)}`)
+    return beneath(`binnacle.view(${key}) returned no drawable node: ${describe(error)}`)
   }
 }
 

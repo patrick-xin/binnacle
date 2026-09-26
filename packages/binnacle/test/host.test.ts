@@ -186,6 +186,18 @@ test('the host provides the binnacle service, and a view an author registers dra
   await until(() => /drawn by an author/.test(terminal.written))
 })
 
+test('a view registered after its entries were drawn draws them again, and disposing it gives them back', async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  await until(() => /› fix the build/.test(terminal.written))
+  const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.view('prompt', () => ({ kind: 'text', text: 'drawn by an author' })) } })
+  await author
+  await until(() => /drawn by an author/.test(terminal.written))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => /› fix the build/.test(terminal.written))
+})
+
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
   commit()
@@ -237,4 +249,27 @@ test('a terminal that fails as it starts is given back, the session closed and u
   assert.equal(session.closed, true)
   assert.deepEqual(out, ['binnacle: could not take the terminal: stdin is not a terminal\n'])
   assert.deepEqual(exits, [1])
+})
+
+test('an author invalidating its view draws its entries again on screen, without reading the log again', async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
+  let adapted = 0
+  let word = 'seeded'
+  let author: Context | undefined
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      author = plugin
+      plugin.binnacle.facts('session/end-seed', () => { adapted++; return { name: 'seeded', data: {} } })
+      plugin.binnacle.view('seeded', () => ({ kind: 'text', text: `${word} from a fork` }))
+    },
+  })
+  commit()
+  await until(() => /seeded from a fork/.test(terminal.written))
+  const read = adapted
+  word = 'grown'
+  author?.binnacle.invalidate('seeded')
+  await until(() => /grown from a fork/.test(terminal.written))
+  assert.equal(adapted, read)
 })

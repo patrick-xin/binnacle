@@ -23,7 +23,7 @@ test('a stack draws its children in order, and what offers something is a region
   } as const
   assert.deepEqual(plain(layout(node, 5, OPEN)), {
     lines: ['one', 'two', 'three'],
-    regions: [{ region: { id: 'answer:4', affordances: [{ kind: 'copy', label: 'copy the answer' }], overflows: false }, top: 1, height: 2 }],
+    regions: [{ region: { id: 'answer:4', affordances: [{ kind: 'copy', label: 'copy the answer' }], overflows: false }, top: 1, height: 2, left: 0, width: 5 }],
   })
 })
 
@@ -32,14 +32,14 @@ const long = { kind: 'fold', id: 'tool:c1', rows: 2, child: { kind: 'text', text
 test('a fold whose content was cut shows its first rows, says what it cut, and offers expand', () => {
   assert.deepEqual(plain(layout(long, 20, OPEN)), {
     lines: ['l1', 'l2', '… 2 more lines'],
-    regions: [{ region: { id: 'tool:c1', affordances: [{ kind: 'expand', label: 'show 2 more lines' }], overflows: false }, top: 0, height: 3 }],
+    regions: [{ region: { id: 'tool:c1', affordances: [{ kind: 'expand', label: 'show 2 more lines' }], overflows: false }, top: 0, height: 3, left: 0, width: 20 }],
   })
 })
 
 test('an expanded fold shows everything, and expand folds it back', () => {
   assert.deepEqual(plain(layout(long, 20, { expanded: new Set(['tool:c1']) })), {
     lines: ['l1', 'l2', 'l3', 'l4'],
-    regions: [{ region: { id: 'tool:c1', affordances: [{ kind: 'expand', label: 'fold to 2 lines' }], overflows: false }, top: 0, height: 4 }],
+    regions: [{ region: { id: 'tool:c1', affordances: [{ kind: 'expand', label: 'fold to 2 lines' }], overflows: false }, top: 0, height: 4, left: 0, width: 20 }],
   })
 })
 
@@ -69,9 +69,9 @@ test('the regions under a row are the ones covering it, innermost first', () => 
     },
   } as const
   const { regions } = layout(node, 10, OPEN)
-  assert.deepEqual(under(regions, 1).map(region => region.id), ['inner', 'outer'])
-  assert.deepEqual(under(regions, 0).map(region => region.id), ['outer'])
-  assert.deepEqual(under(regions, 2), [])
+  assert.deepEqual(under(regions, 1, 0).map(region => region.id), ['inner', 'outer'])
+  assert.deepEqual(under(regions, 0, 0).map(region => region.id), ['outer'])
+  assert.deepEqual(under(regions, 2, 0), [])
 })
 
 test('a blank is one empty line, which text cannot be: pi-tui draws nothing for it', () => {
@@ -84,4 +84,33 @@ const label = (rows: number): string | undefined =>
 
 test('an open fold says in words what folding does: away, to one line, or to its lines', () => {
   assert.deepEqual([label(0), label(1), label(2)], ['fold it away', 'fold to 1 line', 'fold to 2 lines'])
+})
+
+test('text in a tone opens every line it wraps to in the theme\'s style for that tone', () => {
+  const frame = layout({ kind: 'text', text: 'failed to build', tone: 'error' }, 10, { expanded: new Set() })
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['failed to', 'build'])
+  for (const line of frame.lines) assert.ok(line.startsWith('\x1b[31m'), JSON.stringify(line))
+})
+
+test('a card draws what it holds inside a rounded border, its title on the top edge', () => {
+  assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'exit 0' } }, 20, OPEN)), {
+    lines: ['╭─ bash ───────────╮', '│ exit 0           │', '╰──────────────────╯'],
+    regions: [],
+  })
+})
+
+test('what a card holds is a region inside its border, by its rows and by its columns', () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
+  const { regions } = layout({ kind: 'card', child: held }, 20, OPEN)
+  assert.deepEqual(regions.map(({ region, top, height, left, width }) => [region.id, top, height, left, width]), [['o', 1, 1, 2, 16]])
+  assert.deepEqual([0, 1, 2, 17, 18, 19].map(column => under(regions, 1, column).map(region => region.id)), [[], [], ['o'], ['o'], [], []])
+  assert.deepEqual(under(regions, 0, 2), [])
+})
+
+test('a title too wide for the top edge is left off whole, never cut', () => {
+  assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'ok' } }, 9, OPEN)).lines, ['╭───────╮', '│ ok    │', '╰───────╯'])
+})
+
+test('a card with no column inside its border draws what it holds without one', () => {
+  assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'ok' } }, 4, OPEN)).lines, ['ok'])
 })

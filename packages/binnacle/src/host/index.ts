@@ -79,7 +79,11 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const tui = new TuiAltScreen(internals.terminal())
   const events: SessionEvent[] = []
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views)
-  const unregister = registrations.onChange(() => { transcript.reset(events.map(event => adapt(event, registrations.adapters))) })
+  // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
+  const unregister = registrations.onChange((changed) => {
+    if (changed === 'facts') transcript.reset(events.map(event => adapt(event, registrations.adapters)))
+    else tui.requestRender()
+  })
   const composer = new Editor(tui, editorTheme)
   composer.onSubmit = (text) => {
     if (text.trim() === '') return

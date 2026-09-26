@@ -171,7 +171,7 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
     step: data.step,
     callId: data.message.toolCallId,
     failed: data.message.isError === true,
-    ...data.error === undefined ? {} : { failure: data.error },
+    ...data.error === undefined ? {} : { failure: { name: data.error.name, code: data.error.code, ...data.error.reason === undefined ? {} : { reason: data.error.reason } } },
     blocks: data.message.content.map(blockOf),
     meta: data.meta,
   }),
@@ -208,9 +208,25 @@ function authored(event: SessionEvent, author: AuthorAdapter): Fact {
  */
 export function adapt(event: SessionEvent, authors: ReadonlyMap<string, AuthorAdapter> = new Map()): Fact {
   const author = authors.get(event.type)
-  if (author !== undefined) return authored(event, author)
+  if (author !== undefined) return settled(authored(event, author))
   const adapter = adapters[event.type] as Adapter<typeof event.type> | undefined
-  return adapter === undefined
+  return settled(adapter === undefined
     ? { kind: 'unknown', seq: event.seq, time: event.time, type: event.type, record: event }
-    : adapter(event)
+    : adapter(event))
+}
+
+/**
+ * Freeze what binnacle made of an event — the fact, its blocks, its failure —
+ * so an author's view handed it cannot change what binnacle folds. What a
+ * fact carries opaquely, a record, a tool's payload or an author's data, is
+ * not binnacle's to freeze.
+ * @returns the fact itself.
+ */
+function settled(fact: Fact): Fact {
+  if ('blocks' in fact) {
+    for (const block of fact.blocks) Object.freeze(block)
+    Object.freeze(fact.blocks)
+  }
+  if (fact.kind === 'result' && fact.failure !== undefined) Object.freeze(fact.failure)
+  return Object.freeze(fact)
 }
