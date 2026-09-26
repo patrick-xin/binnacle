@@ -1,6 +1,6 @@
 # 2. Five layers, and the registrations an author shares
 
-- Status: accepted; the layers are extended by [ADR 5](0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md) and [ADR 6](0006-a-pane-joins-views-to-pi-tui-and-the-host-keeps-only-what-is-impure.md); how views are registered is revised by [ADR 8](0008-a-view-builds-on-the-one-beneath-it-and-the-newest-draws.md), and what they draw with is grown by [ADR 10](0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md)
+- Status: accepted; the layers are extended by [ADR 5](0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md) and [ADR 6](0006-a-pane-joins-views-to-pi-tui-and-the-host-keeps-only-what-is-impure.md); how views are registered is revised by [ADR 8](0008-a-view-builds-on-the-one-beneath-it-and-the-newest-draws.md), what they draw with is grown by [ADR 10](0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md), and placements are widened by [ADR 11](0011-placements-reach-the-whole-screen-and-the-built-in-surface-is-placed-through-them.md)
 - Date: 2026-09-25
 
 ## Context

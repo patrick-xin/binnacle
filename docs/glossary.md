@@ -32,7 +32,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **binding** | A named, rebindable key: focus movement, the primary affordance, or one affordance by kind. |
 | **registration** | What an author or a built-in feature contributes through `ctx.binnacle`, each an effect of the plugin that made it ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **authored fact** | A fact an author's adapter made from an event kind, named by them; drawn by the view registered under its name, or by the fallback. |
-| **placement** | Where registered content goes: a screen or a side panel. |
+| **placement** | Where registered content goes: anywhere binnacle draws, the transcript and the composer included ([ADR 11](adr/0011-placements-reach-the-whole-screen-and-the-built-in-surface-is-placed-through-them.md)). |
 | **grant** | The affordance a person gives an approval with; a key, never a click. Also, in "grants, not the tree": what a plugin is handed instead of pi-tui components, including an effect the host performs for it. |
 | **author** | An agent a person asks to customize binnacle; it registers through the same doors the built-in surface does ([ADR 0](adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). |
 | **extension skill** | The dsh skill binnacle registers so that an author agent, in its session, can find the author API and learn how to use it. It is held to the source like any restated fact. |
