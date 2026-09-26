@@ -8,6 +8,9 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | --- | --- |
 | **fact** | One session event adapted to binnacle's own type by `adapt` ([ADR 4](adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)): a prompt, context, an answer, a call, a result, or `unknown`. Facts are the only input a model or view reads. |
 | **model** | A pure fold over facts: turns, the agents tree, status. Knows no drawing. |
+| **transcript** | The model of a session as turns: `transcript(facts)` in `src/models/transcript.ts`, built by `fold`, one fact at a time. |
+| **turn** | What a person sent and everything the agent did about it, and why it ended; `turn: null` holds what the log carries before its first turn. dsh's word, grouped by us. |
+| **entry** | One thing a turn holds: a prompt, context, an answer, a tool call with its result once it has one, a result whose call is not in its turn, or an unknown fact. Steps are not entries. |
 | **view** | Draws one kind of content from its facts, with the exposed components, and declares the affordances on what it drew. |
 | **fallback view** | The view for a kind of fact no view claims: its type in one line, and `expand` to the raw record. |
 | **layer** | One of `contract`, `facts`, `models`, `views`, `ui`, `host`; what each may import is [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |

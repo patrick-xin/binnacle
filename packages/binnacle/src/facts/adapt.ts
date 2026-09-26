@@ -30,6 +30,24 @@ interface Logged {
 /** Something that happened in a session, read out of its log. */
 export type Fact =
   | Logged & {
+    readonly kind: 'turn'
+    /** Which turn. */
+    readonly turn: number
+    /** Whether it opens or closes. */
+    readonly phase: 'start' | 'end'
+    /** Why it ended, as dsh names the reason's kind (`completed`, `interrupted`, …; plugins add more); only on `end`. */
+    readonly ending?: string
+  }
+  | Logged & {
+    readonly kind: 'step'
+    /** The turn it is in. */
+    readonly turn: number
+    /** Which step of that turn: one model call and the tools it asked for. */
+    readonly step: number
+    /** Whether it opens or closes. */
+    readonly phase: 'start' | 'end'
+  }
+  | Logged & {
     readonly kind: 'prompt'
     /** What the person sent. */
     readonly blocks: readonly Block[]
@@ -110,6 +128,10 @@ function blockOf(block: ContentBlock): Block {
 
 /** Every kind binnacle has learned, and how it reads one. */
 const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
+  'turn/start': ({ seq, time, data }) => ({ kind: 'turn', seq, time, turn: data.turn, phase: 'start' }),
+  'turn/end': ({ seq, time, data }) => ({ kind: 'turn', seq, time, turn: data.turn, phase: 'end', ending: data.reason.kind }),
+  'step/start': ({ seq, time, data }) => ({ kind: 'step', seq, time, turn: data.turn, step: data.step, phase: 'start' }),
+  'step/end': ({ seq, time, data }) => ({ kind: 'step', seq, time, turn: data.turn, step: data.step, phase: 'end' }),
   'user/message': (event) => {
     const blocks = event.data.content.map(blockOf)
     const source = event.data.source.kind
