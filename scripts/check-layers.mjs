@@ -3,11 +3,13 @@
  * Hold every source module to the layer it sits in.
  *
  * A module under `src/<layer>/` may import only the layers its layer is
- * allowed, and only the external packages a prefix in `layers.json` allows
- * its layer; `src/index.ts`, the entry, may import only what `entry` names.
- * An external package no prefix names is refused everywhere, so knowing a new
- * package is a decision written into `layers.json`, not a line slipped into a
- * module. Tests sit outside `src` and are not held.
+ * allowed, and only the external packages `layers.json` allows its layer;
+ * `src/index.ts`, the entry, may import only what `entry` names. A key in
+ * `external` names one package and its subpaths, unless it ends in `:`, `/`
+ * or `-`, when it is a prefix (`node:`). A package no key names is refused
+ * everywhere, so knowing a new package — a new dsh package above all — is a
+ * decision written into `layers.json`, not a line slipped into a module.
+ * Tests sit outside `src` and are not held.
  * @module binnacle/scripts/check-layers
  */
 import { readFileSync } from 'node:fs'
@@ -49,6 +51,16 @@ function specifiers(path, text) {
 }
 
 /**
+ * Whether a key in `external` covers an import specifier.
+ * @param {string} key - the key: a package name, or a prefix ending in `:`, `/` or `-`.
+ * @param {string} spec - the specifier.
+ * @returns {boolean} true when the key is a prefix of it, or names its package.
+ */
+function covers(key, spec) {
+  return /[:/-]$/.test(key) ? spec.startsWith(key) : spec === key || spec.startsWith(`${key}/`)
+}
+
+/**
  * Check every module against the layer rules.
  * @param {{ path: string, text: string }[]} files - the source files, by path relative to the package.
  * @param {Rules} rules - the rules.
@@ -73,11 +85,11 @@ export function checkLayers(files, rules) {
         }
         continue
       }
-      const prefix = Object.keys(rules.external).filter(key => spec.startsWith(key)).toSorted((a, b) => b.length - a.length)[0]
-      if (prefix === undefined) {
+      const key = Object.keys(rules.external).filter(candidate => covers(candidate, spec)).toSorted((a, b) => b.length - a.length)[0]
+      if (key === undefined) {
         problems.push(`${file.path}: imports ${spec}, which no layer is allowed; add it to layers.json if ${who} should know it`)
-      } else if (!rules.external[prefix].includes(layer)) {
-        problems.push(`${file.path}: imports ${spec}; only ${rules.external[prefix].join(', ')} may — see layers.json`)
+      } else if (!rules.external[key].includes(layer)) {
+        problems.push(`${file.path}: imports ${spec}; only ${rules.external[key].join(', ')} may — see layers.json`)
       }
     }
   }

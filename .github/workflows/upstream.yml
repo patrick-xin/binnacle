@@ -1,0 +1,61 @@
+name: upstream
+
+# Carries each release past a pin on a branch of its own,
+# upstream/<reference>/<version>, with the pin moved and the canary's verdict
+# in the commit message. It never touches main: merging a branch is the
+# upgrade, and a decision.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  carry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Read the releases past each pin
+        run: |
+          node scripts/upstream.mjs
+          node scripts/upstream.mjs --json \
+            | node -e "for (const r of JSON.parse(require('fs').readFileSync(0, 'utf8'))) if (r.newest && !r.carried) console.log(r.name, r.newest, r.branch)" \
+            > "$RUNNER_TEMP/carry.txt"
+      - name: Carry each on a branch, with the canary's verdict
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          while read -r name tag branch <&3; do
+            git switch --quiet --force-create "$branch" "$GITHUB_SHA"
+            pnpm install --frozen-lockfile
+            pnpm refs
+            pnpm pin "$name" "$tag"
+            log="$RUNNER_TEMP/canary.log"
+            {
+              pnpm test \
+                && npm install --global "@deepseek-ai/dsh@$(node -p "require('./references.json').dsh.tag.replace(/^dsh-v/, '')")" \
+                && pnpm profile \
+                && pnpm check:boot
+            } > "$log" 2>&1 && verdict=green || verdict=red
+            {
+              echo "Move the $name pin to $tag: the canary is $verdict"
+              echo
+              echo "Carried by the upstream job. Merging this branch takes the"
+              echo "release; on red, the log below says where to start."
+              echo
+              echo '```'
+              tail -n 60 "$log"
+              echo '```'
+            } > "$RUNNER_TEMP/message.txt"
+            git add references.json package.json packages/binnacle/package.json pnpm-lock.yaml
+            git commit --quiet --file "$RUNNER_TEMP/message.txt"
+            git push --quiet origin "$branch"
+          done 3< "$RUNNER_TEMP/carry.txt"

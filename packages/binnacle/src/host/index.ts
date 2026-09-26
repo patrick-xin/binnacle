@@ -18,8 +18,8 @@ import type { Terminal } from '@earendil-works/pi-tui'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line. */
-export const inject = ['cmdlineArgs']
+/** The services the row needs before it applies: the launcher's command line. Each is a key dsh declares on `Context`. */
+export const inject = ['cmdlineArgs'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {

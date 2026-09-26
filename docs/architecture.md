@@ -12,7 +12,7 @@ It is not a fork of dsh and reaches nothing dsh does not publish.
 | **Cordis** | plugins, services, events, and effects disposed with their plugin (`dsh:docs/cordis-primer.md`)                 | how anything is contributed or removed                                                                   |
 | **pi-tui** | the terminal, differential rendering, components, keys, the mouse                                               | its API — the installed package's `dist/*.d.ts`; `pi:packages/coding-agent` shows what pi builds from it |
 
-A rename upstream is a break here, followed wholesale — no shim, no fallback.
+A rename upstream is a break here, followed wholesale — no shim, no fallback. dsh is a preview, so binnacle reaches it only through seams it names, each held by a gate ([ADR 3](adr/0003-dsh-is-reached-through-named-seams-each-held-by-a-gate.md)).
 
 Two more repositories are read and never depended on: `codex` and `eve`, for what a terminal surface can do.
 
@@ -34,7 +34,8 @@ Two more repositories are read and never depended on: `codex` and `eve`, for wha
 | [`docs/adr/`](adr/)                                                 | the decisions, why, and what each beat                                   |
 | [`references.json`](../references.json)                             | every repository read here, by url, pinned commit, and the tag it is at  |
 | `.refs/`                                                            | those repositories, fetched by `pnpm refs`; read, never written          |
-| [`scripts/`](../scripts/)                                           | the gates `pnpm test` runs, and `pnpm profile`                           |
+| [`scripts/`](../scripts/)                                           | the gates, and `pnpm profile`, `pnpm upstream` and `pnpm pin`            |
+| [`.github/workflows/`](../.github/workflows/)                       | CI, and the upstream job                                                 |
 
 What is wrong, missing or being investigated is a GitHub issue.
 
@@ -47,10 +48,15 @@ What is wrong, missing or being investigated is a GitHub issue.
 | `check:paths`     | a path that belongs to one machine                                                             |
 | `check:citations` | a citation (`` `name:path` ``) whose file is not at its reference's pin                        |
 | `check:links`     | a relative Markdown link to nothing                                                            |
-| `check:pins`      | a dependency range, or a dsh, pi-tui or Cordis version that disagrees with the reference it is read against |
+| `check:pins`      | a dependency range; a dsh, pi-tui or vendored version that disagrees with the reference it is read against; an `@deepseek-ai` package the lockfile resolves that no manifest declares at that version |
+| `check:patch`     | a row the bundle's patch names that dsh-base, at the pin, does not compose                    |
 | `check:layers`    | an import a layer is not allowed by `layers.json`                                              |
 | `check:jsdoc`     | a source module without a `@module` JSDoc, or an export without a JSDoc                        |
-| `lint`            | what oxlint refuses, import cycles included                                                    |
+| `lint`            | what oxlint refuses: import cycles, `any`, and below the host the clock, randomness or the process |
 | `typecheck`       | what TypeScript refuses, tests included                                                        |
 
-Below the gates, the tests mount the host on a real Cordis context with a fake terminal, and load the built bundle under plain `node` the way a profile does. `pnpm check:boot` boots it under the real `dsh`, which CI cannot, so it is run before a change that touches the host or the pins.
+Below the gates, the tests mount the host on a real Cordis context with a fake terminal, and load the built bundle under plain `node` the way a profile does. Then CI installs the `dsh` launcher at the pin, writes the profile, and `check:boot` boots the bundle under it, drawing nothing.
+
+## How it follows upstream
+
+`pnpm upstream` reads each release past a pin. Daily, the upstream job carries the newest on a branch, `upstream/<reference>/<version>`: the pin moved with `pnpm pin`, the tests and the boot run, and the verdict in the commit message. It never touches `main`; merging the branch is the upgrade.

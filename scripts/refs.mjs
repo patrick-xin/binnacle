@@ -74,6 +74,16 @@ export function fetchedAt(dir) {
 }
 
 /**
+ * The commit a tag names, read from `git ls-remote` for the tag and its peel.
+ * @param {string} listing - the output of `git ls-remote <url> refs/tags/<tag> refs/tags/<tag>^{}`.
+ * @returns {string | undefined} the commit an annotated tag peels to, or a lightweight tag names; undefined when nothing is listed.
+ */
+export function taggedCommit(listing) {
+  const lines = listing.trim().split('\n').filter(Boolean)
+  return (lines.find(line => line.endsWith('^{}')) ?? lines[0])?.split('\t')[0]
+}
+
+/**
  * Fetch one reference at its pin, shallow and detached.
  * @param {Ref} ref - the reference.
  * @param {string} root - the repository root.
@@ -91,9 +101,7 @@ function fetchRef(ref, root) {
     git('remote', 'set-url', 'origin', ref.url)
   }
   if (ref.tag !== undefined) {
-    const listed = execFileSync('git', ['-C', dir, 'ls-remote', 'origin', `refs/tags/${ref.tag}`, `refs/tags/${ref.tag}^{}`], { encoding: 'utf8' })
-    const lines = listed.trim().split('\n').filter(Boolean)
-    const tagged = (lines.find(line => line.endsWith('^{}')) ?? lines[0])?.split('\t')[0]
+    const tagged = taggedCommit(execFileSync('git', ['-C', dir, 'ls-remote', 'origin', `refs/tags/${ref.tag}`, `refs/tags/${ref.tag}^{}`], { encoding: 'utf8' }))
     if (!tagged?.startsWith(ref.commit)) throw new Error(`${ref.name}: tag ${ref.tag} names ${tagged ?? 'nothing'}, pinned ${ref.commit}`)
   }
   git('fetch', '-q', '--depth', '1', 'origin', ref.commit)

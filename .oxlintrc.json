@@ -1,13 +1,81 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "import", "node"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import",
+    "node"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
   },
   "rules": {
     "import/no-cycle": "error",
-    "import/no-default-export": "error"
+    "import/no-default-export": "error",
+    "typescript/no-explicit-any": "error",
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "kebabCase"
+      }
+    ]
   },
-  "ignorePatterns": [".refs/**", "**/dist/**", "node_modules/**"]
+  "overrides": [
+    {
+      "files": [
+        "packages/binnacle/src/{contract,facts,models,ui,views}/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "process",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          },
+          {
+            "name": "setTimeout",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          },
+          {
+            "name": "setInterval",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          },
+          {
+            "name": "queueMicrotask",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Date",
+            "property": "now",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          },
+          {
+            "object": "performance",
+            "property": "now",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          },
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          },
+          {
+            "object": "crypto",
+            "property": "randomUUID",
+            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": [
+    ".refs/**",
+    "**/dist/**",
+    "node_modules/**"
+  ]
 }

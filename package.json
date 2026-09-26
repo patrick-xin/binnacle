@@ -6,6 +6,8 @@
   "scripts": {
     "refs": "node scripts/refs.mjs",
     "profile": "node scripts/profile.mjs",
+    "upstream": "node scripts/upstream.mjs",
+    "pin": "node scripts/pin.mjs",
     "build": "pnpm --filter binnacle run build",
     "typecheck": "tsc -p packages/binnacle/tsconfig.json --noEmit",
     "lint": "oxlint",
@@ -13,14 +15,17 @@
     "check:citations": "node scripts/check-citations.mjs",
     "check:links": "node scripts/check-links.mjs",
     "check:pins": "node scripts/check-pins.mjs",
+    "check:patch": "node scripts/check-patch.mjs",
     "check:layers": "node scripts/check-layers.mjs",
     "check:jsdoc": "node scripts/check-jsdoc.mjs",
-    "check:boot": "dsh --profile binnacle --check",
-    "check": "pnpm run check:paths && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:layers && pnpm run check:jsdoc && pnpm run lint && pnpm run typecheck",
+    "check:boot": "node scripts/check-boot.mjs",
+    "check": "pnpm run check:paths && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:layers && pnpm run check:jsdoc && pnpm run lint && pnpm run typecheck",
     "test": "pnpm run check && node --test \"scripts/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis-plugin-include": "1.0.9",
     "@types/node": "24.19.0",
+    "js-yaml": "4.3.1",
     "oxc-parser": "0.151.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2"

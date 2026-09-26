@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { plan } from './refs.mjs'
+import { plan, taggedCommit } from './refs.mjs'
 
 const MANIFEST = {
   pi: { url: 'https://example.com/pi.git', commit: 'aaa', role: 'the renderer' },
@@ -37,4 +37,11 @@ test('only the named references are planned when names are given', () => {
 test('a tag in the manifest is carried to the fetch, which proves it names the pin', () => {
   const tagged = { dsh: { url: 'u', commit: 'bbb', tag: 'dsh-v1.0.0' } }
   assert.deepEqual(plan(tagged, undefined), [{ name: 'dsh', url: 'u', commit: 'bbb', local: false, tag: 'dsh-v1.0.0' }])
+})
+
+test('a tag names the commit it peels to, whether annotated or not', () => {
+  const annotated = 'aaa\trefs/tags/v1\nbbb\trefs/tags/v1^{}\n'
+  assert.equal(taggedCommit(annotated), 'bbb')
+  assert.equal(taggedCommit('ccc\trefs/tags/v2\n'), 'ccc')
+  assert.equal(taggedCommit(''), undefined)
 })
