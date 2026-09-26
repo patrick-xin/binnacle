@@ -28,7 +28,7 @@ test('plain node loads the built entry as a Cordis row, with no default export',
   assert.deepEqual(JSON.parse(run.stdout), {
     keys: ['apply', 'inject', 'internals', 'name'],
     name: 'binnacle',
-    inject: ['cmdlineArgs'],
+    inject: ['cmdlineArgs', 'agents', 'agentDefaultModel'],
     apply: 'function',
   })
 })

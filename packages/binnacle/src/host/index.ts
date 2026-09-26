@@ -2,9 +2,11 @@
  * The host: the one layer that touches the terminal and the harness runtime.
  *
  * It reads the invocation through dsh's command line, and once the launcher
- * commits startup it either reports the composition healthy (`--check`) or
- * takes the terminal through pi-tui until the person quits. Every layer below
- * it is a function of facts, UI state and a size; this is where those meet a
+ * commits startup it opens a session on the default model. With `--check`
+ * it reports the model and closes it; otherwise it takes the terminal through
+ * pi-tui's alternate screen — the transcript in a scroll view that follows
+ * its end, the composer below — until the person quits. Every layer below it
+ * is a function of facts, UI state and a size; this is where those meet a
  * real process.
  * @module binnacle/host
  */
@@ -12,14 +14,19 @@
 import { Command } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
-import { matchesKey, ProcessTerminal, Text, TuiMainScreen } from '@earendil-works/pi-tui'
+import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, VStack } from '@earendil-works/pi-tui'
 import type { Terminal } from '@earendil-works/pi-tui'
+import { adapt } from '../facts/adapt.ts'
+import { editorTheme } from '../ui/theme.ts'
+import { openSession } from './session.ts'
+import type { OpenedSession } from './session.ts'
+import { TranscriptView } from './transcript-view.ts'
 
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line. Each is a key dsh declares on `Context`. */
-export const inject = ['cmdlineArgs'] satisfies (keyof Context)[]
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, and its default model. Each is a key dsh declares on `Context`. */
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {
@@ -27,9 +34,12 @@ export const internals: {
   terminal: () => Terminal
   /** Where `--check` reports. */
   stdout: { write(chunk: string): unknown }
+  /** Open the session the surface draws. */
+  open: (ctx: Context) => Promise<OpenedSession>
 } = {
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
+  open: openSession,
 }
 
 /** What this invocation asked for. */
@@ -45,37 +55,51 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
     .name('dsh --profile binnacle')
     .description('Open a terminal session with an agent.')
     .helpOption('-h, --help', 'show this help')
-    .option('--check', 'mount the composition, report whether it started, and exit, drawing nothing')
+    .option('--check', 'open a session on the default model, report it, close it, and exit, drawing nothing')
     .action((options: { check?: boolean }) => { chosen(options.check === true ? 'check' : 'interactive') })
 }
 
 /**
- * Hold the terminal until the person quits, and give it back on quit or disposal.
- * @param exit - the launcher's bounded exit request.
+ * Draw a session on the terminal until the person quits.
+ * @param session - the open session.
+ * @param quit - called once, when the person asks to quit.
  * @returns a disposer that gives the terminal back.
  */
-function takeTerminal(exit: (code: number) => void): () => void {
-  const tui = new TuiMainScreen(internals.terminal())
-  let held = true
-  const release = (): void => {
-    if (!held) return
-    held = false
-    tui.stop()
+function takeTerminal(session: OpenedSession, quit: () => void): () => void {
+  const tui = new TuiAltScreen(internals.terminal())
+  const transcript = new TranscriptView(() => { tui.requestRender() })
+  const composer = new Editor(tui, editorTheme)
+  composer.onSubmit = (text) => {
+    if (text.trim() === '') return
+    composer.setText('')
+    session.send(text)
   }
-  tui.addChild(new Text('binnacle — nothing is drawn yet. ctrl+c quits.'))
+  tui.addChild(transcript)
+  tui.addChild(composer)
+  tui.setLayoutRoot(new VStack([
+    { component: new ScrollView(transcript, { follow: 'end', primary: true }), basis: 0, grow: 1, shrink: 1, minSize: 1 },
+    { component: composer, basis: 'auto', grow: 0, shrink: 1, minSize: 3 },
+  ]))
+  tui.setFocus(composer)
   tui.addInputListener((data) => {
     if (!matchesKey(data, 'ctrl+c')) return undefined
-    release()
-    exit(0)
+    quit()
     return { consume: true }
   })
+  const unfollow = session.follow((event) => { transcript.push(adapt(event)) })
   tui.start()
-  return release
+  let held = true
+  return () => {
+    if (!held) return
+    held = false
+    unfollow()
+    tui.stop()
+  }
 }
 
 /**
- * Parse the invocation and, once startup commits, check or draw.
- * @param ctx - the row's context, carrying the launcher's command line, exit request and readiness.
+ * Parse the invocation and, once startup commits, open a session and check or draw it.
+ * @param ctx - the row's context, carrying the launcher's command line, exit request and readiness, and dsh's agents and default model.
  */
 export function apply(ctx: Context): void {
   let mode: Mode | undefined
@@ -86,17 +110,35 @@ export function apply(ctx: Context): void {
   if (exit === undefined || ready === undefined) {
     throw new Error('binnacle: the launcher must provide ctx.appExit and ctx.appReady before the tree mounts')
   }
+  let disposed = false
+  let session: OpenedSession | undefined
   let release: (() => void) | undefined
+  const close = async (): Promise<void> => {
+    release?.()
+    release = undefined
+    const open = session
+    session = undefined
+    await open?.close()
+  }
   const cancel = ready.onReady(() => {
-    if (mode === 'check') {
-      internals.stdout.write('binnacle: ok\n')
-      exit(0)
-      return
-    }
-    release = takeTerminal(exit)
+    void internals.open(ctx).then(async (opened) => {
+      if (disposed) {
+        await opened.close()
+        return
+      }
+      session = opened
+      if (mode === 'check') {
+        internals.stdout.write(`binnacle: ok (${opened.model})\n`)
+        await close()
+        exit(0)
+        return
+      }
+      release = takeTerminal(opened, () => { void close().then(() => { exit(0) }) })
+    })
   })
   ctx.effect(() => () => {
+    disposed = true
     cancel()
-    release?.()
-  }, 'binnacle: the terminal')
+    void close()
+  }, 'binnacle: the session and the terminal')
 }
