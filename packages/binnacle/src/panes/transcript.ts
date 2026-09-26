@@ -1,10 +1,9 @@
 /**
- * The transcript view: the screen as a pi-tui component.
+ * The transcript pane: the screen as a pi-tui component.
  *
  * It holds the session's facts and the UI state, draws the screen at the
- * width pi-tui gives it, and answers a pointer through the gesture table. It
- * lives in the host because it is where the screen meets pi-tui's renderer.
- * @module binnacle/host/transcript-view
+ * width pi-tui gives it, and answers a pointer through the gesture table.
+ * @module binnacle/panes/transcript
  */
 
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
@@ -18,14 +17,14 @@ import type { View } from '../views/entries.ts'
 import { screen } from '../views/screen.ts'
 
 /** The screen, as a component pi-tui lays out and scrolls. */
-export class TranscriptView implements Component {
+export class TranscriptPane implements Component {
   readonly #facts: Fact[] = []
   readonly #changed: () => void
   readonly #views: () => ReadonlyMap<string, View>
   #state: UiState = initial
 
   /**
-   * @param changed - called when what the view draws has changed, so the renderer draws a frame.
+   * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
    * @param views - authors' views as they stand, read at each frame.
    */
   constructor(changed: () => void, views: () => ReadonlyMap<string, View> = () => new Map()) {

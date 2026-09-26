@@ -25,26 +25,27 @@
   "overrides": [
     {
       "files": [
-        "packages/binnacle/src/{contract,facts,models,ui,views}/**/*.ts"
+        "packages/binnacle/src/{contract,facts,models,ui,views,panes,plugins}/**/*.ts",
+        "packages/binnacle/src/api.ts"
       ],
       "rules": {
         "no-restricted-globals": [
           "error",
           {
             "name": "process",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           },
           {
             "name": "setTimeout",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           },
           {
             "name": "setInterval",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           },
           {
             "name": "queueMicrotask",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           }
         ],
         "no-restricted-properties": [
@@ -52,22 +53,22 @@
           {
             "object": "Date",
             "property": "now",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           },
           {
             "object": "performance",
             "property": "now",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           },
           {
             "object": "Math",
             "property": "random",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           },
           {
             "object": "crypto",
             "property": "randomUUID",
-            "message": "Below the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
+            "message": "Outside the host, time, randomness and the process arrive as arguments (AGENTS.md, Code)."
           }
         ]
       }

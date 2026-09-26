@@ -80,3 +80,43 @@ test('a dynamic import is held to the module it loads, escapes decoded', () => {
     'src/ui/table.ts: imports facts (../facts/log.ts); ui may import contract — see layers.json',
   ])
 })
+
+const API = {
+  root: 'src',
+  entry: ['host', 'api.ts'],
+  layers: { contract: [], views: ['contract'], 'api.ts': ['views'], plugins: ['api.ts'], host: ['contract', 'views', 'api.ts', 'plugins'] },
+  isolated: ['plugins'],
+  typeOnly: ['plugins'],
+  external: {},
+}
+const source = (path, text) => ({ path, text })
+
+test('a module at the root that layers.json names is a layer of its own', () => {
+  assert.deepEqual(checkLayers([file('src/api.ts', './views/view.ts'), file('src/plugins/export.ts', '../api.ts'), file('src/index.ts', './api.ts')], API), [])
+  assert.deepEqual(checkLayers([file('src/plugins/export.ts', '../views/view.ts')], API), [
+    'src/plugins/export.ts: imports views (../views/view.ts); plugins may import api.ts — see layers.json',
+  ])
+})
+
+test('each unit of an isolated layer imports its own files, never a sibling\'s', () => {
+  assert.deepEqual(checkLayers([file('src/plugins/export/index.ts', './render.ts', '../../api.ts')], API), [])
+  assert.deepEqual(checkLayers([file('src/plugins/export/render.ts', '../settings.ts'), file('src/plugins/login.ts', './export/render.ts')], API), [
+    'src/plugins/export/render.ts: imports settings, another unit of plugins (../settings.ts); a unit of plugins imports only its own files — see layers.json',
+    'src/plugins/login.ts: imports export, another unit of plugins (./export/render.ts); a unit of plugins imports only its own files — see layers.json',
+  ])
+})
+
+test('a root module is its layer, and a folder of its name is not', () => {
+  assert.deepEqual(checkLayers([file('src/plugins/export.ts', '../api/private.ts'), file('src/api/private.ts')], API), [
+    'src/plugins/export.ts: imports a file in no layer (../api/private.ts); plugins may import api.ts — see layers.json',
+    'src/api/private.ts: is in no layer; move it under src/<layer>/',
+  ])
+})
+
+test('a layer typeOnly names reaches other layers only through import type, never loading them', () => {
+  const allowed = source('src/plugins/export/index.ts', "import type { View } from '../../api.ts'\nexport type * from '../../api.ts'\nimport { render } from './render.ts'\n")
+  assert.deepEqual(checkLayers([allowed], API), [])
+  const loading = source('src/plugins/probe.ts', "import '../api.ts'\nimport { type View } from '../api.ts'\nexport * from '../api.ts'\nawait import('../api.ts')\n")
+  const problem = 'src/plugins/probe.ts: loads api.ts at run time (../api.ts); plugins reaches other layers only through import type or export type — see layers.json'
+  assert.deepEqual(checkLayers([loading], API), [problem, problem, problem, problem])
+})

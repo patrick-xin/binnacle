@@ -6,7 +6,7 @@ import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../src/facts/adapt.ts'
 import type { Fact } from '../src/facts/adapt.ts'
-import { Registrations } from '../src/host/registrations.ts'
+import { RegistrationService } from '../src/host/registrations.ts'
 import { initial } from '../src/ui/state.ts'
 import { screen } from '../src/views/screen.ts'
 
@@ -19,7 +19,7 @@ const seed: SessionEvent<'session/end-seed'> = { type: 'session/end-seed', seq: 
  */
 function surface() {
   const ctx = new Context()
-  const registrations = new Registrations(ctx)
+  const registrations = new RegistrationService(ctx)
   const author = async (apply: (ctx: Context) => void) => {
     const fiber = ctx.plugin({ name: 'author', inject: ['binnacle'], apply })
     await fiber
@@ -30,11 +30,11 @@ function surface() {
 
 /**
  * What the screen shows with the registrations as they stand.
- * @param registrations - the registrations.
+ * @param registrations - the service.
  * @param events - the session's events, beyond the prompt.
  * @returns its lines, plain.
  */
-const shown = (registrations: Registrations, ...events: SessionEvent[]): string[] => {
+const shown = (registrations: RegistrationService, ...events: SessionEvent[]): string[] => {
   const facts = [prompt, ...events.map(event => adapt(event, registrations.adapters))]
   return screen(facts, initial, 40, registrations.views).lines.map(line => stripTerminalSequences(line).trimEnd())
 }

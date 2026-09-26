@@ -19,21 +19,10 @@ import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, VStack }
 import type { Terminal } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
-import { Registrations } from './registrations.ts'
+import { TranscriptPane } from '../panes/transcript.ts'
+import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
-import { TranscriptView } from './transcript-view.ts'
-
-/** What an author writes against: the service, and the shapes its registrations take and return. */
-export type { Registrations } from './registrations.ts'
-/** A view, the entries it draws, and the nodes it draws them with. */
-export type { View } from '../views/entries.ts'
-/** The entries of a transcript turn, which a view draws. */
-export type { Entry } from '../models/transcript.ts'
-/** The nodes a view returns. */
-export type { Node } from '../ui/node.ts'
-/** Facts, and the adapter an author reads an event kind with. */
-export type { AuthorAdapter, Fact } from '../facts/adapt.ts'
 
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
@@ -79,9 +68,9 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
  * @param quit - called once, when the person asks to quit.
  * @returns a disposer that gives the terminal back.
  */
-function takeTerminal(session: OpenedSession, registrations: Registrations, quit: () => void): () => void {
+function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void): () => void {
   const tui = new TuiAltScreen(internals.terminal())
-  const transcript = new TranscriptView(() => { tui.requestRender() }, () => registrations.views)
+  const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views)
   const unregister = registrations.onChange(() => { tui.requestRender() })
   const composer = new Editor(tui, editorTheme)
   composer.onSubmit = (text) => {
@@ -118,7 +107,7 @@ function takeTerminal(session: OpenedSession, registrations: Registrations, quit
  * @param ctx - the row's context, carrying the launcher's command line, exit request and readiness, and dsh's agents and default model.
  */
 export function apply(ctx: Context): void {
-  const registrations = new Registrations(ctx)
+  const registrations = new RegistrationService(ctx)
   let mode: Mode | undefined
   parseCmdline(ctx, surfaceCommand((chosen) => { mode = chosen }))
   if (mode === undefined) return

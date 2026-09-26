@@ -4,7 +4,12 @@
  *
  * A module under `src/<layer>/` may import only the layers its layer is
  * allowed, and only the external packages `layers.json` allows its layer;
- * `src/index.ts`, the entry, may import only what `entry` names. A key in
+ * `src/index.ts`, the entry, may import only what `entry` names, and a
+ * module at the root that `layers` names by its file name, `api.ts`, is a
+ * layer of its own. In a layer `isolated` names, each file or folder
+ * directly under it is a unit that imports only its own files, never a
+ * sibling's. A layer `typeOnly` names reaches other layers only through
+ * `import type` and `export type`, which load nothing at run time. A key in
  * `external` names one package and its subpaths, unless it ends in `:`, `/`
  * or `-`, when it is a prefix (`node:`). A package no key names is refused
  * everywhere, so knowing a new package — a new dsh package above all — is a
@@ -22,7 +27,7 @@ import { repositoryFiles } from './check-paths.mjs'
 
 /**
  * The layer rules, as `layers.json` holds them.
- * @typedef {{ root: string, entry: string[], layers: Record<string, string[]>, external: Record<string, string[]> }} Rules
+ * @typedef {{ root: string, entry: string[], layers: Record<string, string[]>, isolated?: string[], typeOnly?: string[], external: Record<string, string[]> }} Rules
  */
 
 /**
@@ -35,7 +40,19 @@ function layerOf(path, rules) {
   const inRoot = relative(rules.root, path)
   if (inRoot === 'index.ts') return 'entry'
   const [first, ...rest] = inRoot.split('/')
-  return rest.length > 0 && first !== undefined && first in rules.layers ? first : undefined
+  if (first === undefined) return undefined
+  if (rest.length === 0) return first in rules.layers ? first : undefined
+  return first in rules.layers && !first.endsWith('.ts') ? first : undefined
+}
+
+/**
+ * Which unit of its layer a path is in: the file or folder directly under the layer.
+ * @param {string} path - the path, relative to the package.
+ * @param {Rules} rules - the rules.
+ * @returns {string | undefined} the unit's name, without a file's extension.
+ */
+function unitOf(path, rules) {
+  return relative(rules.root, path).split('/')[1]?.replace(/\.ts$/, '')
 }
 
 /**
@@ -65,17 +82,18 @@ function dynamicImports(node, text, found = []) {
  * The modules a source text imports or re-exports from.
  * @param {string} path - the file's path, for the parser.
  * @param {string} text - the file's text.
- * @returns {{ named: string[], unnamed: string[] }} each specifier, in order, a dynamic import's included when a string names it; and the argument of each dynamic import whose module is decided at run time.
+ * @returns {{ named: { spec: string, typeOnly: boolean }[], unnamed: string[] }} each specifier, in order, and whether its declaration is `import type` or `export type`, a dynamic import's included when a string names it; and the argument of each dynamic import whose module is decided at run time.
  */
 function specifiers(path, text) {
-  const { module, program } = parseSync(path, text)
+  const { program } = parseSync(path, text)
   const dynamic = dynamicImports(program, text)
+  const declared = program.body.flatMap(node => {
+    if (node.type === 'ImportDeclaration') return [{ spec: node.source.value, typeOnly: node.importKind === 'type' }]
+    if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source) return [{ spec: node.source.value, typeOnly: node.exportKind === 'type' }]
+    return []
+  })
   return {
-    named: [
-      ...module.staticImports.map(entry => entry.moduleRequest.value),
-      ...module.staticExports.flatMap(entry => entry.entries.flatMap(item => item.moduleRequest ? [item.moduleRequest.value] : [])),
-      ...dynamic.flatMap(entry => entry.module === undefined ? [] : [entry.module]),
-    ],
+    named: [...declared, ...dynamic.flatMap(entry => entry.module === undefined ? [] : [{ spec: entry.module, typeOnly: false }])],
     unnamed: dynamic.flatMap(entry => entry.module === undefined ? [entry.source] : []),
   }
 }
@@ -108,12 +126,21 @@ export function checkLayers(files, rules) {
     const who = layer === 'entry' ? 'the entry' : layer
     const { named, unnamed } = specifiers(file.path, file.text)
     for (const source of unnamed) problems.push(`${file.path}: imports a module named at run time (${source}); name it with a string so layers.json can hold it`)
-    for (const spec of new Set(named)) {
+    for (const { spec, typeOnly } of named) {
       if (spec.startsWith('.')) {
-        const target = layerOf(normalize(join(dirname(file.path), spec)), rules)
-        if (target === layer) continue
+        const resolved = normalize(join(dirname(file.path), spec))
+        const target = layerOf(resolved, rules)
+        if (target === layer) {
+          const unit = unitOf(resolved, rules)
+          if (rules.isolated?.includes(layer) && unit !== unitOf(file.path, rules)) {
+            problems.push(`${file.path}: imports ${unit}, another unit of ${layer} (${spec}); a unit of ${layer} imports only its own files — see layers.json`)
+          }
+          continue
+        }
         if (target === undefined || !allowed.includes(target)) {
           problems.push(`${file.path}: imports ${target ?? 'a file in no layer'} (${spec}); ${who} may import ${allowed.join(', ') || 'no other layer'} — see layers.json`)
+        } else if (!typeOnly && rules.typeOnly?.includes(layer)) {
+          problems.push(`${file.path}: loads ${target} at run time (${spec}); ${layer} reaches other layers only through import type or export type — see layers.json`)
         }
         continue
       }
