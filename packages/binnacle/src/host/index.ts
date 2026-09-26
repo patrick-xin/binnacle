@@ -7,8 +7,11 @@
  * pi-tui's alternate screen — the transcript in a scroll view that follows
  * its end, the composer below — until the person quits. It provides the
  * `binnacle` service authors register through, and reads the whole log again
- * when a registration comes or goes. Every layer below it is a function of
- * facts, UI state and a size; this is where those meet a real process.
+ * when a registration comes or goes. A failure it cannot recover from gives
+ * the terminal back, says what failed, and asks the launcher to exit 1: dsh's
+ * own fatal handler cannot give back a terminal a bundle took. Every layer
+ * below it is a function of facts, UI state and a size; this is where those
+ * meet a real process.
  * @module binnacle/host
  */
 
@@ -20,6 +23,7 @@ import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, VStack }
 import type { Terminal } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
+import { describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
@@ -37,11 +41,14 @@ export const internals: {
   terminal: () => Terminal
   /** Where `--check` reports. */
   stdout: { write(chunk: string): unknown }
+  /** Where a failure is said, once the terminal is given back. */
+  stderr: { write(chunk: string): unknown }
   /** Open the session the surface draws. */
   open: (ctx: Context) => Promise<OpenedSession>
 } = {
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
+  stderr: process.stderr,
   open: openSession,
 }
 
@@ -68,6 +75,7 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
  * @param registrations - what authors registered: their adapters and views.
  * @param quit - called once, when the person asks to quit.
  * @returns a disposer that gives the terminal back.
+ * @throws what starting the terminal threw, having given back what it took.
  */
 function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void): () => void {
   const tui = new TuiAltScreen(internals.terminal())
@@ -96,15 +104,21 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     events.push(event)
     transcript.push(adapt(event, registrations.adapters))
   })
-  tui.start()
   let held = true
-  return () => {
+  const release = (): void => {
     if (!held) return
     held = false
     unfollow()
     unregister()
     tui.stop()
   }
+  try {
+    tui.start()
+  } catch (error) {
+    release()
+    throw error
+  }
+  return release
 }
 
 /**
@@ -131,21 +145,33 @@ export function apply(ctx: Context): void {
     session = undefined
     await open?.close()
   }
-  const cancel = ready.onReady(() => {
-    void internals.open(ctx).then(async (opened) => {
-      if (disposed) {
-        await opened.close()
-        return
-      }
-      session = opened
-      if (mode === 'check') {
-        internals.stdout.write(`binnacle: ok (${opened.model})\n`)
-        await close()
-        exit(0)
-        return
-      }
-      release = takeTerminal(opened, registrations, () => { void close().then(() => { exit(0) }) })
+  const fail = (what: string) => (error: unknown): void => {
+    release?.()
+    release = undefined
+    internals.stderr.write(`binnacle: ${what}: ${describe(error)}\n`)
+    const open = session
+    session = undefined
+    void open?.close().catch(() => {
+      // Closing after a failure is best effort; the failure already said is the one that matters.
     })
+    exit(1)
+  }
+  const quit = (): void => { void close().then(() => { exit(0) }, fail('could not close the session')) }
+  const show = (opened: OpenedSession): void => {
+    if (disposed) {
+      void opened.close().catch(fail('could not close the session'))
+      return
+    }
+    session = opened
+    if (mode === 'check') {
+      internals.stdout.write(`binnacle: ok (${opened.model})\n`)
+      quit()
+      return
+    }
+    release = takeTerminal(opened, registrations, quit)
+  }
+  const cancel = ready.onReady(() => {
+    void internals.open(ctx).then(show, fail('could not open a session on the default model')).catch(fail('could not take the terminal'))
   })
   ctx.effect(() => () => {
     disposed = true

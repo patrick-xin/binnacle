@@ -45,6 +45,7 @@ class FakeSession implements OpenedSession {
     this.#listener = listener
     return () => { this.#listener = undefined }
   }
+  get following(): boolean { return this.#listener !== undefined }
   send(text: string): void { this.sent.push(text) }
   async close(): Promise<void> { this.closed = true }
   log(event: SessionEvent): void { this.#listener?.(event) }
@@ -76,17 +77,25 @@ async function until(holds: () => boolean, within = 2_000): Promise<void> {
   }
 }
 
+/** A terminal that starts, then fails before it is ready, as one that cannot enter raw mode does. */
+class FailingTerminal extends FakeTerminal {
+  override start(onInput: (data: string) => void): void {
+    super.start(onInput)
+    throw new Error('stdin is not a terminal')
+  }
+}
+
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
-async function mount(args: string[], session = new FakeSession()) {
+async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal()) {
   const exits: number[] = []
   const out: string[] = []
   let ready: (() => void) | undefined
-  const terminal = new FakeTerminal()
   cmdline.stdout = { write: (chunk: string) => { out.push(chunk); return true } }
   cmdline.stderr = { write: (chunk: string) => { out.push(chunk); return true } }
   host.internals.terminal = () => terminal
   host.internals.stdout = { write: (chunk: string) => { out.push(chunk); return true } }
-  host.internals.open = async () => session
+  host.internals.stderr = { write: (chunk: string) => { out.push(chunk); return true } }
+  host.internals.open = open
   const ctx = new Context()
   provideCmdline(ctx, {
     args,
@@ -194,4 +203,38 @@ test('an adapter registered after its kind was logged reads what was logged, and
   terminal.written = ''
   await author.dispose()
   await until(() => /\? session\/end-seed/.test(terminal.written))
+})
+
+test('a session that cannot be opened is said, and the launcher asked to exit 1, drawing nothing', async () => {
+  const { exits, out, terminal, commit } = await mount([], new FakeSession(), async () => { throw new Error('no key for deepseek') })
+  commit()
+  await settle()
+  assert.deepEqual(out, ['binnacle: could not open a session on the default model: no key for deepseek\n'])
+  assert.deepEqual(exits, [1])
+  assert.equal(terminal.started, false)
+})
+
+test('a session that fails to close on ctrl+c still gives the terminal back, says why, and asks to exit 1', async () => {
+  const session = new FakeSession()
+  session.close = async () => { throw new Error('the agent did not stop') }
+  const { terminal, exits, out, commit } = await mount([], session)
+  commit()
+  await settle()
+  terminal.type('\x03')
+  await settle()
+  assert.equal(terminal.started, false)
+  assert.deepEqual(out, ['binnacle: could not close the session: the agent did not stop\n'])
+  assert.deepEqual(exits, [1])
+})
+
+test('a terminal that fails as it starts is given back, the session closed and unfollowed, and exit 1 asked', async () => {
+  const session = new FakeSession()
+  const { terminal, exits, out, commit } = await mount([], session, async () => session, new FailingTerminal())
+  commit()
+  await settle()
+  assert.equal(terminal.started, false)
+  assert.equal(session.following, false)
+  assert.equal(session.closed, true)
+  assert.deepEqual(out, ['binnacle: could not take the terminal: stdin is not a terminal\n'])
+  assert.deepEqual(exits, [1])
 })
