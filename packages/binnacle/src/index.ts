@@ -1,8 +1,6 @@
 /**
- * binnacle's entry: the Cordis row the bundle patch inserts.
- * @module binnacle
+ * binnacle's entry: the Cordis row the bundle patch inserts, and the author API.
  */
 
-export { apply, inject, internals, name } from './host/index.ts'
-/** The types an author writes a registration against; the service itself is `ctx.binnacle`. */
-export type { AuthorAdapter, Entry, Fact, Node, Registrations, View } from './host/index.ts'
+export { apply, inject, name } from './host/index.ts'
+export type * from './api.ts'

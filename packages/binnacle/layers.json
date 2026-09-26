@@ -1,7 +1,8 @@
 {
   "root": "src",
   "entry": [
-    "host"
+    "host",
+    "api.ts"
   ],
   "layers": {
     "contract": [],
@@ -21,14 +22,39 @@
       "models",
       "ui"
     ],
-    "host": [
+    "panes": [
       "contract",
       "facts",
       "models",
       "ui",
       "views"
+    ],
+    "api.ts": [
+      "facts",
+      "models",
+      "ui",
+      "views"
+    ],
+    "plugins": [
+      "api.ts"
+    ],
+    "host": [
+      "contract",
+      "facts",
+      "models",
+      "ui",
+      "views",
+      "panes",
+      "api.ts",
+      "plugins"
     ]
   },
+  "isolated": [
+    "plugins"
+  ],
+  "typeOnly": [
+    "plugins"
+  ],
   "external": {
     "@deepseek-ai/cordis": [
       "host"
@@ -52,6 +78,7 @@
     ],
     "@earendil-works/pi-tui": [
       "ui",
+      "panes",
       "host"
     ],
     "commander": [

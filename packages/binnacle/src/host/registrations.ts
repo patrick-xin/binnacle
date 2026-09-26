@@ -1,22 +1,18 @@
 /**
- * The registrations an author shares with the built-in surface: the
- * `binnacle` service.
+ * The `binnacle` service: the registrations of the author API, kept for the
+ * host to adapt and draw with.
  *
- * Each is an effect bound to the plugin that made it, through the context
- * Cordis traces to the caller, so disposing that plugin takes back what it
- * registered. Its state is in TypeScript-private members, not `#private`
- * ones: Cordis hands each caller a traced copy of the service, which a
- * `#private` field refuses as its receiver. Facts and views are the two a new
- * tool loop needs; commands,
- * bindings and placements join them with their first consumer
- * (ADR 2).
+ * Each registration is an effect bound to the plugin that made it, through
+ * the context Cordis traces to the caller, so disposing that plugin takes
+ * back what it registered. Its state is in TypeScript-private members, not
+ * `#private` ones: Cordis hands each caller a traced copy of the service,
+ * which a `#private` field refuses as its receiver.
  * @module binnacle/host/registrations
  */
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { AuthorAdapter } from '../facts/adapt.ts'
-import type { View } from '../views/entries.ts'
+import type { AuthorAdapter, Registrations, View } from '../api.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -25,8 +21,8 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** The `binnacle` service. */
-export class Registrations extends Service {
+/** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
+export class RegistrationService extends Service implements Registrations {
   private readonly adapterTable = new Map<string, AuthorAdapter>()
   private readonly viewTable = new Map<string, View>()
   private readonly listeners = new Set<() => void>()
@@ -48,24 +44,12 @@ export class Registrations extends Service {
     return this.viewTable
   }
 
-  /**
-   * Read one kind of session event as a fact of the author's own.
-   * @param type - the dsh event type.
-   * @param adapter - names the fact and says what it holds.
-   * @returns a disposer; the calling plugin's disposal also removes it.
-   * @throws when another plugin already reads that type.
-   */
+  /** @inheritDoc */
   facts(type: string, adapter: AuthorAdapter): () => void {
     return this.register(this.adapterTable, type, adapter, `binnacle.facts(${type})`)
   }
 
-  /**
-   * Draw a kind of entry: a built-in kind, replacing its view, or an authored fact by name.
-   * @param key - the entry kind or fact name.
-   * @param view - how it is drawn.
-   * @returns a disposer; the calling plugin's disposal also removes it.
-   * @throws when another plugin already draws that key.
-   */
+  /** @inheritDoc */
   view(key: string, view: View): () => void {
     return this.register(this.viewTable, key, view, `binnacle.view(${key})`)
   }
