@@ -1,0 +1,19 @@
+{
+  "root": "src",
+  "entry": ["host"],
+  "layers": {
+    "contract": [],
+    "facts": ["contract"],
+    "models": ["contract", "facts"],
+    "ui": ["contract"],
+    "views": ["contract", "facts", "models", "ui"],
+    "host": ["contract", "facts", "models", "ui", "views"]
+  },
+  "external": {
+    "@deepseek-ai/dsh-": ["facts", "host"],
+    "@deepseek-ai/cordis": ["host"],
+    "@earendil-works/pi-tui": ["ui", "host"],
+    "commander": ["host"],
+    "node:": ["host"]
+  }
+}

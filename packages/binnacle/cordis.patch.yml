@@ -1,0 +1,11 @@
+# The binnacle bundle, stacked by a profile over dsh-base.
+#
+# binnacle holds the terminal for the life of the process, so a
+# configuration reload must not swap rows under a live frame: HMR is off,
+# as it is in dsh's own direct-driver bundles (headless, ACP, SDK).
+- id: hmr
+  disabled: true
+
+- insert:
+    - id: binnacle
+      name: 'binnacle'

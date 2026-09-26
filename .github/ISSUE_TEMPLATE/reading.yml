@@ -1,0 +1,22 @@
+name: Reading
+description: A survey or probe — what a reference does, what a terminal can do, what dsh changed.
+labels: [reading]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+    validations:
+      required: true
+  - type: textarea
+    id: findings
+    attributes:
+      label: What was read
+      description: Each finding with the reference it was read in (`name:path`) at its pin.
+    validations:
+      required: true
+  - type: textarea
+    id: decides
+    attributes:
+      label: What it decides
+      description: The gap it opens, the ADR it informs, or nothing yet.

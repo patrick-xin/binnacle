@@ -1,0 +1,31 @@
+{
+  "name": "binnacle-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "refs": "node scripts/refs.mjs",
+    "profile": "node scripts/profile.mjs",
+    "build": "pnpm --filter binnacle run build",
+    "typecheck": "tsc -p packages/binnacle/tsconfig.json --noEmit",
+    "lint": "oxlint",
+    "check:paths": "node scripts/check-paths.mjs",
+    "check:citations": "node scripts/check-citations.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "check:pins": "node scripts/check-pins.mjs",
+    "check:layers": "node scripts/check-layers.mjs",
+    "check:jsdoc": "node scripts/check-jsdoc.mjs",
+    "check:boot": "dsh --profile binnacle --check",
+    "check": "pnpm run check:paths && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:layers && pnpm run check:jsdoc && pnpm run lint && pnpm run typecheck",
+    "test": "pnpm run check && node --test \"scripts/*.test.mjs\" && pnpm --filter binnacle test"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "oxc-parser": "0.151.0",
+    "oxlint": "1.85.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "dsh": {
+    "url": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "commit": "477b4f420553e8a52c2fbccc464d7561b239c443",
+    "tag": "dsh-v0.1.7-rc.2",
+    "role": "The harness this surface mounts into. Authoritative on the harness contract."
+  },
+  "pi": {
+    "url": "https://github.com/earendil-works/pi.git",
+    "commit": "d981de1229ef899957bbe968bc8dcda02a21f477",
+    "tag": "v0.85.1",
+    "role": "pi-tui, the library this surface renders with, and pi's own product composed from it."
+  },
+  "codex": {
+    "url": "https://github.com/openai/codex.git",
+    "commit": "d7b07d45517a793acfba4cbf8de697d723cceb46",
+    "role": "A reference terminal surface: what a terminal can do, read, never copied."
+  },
+  "eve": {
+    "url": "https://github.com/vercel/eve.git",
+    "commit": "d004e6d47e9d25d0380c24b5a47b65a18f8b2784",
+    "role": "A reference terminal surface: what a terminal can do, read, never copied."
+  }
+}
