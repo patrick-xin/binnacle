@@ -15,8 +15,8 @@ import { layout } from '../ui/layout.ts'
 import type { Frame, Placed } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
 import type { UiState } from '../ui/state.ts'
-import { drawEntry } from './entries.ts'
-import type { Views } from './entries.ts'
+import { drawEntry, keyOf } from './entries.ts'
+import type { View, Views } from './entries.ts'
 
 /** What the screen draws, and what on it can take focus. */
 export interface Screen extends Frame {
@@ -29,7 +29,9 @@ export type DrawScreen = (model: Transcript, state: UiState, width: number, view
 
 /** What an entry drew, and how it was last laid out. */
 interface Drawing {
-  /** What its view returned. */
+  /** The views of its key that drew it, as they stood; none when binnacle's own did. */
+  readonly by: readonly View[] | undefined
+  /** What its views returned. */
   readonly node: Node
   /** The id of every fold in it. */
   readonly folds: readonly string[]
@@ -57,18 +59,20 @@ function foldsIn(node: Node): string[] {
 /**
  * A way to draw screens that keeps what each entry drew. An entry is a value
  * the transcript replaces when it changes, so what it drew is kept against
- * the entry itself; the layout is kept against the width and against which of
- * its folds are open, which is all of the state layout reads. Views are read
- * when an entry is first drawn; after they change, draw with a new one.
+ * the entry itself, and against the views of its key, which are replaced as
+ * a whole when one is registered, disposed or invalidated; the layout is kept
+ * against the width and against which of its folds are open, which is all of
+ * the state layout reads.
  * @returns the drawer, holding nothing yet.
  */
 export function screens(): DrawScreen {
   const drawings = new WeakMap<Entry, Drawing>()
   const frameOf = (entry: Entry, state: UiState, width: number, views: Views): Frame => {
+    const by = views.get(keyOf(entry))
     let drawing = drawings.get(entry)
-    if (drawing === undefined) {
+    if (drawing === undefined || drawing.by !== by) {
       const node = drawEntry(entry, views)
-      drawing = { node, folds: foldsIn(node) }
+      drawing = { by, node, folds: foldsIn(node) }
     }
     const laid = drawing.laid
     if (laid?.width === width && drawing.folds.every((id, index) => state.expanded.has(id) === laid.open[index])) return laid.frame

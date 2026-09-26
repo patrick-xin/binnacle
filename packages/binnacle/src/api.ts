@@ -36,4 +36,11 @@ export interface Registrations {
    * @returns a disposer, for taking it back before the plugin is disposed.
    */
   view(key: string, view: View): () => void
+  /**
+   * Draw again, at the next frame, every entry the views of a key draw. An
+   * entry is drawn once and kept, so a view that reads anything besides its
+   * entry — a setting, the time — calls this when what it read has changed.
+   * @param key - the entry kind or fact name, as it was registered.
+   */
+  invalidate(key: string): void
 }

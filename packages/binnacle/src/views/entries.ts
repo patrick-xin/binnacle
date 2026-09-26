@@ -17,8 +17,8 @@ import type { Node } from '../ui/node.ts'
  * A function of its entry alone. binnacle calls it once for each entry and
  * keeps what it returned, laying it out again at a new width or as a fold in
  * it opens, until the entry changes (a call's result arrives), a registration
- * comes or goes, or pi-tui invalidates the pane; anything else it reads is
- * read once.
+ * comes or goes, or pi-tui invalidates the pane. Anything else it reads is
+ * read once, until its author invalidates its key.
  * @param next - draws the entry as the view beneath this one does, for a view
  * to build on or to leave an entry it does not claim to; it never throws, as
  * what goes wrong beneath is drawn there.
@@ -69,9 +69,16 @@ export function drawEntry(entry: Entry, views: Views = new Map()): Node {
   if (entry.kind === 'authored' && Object.hasOwn(drawnHere, entry.fact.name)) {
     return builtIn(entry, `${entry.fact.name} is a kind binnacle draws; the adapter must give its fact another name`)
   }
-  const key = entry.kind === 'authored' ? entry.fact.name : entry.kind
+  const key = keyOf(entry)
   const stack = views.get(key) ?? []
   return drawnBy(entry, key, stack, stack.length)
+}
+
+/**
+ * The key an entry's views are registered under: its kind, or an authored fact's name.
+ */
+export function keyOf(entry: Entry): string {
+  return entry.kind === 'authored' ? entry.fact.name : entry.kind
 }
 
 /**

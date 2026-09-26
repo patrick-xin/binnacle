@@ -32,4 +32,4 @@ Cordis already has a shape for this: a `waterfall` listener receives `next`, cal
 
 - A request about one tool, or one kind of failure, is one small view that leaves the rest to `next`.
 - Order matters. A plugin mounted later draws over one mounted earlier, and a plugin that never calls `next` hides everything beneath it for its key.
-- A stack of views costs one call per view for each entry, paid when the entry is drawn, not at every frame.
+- A stack of views costs one call per view for each entry, paid when the entry is drawn, not at every frame ([ADR 9](0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)).

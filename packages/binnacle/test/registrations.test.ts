@@ -8,6 +8,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../src/facts/adapt.ts'
 import type { Fact } from '../src/facts/adapt.ts'
 import { RegistrationService } from '../src/host/registrations.ts'
+import { TranscriptPane } from '../src/panes/transcript.ts'
 import { initial } from '../src/ui/state.ts'
 import { screen } from '../src/views/screen.ts'
 
@@ -119,4 +120,24 @@ test('two plugins can each draw one tool\'s card, and every other card stays bin
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'bash' ? { kind: 'text', text: '$ make' } : next()) })
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'read' ? { kind: 'text', text: 'read a file' } : next()) })
   assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['› fix the build', '$ make', 'read a file', '● grep {}', '  running…'])
+})
+
+test('a view that read something besides its entry invalidates its key, and only that key\'s entries are drawn again', async () => {
+  const { registrations, author } = surface()
+  let marker = '›'
+  let calls = 0
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', entry => ({ kind: 'text', text: `${marker} ${entry.kind === 'prompt' ? entry.fact.seq : 0}` }))
+    ctx.binnacle.view('context', (_, next) => { calls++; return next() })
+  })
+  const pane = new TranscriptPane(() => {}, () => registrations.views)
+  pane.push(prompt)
+  pane.push({ kind: 'context', seq: 2, time: 2, source: 'goal', blocks: [{ kind: 'text', text: 'ship it' }] })
+  const lines = () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['› 1', '⋯ added by goal', '… 1 more line'])
+  marker = '»'
+  assert.deepEqual(lines(), ['› 1', '⋯ added by goal', '… 1 more line'])
+  registrations.invalidate('prompt')
+  assert.deepEqual(lines(), ['» 1', '⋯ added by goal', '… 1 more line'])
+  assert.equal(calls, 1)
 })

@@ -72,5 +72,6 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | Term | Means |
 | --- | --- |
 | **component** | Anything with `render(width): string[]`, and optionally input and mouse handlers. |
+| **invalidate** | Drop what a component kept, so its next render draws it again. binnacle's registration of the same name does this for the entries of one key ([ADR 9](adr/0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)). |
 | **main screen** / **alternate screen** | `TuiMainScreen` draws into the terminal's scrollback; `TuiAltScreen` owns a full screen. |
 | **terminal** | pi-tui's `Terminal`: the one object the host writes to and reads input from. |

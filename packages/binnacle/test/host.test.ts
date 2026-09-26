@@ -250,3 +250,26 @@ test('a terminal that fails as it starts is given back, the session closed and u
   assert.deepEqual(out, ['binnacle: could not take the terminal: stdin is not a terminal\n'])
   assert.deepEqual(exits, [1])
 })
+
+test('an author invalidating its view draws its entries again on screen, without reading the log again', async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
+  let adapted = 0
+  let word = 'seeded'
+  let author: Context | undefined
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      author = plugin
+      plugin.binnacle.facts('session/end-seed', () => { adapted++; return { name: 'seeded', data: {} } })
+      plugin.binnacle.view('seeded', () => ({ kind: 'text', text: `${word} from a fork` }))
+    },
+  })
+  commit()
+  await until(() => /seeded from a fork/.test(terminal.written))
+  const read = adapted
+  word = 'grown'
+  author?.binnacle.invalidate('seeded')
+  await until(() => /grown from a fork/.test(terminal.written))
+  assert.equal(adapted, read)
+})

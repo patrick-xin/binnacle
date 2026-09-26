@@ -31,7 +31,7 @@ export class TranscriptPane implements Component {
 
   /**
    * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
-   * @param views - authors' views as they stand, read when an entry is first drawn; `reset` draws every entry again.
+   * @param views - authors' views as they stand, read at every frame; an entry is drawn again when the views of its key change.
    */
   constructor(changed: () => void, views: () => Views = () => new Map()) {
     this.#changed = changed
@@ -48,7 +48,7 @@ export class TranscriptPane implements Component {
   }
 
   /**
-   * Replace every fact, as when the adapters or views have changed, and draw every entry again.
+   * Replace every fact, as when the adapters have changed, and draw every entry again.
    * @param facts - the whole log, adapted again, in log order.
    */
   reset(facts: readonly Fact[]): void {
