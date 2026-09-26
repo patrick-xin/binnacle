@@ -15,7 +15,7 @@ A person's journey — arrive, ask, watch, decide — is a good question to ask 
 
 **Content declares affordances; one table gives every gesture its meaning.**
 
-An affordance is something a person can do with a piece of content: `expand`, `choose`, `open`, `copy`, `answer`, `grant`, `dismiss`. A view declares affordances on what it draws, and nothing else may say what input means. An affordance that depends on layout is decided by layout: collapsible content offers `expand` only when it was cut, so content that fits offers nothing and no gesture reaches it.
+An affordance is something a person can do with a piece of content — expand it, open it, copy it, grant what it asks. A view declares affordances on what it draws, and nothing else may say what input means. An affordance that depends on layout is decided by layout: collapsible content offers `expand` only when it was cut, so content that fits offers nothing and no gesture reaches it.
 
 | Gesture | Means |
 |---|---|
