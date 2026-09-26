@@ -2,6 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { TuiMouseEvent } from '@earendil-works/pi-tui'
+import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { adapt } from '../src/facts/adapt.ts'
 import type { Fact } from '../src/facts/adapt.ts'
 import type { View } from '../src/api.ts'
 import { TranscriptPane } from '../src/panes/transcript.ts'
@@ -147,6 +151,47 @@ test('a click at a width nothing was drawn at is answered at that width', () => 
   pane.push(context)
   assert.deepEqual(pane.handleMouse(pointer('click', 2)), { handled: true })
   assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', 'a', 'b'])
+})
+
+/** A tool call as dsh logs it. */
+const asked: SessionEvent<'tool/call'> = { type: 'tool/call', seq: SessionSeq(1), time: 1, data: { turn: 1, step: 1, callId: ToolCallId('c1'), name: 'read', arguments: '{}' } }
+
+/** Its result as dsh logs it. */
+const answered: SessionEvent<'tool/result'> = {
+  type: 'tool/result', seq: SessionSeq(2), time: 2, surfaceOp: 'append',
+  data: { turn: 1, step: 1, message: { role: 'tool', id: MessageId('m1'), source: { kind: 'tool', callId: ToolCallId('c1') }, toolCallId: ToolCallId('c1'), isError: false, content: [{ type: 'text', text: 'done' }] } },
+}
+
+/**
+ * A pane whose author's view of tool calls does something to the entry it is handed, then draws it.
+ * @param tamper - what the view does to its entry.
+ * @returns the pane, the call already pushed and drawn.
+ */
+function tampered(tamper: (entry: Extract<Parameters<View>[0], { kind: 'tool' }>) => void): TranscriptPane {
+  const view: View = (entry) => {
+    if (entry.kind === 'tool') tamper(entry)
+    return { kind: 'text', text: 'drawn by an author' }
+  }
+  const pane = new TranscriptPane(() => {}, () => new Map([['tool', view]]))
+  pane.push(adapt(asked))
+  shown(pane)
+  return pane
+}
+
+test('a view that changes the entry it was handed is fenced, and the transcript goes on', () => {
+  const pane = tampered((entry) => { Object.assign(entry, { call: undefined }) })
+  pane.push(adapt(answered))
+  const lines = shown(pane)
+  assert.deepEqual(lines.slice(0, 2), ['● read {}', 'done'])
+  assert.match(lines[2] ?? '', /^✗ binnacle\.view\(tool\) threw: /)
+})
+
+test('a view that changes the fact in its entry is fenced, and the transcript goes on', () => {
+  const pane = tampered((entry) => { Object.defineProperty(entry.call, 'callId', { get: () => { throw new Error('no call') } }) })
+  pane.push(adapt(answered))
+  const lines = shown(pane)
+  assert.deepEqual(lines.slice(0, 2), ['● read {}', 'done'])
+  assert.match(lines[2] ?? '', /^✗ binnacle\.view\(tool\) threw: /)
 })
 
 test('a click on what offers nothing, a wheel, a drag and hovering are left to pi-tui', () => {

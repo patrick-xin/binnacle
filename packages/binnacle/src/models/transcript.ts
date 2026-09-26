@@ -46,11 +46,14 @@ export const empty: Transcript = { turns: [] }
  * @returns an entry of the fact's kind; TypeScript cannot correlate the two across the union, so the pairing is asserted here, once.
  */
 function single<K extends 'prompt' | 'context' | 'answer' | 'result' | 'authored' | 'unknown'>(fact: FactOf<K>): Single<K> {
-  return { kind: (fact as Fact).kind, fact } as Single<K>
+  return Object.freeze({ kind: (fact as Fact).kind, fact }) as Single<K>
 }
 
 /**
  * Fold one fact into a transcript.
+ *
+ * Each entry it makes is frozen: an author's view is handed entries, never
+ * turns, so it cannot change what later facts are folded into.
  * @param model - the transcript so far.
  * @param fact - the next fact in log order.
  * @returns the transcript with it folded in; `model` is left as it was.
@@ -67,11 +70,11 @@ export function fold(model: Transcript, fact: Fact): Transcript {
   const turns = model.turns.length === 0 ? [] : model.turns.slice(0, -1)
   let entries: readonly Entry[]
   if (fact.kind === 'call') {
-    entries = [...last.entries, { kind: 'tool', call: fact }]
+    entries = [...last.entries, Object.freeze({ kind: 'tool', call: fact })]
   } else if (fact.kind === 'result') {
     const at = last.entries.findLastIndex(entry => entry.kind === 'tool' && entry.call.callId === fact.callId)
     const pending = last.entries[at]
-    entries = pending?.kind === 'tool' ? last.entries.with(at, { ...pending, result: fact }) : [...last.entries, single(fact)]
+    entries = pending?.kind === 'tool' ? last.entries.with(at, Object.freeze({ ...pending, result: fact })) : [...last.entries, single(fact)]
   } else {
     entries = [...last.entries, single(fact)]
   }
