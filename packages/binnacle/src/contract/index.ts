@@ -60,3 +60,17 @@ export type Action =
   | { readonly kind: 'scroll', readonly region: string, readonly delta: number }
   | { readonly kind: 'select' }
   | { readonly kind: 'focus', readonly step: 1 | -1 }
+
+/**
+ * A thrown or foreign value as a person reads it: an error's message, or the value's string form.
+ * @param value - what was thrown, or what an author's code returned.
+ * @returns its text; `a value binnacle cannot show` when even reading that throws.
+ */
+export function describe(value: unknown): string {
+  try {
+    return value instanceof Error ? String(value.message) : String(value)
+  } catch {
+    // A value with no string form, or a message that throws when read: nothing more can be said of it.
+    return 'a value binnacle cannot show'
+  }
+}

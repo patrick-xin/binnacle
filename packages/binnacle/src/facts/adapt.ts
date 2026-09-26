@@ -11,6 +11,7 @@
  */
 
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { describe } from '../contract/index.ts'
 import type { SessionEvent, SessionEventType } from '@deepseek-ai/dsh-session'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
@@ -117,12 +118,14 @@ export type Fact =
     readonly type: string
     /** The event as dsh logged it. */
     readonly record: unknown
+    /** Why an author's adapter for its type made no fact of it; absent when none was registered. */
+    readonly problem?: string
   }
 
 /** An adapter for one kind of event. */
 type Adapter<K extends SessionEventType> = (event: SessionEvent<K>) => Fact
 
-/** An author's adapter for one kind of event: it names the fact and says what it holds. */
+/** An author's adapter for one kind of event: it names the fact and says what it holds. The name must not be an entry kind binnacle draws, such as `prompt` or `tool`. */
 export type AuthorAdapter = (event: SessionEvent) => { readonly name: string, readonly data: unknown }
 
 /**
@@ -178,14 +181,37 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
 }
 
 /**
+ * Read an event with an author's adapter, which is code binnacle does not own.
+ * @param event - the event.
+ * @param author - the adapter registered for its type.
+ * @returns the authored fact; an `unknown` one saying why, when the adapter or reading what it returned throws, or it names no fact.
+ */
+function authored(event: SessionEvent, author: AuthorAdapter): Fact {
+  const failed = (problem: string): Fact => ({ kind: 'unknown', seq: event.seq, time: event.time, type: event.type, record: event, problem: `binnacle.facts(${event.type}) ${problem}` })
+  let name: unknown
+  let data: unknown
+  try {
+    const read: unknown = author(event)
+    if (typeof read === 'object' && read !== null) {
+      name = 'name' in read ? read.name : undefined
+      data = 'data' in read ? read.data : undefined
+    }
+  } catch (error) {
+    return failed(`threw: ${describe(error)}`)
+  }
+  if (typeof name !== 'string') return failed('named no fact: it must return { name, data }')
+  return { kind: 'authored', seq: event.seq, time: event.time, name, data }
+}
+
+/**
  * Adapt one session event.
  * @param event - the event, as dsh logged it.
- * @param authored - authors' adapters by event type; one for a kind binnacle also reads wins.
+ * @param authors - authors' adapters by event type; one for a kind binnacle also reads wins.
  * @returns the fact it is; `unknown` when no adapter reads its kind.
  */
-export function adapt(event: SessionEvent, authored: ReadonlyMap<string, AuthorAdapter> = new Map()): Fact {
-  const author = authored.get(event.type)
-  if (author !== undefined) return { kind: 'authored', seq: event.seq, time: event.time, ...author(event) }
+export function adapt(event: SessionEvent, authors: ReadonlyMap<string, AuthorAdapter> = new Map()): Fact {
+  const author = authors.get(event.type)
+  if (author !== undefined) return authored(event, author)
   const adapter = adapters[event.type] as Adapter<typeof event.type> | undefined
   return adapter === undefined
     ? { kind: 'unknown', seq: event.seq, time: event.time, type: event.type, record: event }
