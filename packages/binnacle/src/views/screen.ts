@@ -50,6 +50,7 @@ function foldsIn(node: Node): string[] {
     case 'stack':
       return node.children.flatMap(foldsIn)
     case 'offer':
+    case 'card':
       return foldsIn(node.child)
     case 'fold':
       return [node.id, ...foldsIn(node.child)]

@@ -8,6 +8,8 @@
 
 import { affordances, describe } from '../contract/index.ts'
 import type { Affordance } from '../contract/index.ts'
+import { tones } from './theme.ts'
+import type { Tone } from './theme.ts'
 
 /** Something a view draws. */
 export type Node =
@@ -18,6 +20,8 @@ export type Node =
     readonly kind: 'text'
     /** What it says; wrapped at the width it is given. */
     readonly text: string
+    /** The theme's colour it is drawn in; the terminal's own when it has none. */
+    readonly tone?: Tone
   }
   | {
     readonly kind: 'stack'
@@ -31,6 +35,13 @@ export type Node =
     /** What the content offers, primary first. */
     readonly affordances: readonly Affordance[]
     /** The content. */
+    readonly child: Node
+  }
+  | {
+    readonly kind: 'card'
+    /** One line on its top edge, left off whole where the edge is too narrow for it. */
+    readonly title?: string
+    /** What it holds, inside a rounded border; drawn without one where the width leaves no room inside it. */
     readonly child: Node
   }
   | {
@@ -58,8 +69,11 @@ export function parseNode(value: unknown): Node {
       return { kind: 'blank' }
     case 'text': {
       const text = field('text')
+      const tone = field('tone')
       if (typeof text !== 'string') throw new Error('a text node needs its text')
-      return { kind: 'text', text }
+      if (tone === undefined) return { kind: 'text', text }
+      if (typeof tone !== 'string' || !Object.hasOwn(tones, tone)) throw new Error(`${describe(tone)} is no tone`)
+      return { kind: 'text', text, tone: tone as Tone }
     }
     case 'stack': {
       const children = field('children')
@@ -72,6 +86,13 @@ export function parseNode(value: unknown): Node {
       if (typeof id !== 'string') throw new Error('an offer needs an id')
       if (!Array.isArray(offered)) throw new Error('an offer needs its affordances')
       return { kind: 'offer', id, affordances: Array.from(offered, affordance => affordanceOf(affordance)), child: parseNode(field('child')) }
+    }
+    case 'card': {
+      const title = field('title')
+      if (title !== undefined && typeof title !== 'string') throw new Error(`a card's title is ${describe(title)}`)
+      if (typeof title === 'string' && /[\r\n]/.test(title)) throw new Error('a card\'s title is one line')
+      const child = parseNode(field('child'))
+      return title === undefined ? { kind: 'card', child } : { kind: 'card', title, child }
     }
     case 'fold': {
       const id = field('id')

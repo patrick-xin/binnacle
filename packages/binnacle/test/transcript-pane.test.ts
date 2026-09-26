@@ -33,10 +33,11 @@ const context: Fact = { kind: 'context', seq: 2, time: 2, source: 'goal', blocks
  * A pointer event on a row of the pane, as pi-tui's containers deliver it.
  * @param type - what the pointer did.
  * @param y - the row, in the pane's own lines.
+ * @param x - the column.
  * @returns the event.
  */
-const pointer = (type: TuiMouseEvent['type'], y: number): TuiMouseEvent => ({
-  type, button: type === 'wheel' || type === 'move' ? 'none' : 'left', x: 0, y, screenX: 0, screenY: y, width: 40, height: 3,
+const pointer = (type: TuiMouseEvent['type'], y: number, x = 0): TuiMouseEvent => ({
+  type, button: type === 'wheel' || type === 'move' ? 'none' : 'left', x, y, screenX: x, screenY: y, width: 40, height: 3,
   shift: false, alt: false, ctrl: false, ...type === 'wheel' ? { wheelDelta: -1 } : {},
 })
 
@@ -172,7 +173,8 @@ function tampered(tamper: (entry: Extract<Parameters<View>[0], { kind: 'tool' }>
     if (entry.kind === 'tool') tamper(entry)
     return { kind: 'text', text: 'drawn by an author' }
   }
-  const pane = new TranscriptPane(() => {}, () => new Map([['tool', [view]]]))
+  const views: Views = new Map([['tool', [view]]])
+  const pane = new TranscriptPane(() => {}, () => views)
   pane.push(adapt(asked))
   shown(pane)
   return pane
@@ -202,4 +204,17 @@ test('a click on what offers nothing, a wheel, a drag and hovering are left to p
   for (const event of [pointer('click', 0), pointer('wheel', 2), pointer('drag', 2), pointer('move', 2)]) {
     assert.equal(pane.handleMouse(event), undefined, event.type)
   }
+})
+
+/** An author's view that draws binnacle's drawing of an entry in a card. */
+const carded: View = (_, next) => ({ kind: 'card', title: 'yours', child: next() })
+
+test('a click on a card\'s border is left to pi-tui, and one inside it reaches what the card holds', () => {
+  const views: Views = new Map([['context', [carded]]])
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.push(context)
+  assert.deepEqual(shown(pane), ['╭─ yours ──────────────────────────────╮', '│ ⋯ added by goal                      │', '│ … 2 more lines                       │', '╰──────────────────────────────────────╯'])
+  assert.equal(pane.handleMouse(pointer('click', 2, 0)), undefined)
+  assert.deepEqual(pane.handleMouse(pointer('click', 2, 2)), { handled: true })
+  assert.deepEqual(shown(pane).slice(1, 4), ['│ ⋯ added by goal                      │', '│ a                                    │', '│ b                                    │'])
 })

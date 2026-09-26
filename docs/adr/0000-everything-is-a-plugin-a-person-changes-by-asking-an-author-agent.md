@@ -18,7 +18,7 @@ An agent learns what it can do from what its session hands it. A plugin can hand
 - **Everything.** This covers what the transcript draws: every tool's card, or one tool's. It covers the composer and the rest of the chrome, and the dialogs and screens a feature opens, signing in and settings among them. It covers the keys and the theme. Nothing binnacle draws or answers is beyond an author's reach; what cannot be reached yet is a gap to close, never a boundary.
 - **At the grain a person asks.** An author changes one tool's card without redrawing every other, and builds on what binnacle draws rather than copying it.
 - **binnacle provides the building blocks, and says what they are.** It provides:
-  - the nodes and frames a view draws with;
+  - the blocks a view draws with, from text in a tone to a card around what it holds;
   - the placements that put what it draws on the screen;
   - the grants that perform its effects;
   - a skill that tells an author agent, in the session, what exists and how to use it.

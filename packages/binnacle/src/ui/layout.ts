@@ -2,9 +2,10 @@
  * Layout: a node at a width, as the lines it draws and the regions on them.
  */
 
-import { Text } from '@earendil-works/pi-tui'
+import { Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node } from './node.ts'
+import { tones } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open. */
 export interface LayoutState {
@@ -12,7 +13,7 @@ export interface LayoutState {
   readonly expanded: ReadonlySet<string>
 }
 
-/** A region, and the rows it covers. */
+/** A region, and the rows and columns it covers. */
 export interface Placed {
   /** The region. */
   readonly region: Region
@@ -20,7 +21,14 @@ export interface Placed {
   readonly top: number
   /** How many rows it covers. */
   readonly height: number
+  /** Its first column. */
+  readonly left: number
+  /** How many columns it covers. */
+  readonly width: number
 }
+
+/** Columns a card spends on each side: its border, and a column of air inside it. */
+const CARD_SIDE = 2
 
 /** What a node draws: its lines, and every region on them, outermost first. */
 export interface Frame {
@@ -51,7 +59,8 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
     case 'blank':
       return { lines: [''], regions: [] }
     case 'text':
-      return { lines: new Text(node.text, 0, 0).render(width), regions: [] }
+      // pi-tui wraps styled text, opening each line it wraps to in the style the line before ended in.
+      return { lines: new Text(node.tone === undefined ? node.text : tones[node.tone](node.text), 0, 0).render(width), regions: [] }
     case 'stack': {
       const lines: string[] = []
       const regions: Placed[] = []
@@ -65,8 +74,10 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
     case 'offer': {
       const frame = layout(node.child, width, state)
       const region = { id: node.id, affordances: node.affordances, overflows: false }
-      return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length }, ...frame.regions] }
+      return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length, left: 0, width }, ...frame.regions] }
     }
+    case 'card':
+      return card(node, width, state)
     case 'fold': {
       const frame = layout(node.child, width, state)
       const cut = frame.lines.length - node.rows
@@ -74,7 +85,7 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
       if (state.expanded.has(node.id)) {
         const label = node.rows === 0 ? 'fold it away' : `fold to ${node.rows} ${line(node.rows)}`
         const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
-        return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length }, ...frame.regions] }
+        return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length, left: 0, width }, ...frame.regions] }
       }
       const shown = frame.lines.slice(0, node.rows)
       const marker = new Text(`… ${cut} more ${line(cut)}`, 0, 0).render(width)
@@ -82,16 +93,42 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
       const inside = frame.regions
         .filter(placed => placed.top < node.rows)
         .map(placed => ({ ...placed, height: Math.min(placed.height, node.rows - placed.top) }))
-      return { lines: [...shown, ...marker], regions: [{ region, top: 0, height: node.rows + marker.length }, ...inside] }
+      return { lines: [...shown, ...marker], regions: [{ region, top: 0, height: node.rows + marker.length, left: 0, width }, ...inside] }
     }
   }
 }
 
 /**
- * The regions a row lands on.
+ * Lay a card out: what it holds, inside a rounded border drawn in the theme's dim tone.
+ * @returns its lines, and what it holds's regions moved inside the border; what it holds alone where the width leaves no column inside.
+ */
+function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, state: LayoutState): Frame {
+  const inner = width - 2 * CARD_SIDE
+  if (inner < 1) return layout(node.child, width, state)
+  const frame = layout(node.child, inner, state)
+  const edge = tones.dim
+  // A title is left off whole, never cut, where it would leave no rule beside it: a cut title reads as another one.
+  const title = node.title !== undefined && visibleWidth(node.title) <= width - 6 ? node.title : undefined
+  const top = title === undefined
+    ? edge(`╭${'─'.repeat(width - 2)}╮`)
+    : `${edge('╭─ ')}${title}${edge(` ${'─'.repeat(width - 5 - visibleWidth(title))}╮`)}`
+  const body = frame.lines.map(row => `${edge('│')} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge('│')}`)
+  return {
+    lines: [top, ...body, edge(`╰${'─'.repeat(width - 2)}╯`)],
+    regions: frame.regions.map(placed => ({ ...placed, top: placed.top + 1, left: placed.left + CARD_SIDE })),
+  }
+}
+
+/**
+ * The regions a point lands on.
  * @param regions - a frame's regions, outermost first.
+ * @param row - the point's row, in the frame's lines.
+ * @param column - the point's column, from the frame's left edge.
  * @returns the regions covering it, innermost first.
  */
-export function under(regions: readonly Placed[], row: number): Region[] {
-  return regions.filter(placed => row >= placed.top && row < placed.top + placed.height).map(placed => placed.region).toReversed()
+export function under(regions: readonly Placed[], row: number, column: number): Region[] {
+  return regions
+    .filter(placed => row >= placed.top && row < placed.top + placed.height && column >= placed.left && column < placed.left + placed.width)
+    .map(placed => placed.region)
+    .toReversed()
 }

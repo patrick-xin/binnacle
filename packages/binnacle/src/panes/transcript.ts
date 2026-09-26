@@ -77,7 +77,7 @@ export class TranscriptPane implements Component {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
     const drawn = this.#drawn?.width === event.width ? this.#drawn.screen : this.#draw(this.#transcript, this.#state, event.width, this.#views())
-    const action = meaning(gesture, under(drawn.regions, event.y))
+    const action = meaning(gesture, under(drawn.regions, event.y, event.x))
     if (action === undefined) return undefined
     const next = act(this.#state, action, drawn)
     if (next === this.#state) return undefined
