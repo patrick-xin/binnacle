@@ -32,7 +32,8 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **authored fact** | A fact an author's adapter made from an event kind, named by them; drawn by the view registered under its name, or by the fallback. |
 | **placement** | Where registered content goes: a screen or a side panel. |
 | **grant** | The affordance a person gives an approval with; a key, never a click. Also, in "grants, not the tree": what a plugin is handed instead of pi-tui components, including an effect the host performs for it. |
-| **author** | An agent a person asks to customize binnacle; it registers through the same doors the built-in surface does. |
+| **author** | An agent a person asks to customize binnacle; it registers through the same doors the built-in surface does ([ADR 0](adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). |
+| **extension skill** | The dsh skill binnacle registers so that an author agent, in its session, can find the author API and learn how to use it. It is held to the source like any restated fact. |
 | **seam** | A named place binnacle reaches dsh through, held by a gate ([ADR 3](adr/0003-dsh-is-reached-through-named-seams-each-held-by-a-gate.md)); in tests, the public boundary a test is written at. |
 | **gate** | A check `pnpm test` runs that refuses a class of defect: `check:*`, `lint`, `typecheck`. |
 | **reference** | A repository read and never written, fetched into `.refs/<name>` at its pin ([`references.json`](../references.json)). |
@@ -54,6 +55,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **preset** | A named agent configuration; a preset can run a different tool loop, logging kinds binnacle has never seen. |
 | **session log** | A session's events in order: what was sent, streamed, called and decided. |
 | **event kind** | The `type` of a session log event; dsh packages add kinds by augmenting `SessionEventMap`. |
+| **skill** | Instructions the agent can load by name: found in a directory, or registered by a plugin (`dsh:packages/skill/skill/src/index.ts#SkillRegistration`). |
 
 ## Cordis's
 

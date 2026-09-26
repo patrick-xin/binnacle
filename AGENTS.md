@@ -4,6 +4,8 @@ binnacle is a terminal surface for [DeepSeek Harness](https://github.com/deepsee
 
 Standing orders — the one page here that binds. A record is evidence, never a rule.
 
+**First: everything is a plugin that a person can change by asking an author agent** ([ADR 0](docs/adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). An author can change, replace or remove whatever binnacle draws or answers, at the grain a person asks for, through the registrations the built-in surface uses. binnacle supplies the building blocks and the skill that teaches them. When an order below would stop this, revise the order through a record; never work around it.
+
 ## Working here
 
 | Command | Does |
@@ -78,7 +80,7 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 
 - **Each fact has one home; everywhere else links to it.** What code or config states — the layers, the affordances, what a gate refuses — is linked or cited, never restated.
 - **No implementation status or progress in prose, and no inventory restated from code or config.** The architecture states commitments, which may run ahead of the code; where the code falls short, that is an issue.
-- **A decision a maintainer may revisit is a decision record**: `docs/adr/NNNN-title.md`, numbered in order, from [the template](docs/adr/0000-template.md), one decision each. The decision stays short and states a principle, not an inventory; the alternatives are real ones, never invented. A record is not edited into a different decision; a new one supersedes it, and both say so.
+- **A decision a maintainer may revisit is a decision record**: `docs/adr/NNNN-title.md`, numbered in order, from [the template](docs/adr/template.md), one decision each. The decision stays short and states a principle, not an inventory; the alternatives are real ones, never invented. A record is not edited into a different decision; a new one supersedes it, and both say so.
 - **A reading — a survey, a probe, a limitation found — goes on the issue it informs**, naming the reference it was read in.
 - **Use the owner's term** — dsh's, Cordis's, pi-tui's — and check [the glossary](docs/glossary.md) before coining one; a new term is added there in the same change.
 - **Durable prose carries no change history**; the story goes in the commit message.
