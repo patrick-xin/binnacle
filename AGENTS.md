@@ -4,6 +4,8 @@ binnacle is a terminal surface for [DeepSeek Harness](https://github.com/deepsee
 
 Standing orders — the one page here that binds. A record is evidence, never a rule.
 
+binnacle is being migrated from an earlier surface, step by step. **[`docs/migration.md`](docs/migration.md) is the plan and where it stands**; start there to take the next step.
+
 ## Working here
 
 | Command | Does |
@@ -70,6 +72,7 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 | why, and what it beat | a decision record in [`docs/adr/`](docs/adr/) |
 | what is wrong, missing or being read | a GitHub issue |
 | what one change did and why | its commit message |
+| the migration: its steps, and what legacy learned | [`docs/migration.md`](docs/migration.md), until it is done |
 
 - **A decision a maintainer may revisit is a decision record**: `docs/adr/NNNN-title.md`, numbered in order, from [the template](docs/adr/0000-template.md). The decision stays short and the alternatives are real ones, never invented. A record is not edited into a different decision; a new one supersedes it, and both say so.
 - **A reading — a survey, a probe, a limitation found — goes on the issue it informs**, naming the reference it was read in.
