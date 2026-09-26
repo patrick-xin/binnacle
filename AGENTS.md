@@ -59,6 +59,7 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 - **Expected values come from outside the code** — a literal, a worked example, upstream's behaviour — never recomputed the way the code computes them.
 - **Assert the contract, not the implementation**; a test written against working code cannot disagree with it.
 - **Prefer the real implementation over a fake.** Fake the terminal and the model; keep everything downstream real, dsh's own functions included.
+- **What a person sees is asserted as lines**, drawn by `drawText` (`packages/binnacle/src/ui/draw.ts`) through real pi-tui components — never by reading a component's fields.
 - **A registration proves its disposal.** Dispose the fiber and assert the contribution is gone.
 - **A guard is shown to bind.** Break what a gate or type-level test holds once, watch it fail, and say so in the commit.
 - **Test the real entry path**: load the built bundle under plain `node`, and boot it under the real launcher.
