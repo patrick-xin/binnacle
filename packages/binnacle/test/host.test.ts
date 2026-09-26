@@ -59,6 +59,20 @@ const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
 /** Let the host's pending promises settle. */
 const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 10))
 
+/**
+ * Wait until something holds, as pi-tui draws a frame when it next can, not when asked.
+ * @param holds - the condition.
+ * @param within - how long to wait, in milliseconds.
+ * @throws when it does not hold in time.
+ */
+async function until(holds: () => boolean, within = 2_000): Promise<void> {
+  const deadline = Date.now() + within
+  while (!holds()) {
+    if (Date.now() > deadline) throw new Error(`did not hold within ${within} ms`)
+    await settle()
+  }
+}
+
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
 async function mount(args: string[], session = new FakeSession()) {
   const exits: number[] = []
@@ -111,12 +125,10 @@ test('with no flag, the terminal is taken once startup commits, and draws what t
   const { terminal, commit } = await mount([], session)
   assert.equal(terminal.started, false)
   commit()
-  await settle()
+  await until(() => /fix the build/.test(terminal.written))
   assert.equal(terminal.started, true)
-  assert.match(terminal.written, /fix the build/)
   session.log(prompt(2, 'and the tests'))
-  await settle()
-  assert.match(terminal.written, /and the tests/)
+  await until(() => /and the tests/.test(terminal.written))
 })
 
 test('a line typed and entered is sent to the session', async () => {
