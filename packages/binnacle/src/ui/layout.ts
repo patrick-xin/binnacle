@@ -32,6 +32,15 @@ export interface Frame {
 }
 
 /**
+ * The word for a count of lines.
+ * @param count - how many.
+ * @returns `line` for one, `lines` otherwise.
+ */
+function line(count: number): string {
+  return count === 1 ? 'line' : 'lines'
+}
+
+/**
  * Lay a node out.
  * @param node - what to draw.
  * @param width - the columns it is given.
@@ -64,12 +73,13 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
       const cut = frame.lines.length - node.rows
       if (cut <= 0) return frame
       if (state.expanded.has(node.id)) {
-        const region = { id: node.id, affordances: [{ kind: 'expand' as const, label: `fold to ${node.rows} lines` }], overflows: false }
+        const label = node.rows === 0 ? 'fold it away' : `fold to ${node.rows} ${line(node.rows)}`
+        const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
         return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length }, ...frame.regions] }
       }
       const shown = frame.lines.slice(0, node.rows)
-      const marker = new Text(`… ${cut} more ${cut === 1 ? 'line' : 'lines'}`, 0, 0).render(width)
-      const region = { id: node.id, affordances: [{ kind: 'expand' as const, label: `show ${cut} more ${cut === 1 ? 'line' : 'lines'}` }], overflows: false }
+      const marker = new Text(`… ${cut} more ${line(cut)}`, 0, 0).render(width)
+      const region = { id: node.id, affordances: [{ kind: 'expand' as const, label: `show ${cut} more ${line(cut)}` }], overflows: false }
       const inside = frame.regions
         .filter(placed => placed.top < node.rows)
         .map(placed => ({ ...placed, height: Math.min(placed.height, node.rows - placed.top) }))

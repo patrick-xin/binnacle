@@ -77,3 +77,11 @@ test('the regions under a row are the ones covering it, innermost first', () => 
 test('a blank is one empty line, which text cannot be: pi-tui draws nothing for it', () => {
   assert.deepEqual(plain(layout({ kind: 'stack', children: [{ kind: 'text', text: 'a' }, { kind: 'blank' }, { kind: 'text', text: 'b' }] }, 10, OPEN)).lines, ['a', '', 'b'])
 })
+
+/** What expand says on an open fold that shows so many rows while folded. */
+const label = (rows: number): string | undefined =>
+  layout({ ...long, rows }, 20, { expanded: new Set(['tool:c1']) }).regions[0]?.region.affordances[0]?.label
+
+test('an open fold says in words what folding does: away, to one line, or to its lines', () => {
+  assert.deepEqual([label(0), label(1), label(2)], ['fold it away', 'fold to 1 line', 'fold to 2 lines'])
+})
