@@ -9,7 +9,9 @@
  * or `-`, when it is a prefix (`node:`). A package no key names is refused
  * everywhere, so knowing a new package — a new dsh package above all — is a
  * decision written into `layers.json`, not a line slipped into a module.
- * Tests sit outside `src` and are not held.
+ * A dynamic import is held as a static one is, and one whose module is
+ * decided at run time is refused, since no rule can hold it. Tests sit
+ * outside `src` and are not held.
  * @module binnacle/scripts/check-layers
  */
 import { readFileSync } from 'node:fs'
@@ -37,17 +39,45 @@ function layerOf(path, rules) {
 }
 
 /**
+ * Every dynamic import in a program, with the module it loads when a string names it.
+ * @param {unknown} node - the program, or a node in it.
+ * @param {string} text - the program's text.
+ * @param {{ module?: string, source: string }[]} found - where each is added, in order.
+ * @returns {{ module?: string, source: string }[]} `found`: each import's module as the parser decoded it, absent when decided at run time, and its argument as written.
+ */
+function dynamicImports(node, text, found = []) {
+  if (Array.isArray(node)) {
+    for (const child of node) dynamicImports(child, text, found)
+    return found
+  }
+  if (node === null || typeof node !== 'object') return found
+  if (node.type === 'ImportExpression') {
+    const { source } = node
+    const module = source.type === 'Literal' && typeof source.value === 'string' ? source.value
+      : source.type === 'TemplateLiteral' && source.expressions.length === 0 ? source.quasis[0].value.cooked : undefined
+    found.push({ ...module === undefined ? {} : { module }, source: text.slice(source.start, source.end) })
+  }
+  for (const value of Object.values(node)) dynamicImports(value, text, found)
+  return found
+}
+
+/**
  * The modules a source text imports or re-exports from.
  * @param {string} path - the file's path, for the parser.
  * @param {string} text - the file's text.
- * @returns {string[]} each specifier, in order.
+ * @returns {{ named: string[], unnamed: string[] }} each specifier, in order, a dynamic import's included when a string names it; and the argument of each dynamic import whose module is decided at run time.
  */
 function specifiers(path, text) {
-  const { module } = parseSync(path, text)
-  return [
-    ...module.staticImports.map(entry => entry.moduleRequest.value),
-    ...module.staticExports.flatMap(entry => entry.entries.flatMap(item => item.moduleRequest ? [item.moduleRequest.value] : [])),
-  ]
+  const { module, program } = parseSync(path, text)
+  const dynamic = dynamicImports(program, text)
+  return {
+    named: [
+      ...module.staticImports.map(entry => entry.moduleRequest.value),
+      ...module.staticExports.flatMap(entry => entry.entries.flatMap(item => item.moduleRequest ? [item.moduleRequest.value] : [])),
+      ...dynamic.flatMap(entry => entry.module === undefined ? [] : [entry.module]),
+    ],
+    unnamed: dynamic.flatMap(entry => entry.module === undefined ? [entry.source] : []),
+  }
 }
 
 /**
@@ -76,7 +106,9 @@ export function checkLayers(files, rules) {
     }
     const allowed = layer === 'entry' ? rules.entry : rules.layers[layer] ?? []
     const who = layer === 'entry' ? 'the entry' : layer
-    for (const spec of new Set(specifiers(file.path, file.text))) {
+    const { named, unnamed } = specifiers(file.path, file.text)
+    for (const source of unnamed) problems.push(`${file.path}: imports a module named at run time (${source}); name it with a string so layers.json can hold it`)
+    for (const spec of new Set(named)) {
       if (spec.startsWith('.')) {
         const target = layerOf(normalize(join(dirname(file.path), spec)), rules)
         if (target === layer) continue
