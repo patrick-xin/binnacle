@@ -11,13 +11,16 @@ import type { Fact } from '../facts/adapt.ts'
 /** A fact of one kind. */
 type FactOf<K extends Fact['kind']> = Extract<Fact, { readonly kind: K }>
 
+/** An entry holding one fact, its kind the fact's: distributed so each kind narrows its fact. */
+type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, readonly fact: FactOf<K> } : never
+
 /**
  * One thing a turn holds, in log order: a fact, or a tool call with its
  * result once it has one. A `result` entry is a result whose call is not in
  * its turn, kept rather than dropped.
  */
 export type Entry =
-  | { readonly kind: 'prompt' | 'context' | 'answer' | 'result' | 'unknown', readonly fact: FactOf<'prompt' | 'context' | 'answer' | 'result' | 'unknown'> }
+  | Single<'prompt' | 'context' | 'answer' | 'result' | 'unknown'>
   | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'> }
 
 /** A turn: what a person sent and everything the agent did about it. */
@@ -38,6 +41,15 @@ export interface Transcript {
 
 /** The transcript of a session with nothing logged yet. */
 export const empty: Transcript = { turns: [] }
+
+/**
+ * The entry holding one fact.
+ * @param fact - the fact.
+ * @returns an entry of the fact's kind; TypeScript cannot correlate the two across the union, so the pairing is asserted here, once.
+ */
+function single<K extends 'prompt' | 'context' | 'answer' | 'result' | 'unknown'>(fact: FactOf<K>): Single<K> {
+  return { kind: (fact as Fact).kind, fact } as Single<K>
+}
 
 /**
  * Fold one fact into a transcript.
@@ -61,9 +73,9 @@ export function fold(model: Transcript, fact: Fact): Transcript {
   } else if (fact.kind === 'result') {
     const at = last.entries.findLastIndex(entry => entry.kind === 'tool' && entry.call.callId === fact.callId)
     const pending = last.entries[at]
-    entries = pending?.kind === 'tool' ? last.entries.with(at, { ...pending, result: fact }) : [...last.entries, { kind: 'result', fact }]
+    entries = pending?.kind === 'tool' ? last.entries.with(at, { ...pending, result: fact }) : [...last.entries, single(fact)]
   } else {
-    entries = [...last.entries, { kind: fact.kind, fact }]
+    entries = [...last.entries, single(fact)]
   }
   return { turns: [...turns, { ...last, entries }] }
 }
