@@ -165,3 +165,11 @@ test('disposing the row gives the terminal back, closes the session, and cancels
   await settle()
   assert.equal(pending.terminal.started, false)
 })
+
+test('the host provides the binnacle service, and a view an author registers draws on the screen', async () => {
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, terminal, commit } = await mount([], session)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.view('prompt', () => ({ kind: 'text', text: 'drawn by an author' })) } })
+  commit()
+  await until(() => /drawn by an author/.test(terminal.written))
+})

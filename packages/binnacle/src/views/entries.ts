@@ -10,6 +10,9 @@ import type { Block, Fact } from '../facts/adapt.ts'
 import type { Entry } from '../models/transcript.ts'
 import type { Node } from '../ui/node.ts'
 
+/** How a kind of entry is drawn: a built-in view, or one an author registered. */
+export type View = (entry: Entry) => Node
+
 /**
  * The text of some blocks, one paragraph each.
  * @param blocks - the blocks.
@@ -48,9 +51,12 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
 /**
  * Draw one entry.
  * @param entry - the entry.
+ * @param views - authors' views, by entry kind or by the name of an authored fact; one for a built-in kind replaces it.
  * @returns what it draws.
  */
-export function drawEntry(entry: Entry): Node {
+export function drawEntry(entry: Entry, views: ReadonlyMap<string, View> = new Map()): Node {
+  const registered = views.get(entry.kind === 'authored' ? entry.fact.name : entry.kind)
+  if (registered !== undefined) return registered(entry)
   switch (entry.kind) {
     case 'prompt':
       return { kind: 'text', text: `› ${textOf(entry.fact.blocks)}` }
@@ -62,6 +68,8 @@ export function drawEntry(entry: Entry): Node {
       return drawTool(entry.call, entry.result)
     case 'result':
       return titled(`● result of call ${entry.fact.callId}`, { kind: 'fold', id: `result:${entry.fact.seq}`, rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } })
+    case 'authored':
+      return titled(`? ${entry.fact.name}`, { kind: 'fold', id: `authored:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: JSON.stringify(entry.fact.data, null, 2) } })
     case 'unknown':
       return titled(`? ${entry.fact.type}`, { kind: 'fold', id: `unknown:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: JSON.stringify(entry.fact.record, null, 2) } })
   }

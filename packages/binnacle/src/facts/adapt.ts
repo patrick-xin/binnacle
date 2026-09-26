@@ -105,6 +105,13 @@ export type Fact =
     readonly meta: unknown
   }
   | Logged & {
+    readonly kind: 'authored'
+    /** The name its author's adapter gave it; a view registered under the name draws it. */
+    readonly name: string
+    /** What the adapter read out of the event, in the author's shape. */
+    readonly data: unknown
+  }
+  | Logged & {
     readonly kind: 'unknown'
     /** The event's dsh type. */
     readonly type: string
@@ -114,6 +121,9 @@ export type Fact =
 
 /** An adapter for one kind of event. */
 type Adapter<K extends SessionEventType> = (event: SessionEvent<K>) => Fact
+
+/** An author's adapter for one kind of event: it names the fact and says what it holds. */
+export type AuthorAdapter = (event: SessionEvent) => { readonly name: string, readonly data: unknown }
 
 /**
  * Read one content block.
@@ -170,9 +180,12 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
 /**
  * Adapt one session event.
  * @param event - the event, as dsh logged it.
+ * @param authored - authors' adapters by event type; one for a kind binnacle also reads wins.
  * @returns the fact it is; `unknown` when no adapter reads its kind.
  */
-export function adapt(event: SessionEvent): Fact {
+export function adapt(event: SessionEvent, authored: ReadonlyMap<string, AuthorAdapter> = new Map()): Fact {
+  const author = authored.get(event.type)
+  if (author !== undefined) return { kind: 'authored', seq: event.seq, time: event.time, ...author(event) }
   const adapter = adapters[event.type] as Adapter<typeof event.type> | undefined
   return adapter === undefined
     ? { kind: 'unknown', seq: event.seq, time: event.time, type: event.type, record: event }
