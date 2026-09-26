@@ -16,7 +16,7 @@ import type { Frame, Placed } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
 import type { UiState } from '../ui/state.ts'
 import { drawEntry } from './entries.ts'
-import type { View } from './entries.ts'
+import type { Views } from './entries.ts'
 
 /** What the screen draws, and what on it can take focus. */
 export interface Screen extends Frame {
@@ -25,7 +25,7 @@ export interface Screen extends Frame {
 }
 
 /** Draws one screen after another from the same session. */
-export type DrawScreen = (model: Transcript, state: UiState, width: number, views?: ReadonlyMap<string, View>) => Screen
+export type DrawScreen = (model: Transcript, state: UiState, width: number, views?: Views) => Screen
 
 /** What an entry drew, and how it was last laid out. */
 interface Drawing {
@@ -64,7 +64,7 @@ function foldsIn(node: Node): string[] {
  */
 export function screens(): DrawScreen {
   const drawings = new WeakMap<Entry, Drawing>()
-  const frameOf = (entry: Entry, state: UiState, width: number, views: ReadonlyMap<string, View>): Frame => {
+  const frameOf = (entry: Entry, state: UiState, width: number, views: Views): Frame => {
     let drawing = drawings.get(entry)
     if (drawing === undefined) {
       const node = drawEntry(entry, views)
@@ -100,6 +100,6 @@ export function screens(): DrawScreen {
  * @param views - authors' views, as `drawEntry` takes them.
  * @returns every line, every region on them, and what can take focus.
  */
-export function screen(facts: readonly Fact[], state: UiState, width: number, views: ReadonlyMap<string, View> = new Map()): Screen {
+export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map()): Screen {
   return screens()(transcript(facts), state, width, views)
 }

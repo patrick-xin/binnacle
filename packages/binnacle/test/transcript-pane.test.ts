@@ -7,7 +7,7 @@ import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../src/facts/adapt.ts'
 import type { Fact } from '../src/facts/adapt.ts'
-import type { View } from '../src/api.ts'
+import type { View, Views } from '../src/api.ts'
 import { TranscriptPane } from '../src/panes/transcript.ts'
 
 const prompt: Fact = { kind: 'prompt', seq: 1, time: 1, blocks: [{ kind: 'text', text: 'fix the build' }] }
@@ -62,14 +62,14 @@ const sent = (seq: number, text: string): Fact => ({ kind: 'prompt', seq, time: 
  * prompt's text, folded to its first line.
  * @returns the views to hand a pane, and the calls so far.
  */
-function counting(): { views: Map<string, View>, calls: () => number } {
+function counting(): { views: Views, calls: () => number } {
   let calls = 0
   const view: View = (entry) => {
     calls++
     const text = entry.kind === 'prompt' ? entry.fact.blocks.map(block => block.kind === 'unread' ? '' : block.text).join('\n') : ''
     return { kind: 'fold', id: `mine:${entry.kind === 'prompt' ? entry.fact.seq : 0}`, rows: 1, child: { kind: 'text', text } }
   }
-  return { views: new Map([['prompt', view]]), calls: () => calls }
+  return { views: new Map([['prompt', [view]]]), calls: () => calls }
 }
 
 test('a view is called once for each entry, however many frames draw it', () => {
@@ -172,7 +172,7 @@ function tampered(tamper: (entry: Extract<Parameters<View>[0], { kind: 'tool' }>
     if (entry.kind === 'tool') tamper(entry)
     return { kind: 'text', text: 'drawn by an author' }
   }
-  const pane = new TranscriptPane(() => {}, () => new Map([['tool', view]]))
+  const pane = new TranscriptPane(() => {}, () => new Map([['tool', [view]]]))
   pane.push(adapt(asked))
   shown(pane)
   return pane

@@ -11,7 +11,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **transcript** | The model of a session as turns (`binnacle:packages/binnacle/src/models/transcript.ts#transcript`), folded one fact at a time. |
 | **turn** | What a person sent and everything the agent did about it, and why it ended; a turn numbered `null` holds what the log carries before its first turn. dsh's word, grouped by us. |
 | **entry** | One thing a turn holds: a fact, or a tool call paired with its result once it has one (`binnacle:packages/binnacle/src/models/transcript.ts#Entry`). Steps are not entries. |
-| **view** | `(entry) → Node`: draws one kind of entry, and declares the affordances on what it drew (`binnacle:packages/binnacle/src/views/entries.ts#View`). |
+| **view** | `(entry, next) → Node`: draws one kind of entry, and declares the affordances on what it drew (`binnacle:packages/binnacle/src/views/entries.ts#View`). Views of one key stack; the newest draws, and `next` draws the entry as the view beneath it does, binnacle's own at the bottom ([ADR 8](adr/0008-a-view-builds-on-the-one-beneath-it-and-the-newest-draws.md)). |
 | **node** | What a view returns: data, laid out by the ui with pi-tui (`binnacle:packages/binnacle/src/ui/node.ts#Node`). |
 | **fallback view** | How an entry no view claims is drawn: its type in one line, and `expand` to the raw record. It also says what went wrong when an author's adapter or view failed. |
 | **layer** | A folder of `src`, or the module `api.ts`, and what it may import: [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |

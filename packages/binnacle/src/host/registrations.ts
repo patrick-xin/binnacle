@@ -11,7 +11,7 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { AuthorAdapter, Registrations, View } from '../api.ts'
+import type { AuthorAdapter, Registrations, View, Views } from '../api.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -22,8 +22,9 @@ declare module '@deepseek-ai/cordis' {
 
 /** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
 export class RegistrationService extends Service implements Registrations {
-  private readonly adapterTable = new Map<string, AuthorAdapter>()
-  private readonly viewTable = new Map<string, View>()
+  private readonly adapterTable = new Map<string, readonly AuthorAdapter[]>()
+  private readonly newestAdapters = new Map<string, AuthorAdapter>()
+  private readonly viewTable = new Map<string, readonly View[]>()
   private readonly listeners = new Set<() => void>()
 
   /**
@@ -33,13 +34,13 @@ export class RegistrationService extends Service implements Registrations {
     super(ctx, 'binnacle')
   }
 
-  /** Authors' adapters, by the dsh event type each reads. */
+  /** The adapter that reads each dsh event type: the newest registered for it. */
   get adapters(): ReadonlyMap<string, AuthorAdapter> {
-    return this.adapterTable
+    return this.newestAdapters
   }
 
-  /** Authors' views, by entry kind or authored fact name. */
-  get views(): ReadonlyMap<string, View> {
+  /** Authors' views, by entry kind or authored fact name, each key's oldest first. */
+  get views(): Views {
     return this.viewTable
   }
 
@@ -64,26 +65,34 @@ export class RegistrationService extends Service implements Registrations {
   }
 
   /**
-   * Register one entry as an effect of the calling plugin.
+   * Register one entry as an effect of the calling plugin, above any the key already has.
    * @param into - the table.
    * @param value - what is registered.
    * @param label - the effect's label.
    * @returns the effect's disposer.
    */
-  private register<T>(into: Map<string, T>, key: string, value: T, label: string): () => void {
-    if (into.has(key)) throw new Error(`${label}: already registered by another plugin; dispose it first`)
+  private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string): () => void {
     return this.ctx.effect(() => {
-      into.set(key, value)
-      this.notify()
+      into.set(key, [...into.get(key) ?? [], value])
+      this.changed()
       return () => {
-        into.delete(key)
-        this.notify()
+        const rest = [...into.get(key) ?? []]
+        // Any one of equal values: the same function registered twice leaves the same table whichever goes.
+        rest.splice(rest.indexOf(value), 1)
+        if (rest.length === 0) into.delete(key)
+        else into.set(key, rest)
+        this.changed()
       }
     }, label)
   }
 
-  /** Tell every listener something changed. */
-  private notify(): void {
+  /** Take the newest adapter of each type, and tell every listener something changed. */
+  private changed(): void {
+    this.newestAdapters.clear()
+    for (const [type, stack] of this.adapterTable) {
+      const newest = stack.at(-1)
+      if (newest !== undefined) this.newestAdapters.set(type, newest)
+    }
     for (const listener of this.listeners) listener()
   }
 }

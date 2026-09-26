@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../src/facts/adapt.ts'
@@ -64,11 +65,58 @@ test('a fact of the author\'s own with no view is drawn by the fallback, by its 
   assert.deepEqual(shown(registrations, seed), ['› fix the build', '? seeded', '… 3 more lines'])
 })
 
-test('a second plugin cannot draw a key another plugin draws, until the first is disposed', async () => {
+test('the newest plugin to draw a key draws it, on what the one before drew, and disposing either gives its place back', async () => {
   const { registrations, author } = surface()
   const first = await author((ctx) => { ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'first' })) })
-  assert.throws(() => registrations.view('prompt', () => ({ kind: 'text', text: 'second' })), /binnacle\.view\(prompt\): already registered by another plugin; dispose it first/)
+  const second = await author((ctx) => { ctx.binnacle.view('prompt', (_, next) => ({ kind: 'stack', children: [next(), { kind: 'text', text: 'second' }] })) })
+  assert.deepEqual(shown(registrations), ['first', 'second'])
   await first.dispose()
-  await author((ctx) => { ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'second' })) })
-  assert.deepEqual(shown(registrations), ['second'])
+  assert.deepEqual(shown(registrations), ['› fix the build', 'second'])
+  await second.dispose()
+  assert.deepEqual(shown(registrations), ['› fix the build'])
+})
+
+test('a view that throws is drawn over by the view beneath it, which says whose view failed and why', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'first' })) })
+  await author((ctx) => { ctx.binnacle.view('prompt', () => { throw new Error('no phone') }) })
+  assert.deepEqual(shown(registrations), ['first', '✗ binnacle.view(prompt) threw: no phone'])
+})
+
+test('the newest adapter of a kind reads it, and disposing it gives the kind back to the one before', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.facts('session/end-seed', () => ({ name: 'seeded', data: {} }))
+    ctx.binnacle.view('seeded', () => ({ kind: 'text', text: 'seeded' }))
+  })
+  const forked = await author((ctx) => {
+    ctx.binnacle.facts('session/end-seed', () => ({ name: 'forked', data: {} }))
+    ctx.binnacle.view('forked', () => ({ kind: 'text', text: 'forked' }))
+  })
+  assert.deepEqual(shown(registrations, seed), ['› fix the build', 'forked'])
+  await forked.dispose()
+  assert.deepEqual(shown(registrations, seed), ['› fix the build', 'seeded'])
+})
+
+test('a view is handed what the view beneath it draws, and builds on it', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('prompt', (_, next) => ({ kind: 'stack', children: [next(), { kind: 'text', text: '  sent from the phone' }] })) })
+  assert.deepEqual(shown(registrations), ['› fix the build', '  sent from the phone'])
+})
+
+/**
+ * A tool the model asked for, as dsh logs it.
+ * @param seq - its place in the log, which also names the call.
+ * @param name - the tool.
+ * @returns the event.
+ */
+const called = (seq: number, name: string): SessionEvent<'tool/call'> => ({
+  type: 'tool/call', seq: SessionSeq(seq), time: seq, data: { turn: 1, step: 1, callId: ToolCallId(`c${seq}`), name, arguments: '{}' },
+})
+
+test('two plugins can each draw one tool\'s card, and every other card stays binnacle\'s', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'bash' ? { kind: 'text', text: '$ make' } : next()) })
+  await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'read' ? { kind: 'text', text: 'read a file' } : next()) })
+  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['› fix the build', '$ make', 'read a file', '● grep {}', '  running…'])
 })

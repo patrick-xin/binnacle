@@ -16,7 +16,7 @@ import { under } from '../ui/layout.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { act, initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
-import type { View } from '../views/entries.ts'
+import type { Views } from '../views/entries.ts'
 import { screens } from '../views/screen.ts'
 import type { DrawScreen, Screen } from '../views/screen.ts'
 
@@ -24,7 +24,7 @@ import type { DrawScreen, Screen } from '../views/screen.ts'
 export class TranscriptPane implements Component {
   #transcript: Transcript = empty
   readonly #changed: () => void
-  readonly #views: () => ReadonlyMap<string, View>
+  readonly #views: () => Views
   #state: UiState = initial
   #draw: DrawScreen = screens()
   #drawn: { readonly width: number, readonly screen: Screen } | undefined
@@ -33,7 +33,7 @@ export class TranscriptPane implements Component {
    * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
    * @param views - authors' views as they stand, read when an entry is first drawn; `reset` draws every entry again.
    */
-  constructor(changed: () => void, views: () => ReadonlyMap<string, View> = () => new Map()) {
+  constructor(changed: () => void, views: () => Views = () => new Map()) {
     this.#changed = changed
     this.#views = views
   }
