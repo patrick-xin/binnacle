@@ -24,8 +24,18 @@ test('a line a person sent is a prompt, carrying its text', () => {
 })
 
 test('a kind no adapter knows is an unknown fact, carrying its type and the raw record', () => {
-  const event: SessionEvent<'turn/start'> = { type: 'turn/start', seq: SessionSeq(2), time: 900, data: { turn: 1 } }
-  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 2, time: 900, type: 'turn/start', record: event })
+  const event: SessionEvent<'session/end-seed'> = { type: 'session/end-seed', seq: SessionSeq(2), time: 900, data: {} }
+  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: event })
+})
+
+test('a turn opening is a turn fact', () => {
+  const event: SessionEvent<'turn/start'> = { type: 'turn/start', seq: SessionSeq(1), time: 800, data: { turn: 1 } }
+  assert.deepEqual(adapt(event), { kind: 'turn', seq: 1, time: 800, turn: 1, phase: 'start' })
+})
+
+test('a turn closing is a turn fact naming why it ended', () => {
+  const event: SessionEvent<'turn/end'> = { type: 'turn/end', seq: SessionSeq(13), time: 2_600, data: { turn: 1, reason: { kind: 'interrupted' } } }
+  assert.deepEqual(adapt(event), { kind: 'turn', seq: 13, time: 2_600, turn: 1, phase: 'end', ending: 'interrupted' })
 })
 
 test('a user-role message from any source but a person is context they did not type, naming its source', () => {
@@ -117,4 +127,11 @@ test('a result that succeeded carries no failure', () => {
     data: { turn: 1, step: 2, message: { role: 'tool', id: MessageId('m6'), source: { kind: 'tool', callId: ToolCallId('c2') }, toolCallId: ToolCallId('c2'), content: [] } },
   }
   assert.deepEqual(adapt(event), { kind: 'result', seq: 12, time: 2_500, turn: 1, step: 2, callId: 'c2', failed: false, blocks: [], meta: undefined })
+})
+
+test('a step opening or closing is a step fact', () => {
+  const start: SessionEvent<'step/start'> = { type: 'step/start', seq: SessionSeq(6), time: 1_300, data: { turn: 1, step: 1 } }
+  const end: SessionEvent<'step/end'> = { type: 'step/end', seq: SessionSeq(12), time: 2_550, data: { turn: 1, step: 1 } }
+  assert.deepEqual(adapt(start), { kind: 'step', seq: 6, time: 1_300, turn: 1, step: 1, phase: 'start' })
+  assert.deepEqual(adapt(end), { kind: 'step', seq: 12, time: 2_550, turn: 1, step: 1, phase: 'end' })
 })
