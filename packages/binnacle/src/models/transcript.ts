@@ -20,7 +20,7 @@ type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, re
  * its turn, kept rather than dropped.
  */
 export type Entry =
-  | Single<'prompt' | 'context' | 'answer' | 'result' | 'unknown'>
+  | Single<'prompt' | 'context' | 'answer' | 'result' | 'authored' | 'unknown'>
   | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'> }
 
 /** A turn: what a person sent and everything the agent did about it. */
@@ -47,7 +47,7 @@ export const empty: Transcript = { turns: [] }
  * @param fact - the fact.
  * @returns an entry of the fact's kind; TypeScript cannot correlate the two across the union, so the pairing is asserted here, once.
  */
-function single<K extends 'prompt' | 'context' | 'answer' | 'result' | 'unknown'>(fact: FactOf<K>): Single<K> {
+function single<K extends 'prompt' | 'context' | 'answer' | 'result' | 'authored' | 'unknown'>(fact: FactOf<K>): Single<K> {
   return { kind: (fact as Fact).kind, fact } as Single<K>
 }
 

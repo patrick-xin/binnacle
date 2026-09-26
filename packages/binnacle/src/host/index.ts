@@ -5,7 +5,8 @@
  * commits startup it opens a session on the default model. With `--check`
  * it reports the model and closes it; otherwise it takes the terminal through
  * pi-tui's alternate screen — the transcript in a scroll view that follows
- * its end, the composer below — until the person quits. Every layer below it
+ * its end, the composer below — until the person quits. It provides the
+ * `binnacle` service authors register through. Every layer below it
  * is a function of facts, UI state and a size; this is where those meet a
  * real process.
  * @module binnacle/host
@@ -18,9 +19,21 @@ import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, VStack }
 import type { Terminal } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
+import { Registrations } from './registrations.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
 import { TranscriptView } from './transcript-view.ts'
+
+/** What an author writes against: the service, and the shapes its registrations take and return. */
+export type { Registrations } from './registrations.ts'
+/** A view, the entries it draws, and the nodes it draws them with. */
+export type { View } from '../views/entries.ts'
+/** The entries of a transcript turn, which a view draws. */
+export type { Entry } from '../models/transcript.ts'
+/** The nodes a view returns. */
+export type { Node } from '../ui/node.ts'
+/** Facts, and the adapter an author reads an event kind with. */
+export type { AuthorAdapter, Fact } from '../facts/adapt.ts'
 
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
@@ -62,12 +75,14 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
 /**
  * Draw a session on the terminal until the person quits.
  * @param session - the open session.
+ * @param registrations - what authors registered: their adapters and views.
  * @param quit - called once, when the person asks to quit.
  * @returns a disposer that gives the terminal back.
  */
-function takeTerminal(session: OpenedSession, quit: () => void): () => void {
+function takeTerminal(session: OpenedSession, registrations: Registrations, quit: () => void): () => void {
   const tui = new TuiAltScreen(internals.terminal())
-  const transcript = new TranscriptView(() => { tui.requestRender() })
+  const transcript = new TranscriptView(() => { tui.requestRender() }, () => registrations.views)
+  const unregister = registrations.onChange(() => { tui.requestRender() })
   const composer = new Editor(tui, editorTheme)
   composer.onSubmit = (text) => {
     if (text.trim() === '') return
@@ -86,13 +101,14 @@ function takeTerminal(session: OpenedSession, quit: () => void): () => void {
     quit()
     return { consume: true }
   })
-  const unfollow = session.follow((event) => { transcript.push(adapt(event)) })
+  const unfollow = session.follow((event) => { transcript.push(adapt(event, registrations.adapters)) })
   tui.start()
   let held = true
   return () => {
     if (!held) return
     held = false
     unfollow()
+    unregister()
     tui.stop()
   }
 }
@@ -102,6 +118,7 @@ function takeTerminal(session: OpenedSession, quit: () => void): () => void {
  * @param ctx - the row's context, carrying the launcher's command line, exit request and readiness, and dsh's agents and default model.
  */
 export function apply(ctx: Context): void {
+  const registrations = new Registrations(ctx)
   let mode: Mode | undefined
   parseCmdline(ctx, surfaceCommand((chosen) => { mode = chosen }))
   if (mode === undefined) return
@@ -133,7 +150,7 @@ export function apply(ctx: Context): void {
         exit(0)
         return
       }
-      release = takeTerminal(opened, () => { void close().then(() => { exit(0) }) })
+      release = takeTerminal(opened, registrations, () => { void close().then(() => { exit(0) }) })
     })
   })
   ctx.effect(() => () => {

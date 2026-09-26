@@ -14,19 +14,23 @@ import { under } from '../ui/layout.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { act, initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
+import type { View } from '../views/entries.ts'
 import { screen } from '../views/screen.ts'
 
 /** The screen, as a component pi-tui lays out and scrolls. */
 export class TranscriptView implements Component {
   readonly #facts: Fact[] = []
   readonly #changed: () => void
+  readonly #views: () => ReadonlyMap<string, View>
   #state: UiState = initial
 
   /**
    * @param changed - called when what the view draws has changed, so the renderer draws a frame.
+   * @param views - authors' views as they stand, read at each frame.
    */
-  constructor(changed: () => void) {
+  constructor(changed: () => void, views: () => ReadonlyMap<string, View> = () => new Map()) {
     this.#changed = changed
+    this.#views = views
   }
 
   /**
@@ -44,7 +48,7 @@ export class TranscriptView implements Component {
    * @returns every line of the transcript.
    */
   render(width: number): string[] {
-    return [...screen(this.#facts, this.#state, width).lines]
+    return [...screen(this.#facts, this.#state, width, this.#views()).lines]
   }
 
   /**
@@ -55,7 +59,7 @@ export class TranscriptView implements Component {
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
-    const drawn = screen(this.#facts, this.#state, event.width)
+    const drawn = screen(this.#facts, this.#state, event.width, this.#views())
     const action = meaning(gesture, under(drawn.regions, event.y))
     if (action === undefined) return undefined
     const next = act(this.#state, action, drawn)

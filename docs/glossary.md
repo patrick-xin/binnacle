@@ -11,7 +11,8 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **transcript** | The model of a session as turns: `transcript(facts)` in `src/models/transcript.ts`, built by `fold`, one fact at a time. |
 | **turn** | What a person sent and everything the agent did about it, and why it ended; `turn: null` holds what the log carries before its first turn. dsh's word, grouped by us. |
 | **entry** | One thing a turn holds: a prompt, context, an answer, a tool call with its result once it has one, a result whose call is not in its turn, or an unknown fact. Steps are not entries. |
-| **view** | Draws one kind of content from its facts, with the exposed components, and declares the affordances on what it drew. |
+| **view** | `(entry) → Node`: draws one kind of entry, and declares the affordances on what it drew with `offer` and `fold` nodes. |
+| **node** | What a view returns: `text`, `blank`, `stack`, `offer` (content and the affordances it offers) or `fold`; data, laid out by the ui with pi-tui. |
 | **fallback view** | The view for a kind of fact no view claims: its type in one line, and `expand` to the raw record. |
 | **layer** | One of `contract`, `facts`, `models`, `views`, `ui`, `host`; what each may import is [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **contract** | The layer every other may import and that imports nothing: the vocabulary below. |
@@ -24,7 +25,8 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **gesture table** | `meaning(gesture, under)` in `src/ui/gestures.ts`: the one place a gesture is given a meaning. |
 | **action** | What a gesture means: invoke an affordance, scroll a region, select, or move focus. |
 | **binding** | A named, rebindable key: focus movement, the primary affordance, or one affordance by kind. |
-| **registration** | What an author and the built-in surface contribute through: facts, views, affordances and commands, bindings, placements. Each is a Cordis effect. |
+| **registration** | What an author contributes through `ctx.binnacle`, the service the host provides: `facts(type, adapter)` reads a dsh event kind as an authored fact, `view(key, view)` draws an entry kind or an authored fact. Each is an effect of the plugin that made it. Affordances and commands, bindings and placements join with their first use ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
+| **authored fact** | A fact an author's adapter made from an event kind, named by them; drawn by the view registered under its name, or by the fallback. |
 | **placement** | Where registered content goes: a screen or a side panel. |
 | **grant** | The affordance a person gives an approval with; a key, never a click. Also, in "grants, not the tree": what a plugin is handed instead of pi-tui components. |
 | **author** | An agent a person asks to customize binnacle; it registers through the same doors the built-in surface does. |
