@@ -12,6 +12,9 @@ import type { Affordance } from '../contract/index.ts'
 /** Something a view draws. */
 export type Node =
   | {
+    readonly kind: 'blank'
+  }
+  | {
     readonly kind: 'text'
     /** What it says; wrapped at the width it is given. */
     readonly text: string
