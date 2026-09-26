@@ -20,6 +20,7 @@ Two more repositories are read and never depended on: `codex` and `eve`, for wha
 
 ## How it is put together
 
+- **Everything is a plugin that a person can change by asking an author agent** ([ADR 0](adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). That covers the transcript, the chrome, the dialogs and screens a feature opens, the keys and the theme. binnacle supplies the building blocks an author draws with and the extension skill that says what they are; a request the blocks cannot draw is binnacle's defect. Every commitment below serves this one.
 - **The conversation transcript is drawn from the session log alone.** binnacle keeps no second record of a conversation, so what a person reads is what the harness holds: what the model sees is logged, and what is logged can be drawn.
 - **Code is in layers, each knowing only what it is allowed** ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md), [ADR 6](adr/0006-a-pane-joins-views-to-pi-tui-and-the-host-keeps-only-what-is-impure.md)). [`layers.json`](../packages/binnacle/layers.json) is the graph, and `check:layers` holds it. What happened, what it means, how it looks and how it answers each have one home; only the host touches the terminal and the process, so everything else is tested as facts in and lines out.
 - **Content declares what can be done with it; one table gives every gesture its meaning** ([ADR 1](adr/0001-content-offers-affordances-the-surface-owns-gestures.md)).
