@@ -6,7 +6,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 
 | Term | Means |
 | --- | --- |
-| **fact** | One thing that happened in a session, typed: dsh's session log adapted by the facts layer. Facts are the only input a model or view reads. |
+| **fact** | One session event adapted to binnacle's own type by `adapt` ([ADR 4](adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)): a prompt, context, an answer, a call, a result, or `unknown`. Facts are the only input a model or view reads. |
 | **model** | A pure fold over facts: turns, the agents tree, status. Knows no drawing. |
 | **view** | Draws one kind of content from its facts, with the exposed components, and declares the affordances on what it drew. |
 | **fallback view** | The view for a kind of fact no view claims: its type in one line, and `expand` to the raw record. |

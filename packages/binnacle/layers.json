@@ -1,19 +1,58 @@
 {
   "root": "src",
-  "entry": ["host"],
+  "entry": [
+    "host"
+  ],
   "layers": {
     "contract": [],
-    "facts": ["contract"],
-    "models": ["contract", "facts"],
-    "ui": ["contract"],
-    "views": ["contract", "facts", "models", "ui"],
-    "host": ["contract", "facts", "models", "ui", "views"]
+    "facts": [
+      "contract"
+    ],
+    "models": [
+      "contract",
+      "facts"
+    ],
+    "ui": [
+      "contract"
+    ],
+    "views": [
+      "contract",
+      "facts",
+      "models",
+      "ui"
+    ],
+    "host": [
+      "contract",
+      "facts",
+      "models",
+      "ui",
+      "views"
+    ]
   },
   "external": {
-    "@deepseek-ai/dsh-cmdline": ["host"],
-    "@deepseek-ai/cordis": ["host"],
-    "@earendil-works/pi-tui": ["ui", "host"],
-    "commander": ["host"],
-    "node:": ["host"]
+    "@deepseek-ai/dsh-cmdline": [
+      "host"
+    ],
+    "@deepseek-ai/dsh-llm": [
+      "facts",
+      "host"
+    ],
+    "@deepseek-ai/dsh-session": [
+      "facts",
+      "host"
+    ],
+    "@deepseek-ai/cordis": [
+      "host"
+    ],
+    "@earendil-works/pi-tui": [
+      "ui",
+      "host"
+    ],
+    "commander": [
+      "host"
+    ],
+    "node:": [
+      "host"
+    ]
   }
 }
