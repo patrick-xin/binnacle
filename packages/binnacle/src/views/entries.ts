@@ -11,7 +11,15 @@ import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
 import type { Node } from '../ui/node.ts'
 
-/** How a kind of entry is drawn: a built-in view, or one an author registered. */
+/**
+ * How a kind of entry is drawn: a built-in view, or one an author registered.
+ *
+ * A function of its entry alone. binnacle calls it once for each entry and
+ * keeps what it returned, laying it out again at a new width or as a fold in
+ * it opens, until the entry changes (a call's result arrives), a registration
+ * comes or goes, or pi-tui invalidates the pane; anything else it reads is
+ * read once.
+ */
 export type View = (entry: Entry) => Node
 
 /**

@@ -1,15 +1,18 @@
 /**
- * The screen: a session's facts and the UI state, at a width, as every line
- * of the transcript and the regions on them.
+ * The screen: a session's transcript and the UI state, at a width, as every
+ * line of the transcript and the regions on them.
  *
  * It draws the whole transcript, which pi-tui windows, scrolls and selects
- * ([ADR 7](../../../../docs/adr/0007-pi-tui-windows-scrolls-and-selects-the-transcript.md)).
+ * ([ADR 7](../../../../docs/adr/0007-pi-tui-windows-scrolls-and-selects-the-transcript.md)),
+ * so a frame's cost is kept to what changed: each entry's view is called once
+ * and its layout kept while its width and folds stay as they were.
  */
 
 import type { Fact } from '../facts/adapt.ts'
 import { transcript } from '../models/transcript.ts'
+import type { Entry, Transcript } from '../models/transcript.ts'
 import { layout } from '../ui/layout.ts'
-import type { Frame } from '../ui/layout.ts'
+import type { Frame, Placed } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
 import type { UiState } from '../ui/state.ts'
 import { drawEntry } from './entries.ts'
@@ -21,8 +24,76 @@ export interface Screen extends Frame {
   readonly focusable: readonly string[]
 }
 
+/** Draws one screen after another from the same session. */
+export type DrawScreen = (model: Transcript, state: UiState, width: number, views?: ReadonlyMap<string, View>) => Screen
+
+/** What an entry drew, and how it was last laid out. */
+interface Drawing {
+  /** What its view returned. */
+  readonly node: Node
+  /** The id of every fold in it. */
+  readonly folds: readonly string[]
+  /** Its last layout: at what width, which of `folds` were open, and what it drew. */
+  readonly laid?: { readonly width: number, readonly open: readonly boolean[], readonly frame: Frame }
+}
+
 /**
- * Draw the whole transcript at a width.
+ * The id of every fold in a node, however deep.
+ */
+function foldsIn(node: Node): string[] {
+  switch (node.kind) {
+    case 'blank':
+    case 'text':
+      return []
+    case 'stack':
+      return node.children.flatMap(foldsIn)
+    case 'offer':
+      return foldsIn(node.child)
+    case 'fold':
+      return [node.id, ...foldsIn(node.child)]
+  }
+}
+
+/**
+ * A way to draw screens that keeps what each entry drew. An entry is a value
+ * the transcript replaces when it changes, so what it drew is kept against
+ * the entry itself; the layout is kept against the width and against which of
+ * its folds are open, which is all of the state layout reads. Views are read
+ * when an entry is first drawn; after they change, draw with a new one.
+ * @returns the drawer, holding nothing yet.
+ */
+export function screens(): DrawScreen {
+  const drawings = new WeakMap<Entry, Drawing>()
+  const frameOf = (entry: Entry, state: UiState, width: number, views: ReadonlyMap<string, View>): Frame => {
+    let drawing = drawings.get(entry)
+    if (drawing === undefined) {
+      const node = drawEntry(entry, views)
+      drawing = { node, folds: foldsIn(node) }
+    }
+    const laid = drawing.laid
+    if (laid?.width === width && drawing.folds.every((id, index) => state.expanded.has(id) === laid.open[index])) return laid.frame
+    const frame = layout(drawing.node, width, state)
+    drawings.set(entry, { ...drawing, laid: { width, open: drawing.folds.map(id => state.expanded.has(id)), frame } })
+    return frame
+  }
+  return (model, state, width, views = new Map()) => {
+    const lines: string[] = []
+    const regions: Placed[] = []
+    for (const [index, turn] of model.turns.entries()) {
+      if (index > 0) lines.push('')
+      for (const entry of turn.entries) {
+        const frame = frameOf(entry, state, width, views)
+        for (const placed of frame.regions) regions.push({ ...placed, top: placed.top + lines.length })
+        // One line at a time: spreading an entry's lines into `push` throws once it draws more than about a hundred thousand.
+        for (const line of frame.lines) lines.push(line)
+      }
+    }
+    return { lines, regions, focusable: regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
+  }
+}
+
+/**
+ * Draw the whole transcript at a width, once.
  * @param facts - the session's facts, in log order.
  * @param state - what the person has changed about the screen.
  * @param width - the columns it is given.
@@ -30,8 +101,5 @@ export interface Screen extends Frame {
  * @returns every line, every region on them, and what can take focus.
  */
 export function screen(facts: readonly Fact[], state: UiState, width: number, views: ReadonlyMap<string, View> = new Map()): Screen {
-  const turns = transcript(facts).turns.map((turn): Node => ({ kind: 'stack', children: turn.entries.map(entry => drawEntry(entry, views)) }))
-  const children = turns.flatMap((turn, index): Node[] => index === 0 ? [turn] : [{ kind: 'blank' }, turn])
-  const frame = layout({ kind: 'stack', children }, width, state)
-  return { ...frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
+  return screens()(transcript(facts), state, width, views)
 }

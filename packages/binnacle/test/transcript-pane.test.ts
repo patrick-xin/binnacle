@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { TuiMouseEvent } from '@earendil-works/pi-tui'
 import type { Fact } from '../src/facts/adapt.ts'
+import type { View } from '../src/api.ts'
 import { TranscriptPane } from '../src/panes/transcript.ts'
 
 const prompt: Fact = { kind: 'prompt', seq: 1, time: 1, blocks: [{ kind: 'text', text: 'fix the build' }] }
@@ -40,6 +41,110 @@ test('a click on a fold opens it, and the pane claims the click', () => {
   pane.push(prompt)
   pane.push(context)
   assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 2)), { handled: true })
+  assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', 'a', 'b'])
+})
+
+/**
+ * A prompt the person sent.
+ * @param seq - its place in the log.
+ * @param text - what they wrote.
+ * @returns the fact.
+ */
+const sent = (seq: number, text: string): Fact => ({ kind: 'prompt', seq, time: seq, blocks: [{ kind: 'text', text }] })
+
+/**
+ * An author's view of prompts that counts how often binnacle calls it: each
+ * prompt's text, folded to its first line.
+ * @returns the views to hand a pane, and the calls so far.
+ */
+function counting(): { views: Map<string, View>, calls: () => number } {
+  let calls = 0
+  const view: View = (entry) => {
+    calls++
+    const text = entry.kind === 'prompt' ? entry.fact.blocks.map(block => block.kind === 'unread' ? '' : block.text).join('\n') : ''
+    return { kind: 'fold', id: `mine:${entry.kind === 'prompt' ? entry.fact.seq : 0}`, rows: 1, child: { kind: 'text', text } }
+  }
+  return { views: new Map([['prompt', view]]), calls: () => calls }
+}
+
+test('a view is called once for each entry, however many frames draw it', () => {
+  const { views, calls } = counting()
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.push(sent(1, 'one'))
+  pane.push(sent(2, 'two'))
+  shown(pane)
+  shown(pane)
+  shown(pane)
+  assert.equal(calls(), 2)
+  pane.push(sent(3, 'three'))
+  assert.deepEqual(shown(pane), ['one', 'two', 'three'])
+  assert.equal(calls(), 3)
+})
+
+test('opening a fold draws its entry again, laid out anew, without calling its view', () => {
+  const { views, calls } = counting()
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.push(sent(1, 'one\nmore'))
+  pane.push(sent(2, 'two\nmore'))
+  assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', '… 1 more line'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 1)), { handled: true })
+  assert.deepEqual(shown(pane), ['one', 'more', 'two', '… 1 more line'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 0)), { handled: true })
+  assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', '… 1 more line'])
+  assert.equal(calls(), 2)
+})
+
+test('a resize lays every entry out at the new width, without calling its view', () => {
+  const { views, calls } = counting()
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.push(sent(1, 'fix the build and the tests'))
+  assert.deepEqual(shown(pane), ['fix the build and the tests'])
+  assert.deepEqual(pane.render(16).map(line => stripTerminalSequences(line).trimEnd()), ['fix the build', '… 1 more line'])
+  assert.equal(calls(), 1)
+})
+
+test('invalidating the pane calls every view again, as pi-tui asks when the theme changes', () => {
+  const { views, calls } = counting()
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.push(sent(1, 'one'))
+  shown(pane)
+  pane.invalidate()
+  shown(pane)
+  assert.equal(calls(), 2)
+})
+
+/** A tool call, asked in turn 1. */
+const call: Fact = { kind: 'call', seq: 1, time: 1, turn: 1, step: 1, callId: 'c1', name: 'read', arguments: '{}' }
+
+/** A fold a person can open, after the call. */
+const goal: Fact = { ...context, seq: 2, time: 2 }
+
+/** The call's result, arriving once the fold is on screen: more lines than the call's `running…`. */
+const result: Fact = { kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'w\nx\ny\nz' }], meta: undefined }
+
+test('a result draws its call again, with it', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(call)
+  assert.deepEqual(shown(pane), ['● read {}', '  running…'])
+  pane.push(result)
+  assert.deepEqual(shown(pane), ['● read {}', 'w', 'x', 'y', '… 1 more line'])
+})
+
+test('a click answers the screen last drawn, the one the person pointed at, though a fact has arrived since', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(call)
+  pane.push(goal)
+  assert.deepEqual(shown(pane), ['● read {}', '  running…', '⋯ added by goal', '… 2 more lines'])
+  pane.push(result)
+  assert.deepEqual(pane.handleMouse(pointer('click', 3)), { handled: true })
+  assert.deepEqual(shown(pane), ['● read {}', 'w', 'x', 'y', '… 1 more line', '⋯ added by goal', 'a', 'b'])
+})
+
+test('a click at a width nothing was drawn at is answered at that width', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(prompt)
+  pane.push(context)
   assert.deepEqual(pane.handleMouse(pointer('click', 2)), { handled: true })
   assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', 'a', 'b'])
 })

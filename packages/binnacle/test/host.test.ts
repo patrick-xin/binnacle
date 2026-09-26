@@ -186,6 +186,18 @@ test('the host provides the binnacle service, and a view an author registers dra
   await until(() => /drawn by an author/.test(terminal.written))
 })
 
+test('a view registered after its entries were drawn draws them again, and disposing it gives them back', async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  await until(() => /› fix the build/.test(terminal.written))
+  const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.view('prompt', () => ({ kind: 'text', text: 'drawn by an author' })) } })
+  await author
+  await until(() => /drawn by an author/.test(terminal.written))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => /› fix the build/.test(terminal.written))
+})
+
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
   commit()
