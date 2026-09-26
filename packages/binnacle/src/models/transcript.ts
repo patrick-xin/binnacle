@@ -3,7 +3,6 @@
  *
  * A pure fold, so the host can apply one fact as it arrives and a replay can
  * apply the whole log, and both reach the same transcript.
- * @module binnacle/models/transcript
  */
 
 import type { Fact } from '../facts/adapt.ts'
@@ -44,7 +43,6 @@ export const empty: Transcript = { turns: [] }
 
 /**
  * The entry holding one fact.
- * @param fact - the fact.
  * @returns an entry of the fact's kind; TypeScript cannot correlate the two across the union, so the pairing is asserted here, once.
  */
 function single<K extends 'prompt' | 'context' | 'answer' | 'result' | 'authored' | 'unknown'>(fact: FactOf<K>): Single<K> {

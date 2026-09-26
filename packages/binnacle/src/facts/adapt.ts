@@ -1,5 +1,5 @@
 /**
- * The facts adapter: one dsh session event, read once, as one fact.
+ * The facts adapter: one dsh session event as one fact.
  *
  * This is where dsh's event shapes are read, and nowhere else below the host;
  * everything above it knows only the facts it returns. A kind with no
@@ -7,7 +7,6 @@
  * can show it: dsh has already refused any log whose unknown events are not
  * marked ignorable, so what arrives here unadapted is a kind binnacle has
  * not learned yet, never one it may silently drop.
- * @module binnacle/facts/adapt
  */
 
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -129,9 +128,7 @@ type Adapter<K extends SessionEventType> = (event: SessionEvent<K>) => Fact
 export type AuthorAdapter = (event: SessionEvent) => { readonly name: string, readonly data: unknown }
 
 /**
- * Read one content block.
- * @param block - dsh's block.
- * @returns ours.
+ * Read one of dsh's content blocks as binnacle's.
  */
 function blockOf(block: ContentBlock): Block {
   if (block.type === 'text') return { kind: 'text', text: block.text }

@@ -1,6 +1,5 @@
 /**
  * Layout: a node at a width, as the lines it draws and the regions on them.
- * @module binnacle/ui/layout
  */
 
 import { Text } from '@earendil-works/pi-tui'
@@ -91,7 +90,6 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
 /**
  * The regions a row lands on.
  * @param regions - a frame's regions, outermost first.
- * @param row - the row.
  * @returns the regions covering it, innermost first.
  */
 export function under(regions: readonly Placed[], row: number): Region[] {

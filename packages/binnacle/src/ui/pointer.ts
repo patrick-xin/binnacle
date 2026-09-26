@@ -3,7 +3,6 @@
  *
  * The one place pi-tui's mouse vocabulary is read; the gesture table knows
  * only gestures.
- * @module binnacle/ui/pointer
  */
 
 import type { TuiMouseEvent } from '@earendil-works/pi-tui'

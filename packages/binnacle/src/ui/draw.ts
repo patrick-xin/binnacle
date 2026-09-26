@@ -3,7 +3,6 @@
  *
  * The screen as a test sees it — no terminal, no styling — so a view, a
  * layout or a whole screen is asserted as lines.
- * @module binnacle/ui/draw
  */
 
 import { stripTerminalSequences, visibleWidth } from '@earendil-works/pi-tui'

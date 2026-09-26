@@ -1,5 +1,5 @@
 /**
- * The host: the one layer that touches the terminal and the harness runtime.
+ * The host: the one layer that touches the terminal and the process.
  *
  * It reads the invocation through dsh's command line, and once the launcher
  * commits startup it opens a session on the default model. With `--check`
@@ -8,11 +8,9 @@
  * its end, the composer below — until the person quits. It provides the
  * `binnacle` service authors register through, and reads the whole log again
  * when a registration comes or goes. A failure it cannot recover from gives
- * the terminal back, says what failed, and asks the launcher to exit 1: dsh's
- * own fatal handler cannot give back a terminal a bundle took. Every layer
- * below it is a function of facts, UI state and a size; this is where those
- * meet a real process.
- * @module binnacle/host
+ * back what it took, a terminal half-started included, says what failed, and
+ * asks the launcher to exit 1. Every layer below it is a function of facts,
+ * UI state and a size; this is where those meet a real process.
  */
 
 import { Command } from 'commander'

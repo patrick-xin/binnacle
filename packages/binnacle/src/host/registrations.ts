@@ -7,7 +7,6 @@
  * back what it registered. Its state is in TypeScript-private members, not
  * `#private` ones: Cordis hands each caller a traced copy of the service,
  * which a `#private` field refuses as its receiver.
- * @module binnacle/host/registrations
  */
 
 import { Service } from '@deepseek-ai/cordis'
@@ -67,7 +66,6 @@ export class RegistrationService extends Service implements Registrations {
   /**
    * Register one entry as an effect of the calling plugin.
    * @param into - the table.
-   * @param key - its key.
    * @param value - what is registered.
    * @param label - the effect's label.
    * @returns the effect's disposer.

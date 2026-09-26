@@ -3,7 +3,6 @@
  *
  * Each returns nodes and declares what its content offers; none reads input
  * or holds a pi-tui component.
- * @module binnacle/views/entries
  */
 
 import type { Block, Fact } from '../facts/adapt.ts'
@@ -16,9 +15,7 @@ import type { Node } from '../ui/node.ts'
 export type View = (entry: Entry) => Node
 
 /**
- * The text of some blocks, one paragraph each.
- * @param blocks - the blocks.
- * @returns their text.
+ * The text of some blocks, one paragraph each; a block binnacle cannot read is its type in brackets.
  */
 function textOf(blocks: readonly Block[]): string {
   return blocks.map(block => block.kind === 'unread' ? `[${block.type}]` : block.text).join('\n')
@@ -26,8 +23,6 @@ function textOf(blocks: readonly Block[]): string {
 
 /**
  * Draw an answer: reasoning folded under a label, text as it was written.
- * @param fact - the answer.
- * @returns what it draws.
  */
 function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
   const children = fact.blocks.map((block, index): Node => block.kind === 'reasoning'
@@ -38,9 +33,7 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
 
 /**
  * Draw a tool call: what was asked, then whether it is running, failed, or what it returned, folded.
- * @param call - the call.
  * @param result - its result, once it has one.
- * @returns what it draws.
  */
 function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined): Node {
   const head: Node = { kind: 'text', text: `${result?.failed === true ? '✗' : '●'} ${call.name} ${call.arguments}` }
@@ -55,7 +48,6 @@ const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context
 
 /**
  * Draw one entry.
- * @param entry - the entry.
  * @param views - authors' views, by entry kind or by the name of an authored fact; one for a built-in kind replaces it.
  * @returns what it draws; the built-in drawing, saying what went wrong, when an author's view throws or returns no node binnacle can lay out, or an authored fact is named as a built-in kind.
  */
@@ -81,7 +73,6 @@ export function drawEntry(entry: Entry, views: ReadonlyMap<string, View> = new M
 
 /**
  * Draw one entry as binnacle does.
- * @param entry - the entry.
  * @param problem - what went wrong drawing it otherwise, said under its title, or after it when it has none.
  * @returns what it draws.
  */
@@ -106,20 +97,13 @@ function builtIn(entry: Entry, problem?: string): Node {
 
 /**
  * A line of title above some content, and what went wrong under the title.
- * @param title - the title.
- * @param body - the content.
- * @param problem - what went wrong, if anything.
- * @returns them, stacked.
  */
 function titled(title: string, body: Node, problem: string | undefined): Node {
   return { kind: 'stack', children: problem === undefined ? [{ kind: 'text', text: title }, body] : [{ kind: 'text', text: title }, { kind: 'text', text: `✗ ${problem}` }, body] }
 }
 
 /**
- * Content, and what went wrong after it.
- * @param body - the content.
- * @param problem - what went wrong, if anything.
- * @returns the content alone, or both stacked.
+ * Content, and what went wrong after it, if anything.
  */
 function noted(body: Node, problem: string | undefined): Node {
   return problem === undefined ? body : { kind: 'stack', children: [body, { kind: 'text', text: `✗ ${problem}` }] }

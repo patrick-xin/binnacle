@@ -3,7 +3,6 @@
  *
  * It holds the session's facts and the UI state, draws the screen at the
  * width pi-tui gives it, and answers a pointer through the gesture table.
- * @module binnacle/panes/transcript
  */
 
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'

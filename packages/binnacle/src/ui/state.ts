@@ -2,8 +2,8 @@
  * UI state: what a person has changed about how the session is shown.
  *
  * Never a copy of the session: that is the log's. Only what they opened and
- * what has focus; where they scrolled is pi-tui's scroll view's.
- * @module binnacle/ui/state
+ * what has focus; where they scrolled and what they selected are pi-tui's
+ * ([ADR 7](../../../../docs/adr/0007-pi-tui-windows-scrolls-and-selects-the-transcript.md)).
  */
 
 import type { Action } from '../contract/index.ts'

@@ -1,11 +1,10 @@
 /**
- * The contract: the vocabulary every layer shares, and an author writes against.
+ * The contract: what layers that otherwise know nothing of each other share.
  *
  * Content offers affordances; a region of the screen carries them; a gesture
  * lands on regions and means an action, or nothing
  * ([ADR 1](../../../../docs/adr/0001-content-offers-affordances-the-surface-owns-gestures.md)).
  * Nothing here draws or reads input; it imports nothing.
- * @module binnacle/contract
  */
 
 /**
