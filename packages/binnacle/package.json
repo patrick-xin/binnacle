@@ -29,7 +29,7 @@
     "test": "pnpm run build && node --test \"test/*.test.ts\""
   },
   "dependencies": {
-    "@earendil-works/pi-tui": "0.85.1",
+    "@earendil-works/pi-tui": "0.87.1",
     "commander": "15.0.0"
   },
   "peerDependencies": {
