@@ -37,10 +37,10 @@ jobs:
             git switch --quiet --force-create "$branch" "$GITHUB_SHA"
             pnpm install --frozen-lockfile
             pnpm refs
-            pnpm pin "$name" "$tag"
             log="$RUNNER_TEMP/canary.log"
             {
-              pnpm test \
+              pnpm pin "$name" "$tag" \
+                && pnpm test \
                 && npm install --global "@deepseek-ai/dsh@$(node -p "require('./references.json').dsh.tag.replace(/^dsh-v/, '')")" \
                 && pnpm dsh:profile \
                 && pnpm check:boot
@@ -56,6 +56,6 @@ jobs:
               echo '```'
             } > "$RUNNER_TEMP/message.txt"
             git add references.json package.json packages/binnacle/package.json pnpm-lock.yaml
-            git commit --quiet --file "$RUNNER_TEMP/message.txt"
+            git commit --quiet --allow-empty --file "$RUNNER_TEMP/message.txt"
             git push --quiet origin "$branch"
           done 3< "$RUNNER_TEMP/carry.txt"

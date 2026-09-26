@@ -135,3 +135,26 @@ test('a step opening or closing is a step fact', () => {
   assert.deepEqual(adapt(start), { kind: 'step', seq: 6, time: 1_300, turn: 1, step: 1, phase: 'start' })
   assert.deepEqual(adapt(end), { kind: 'step', seq: 12, time: 2_550, turn: 1, step: 1, phase: 'end' })
 })
+
+const seed: SessionEvent<'session/end-seed'> = { type: 'session/end-seed', seq: SessionSeq(2), time: 900, data: {} }
+
+/** What an adapter returns beyond its name and data: a kind and a place in the log that are not its to say. */
+const overreaching = { name: 'seeded', data: { from: 'fork' }, kind: 'prompt', seq: 99 }
+
+test('an author\'s fact is its name and data, in the event\'s place; nothing else the adapter returns reaches it', () => {
+  assert.deepEqual(adapt(seed, new Map([['session/end-seed', () => overreaching]])), { kind: 'authored', seq: 2, time: 900, name: 'seeded', data: { from: 'fork' } })
+})
+
+test('an author\'s adapter that throws, or names nothing, leaves the event unknown and says which adapter and why', () => {
+  const threw = new Map([['session/end-seed', () => { throw new Error('no fork recorded') }]])
+  assert.deepEqual(adapt(seed, threw), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: seed, problem: 'binnacle.facts(session/end-seed) threw: no fork recorded' })
+  const nameless = new Map([['session/end-seed', () => ({ data: 1 }) as unknown as { name: string, data: unknown }]])
+  assert.deepEqual(adapt(seed, nameless), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: seed, problem: 'binnacle.facts(session/end-seed) named no fact: it must return { name, data }' })
+})
+
+/** An adapter whose result throws when its name is read. */
+const unreadable = (): { name: string, data: unknown } => ({ get name(): string { throw new Error('name unavailable') }, data: {} })
+
+test('an adapter whose result throws when read is fenced like one that throws when called', () => {
+  assert.deepEqual(adapt(seed, new Map([['session/end-seed', unreadable]])), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: seed, problem: 'binnacle.facts(session/end-seed) threw: name unavailable' })
+})

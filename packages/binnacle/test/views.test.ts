@@ -4,6 +4,8 @@ import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Entry } from '../src/models/transcript.ts'
 import { layout } from '../src/ui/layout.ts'
 import { drawEntry } from '../src/views/entries.ts'
+import type { View } from '../src/views/entries.ts'
+import type { Node } from '../src/ui/node.ts'
 
 /**
  * What an entry draws at a width, as a person reads it.
@@ -68,4 +70,47 @@ test('a kind nothing draws is its type in one line, and expand shows the raw rec
   const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'goal/change', record: { type: 'goal/change', data: {} } } }
   assert.deepEqual(lines(entry), ['? goal/change', '… 4 more lines'])
   assert.deepEqual(lines(entry, ['unknown:2']), ['? goal/change', '{', '  "type": "goal/change",', '  "data": {}', '}'])
+})
+
+const prompt: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
+const drawn = (entry: Entry, views: Map<string, View>): string[] =>
+  layout(drawEntry(entry, views), 80, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+
+test('an author\'s view that throws is drawn over by the built-in one, which says whose view failed and why', () => {
+  const views = new Map<string, View>([['prompt', () => { throw new Error('no blocks') }]])
+  assert.deepEqual(drawn(prompt, views), ['› fix the build', '✗ binnacle.view(prompt) threw: no blocks'])
+})
+
+test('an authored fact named as a kind binnacle draws is drawn by the fallback, never by that kind\'s view', () => {
+  const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'tool', data: {} } }
+  const views = new Map<string, View>([['tool', () => ({ kind: 'text', text: 'a tool card' })]])
+  assert.deepEqual(drawn(entry, views), ['? tool', '✗ tool is a kind binnacle draws; the adapter must give its fact another name', '… 1 more line'])
+})
+
+test('an unknown fact carrying a problem says it under its type', () => {
+  const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: {}, problem: 'binnacle.facts(session/end-seed) threw: no fork recorded' } }
+  assert.deepEqual(drawn(entry, new Map()), ['? session/end-seed', '✗ binnacle.facts(session/end-seed) threw: no fork recorded', '… 1 more line'])
+})
+
+/** An array of one slot with nothing in it, as a careless view might return. */
+const hole = <T>(): T[] => Object.assign<T[], { length: number }>([], { length: 1 })
+
+test('an author\'s view that returns what binnacle cannot lay out is drawn over, saying what was wrong with it', () => {
+  const nothing = new Map<string, View>([['prompt', () => undefined as unknown as Node]])
+  assert.deepEqual(drawn(prompt, nothing), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: it is undefined'])
+  const unreadable = new Map<string, View>([['prompt', () => ({ kind: 'stack', children: [{ kind: 'text', get text(): string { throw new Error('text unavailable') } }] })]])
+  assert.deepEqual(drawn(prompt, unreadable), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: text unavailable'])
+  const holed = new Map<string, View>([['prompt', () => ({ kind: 'stack', children: hole<Node>() })]])
+  assert.deepEqual(drawn(prompt, holed), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: it is undefined'])
+  const unlabelled = new Map<string, View>([['prompt', () => ({ kind: 'offer', id: 'o', affordances: hole(), child: { kind: 'blank' } })]])
+  assert.deepEqual(drawn(prompt, unlabelled), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: undefined is no affordance'])
+  const folded = new Map<string, View>([['prompt', () => ({ kind: 'fold', id: 'f', rows: -1, child: { kind: 'blank' } })]])
+  assert.deepEqual(drawn(prompt, folded), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a fold\'s rows are -1'])
+})
+
+test('data with no JSON and no string form is still drawn, as what it is', () => {
+  const cycle: Record<string, unknown> = Object.create(null)
+  cycle.self = cycle
+  const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'seeded', data: cycle } }
+  assert.deepEqual(layout(drawEntry(entry), 80, { expanded: new Set(['authored:3']) }).lines.map(line => stripTerminalSequences(line).trimEnd()), ['? seeded', 'a value binnacle cannot show'])
 })

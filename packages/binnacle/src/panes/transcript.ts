@@ -18,7 +18,7 @@ import { screen } from '../views/screen.ts'
 
 /** The screen, as a component pi-tui lays out and scrolls. */
 export class TranscriptPane implements Component {
-  readonly #facts: Fact[] = []
+  #facts: Fact[] = []
   readonly #changed: () => void
   readonly #views: () => ReadonlyMap<string, View>
   #state: UiState = initial
@@ -38,6 +38,15 @@ export class TranscriptPane implements Component {
    */
   push(fact: Fact): void {
     this.#facts.push(fact)
+    this.#changed()
+  }
+
+  /**
+   * Replace every fact, as when the adapters that read the log have changed.
+   * @param facts - the whole log, adapted again, in log order.
+   */
+  reset(facts: readonly Fact[]): void {
+    this.#facts = [...facts]
     this.#changed()
   }
 
