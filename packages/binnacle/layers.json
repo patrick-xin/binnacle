@@ -10,7 +10,7 @@
     "host": ["contract", "facts", "models", "ui", "views"]
   },
   "external": {
-    "@deepseek-ai/dsh-": ["facts", "host"],
+    "@deepseek-ai/dsh-cmdline": ["host"],
     "@deepseek-ai/cordis": ["host"],
     "@earendil-works/pi-tui": ["ui", "host"],
     "commander": ["host"],
