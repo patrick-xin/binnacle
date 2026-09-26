@@ -6,15 +6,16 @@
  * it reports the model and closes it; otherwise it takes the terminal through
  * pi-tui's alternate screen — the transcript in a scroll view that follows
  * its end, the composer below — until the person quits. It provides the
- * `binnacle` service authors register through. Every layer below it
- * is a function of facts, UI state and a size; this is where those meet a
- * real process.
+ * `binnacle` service authors register through, and reads the whole log again
+ * when a registration comes or goes. Every layer below it is a function of
+ * facts, UI state and a size; this is where those meet a real process.
  * @module binnacle/host
  */
 
 import { Command } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, VStack } from '@earendil-works/pi-tui'
 import type { Terminal } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
@@ -70,8 +71,9 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
  */
 function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void): () => void {
   const tui = new TuiAltScreen(internals.terminal())
+  const events: SessionEvent[] = []
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views)
-  const unregister = registrations.onChange(() => { tui.requestRender() })
+  const unregister = registrations.onChange(() => { transcript.reset(events.map(event => adapt(event, registrations.adapters))) })
   const composer = new Editor(tui, editorTheme)
   composer.onSubmit = (text) => {
     if (text.trim() === '') return
@@ -90,7 +92,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     quit()
     return { consume: true }
   })
-  const unfollow = session.follow((event) => { transcript.push(adapt(event, registrations.adapters)) })
+  const unfollow = session.follow((event) => {
+    events.push(event)
+    transcript.push(adapt(event, registrations.adapters))
+  })
   tui.start()
   let held = true
   return () => {

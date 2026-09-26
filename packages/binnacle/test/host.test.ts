@@ -56,6 +56,9 @@ const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
   data: { role: 'user', id: MessageId(`m${seq}`), source: { kind: 'user' }, content: [{ type: 'text', text }] },
 })
 
+/** A kind binnacle has no adapter for, as dsh logs it. */
+const seed = (seq: number): SessionEvent<'session/end-seed'> => ({ type: 'session/end-seed', seq: SessionSeq(seq), time: seq, data: {} })
+
 /** Let the host's pending promises settle. */
 const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 10))
 
@@ -172,4 +175,23 @@ test('the host provides the binnacle service, and a view an author registers dra
   await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.view('prompt', () => ({ kind: 'text', text: 'drawn by an author' })) } })
   commit()
   await until(() => /drawn by an author/.test(terminal.written))
+})
+
+test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
+  commit()
+  await until(() => /\? session\/end-seed/.test(terminal.written))
+  const author = ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.facts('session/end-seed', () => ({ name: 'seeded', data: {} }))
+      plugin.binnacle.view('seeded', () => ({ kind: 'text', text: 'seeded from a fork' }))
+    },
+  })
+  await author
+  await until(() => /seeded from a fork/.test(terminal.written))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => /\? session\/end-seed/.test(terminal.written))
 })
