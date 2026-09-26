@@ -5,7 +5,7 @@
  * A profile composes its bundles' patches in order over an empty root, and a
  * patch naming a row no earlier layer composed is skipped with a warning on
  * stderr; the process boots without it. This composes the profile
- * `pnpm profile` writes — dsh-base's patch at the dsh pin, then this
+ * `pnpm dsh:profile` writes — dsh-base's patch at the dsh pin, then this
  * bundle's — read with dsh's `entryListSchema` and applied by dsh's own
  * `applyEntryPatches`, and makes every warning a failure.
  * @module binnacle/scripts/check-patch

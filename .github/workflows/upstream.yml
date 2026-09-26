@@ -42,7 +42,7 @@ jobs:
             {
               pnpm test \
                 && npm install --global "@deepseek-ai/dsh@$(node -p "require('./references.json').dsh.tag.replace(/^dsh-v/, '')")" \
-                && pnpm profile \
+                && pnpm dsh:profile \
                 && pnpm check:boot
             } > "$log" 2>&1 && verdict=green || verdict=red
             {

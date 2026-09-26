@@ -45,5 +45,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     writeFileSync(join(profile, file), text)
   }
   execFileSync('dsh', ['plugin', '--profile', 'binnacle', 'install'], { stdio: 'inherit' })
-  console.log('profile: binnacle is ready; run `pnpm build`, then `dsh --profile binnacle`')
+  console.log('dsh:profile: binnacle is ready; run `pnpm build`, then `dsh --profile binnacle`')
 }

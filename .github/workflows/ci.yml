@@ -20,5 +20,5 @@ jobs:
       - run: pnpm test
       - name: Install the dsh launcher at the pin
         run: npm install --global "@deepseek-ai/dsh@$(node -p "require('./references.json').dsh.tag.replace(/^dsh-v/, '')")"
-      - run: pnpm profile
+      - run: pnpm dsh:profile
       - run: pnpm check:boot

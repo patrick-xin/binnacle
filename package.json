@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "refs": "node scripts/refs.mjs",
-    "profile": "node scripts/profile.mjs",
+    "dsh:profile": "node scripts/profile.mjs",
     "upstream": "node scripts/upstream.mjs",
     "pin": "node scripts/pin.mjs",
     "build": "pnpm --filter binnacle run build",

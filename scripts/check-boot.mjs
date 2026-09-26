@@ -5,7 +5,7 @@
  * Runs `dsh --profile binnacle --check` and requires the launcher on `PATH`
  * to be the release the `dsh` reference is pinned at, since the bundle
  * compiles against that release and runs inside whatever launcher mounts it.
- * Needs the profile `pnpm profile` writes and a fresh `pnpm build`.
+ * Needs the profile `pnpm dsh:profile` writes and a fresh `pnpm build`.
  * @module binnacle/scripts/check-boot
  */
 import { spawnSync } from 'node:child_process'
