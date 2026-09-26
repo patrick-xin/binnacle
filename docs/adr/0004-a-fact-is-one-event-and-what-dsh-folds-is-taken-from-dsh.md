@@ -11,7 +11,7 @@ dsh already folds some of it. `foldSurface` and a live `Session`'s `surface` say
 
 ## Decision
 
-**A fact is one event, adapted: `adapt(event) → Fact`, pure, in `src/facts/adapt.ts`.** A kind with no adapter is an `unknown` fact carrying its type and raw record. A block binnacle cannot read is kept as `unread`, named by its type.
+**A fact is one event, adapted: `adapt(event) → Fact`, pure (`binnacle:packages/binnacle/src/facts/adapt.ts#adapt`).** A kind with no adapter is an `unknown` fact carrying its type and raw record. A block binnacle cannot read is kept as `unread`, named by its type.
 
 **What dsh already folds is taken from dsh, never derived again.** The model-visible surface and what a replacement shadowed come from the live `Session` the host holds, handed to the facts layer as facts.
 
@@ -27,7 +27,7 @@ dsh already folds some of it. `foldSurface` and a live `Session`'s `surface` say
 
 ## Consequences
 
-- Facts are append-only and keyed by `seq`, so a view is cached per fact.
+- Facts are append-only and keyed by `seq`, so a view can be cached per fact.
 - Test fixtures are typed as dsh's `SessionEvent`, so a dsh rename fails the typecheck of the test that reads it.
 - A new tool loop's author registers one adapter per event kind, and anything unadapted is still drawn.
 - The surface facts depend on the host, so they arrive with the host's session wiring, not before it.

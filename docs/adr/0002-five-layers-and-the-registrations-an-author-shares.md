@@ -1,6 +1,6 @@
 # 2. Five layers, and the registrations an author shares
 
-- Status: accepted
+- Status: accepted; the layers are extended by [ADR 5](0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md) and [ADR 6](0006-a-pane-joins-views-to-pi-tui-and-the-host-keeps-only-what-is-impure.md)
 - Date: 2026-09-25
 
 ## Context
@@ -13,15 +13,15 @@ The repository is maintained by agents. An agent has to find where a behaviour l
 
 **Five layers, each knowing only what is below it:**
 
-| Layer  | Holds                                                                                                                       | Knows                             |
-| ------ | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| facts  | dsh's session log, adapted to typed facts                                                                                   | dsh only                          |
-| models | pure folds: turns, the agents tree, status                                                                                  | facts                             |
-| views  | fact → what is drawn, one module per kind of content                                                                        | facts, models, the ui's components |
-| ui     | the components, layout, the gesture table ([ADR 1](0001-content-offers-affordances-the-surface-owns-gestures.md)), UI state | pi-tui                            |
-| host   | the terminal and the harness runtime                                                                                        | everything; the only impure layer |
+| Layer  | Holds |
+| ------ | ----- |
+| facts  | dsh's session log, adapted to typed facts |
+| models | pure folds over facts |
+| views  | what each kind of content draws, as nodes |
+| ui     | the nodes a view draws with, layout, the gesture table ([ADR 1](0001-content-offers-affordances-the-surface-owns-gestures.md)), UI state |
+| host   | the terminal and the harness runtime; the only impure layer |
 
-The components a view draws with are few and exposed — text, code, markdown, card, collapsible, list, table, field, link — each drawn by the pi-tui component that already draws it. The contract types live in a leaf layer, `contract`, that imports nothing of ours and that every layer may know. [`layers.json`](../../packages/binnacle/layers.json) states exactly what each layer may import, and `pnpm test` holds it.
+A view draws with a few kinds of node — data, never a component — each laid out by the pi-tui component that already draws it. The vocabulary layers share without owning lives in a leaf, `contract`, that imports nothing of ours and that every layer may know. [`layers.json`](../../packages/binnacle/layers.json) states exactly what each layer may import, and `pnpm test` holds it.
 
 **An author and the built-in surface register through the same five doors**, each an effect disposed with its plugin:
 
@@ -46,4 +46,4 @@ An event kind with no view is drawn by a fallback — its type, one line, and `e
 - Below the host everything is a function of facts, UI state and a size, so a test feeds a log and reads the screen as text, with no terminal.
 - An import across layers the wrong way is a defect a gate can find, and the graph has no cycles to find one through.
 - The built-in surface has no private door: anything it draws, an author can draw, replace or remove.
-- A view tree rebuilt per frame costs time on a long session; views are cached per fact and invalidated when their fact or its UI state changes.
+- A view tree rebuilt per frame costs time that grows with the session.
