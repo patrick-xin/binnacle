@@ -11,7 +11,7 @@ How it is built is [the architecture](docs/architecture.md), and why is [the dec
 ```sh
 pnpm install && pnpm refs   # install, and fetch the repositories binnacle is read against
 pnpm test                   # every gate and every test
-pnpm build && pnpm profile  # build the bundle and create the `binnacle` dsh profile
+pnpm build && pnpm dsh:profile  # build the bundle and create the `binnacle` dsh profile
 dsh --profile binnacle      # run it, under the dsh launcher at the release references.json pins
 ```
 

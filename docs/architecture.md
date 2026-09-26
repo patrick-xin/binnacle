@@ -34,7 +34,7 @@ Two more repositories are read and never depended on: `codex` and `eve`, for wha
 | [`docs/adr/`](adr/)                                                 | the decisions, why, and what each beat                                   |
 | [`references.json`](../references.json)                             | every repository read here, by url, pinned commit, and the tag it is at  |
 | `.refs/`                                                            | those repositories, fetched by `pnpm refs`; read, never written          |
-| [`scripts/`](../scripts/)                                           | the gates, and `pnpm profile`, `pnpm upstream` and `pnpm pin`            |
+| [`scripts/`](../scripts/)                                           | the gates, and `pnpm dsh:profile`, `pnpm upstream` and `pnpm pin`            |
 | [`.github/workflows/`](../.github/workflows/)                       | CI, and the upstream job                                                 |
 
 What is wrong, missing or being investigated is a GitHub issue.

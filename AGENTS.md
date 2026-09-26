@@ -11,7 +11,7 @@ Standing orders — the one page here that binds. A record is evidence, never a 
 | `pnpm install && pnpm refs` | install, and fetch every reference into `.refs/` |
 | `pnpm test` | every gate, then every test — what CI runs |
 | `pnpm build` | build the bundle into `packages/binnacle/dist/` |
-| `pnpm profile` | create the `binnacle` dsh profile linking this checkout |
+| `pnpm dsh:profile` | create the `binnacle` dsh profile linking this checkout |
 | `pnpm check:boot` | boot it under the real `dsh` at the pin, draw nothing, exit |
 | `dsh --profile binnacle` | run it |
 | `pnpm upstream` | list each release upstream has published past a pin |
