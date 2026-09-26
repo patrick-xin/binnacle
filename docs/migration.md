@@ -24,9 +24,10 @@ In order; each builds on the ones above it.
 
 - [x] **Scaffold**: a bundle that boots under the real launcher, the gates, the references.
 - [x] **dsh seams and upstream following** ([ADR 3](adr/0003-dsh-is-reached-through-named-seams-each-held-by-a-gate.md)).
-- [ ] **Contract**: the types every layer shares — affordance kinds, gestures, what a region declares, drawn lines.
-- [ ] **Gesture table**: a gesture and what is under it to an action or nothing, one table for every screen.
-- [ ] **Render-to-text harness**: facts, UI state and a size in, the screen's lines out, drawn by real pi-tui components.
+- [x] **Contract**: the types every layer shares — affordance kinds, gestures, what a region declares, drawn lines.
+- [x] **Gesture table**: a gesture and what is under it to an action or nothing, one table for every screen.
+- [x] **Render-to-text harness**: `drawText` draws real pi-tui components at a width as the lines a person reads, and fails a line wider than its width.
+- [ ] **The screen harness**: facts, UI state and a size in, the screen's lines and the regions on them out — `drawText` over the views, once they exist.
 - [ ] **Facts**: the session log adapted to typed facts, and the fallback for a kind no adapter knows.
 - [ ] **Models**: turns, the agents tree, status — pure folds over facts.
 - [ ] **Views**: one per kind of content, drawn with the exposed components.
