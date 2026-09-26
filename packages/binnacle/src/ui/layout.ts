@@ -40,6 +40,8 @@ export interface Frame {
  */
 export function layout(node: Node, width: number, state: LayoutState): Frame {
   switch (node.kind) {
+    case 'blank':
+      return { lines: [''], regions: [] }
     case 'text':
       return { lines: new Text(node.text, 0, 0).render(width), regions: [] }
     case 'stack': {

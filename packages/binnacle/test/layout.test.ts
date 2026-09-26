@@ -73,3 +73,7 @@ test('the regions under a row are the ones covering it, innermost first', () => 
   assert.deepEqual(under(regions, 0).map(region => region.id), ['outer'])
   assert.deepEqual(under(regions, 2), [])
 })
+
+test('a blank is one empty line, which text cannot be: pi-tui draws nothing for it', () => {
+  assert.deepEqual(plain(layout({ kind: 'stack', children: [{ kind: 'text', text: 'a' }, { kind: 'blank' }, { kind: 'text', text: 'b' }] }, 10, OPEN)).lines, ['a', '', 'b'])
+})
