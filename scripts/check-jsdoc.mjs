@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * Refuse a source module that does not say what it is, or an export that does
- * not state its contract.
+ * Refuse a source module that does not say what it is for, or an export that
+ * does not state its contract.
  *
- * Every module under `packages/*\/src` opens with a JSDoc block carrying
- * `@module`, and every declaration it exports has a JSDoc block directly above
- * it, with nothing but whitespace between. A re-export is documented where it
- * is declared.
+ * Every module under `packages/*\/src` opens with a JSDoc block saying what
+ * it is for, set apart from what follows by a blank line or followed by its
+ * imports; a block right above the first export is that export's. Every
+ * declaration it exports has a JSDoc block directly above it, with nothing but
+ * whitespace between. A re-export is documented where it is declared.
  * @module binnacle/scripts/check-jsdoc
  */
 import { dirname, join } from 'node:path'
@@ -37,9 +38,9 @@ export function undocumented(path, text) {
   const problems = []
   const first = program.body[0]
   const opening = comments[0]
-  const isModuleDoc = opening?.type === 'Block' && opening.value.startsWith('*') && opening.value.includes('@module')
-    && (first === undefined || opening.end <= first.start)
-  if (!isModuleDoc) problems.push(`${path}:1: the module has no opening JSDoc with @module`)
+  const isModuleDoc = opening?.type === 'Block' && opening.value.startsWith('*')
+    && (first === undefined || (opening.end <= first.start && (first.type === 'ImportDeclaration' || /\n[ \t]*\n/.test(text.slice(opening.end, first.start)))))
+  if (!isModuleDoc) problems.push(`${path}:1: the module opens with no JSDoc saying what it is for`)
   for (const node of program.body) {
     const declaration = node.type === 'ExportNamedDeclaration' ? node.declaration
       : node.type === 'ExportDefaultDeclaration' ? node.declaration : undefined

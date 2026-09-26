@@ -56,3 +56,27 @@ test('the entry may import only what it is allowed, and a file outside every lay
     'src/stray.ts: is in no layer; move it under src/<layer>/',
   ])
 })
+
+test('a dynamic import naming its module is held as a static one is', () => {
+  const dynamic = { path: 'src/ui/table.ts', text: "const log = await import('../facts/log.ts')\nconst fs = await import(`node:fs`)\n" }
+  assert.deepEqual(checkLayers([dynamic], RULES), [
+    'src/ui/table.ts: imports facts (../facts/log.ts); ui may import contract — see layers.json',
+    'src/ui/table.ts: imports node:fs; only host may — see layers.json',
+  ])
+})
+
+test('a dynamic import whose module is decided at run time is a problem, since no rule can hold it', () => {
+  const dynamic = { path: 'src/host/index.ts', text: 'const which = `../${name}.ts`\nawait import(which)\nawait import(`../${name}.ts`)\n' }
+  assert.deepEqual(checkLayers([dynamic], RULES), [
+    'src/host/index.ts: imports a module named at run time (which); name it with a string so layers.json can hold it',
+    'src/host/index.ts: imports a module named at run time (`../${name}.ts`); name it with a string so layers.json can hold it',
+  ])
+})
+
+test('a dynamic import is held to the module it loads, escapes decoded', () => {
+  const dynamic = { path: 'src/ui/table.ts', text: "await import('../ui/\\u002e\\u002e/host/index.ts')\nawait import(`../\\u0066acts/log.ts`)\n" }
+  assert.deepEqual(checkLayers([dynamic], RULES), [
+    'src/ui/table.ts: imports host (../ui/../host/index.ts); ui may import contract — see layers.json',
+    'src/ui/table.ts: imports facts (../facts/log.ts); ui may import contract — see layers.json',
+  ])
+})
