@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
-import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
+import type { ToolCallView, ToolDefinition, ToolResultView } from '@deepseek-ai/dsh-tools'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Fact } from '../src/facts/adapt.ts'
 import { RegistrationService } from '../src/host/registrations.ts'
@@ -356,6 +356,26 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
   assert.deepEqual(lines(exit.draw(parts) as Node), ['✗ pnpm test', '  exited 2', 'tsc: 1 error'])
   assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal' } } }), { declined: 'exitCode is absent' })
   assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal', exitCode: 'two' } } }), { declined: 'exitCode is a string' })
+})
+
+test('the object a presenter returned is not frozen after drawing', async () => {
+  const call: ToolCallView = { card: 'terminal', title: 'pnpm test', cwd: '.' }
+  const result: ToolResultView = { card: 'terminal', exitCode: 2, output: 'tsc: 1 error' }
+  const cached = defineTool({
+    name: 'cached',
+    description: 'Presents objects it keeps.',
+    parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    execute: async () => 'cached',
+    presentCall: () => call,
+    presentResult: () => result,
+  })
+  const { pane } = await withCards(cached)
+  pane.push(asked('cached', '{}'))
+  pane.push(returned('tsc: 1 error'))
+  assert.deepEqual(drawText(pane, 60), ['● pnpm test', 'tsc: 1 error'])
+  assert.equal(Object.isFrozen(call), false)
+  assert.equal(Object.isFrozen(result), false)
 })
 
 test('disposing the plugin gives every call back to binnacle\'s card', async () => {

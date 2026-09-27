@@ -45,7 +45,7 @@ export interface PresentedCall {
   readonly card: 'generic' | 'terminal' | 'diff'
   /** What this call does, as the tool titled it: drawn as the card's head, its first line beside the glyph and each later line indented two columns beneath it. */
   readonly title: string
-  /** The object the presenter returned, read-only and unread beyond the fields above: a row reads its kind's own fields here, parsing them where it draws, as data from code binnacle does not own. */
+  /** A shallow copy of the object the presenter returned, frozen read-only and unread beyond the fields above: a row reads its kind's own fields here, parsing them where it draws, as data from code binnacle does not own. */
   readonly returned: Readonly<Record<string, unknown>>
 }
 
@@ -65,7 +65,7 @@ export function callViewOf(value: unknown): Read<PresentedCall> | undefined {
   const title: unknown = record.title
   if (typeof card !== 'string' || !callCards.has(card)) return { why: `${readable(card)} is no card the tool cards draw` }
   if (typeof title !== 'string') return { why: 'a call view needs its title' }
-  return { view: { card: card as PresentedCall['card'], title, returned: Object.freeze(value) as Readonly<Record<string, unknown>> } }
+  return { view: { card: card as PresentedCall['card'], title, returned: frozenCopy(value) } }
 }
 
 /** A result as its tool presented it, read as data. */
@@ -76,7 +76,7 @@ export interface PresentedResult {
   readonly title?: string
   /** The content the completed call folds beneath it, when the tool presented some; the result's own text when it did not. */
   readonly content?: readonly unknown[]
-  /** The object the presenter returned, read-only and unread beyond the fields above: a row reads its kind's own fields here, parsing them where it draws, as data from code binnacle does not own. */
+  /** A shallow copy of the object the presenter returned, frozen read-only and unread beyond the fields above: a row reads its kind's own fields here, parsing them where it draws, as data from code binnacle does not own. */
   readonly returned: Readonly<Record<string, unknown>>
 }
 
@@ -103,9 +103,22 @@ export function resultViewOf(value: unknown): Read<PresentedResult> | undefined 
       card: card as PresentedResult['card'],
       ...title === undefined ? {} : { title },
       ...content === undefined ? {} : { content },
-      returned: Object.freeze(value) as Readonly<Record<string, unknown>>,
+      returned: frozenCopy(value),
     },
   }
+}
+
+/**
+ * A shallow copy of a presenter's returned object, frozen: what a row reads
+ * is binnacle's to freeze; the object itself is the tool's, which may cache
+ * or reuse it, and binnacle never freezes what it does not own — as the
+ * facts layer freezes the fact it made, never the record it read
+ * (`binnacle:packages/binnacle/src/facts/adapt.ts`).
+ * @param value - the object a presenter returned.
+ * @returns the frozen copy a presented view carries.
+ */
+function frozenCopy(value: object): Readonly<Record<string, unknown>> {
+  return Object.freeze({ ...(value as Record<string, unknown>) })
 }
 
 /**
