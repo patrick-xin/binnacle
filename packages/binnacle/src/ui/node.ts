@@ -24,6 +24,11 @@ export type Node =
     readonly tone?: Tone
   }
   | {
+    readonly kind: 'markdown'
+    /** What it says, as a markdown document laid out by pi-tui's component in the theme's markdown styles. */
+    readonly text: string
+  }
+  | {
     readonly kind: 'stack'
     /** What it draws, top to bottom. */
     readonly children: readonly Node[]
@@ -74,6 +79,11 @@ export function parseNode(value: unknown): Node {
       if (tone === undefined) return { kind: 'text', text }
       if (typeof tone !== 'string' || !Object.hasOwn(tones, tone)) throw new Error(`${describe(tone)} is no tone`)
       return { kind: 'text', text, tone: tone as Tone }
+    }
+    case 'markdown': {
+      const text = field('text')
+      if (typeof text !== 'string') throw new Error('a markdown block needs text')
+      return { kind: 'markdown', text }
     }
     case 'stack': {
       const children = field('children')

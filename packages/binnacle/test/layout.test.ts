@@ -114,3 +114,37 @@ test('a title too wide for the top edge is left off whole, never cut', () => {
 test('a card with no column inside its border draws what it holds without one', () => {
   assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'ok' } }, 4, OPEN)).lines, ['ok'])
 })
+
+/** A document with one of each part, laid out at 20 columns. */
+const document = { kind: 'markdown', text: '## Ship it\n\nRun `pnpm test` first.\n\n- one\n- two\n\n> quoted\n\n```\nx = 1\n```\n\n---' } as const
+
+test('a markdown block is laid out as a document by pi-tui\'s component, and offers nothing', () => {
+  const frame = layout(document, 20, OPEN)
+  assert.deepEqual(plain(frame).lines, [
+    'Ship it',
+    '',
+    'Run pnpm test first.',
+    '',
+    '- one',
+    '- two',
+    '',
+    '│ quoted',
+    '',
+    '```',
+    '  x = 1',
+    '```',
+    '',
+    '────────────────────',
+  ])
+  assert.deepEqual(frame.regions, [])
+})
+
+test('a document\'s parts are drawn in the theme\'s markdown styles', () => {
+  const lines = layout(document, 20, OPEN).lines.map(line => line.trimEnd())
+  assert.ok(lines[0]?.startsWith('\x1b[1m'), JSON.stringify(lines[0]))
+  assert.equal(lines[2], 'Run \x1b[33mpnpm test\x1b[39m first.')
+  assert.equal(lines[4], '\x1b[36m- \x1b[39mone')
+  assert.ok(lines[7]?.startsWith('\x1b[2m│ \x1b[22m'), JSON.stringify(lines[7]))
+  assert.equal(lines[9], '\x1b[2m```\x1b[22m')
+  assert.equal(lines[13], '\x1b[2m' + '─'.repeat(20) + '\x1b[22m')
+})

@@ -110,6 +110,8 @@ test('an author\'s view that returns what binnacle cannot lay out is drawn over,
   assert.deepEqual(drawn(prompt, loud), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: shouting is no tone'])
   const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'card', title: 'two\nlines', child: { kind: 'blank' } })]]])
   assert.deepEqual(drawn(prompt, titled), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a card\'s title is one line'])
+  const undocumented = new Map<string, View[]>([['prompt', [() => ({ kind: 'markdown' }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, undocumented), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a markdown block needs text'])
 })
 
 test('data with no JSON and no string form is still drawn, as what it is', () => {

@@ -2,10 +2,10 @@
  * Layout: a node at a width, as the lines it draws and the regions on them.
  */
 
-import { Text, visibleWidth } from '@earendil-works/pi-tui'
+import { Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node } from './node.ts'
-import { tones } from './theme.ts'
+import { markdownTheme, tones } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open. */
 export interface LayoutState {
@@ -61,6 +61,9 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
     case 'text':
       // pi-tui wraps styled text, opening each line it wraps to in the style the line before ended in.
       return { lines: new Text(node.tone === undefined ? node.text : tones[node.tone](node.text), 0, 0).render(width), regions: [] }
+    case 'markdown':
+      // pi-tui lays a document out, in the theme's markdown styles; it offers nothing.
+      return { lines: new Markdown(node.text, 0, 0, markdownTheme).render(width), regions: [] }
     case 'stack': {
       const lines: string[] = []
       const regions: Placed[] = []
