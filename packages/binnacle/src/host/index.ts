@@ -32,6 +32,7 @@ import { describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
 import { toolCards } from '../plugins/tool-cards/index.ts'
+import { trajectory } from '../plugins/trajectory/index.ts'
 import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
@@ -171,6 +172,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       ? transcriptView()
       : screenViews.get(open.name) ?? new ScrollView(open.pane, { primary: true })
     if (open !== undefined) screenViews.set(open.name, reading)
+    // What is being read is what focus is brought into view on: the transcript, or the placed screen that is open.
+    scroll = reading
     alternate.setLayoutRoot(readBelowComposer(reading))
   }
   /** Close the placed screen that is open: the transcript returns to its place, and one opened from the main screen returns there. */
@@ -190,7 +193,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
-      pane = new ScreenPane(() => facts)
+      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView })
       screenPanes.set(id, pane)
     }
     pane.place(id, placed)
@@ -205,6 +208,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       facts.length = 0
       for (const event of events) facts.push(adapt(event, registrations.adapters))
       transcript.reset(facts)
+      for (const pane of screenPanes.values()) pane.factsChanged()
     } else if (changed === 'screens') offerScreens()
     else tui.requestRender()
   })
@@ -238,11 +242,13 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   offerScreens()
   // Keys arrive ahead of the composer, through pi-tui's input listener. The host answers what is bound to it, quitting
   // and switching screens; the key that opens a placed screen, and what it answers with, is the host's too; a gesture
-  // is the pane's to answer, and a key nothing answers gives the keyboard back to the composer, reaching it typed, so
-  // typing is never lost. While a placed screen is open, Esc returns to the transcript and no gesture moves on it;
+  // is the pane's to answer — the transcript's, or the placed screen that is open in its place, which holds UI state of
+  // its own — and a key nothing answers gives the keyboard back to the composer, reaching it typed, so typing is never
+  // lost. While a placed screen is open, Esc returns to the transcript and no gesture moves on it;
   // scrolling, search and selection are the alternate screen's own, and the composer below stays live.
   const keys = (data: string): TuiInputListenerResult => {
-    const resolved = table.resolve(data, transcript.focused, open !== undefined)
+    const reading = open === undefined ? transcript : open.pane
+    const resolved = table.resolve(data, reading.focused, open !== undefined)
     if (resolved?.kind === 'quit') {
       quit()
       return { consume: true }
@@ -262,9 +268,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       closeScreen()
       return { consume: true }
     }
-    if (resolved !== undefined && transcript.handleKey({ kind: 'key', binding: resolved.binding })) return { consume: true }
+    if (resolved !== undefined && reading.handleKey({ kind: 'key', binding: resolved.binding })) return { consume: true }
     // Stepping out drops focus, and where the main screen parked it, so what was typed is sent, not answered by focus.
-    transcript.handleKey({ kind: 'key', binding: 'focus.out' })
+    reading.handleKey({ kind: 'key', binding: 'focus.out' })
     return undefined
   }
   // While the fullscreen's scroll view is scrolled away from the end it follows, pi-tui's indicator says so on the
@@ -306,6 +312,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const fact = adapt(event, registrations.adapters)
     facts.push(fact)
     transcript.push(fact)
+    for (const pane of screenPanes.values()) pane.factsChanged()
   })
   let held = true
   let started = false
@@ -342,6 +349,7 @@ export function apply(ctx: Context): void {
   const registrations = new RegistrationService(ctx)
   // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
   ctx.plugin(toolCards)
+  ctx.plugin(trajectory)
   let parsed: Mode | undefined
   parseCmdline(ctx, surfaceCommand((chosen) => { parsed = chosen }))
   if (parsed === undefined) return

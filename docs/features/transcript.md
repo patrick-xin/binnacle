@@ -8,7 +8,7 @@ A person reads the session as it happens, turn by turn:
 - each tool call, as [Tool cards](tool-cards.md) draws it when its tool presents it, and as its mark and arguments otherwise ([Theme](theme.md)): the `running` mark and `running…` while it runs; `done` once it returned, its result folded to three rows; `failed`, and why, when it failed;
 - a kind of event binnacle has not learned to draw, as the `unknown` mark and its type, folded to its raw record.
 
-The session's machinery draws no line at all. The transcript is the conversation: what the person asked, what the model said and did. Everything the session logged stays one key away, on the Trajectory ([#20](https://github.com/[REDACTED:pii]/binnacle/issues/20)).
+The session's machinery draws no line at all. The transcript is the conversation: what the person asked, what the model said and did. Everything the session logged stays one key away, on the [Trajectory](trajectory.md).
 
 A click on a fold opens it, and a click on an open one folds it again; so does Enter on the focused fold ([Keys](keys.md)). The wheel scrolls, and a drag selects.
 
@@ -30,5 +30,4 @@ How a session reaches the screen is [the package map's](../../packages/binnacle/
 
 ## Open
 
-- [#20](https://github.com/[REDACTED:pii]/binnacle/issues/20): the Trajectory — every event the session logged, machinery included, one key away.
 - [#18](https://github.com/[REDACTED:pii]/binnacle/issues/18): the fallback's one line, for the kinds named unread.

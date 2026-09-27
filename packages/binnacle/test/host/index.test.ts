@@ -38,8 +38,8 @@ const added = (seq: number, text: string): SessionEvent<'user/message'> => ({
 const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 10))
 
 /** A plugin that places a screen of its own, opened with f2, drawing what it is told. */
-const placesAScreen = (ctx: Context, draw: (facts: readonly Fact[]) => Node, name = 'trajectory') =>
-  ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.screen(name, { key: 'f2', description: 'open the trajectory', draw }) } })
+const placesAScreen = (ctx: Context, draw: (facts: readonly Fact[]) => Node, name = 'review') =>
+  ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.screen(name, { key: 'f2', description: 'open the review', draw }) } })
 
 /** A screen that names its rows, so what it drew is plain on the terminal. */
 const namedRows = (count: number): (facts: readonly Fact[]) => Node => _facts => ({
@@ -687,7 +687,7 @@ test('a screen whose drawing throws draws what went wrong, naming its registrati
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
   terminal.type('\x1bOQ')
-  await until(async () => (await terminal.altScreen()).some(row => row.includes('✗ binnacle.screen(trajectory) threw: no')))
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('✗ binnacle.screen(review) threw: no')))
   await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'phone'))
   terminal.type('\x1bOQ')
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
@@ -749,4 +749,84 @@ test('leaving the alternate screen closes a placed screen open on it, and the tr
   }, 4000)
   terminal.type('\x1bOQ')
   await until(async () => (await terminal.altScreen()).slice(0, 5).every(row => row.startsWith('screen ')))
+})
+
+/** The session the Trajectory is read over: machinery, then one turn that asks and is answered. */
+const trajectorySession = (): SessionEvent[] => [
+  seed(0),
+  { type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } },
+  prompt(2, 'fix the build'),
+  { type: 'turn/end', seq: SessionSeq(3), time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
+]
+
+/** The row a click lands on, as the SGR mouse protocol reports it: 1-based. */
+const click = (terminal: XtermTerminal, column: number, row: number): void => {
+  terminal.type(`\x1b[<0;${column};${row}M`)
+  terminal.type(`\x1b[<0;${column};${row}m`)
+}
+
+test('a click on a line\'s fold marker opens the line to its record, and the composer below stays live', async () => {
+  const terminal = new XtermTerminal(60, 18)
+  const session = new FakeSession(trajectorySession())
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x0f')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('before turn 1')))
+  click(terminal, 3, 3)
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === '"type": "test/marker",'))
+  const opened = await terminal.altScreen()
+  assert.ok(opened.some(row => row.includes('0 ? test/marker')))
+  assert.ok(opened.some(row => row.trim() === '"data": {}'))
+  terminal.type('note')
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['note'])
+})
+
+test('enter opens the line a person focused, and focus reaches the screen from the composer by shift+tab', async () => {
+  const terminal = new XtermTerminal(60, 18)
+  const session = new FakeSession(trajectorySession())
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x0f')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('before turn 1')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show')))
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === '"kind": "turn",'))
+})
+
+test('the trajectory follows a live session: an event logged while it is open draws its line', async () => {
+  const terminal = new XtermTerminal(60, 18)
+  const session = new FakeSession(trajectorySession())
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x0f')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('3 turn 1 ended · completed')))
+  session.log(seed(4))
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('4 ? test/marker')))
+})
+
+test('ctrl+o opens the trajectory, one line per event with the machinery in it, and escape returns the transcript as it was', async () => {
+  const terminal = new XtermTerminal(60, 18)
+  const session = new FakeSession(trajectorySession())
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x0f')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('before turn 1')) && rows.some(row => row.includes('0 ? test/marker'))
+  })
+  const opened = await terminal.altScreen()
+  assert.ok(opened.some(row => row.includes('1 turn 1 begins')))
+  assert.ok(opened.some(row => row.includes('2 › fix the build')))
+  assert.ok(opened.some(row => row.includes('3 turn 1 ended · completed')))
+  terminal.type('\x1b')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('fix the build')) && rows.every(row => row.includes('turn 1 begins') === false)
+  })
 })
