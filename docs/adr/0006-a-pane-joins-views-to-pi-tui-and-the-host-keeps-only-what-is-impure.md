@@ -13,7 +13,7 @@ Only the host may import both views and pi-tui, so each lands there. The lint th
 
 **A pane is a pi-tui component that draws views. Panes live in `src/panes/`, between views and the host.**
 
-- A pane may import the layers below it and pi-tui; [`layers.json`](../../packages/binnacle/layers.json) states which, and `check:layers` holds it.
+- A pane may import the layers below it and pi-tui; `layers.json` states which, and `check:layers` holds it.
 - A pane is deterministic: what it draws follows from what it was given — facts, registrations and a width — and from the UI state it holds. It reports what it cannot do itself through callbacks it was given, and it reads no clock, randomness, environment or process; the lint that holds the layers below holds it too.
 - A component that draws no view belongs in `ui`, not here.
 - The host keeps the terminal, the harness runtime and the process: it builds panes, places them on the screen, and wires them to the session.

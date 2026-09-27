@@ -5,7 +5,7 @@
 
 ## Context
 
-The problem, written to stand without the decision: what forces it, and what was read (`name:path`).
+The problem, written to stand without the decision: what forces it, and what was read, named in words with its version (pi's TUI guide, at v0.87.1).
 
 ## Decision
 

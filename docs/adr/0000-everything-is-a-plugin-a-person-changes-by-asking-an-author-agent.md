@@ -5,11 +5,11 @@
 
 ## Context
 
-dsh keeps nothing privileged: every part of it is a plugin, so each is replaceable from configuration, and there is no core to patch (`dsh:docs/architecture.md`). pi's terminal is open the same way to its extensions: one may draw a tool or a session entry its own way, replace the header, the footer or the editor, and open a screen of its own (`pi:packages/coding-agent/docs/tui.md`).
+dsh keeps nothing privileged: every part of it is a plugin, so each is replaceable from configuration, and there is no core to patch (dsh's architecture, at dsh-v0.1.7-rc.2). pi's terminal is open the same way to its extensions: one may draw a tool or a session entry its own way, replace the header, the footer or the editor, and open a screen of its own (pi's TUI guide, at v0.87.1).
 
 binnacle is drawn for a person who is not expected to write its code. What they want differs from person to person: how a tool's card reads, whether signing in is a dialog or a page, what settings look like and which are a key away. And a preset can log kinds nobody writing binnacle has seen ([ADR 3](0003-dsh-is-reached-through-named-seams-each-held-by-a-gate.md)). A person gets what they want by asking the agent in front of them, which writes a plugin: an author. So what an author agent can find and reach is exactly what a person can change. Anything it cannot reach is a choice binnacle made for them.
 
-An agent learns what it can do from what its session hands it. A plugin can hand it a skill (`dsh:packages/skill/skill/src/index.ts#SkillRegistration`). An extension point no skill describes is one no agent uses.
+An agent learns what it can do from what its session hands it. A plugin can hand it a skill (dsh's `SkillRegistration`, at dsh-v0.1.7-rc.2). An extension point no skill describes is one no agent uses.
 
 ## Decision
 
@@ -28,7 +28,7 @@ An agent learns what it can do from what its session hands it. A plugin can hand
 
 ## Alternatives considered
 
-**A fixed surface that a person tunes with settings.** codex's terminal takes this road: animations, tooltips, notifications and the like are switches in its configuration (`codex:codex-rs/config/src/types.rs#Tui`). It is simpler, and every combination can be tested. It lost because each switch is a guess at what a person will want, and a kind a preset logs tomorrow has no switch.
+**A fixed surface that a person tunes with settings.** codex's terminal takes this road: animations, tooltips, notifications and the like are switches in its configuration (its `Tui` configuration, at commit d7b07d4). It is simpler, and every combination can be tested. It lost because each switch is a guess at what a person will want, and a kind a preset logs tomorrow has no switch.
 
 **Hand an author pi-tui's components, as pi hands them to its extensions.** It gives the most reach with nothing to design. It lost ([ADR 2](0002-five-layers-and-the-registrations-an-author-shares.md)) because a component an agent writes can break widths, focus or the keyboard in ways no fence catches, and a pi-tui release can break all such components at once. The building blocks give the same reach, and binnacle handles those failures once, for every author.
 

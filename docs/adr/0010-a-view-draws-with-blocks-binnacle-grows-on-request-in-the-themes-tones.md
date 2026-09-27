@@ -9,7 +9,7 @@
 
 A region knew only its rows. Once something sits inside a border, or beside something else, the rows alone no longer say what a pointer landed on.
 
-pi styles what its extensions draw through a theme whose colours are named by what content means: `accent`, `muted`, `dim`, `success`, `error`, `warning` (`pi:packages/coding-agent/docs/themes.md`). It hands an extension components to draw with (`pi:packages/coding-agent/docs/tui.md`).
+pi styles what its extensions draw through a theme whose colours are named by what content means: `accent`, `muted`, `dim`, `success`, `error`, `warning` (pi's themes guide, at v0.87.1). It hands an extension components to draw with (pi's TUI guide, at v0.87.1).
 
 ## Decision
 

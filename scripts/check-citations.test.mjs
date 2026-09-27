@@ -73,3 +73,16 @@ test('a symbol is exported through a star re-export too, and a namespace re-expo
   const { problems } = checkCitations(files, { binnacle: { self: true } }, here)
   assert.deepEqual(problems, ['n.md:2: binnacle:packages/binnacle/src/api.ts does not export default'])
 })
+
+const everywhere = (name, path) => name === 'pi' ? onlyTui(name, path) : here(name, path)
+
+test('a decision record cites nothing, as it is never edited to follow a move: a citation in one is a problem, resolved or not', () => {
+  const files = [
+    { path: 'docs/adr/0001-x.md', text: cite('as pi draws (^pi:packages/tui/src/tui.ts^)\nand ^binnacle:docs/glossary.md#fact^') },
+    { path: 'docs/glossary.md', text: cite('^pi:packages/tui/src/tui.ts^') },
+  ]
+  assert.deepEqual(checkCitations(files, { pi: { commit: 'abc' }, binnacle: { self: true } }, everywhere).problems, [
+    'docs/adr/0001-x.md:1: pi:packages/tui/src/tui.ts is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words',
+    'docs/adr/0001-x.md:2: binnacle:docs/glossary.md is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words',
+  ])
+})

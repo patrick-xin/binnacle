@@ -40,7 +40,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **gate** | A check `pnpm test` runs that refuses a class of defect: `check:*`, `lint`, `typecheck`. |
 | **reference** | A repository read and never written, fetched into `.refs/<name>` at its pin ([`references.json`](../references.json)). |
 | **pin** | The commit, and for a release line the tag, a reference is read at; packages that follow it are pinned to match. |
-| **citation** | `` `name:path` ``, naming a file in a reference, resolved at its pin, or in this repository under the name `binnacle`; an optional `#symbol` must be found there. |
+| **citation** | `` `name:path` ``, naming a file in a reference, resolved at its pin, or in this repository under the name `binnacle`; an optional `#symbol` must be found there. Never in a decision record, which is not edited to follow a move. |
 | **upstream branch** | `upstream/<reference>/<version>`: a release past a pin, carried by the upstream job with the canary's verdict in its commit. |
 | **canary** | Moving a pin, then the tests and the boot, as the upstream job runs them; green, or red with the log of where it stopped. |
 

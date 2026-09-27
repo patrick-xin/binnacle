@@ -7,7 +7,7 @@
 
 The transcript is taller than the terminal. Something has to decide which rows are shown, follow the end while the session grows, scroll when the wheel turns over content nothing claims, and select text on a drag.
 
-pi-tui does all four. A `ScrollView` windows its content and follows its end (`pi:packages/tui/src/components/scroll-view.ts#ScrollView`); the alternate screen hands a wheel no component claims to a scroll view (`pi:packages/tui/src/tui-alt-screen.ts#routeWheel`) and owns selection (`pi:packages/tui/src/tui-alt-screen.ts#selectionAnchor`). pi's own app stacks its transcript in a scroll view above its editor (`pi:packages/coding-agent/src/modes/interactive/chat-viewport.ts`). binnacle's first screen harness windowed the transcript itself, and its UI state kept a scroll offset.
+pi-tui does all four, as read at v0.87.1. A `ScrollView` windows its content and follows its end; the alternate screen hands a wheel no component claims to a scroll view and owns selection. pi's own app stacks its transcript in a scroll view above its editor. binnacle's first screen harness windowed the transcript itself, and its UI state kept a scroll offset.
 
 ## Decision
 

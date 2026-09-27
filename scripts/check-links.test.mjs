@@ -17,3 +17,11 @@ test('a link inside code is not a link', () => {
   const files = [{ path: 'README.md', text: '`[a](b.md)`\n```\n[c](d.md)\n```\n' }]
   assert.deepEqual(brokenLinks(files, () => false), [])
 })
+
+test('a decision record links only other records, as it is never edited to follow a move', () => {
+  const files = [{ path: 'docs/adr/0002-y.md', text: '[ADR 1](0001-x.md), [the layers](../../packages/binnacle/layers.json),\n[the glossary](../glossary.md#fact) and [web](https://x.y)' }]
+  assert.deepEqual(brokenLinks(files, () => true), [
+    'docs/adr/0002-y.md:1: ../../packages/binnacle/layers.json is not a decision record; a record links only other records, and names the rest in words',
+    'docs/adr/0002-y.md:2: ../glossary.md is not a decision record; a record links only other records, and names the rest in words',
+  ])
+})
