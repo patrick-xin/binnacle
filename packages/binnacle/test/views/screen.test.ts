@@ -5,6 +5,7 @@ import type { Fact } from '../../src/facts/adapt.ts'
 import type { Frame } from '../../src/ui/layout.ts'
 import { initial } from '../../src/ui/state.ts'
 import { screen } from '../../src/views/screen.ts'
+import { prompt as promptFact } from '../support/facts.ts'
 
 /** A frame as a person reads it. */
 const plain = (frame: Frame): Frame => ({ lines: frame.lines.map(line => stripTerminalSequences(line).trimEnd()), regions: frame.regions })
@@ -20,7 +21,7 @@ function session(count: number): Fact[] {
     const seq = turn * 10
     facts.push(
       { kind: 'turn', seq, time: seq, turn, phase: 'start' },
-      { kind: 'prompt', seq: seq + 1, time: seq, blocks: [{ kind: 'text', text: `question ${turn}` }] },
+      promptFact(seq + 1, seq, `question ${turn}`),
       { kind: 'answer', seq: seq + 2, time: seq, turn, step: 1, provider: 'p', model: 'm', interrupted: false, blocks: [{ kind: 'text', text: `answer ${turn}` }] },
       { kind: 'turn', seq: seq + 3, time: seq, turn, phase: 'end', ending: 'completed' },
     )

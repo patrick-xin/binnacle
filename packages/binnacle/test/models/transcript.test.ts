@@ -2,8 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Fact } from '../../src/facts/adapt.ts'
 import { settled, transcript } from '../../src/models/transcript.ts'
+import { prompt as promptFact, call as callFact, returned as returnedFact } from '../support/facts.ts'
 
-const prompt: Fact = { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] }
+const prompt = promptFact(2, 10, 'fix the build')
 const answer: Fact = { kind: 'answer', seq: 4, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'text', text: 'Done.' }] }
 
 test('a turn holds what happened in it, in log order, and why it ended; steps are not entries', () => {
@@ -20,8 +21,8 @@ test('a turn holds what happened in it, in log order, and why it ended; steps ar
   })
 })
 
-const call: Fact = { kind: 'call', seq: 5, time: 21, turn: 1, step: 1, callId: 'c1', name: 'bash', arguments: '{"command":"pnpm build"}' }
-const result: Fact = { kind: 'result', seq: 7, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'ok' }], meta: undefined }
+const call = callFact(5, 21, 'c1', 'bash', '{"command":"pnpm build"}')
+const result = returnedFact(7, 40, 'c1', 'ok')
 
 test('a call and its result are one tool entry, where the call was asked', () => {
   const facts: Fact[] = [
@@ -85,10 +86,10 @@ test('a result arriving for a left call answers it, and the mark is gone', () =>
 const start = (seq: number, turn: number): Fact => ({ kind: 'turn', seq, time: seq, turn, phase: 'start' })
 
 /** The call, asked again under another id. */
-const asked = (seq: number, callId: string): Fact => ({ ...call, seq, callId }) as Fact
+const asked = (seq: number, callId: string): Fact => callFact(seq, 21, callId, 'bash', '{"command":"pnpm build"}')
 
 /** The result, for a call of another id. */
-const returned = (seq: number, callId: string): Fact => ({ ...result, seq, callId }) as Fact
+const returned = (seq: number, callId: string): Fact => returnedFact(seq, 40, callId, 'ok')
 
 test('what has settled is every entry, oldest first, up to a call still waiting for its result in a turn still running', () => {
   const interrupted: Fact = { kind: 'turn', seq: 4, time: 4, turn: 1, phase: 'end', ending: 'aborted' }

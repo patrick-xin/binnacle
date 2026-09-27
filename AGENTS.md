@@ -68,7 +68,7 @@ The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/
 - **A registration proves its disposal.** Dispose the fiber and assert the contribution is gone.
 - **A guard is shown to bind.** Break what a gate or type-level test holds once, watch it fail, and say so in the commit.
 - **Test the real entry path**: load the built bundle under plain `node`, and boot it under the real launcher.
-- **Where tests live:** `packages/binnacle/test/<subject>.test.ts` and `scripts/<script>.test.mjs`, on `node:test` and `node:assert/strict`.
+- **Where tests live:** `packages/binnacle/test/<path>.test.ts`, mirroring the `src/<path>.ts` whose seam it tests, with `test/artifact.test.ts` for the built bundle and `test/support/` for what more than one test file builds; and `scripts/<script>.test.mjs`, on `node:test` and `node:assert/strict`.
 
 ## Where a record lives
 

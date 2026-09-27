@@ -19,6 +19,7 @@ import type { Node } from '../../../src/api.ts'
 import type { CardParts, CardRow } from '../../../src/plugins/tool-cards/cards.ts'
 import { rowFor } from '../../../src/plugins/tool-cards/cards.ts'
 import { toolCards } from '../../../src/plugins/tool-cards/index.ts'
+import { call as callFact, returned as returnedFact } from '../../support/facts.ts'
 
 /**
  * The cards applied in a Cordis context, with the `binnacle` service and a
@@ -49,10 +50,10 @@ const read = defineTool({
 })
 
 /** A call the model asked for, as it lands in the log. */
-const asked = (name: string, args: string): Extract<Fact, { readonly kind: 'call' }> => ({ kind: 'call', seq: 2, time: 2, turn: 1, step: 1, callId: 'c1', name, arguments: args })
+const asked = (name: string, args: string): Extract<Fact, { readonly kind: 'call' }> => callFact(2, 2, 'c1', name, args)
 
 /** What a call returned, as it lands in the log. */
-const returned = (text: string): Extract<Fact, { readonly kind: 'result' }> => ({ kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text }], meta: undefined })
+const returned = (text: string): Extract<Fact, { readonly kind: 'result' }> => returnedFact(3, 3, 'c1', text)
 
 /**
  * What a node draws at width 40, as a person reads it.
