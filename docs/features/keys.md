@@ -30,3 +30,8 @@ One key table (`binnacle:packages/binnacle/src/ui/keys.ts#KEYBINDINGS`), held wi
 - Focus is drawn as one row in the accent tone under the focused thing, saying what Enter will do in the thing's own words, so nothing moves when a cut fold takes focus.
 - Step in lands on the nearest thing that offers something — the last on screen, by the composer.
 - On the main screen, focus reaching a printed entry switches to the fullscreen rather than reprint the scrollback ([ADR 12](../adr/0012-on-the-main-screen-a-printed-row-never-changes.md)); bringing what is focused into view scrolls only when it is out of view.
+
+## Open
+
+- [#5](https://github.com/patrick-xin/binnacle/issues/5): a person cannot rebind a key.
+- [#6](https://github.com/patrick-xin/binnacle/issues/6): no key reaches an affordance but the primary one.
