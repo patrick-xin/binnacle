@@ -41,11 +41,12 @@ export interface CardParts {
 
 /**
  * How one kind of card draws: its kind's whole card — the head its own, lines
- * above and under it, and the fold it chooses.
+ * above and under it, and the fold it chooses — or a decline, when it cannot
+ * read what its kind's view holds.
  */
 export interface CardRow {
-  /** Draw the card from its parts. */
-  draw(parts: CardParts): Node
+  /** Draw the card from its parts, or decline with why: the entry is then left to the card beneath, with why said beneath it. */
+  draw(parts: CardParts): Node | { readonly declined: string }
 }
 
 /** Every row the cards hold, by the card kind it draws; generic's is the one today. */

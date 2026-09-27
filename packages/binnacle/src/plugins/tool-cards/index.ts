@@ -87,7 +87,10 @@ function viewOf(tools: ToolRuntime): View {
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
       fold: (child: Node, rows = 3) => ({ kind: 'fold', id: `tool:${entry.call.callId}`, rows, child }),
     }
-    return rowFor(shown?.card ?? call.card).draw(parts)
+    const kind = shown?.card ?? call.card
+    const drawn = rowFor(kind).draw(parts)
+    if ('declined' in drawn) return refused(next(), `the ${kind} card could not draw this call: ${drawn.declined}`)
+    return drawn
   }
 }
 

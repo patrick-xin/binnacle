@@ -54,6 +54,14 @@ const asked = (name: string, args: string): Extract<Fact, { readonly kind: 'call
 /** What a call returned, as it lands in the log. */
 const returned = (text: string): Extract<Fact, { readonly kind: 'result' }> => ({ kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text }], meta: undefined })
 
+/**
+ * What a node draws at width 40, as a person reads it.
+ * @param node - what a row drew.
+ * @returns its lines.
+ */
+const lines = (node: Node): string[] =>
+  layout(node, 40, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+
 /** What a call returned, having failed, as it lands in the log. */
 const failed = (callId: string): Extract<Fact, { readonly kind: 'result' }> => ({
   kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId, failed: true,
@@ -302,10 +310,9 @@ test('a row can draw a head of its own and a line under a completed head', () =>
       return { kind: 'stack', children: [head, status, parts.fold({ kind: 'text', text: parts.resultText }, 1)] }
     },
   }
-  const drawn = (parts: CardParts): string[] =>
-    layout(shell.draw(parts), 40, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  const drawn = (parts: CardParts): string[] => lines(shell.draw(parts) as Node)
   const running: CardParts = {
-    call: { card: 'generic', title: 'pnpm test' },
+    call: { card: 'generic', title: 'pnpm test', returned: {} },
     result: undefined,
     glyph: { text: '●', tone: 'muted' },
     waiting: { kind: 'text', text: '  running…', tone: 'muted' },
@@ -322,6 +329,33 @@ test('a row can draw a head of its own and a line under a completed head', () =>
     resultText: 'a\nb\nc',
   }
   assert.deepEqual(drawn(done), ['$ pnpm test', '  exited badly', 'a', '… 2 more lines'])
+})
+
+test("a row reads its kind's own fields, and one that cannot read them declines", () => {
+  const parts: CardParts = {
+    call: { card: 'terminal', title: 'pnpm test', returned: { card: 'terminal', title: 'pnpm test', exitCode: 2 } },
+    result: { card: 'terminal', returned: { card: 'terminal', exitCode: 2, output: 'tsc: 1 error' } },
+    glyph: { text: '✗', tone: 'error' },
+    waiting: undefined,
+    reason: undefined,
+    resultText: 'tsc: 1 error',
+    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'tool:c1', rows, child }),
+  }
+  const exit: CardRow = {
+    draw: current => {
+      const head: Node = { kind: 'text', text: [current.glyph, ` ${current.call.title}`] }
+      if (current.waiting !== undefined) return { kind: 'stack', children: [head, current.waiting] }
+      const code: unknown = current.result?.returned.exitCode
+      if (typeof code !== 'number') return { declined: `exitCode is ${code === undefined ? 'absent' : `a ${typeof code}`}` }
+      return {
+        kind: 'stack',
+        children: [head, { kind: 'text', text: `  exited ${code}`, tone: code === 0 ? 'success' : 'error' }, current.fold({ kind: 'text', text: current.resultText })],
+      }
+    },
+  }
+  assert.deepEqual(lines(exit.draw(parts) as Node), ['✗ pnpm test', '  exited 2', 'tsc: 1 error'])
+  assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal' } } }), { declined: 'exitCode is absent' })
+  assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal', exitCode: 'two' } } }), { declined: 'exitCode is a string' })
 })
 
 test('disposing the plugin gives every call back to binnacle\'s card', async () => {
