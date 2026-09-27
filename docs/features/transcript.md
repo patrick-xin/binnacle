@@ -8,7 +8,7 @@ A person reads the session as it happens, turn by turn:
 - each tool call, as [Tool cards](tool-cards.md) draws it when its tool presents it, and as its mark and arguments otherwise ([Theme](theme.md)): the `running` mark and `running…` while it runs; `done` once it returned, its result folded to three rows; `failed`, and why, when it failed;
 - a kind of event binnacle has not learned to draw, as the `unknown` mark and its type, folded to its raw record.
 
-The session's machinery — the permission preset and sandbox mode, the inbox splices, the system prompt, each request's header and context, the titles, the delivery receipts, the agent instructions, runtime context and skill catalog the harness adds each turn — draws no line at all. The transcript is the conversation: what the person asked, what the model said and did. Everything the session logged stays one key away, on the Trajectory ([#20](https://github.com/[REDACTED:pii]/binnacle/issues/20)), and what is quiet here is a default, not a verdict: an author's view registered for a quiet kind draws it in the transcript again.
+The session's machinery draws no line at all. The transcript is the conversation: what the person asked, what the model said and did. Everything the session logged stays one key away, on the Trajectory ([#20](https://github.com/[REDACTED:pii]/binnacle/issues/20)).
 
 A click on a fold opens it, and a click on an open one folds it again; so does Enter on the focused fold ([Keys](keys.md)). The wheel scrolls, and a drag selects.
 
@@ -22,7 +22,7 @@ How a session reaches the screen is [the package map's](../../packages/binnacle/
 - A call and its result are drawn as one entry, the result under its call, and the mark says how the call stands ([Theme](theme.md)).
 - An answer's text is drawn as markdown, by pi-tui's `Markdown`; reasoning stays plain text.
 - An answer draws no line for a call it made: every call an answer keeps is also logged as a call of its own, so it is its tool entry's to draw ([Tool cards](tool-cards.md) when its tool presents it).
-- Which kinds are quiet is the table's (`binnacle:packages/binnacle/src/facts/kinds.ts#kinds`), and any of them can be drawn again: a view registered for the kind's dsh type, by an author or a built-in feature, draws it ([Authoring](authoring.md)). A kind named unread keeps its fallback line until a feature draws it.
+- Which kinds are quiet is the kinds table's, and it is this page's default, a person's to change: a view registered for a quiet kind, by its dsh type, draws it again ([Authoring](authoring.md)). A kind named unread keeps its fallback line until a feature draws it.
 - Titles are muted, and what went wrong is drawn in error.
 - A kind no view draws is drawn by the fallback, never skipped ([ADR 4](../adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)) — a kind dsh does not know included, which is how a plugin outside dsh's log reaches the screen.
 - A control sequence in what was logged — one that would clear the screen, write the clipboard, set the title or colour the text — never acts on the terminal: it is drawn as its text, and any other control character as a symbol a person can read ([ADR 14](../adr/0014-no-text-a-node-carries-reaches-the-terminal-as-a-control.md)).

@@ -155,14 +155,15 @@ export function screens(): DrawScreen {
       }
       // A turn whose entries drew nothing — the machinery before the first, a turn of quiet kinds — draws no line at all, not even the blank one that opens a turn.
       if (turnLines.length === 0) {
-        ends.push(...turnEnds.map(end => end + lines.length))
+        for (const end of turnEnds) ends.push(end + lines.length)
         continue
       }
       if (opened) lines.push('')
       opened = true
-      regions.push(...turnRegions.map(placed => ({ ...placed, top: placed.top + lines.length })))
-      lines.push(...turnLines)
-      ends.push(...turnEnds.map(end => end + lines.length - turnLines.length))
+      for (const placed of turnRegions) regions.push({ ...placed, top: placed.top + lines.length })
+      // One line at a time: spreading a turn's lines into `push` throws once it draws more than about a hundred thousand, as an entry's do.
+      for (const line of turnLines) lines.push(line)
+      for (const end of turnEnds) ends.push(end + lines.length - turnLines.length)
     }
     return { lines, regions, focusable: regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id), ends }
   }

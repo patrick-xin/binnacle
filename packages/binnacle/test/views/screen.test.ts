@@ -39,6 +39,16 @@ test('the screen is every turn, a blank line between them, however long the sess
 })
 
 
+test('a turn that draws more lines than a spread can push still draws: one line at a time', () => {
+  const long = `fix the build\n${'line\n'.repeat(199_999)}line`
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' },
+    promptFact(2, 1, long),
+    { kind: 'turn', seq: 3, time: 3, turn: 1, phase: 'end', ending: 'completed' },
+  ]
+  assert.equal(screen(facts, initial, 40).lines.length, 200_001)
+})
+
 test('the screen over a real session\'s log is the conversation: no line for the machinery a session logs', () => {
   const facts = logged().map(event => adapt(event))
   const drawn = screen(facts, initial, 60)

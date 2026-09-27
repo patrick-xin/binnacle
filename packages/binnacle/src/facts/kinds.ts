@@ -39,7 +39,7 @@ export const kinds: Readonly<Record<string, Treatment>> = {
   'compaction/prune': 'quiet',
   'compaction/start': 'unread',
   'compaction/summary': 'unread',
-  'deliverables/presented': 'quiet',
+  'deliverables/presented': 'unread',
   'developer/message': 'read',
   'feedback/message-delete': 'quiet',
   'feedback/message-put': 'quiet',
@@ -84,5 +84,5 @@ export const kinds: Readonly<Record<string, Treatment>> = {
   'turn/start': 'read',
   'user/message': 'read',
   'web/deepseek-search-llm-request': 'quiet',
-  'workspace/changes': 'quiet',
+  'workspace/changes': 'unread',
 }
