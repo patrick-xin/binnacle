@@ -19,7 +19,7 @@ import { Command, Option } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
+import { Editor, isKeyRelease, isKeyRepeat, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
 import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
@@ -118,7 +118,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     composer.setText('')
     session.send(text)
   }
+  // A terminal speaking the kitty protocol, which pi-tui asks for, also reports a key held and let go; only the press is answered, the rest left to pi-tui.
   const keys = (data: string): TuiInputListenerResult => {
+    if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
     if (matchesKey(data, 'ctrl+c')) quit()
     else if (matchesKey(data, 'ctrl+t')) show(tui.mode === 'fullscreen' ? 'regular' : 'fullscreen')
     else return undefined

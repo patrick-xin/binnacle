@@ -396,3 +396,20 @@ test('whichever screen a person quits from, the main screen is left holding the 
     assert.deepEqual((await terminal.mainScreen()).filter(row => row.startsWith('› ')), ['› p1', '› p2', '› p3', '› p4'], `${args.join(' ') || 'fullscreen'}, switched ${switches} times`)
   }
 })
+
+test('where the terminal reports holding and releasing a key, as pi-tui asks a kitty-protocol one to, ctrl+t switches once and ctrl+c asks to exit once', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { exits, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(() => /fix the build/.test(terminal.written))
+  for (const event of ['\x1b[116;5u', '\x1b[116;5:2u', '\x1b[116;5:2u', '\x1b[116;5:3u']) {
+    terminal.type(event)
+    await settle()
+    assert.equal(await terminal.onAlternateScreen(), false, JSON.stringify(event))
+  }
+  terminal.type('\x1b[99;5u')
+  terminal.type('\x1b[99;5:3u')
+  await settle()
+  assert.deepEqual(exits, [0])
+})
