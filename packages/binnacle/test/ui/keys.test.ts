@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import type { Keybindings } from '@earendil-works/pi-tui'
 import { keyTable } from '../../src/ui/keys.ts'
 
 /** The one key table. */
@@ -44,4 +45,29 @@ test('a key binnacle does not bind resolves to nothing, whatever has focus', () 
     assert.deepEqual(resolve('\x7f', focused), undefined)
     assert.deepEqual(resolve('\x1b[13;2u', focused), undefined)
   }
+})
+
+test('a key a plugin offers resolves to the screen it opens, and withdrawing the offer stops it resolving', () => {
+  const table = keyTable()
+  const withdraw = table.offer('trajectory', { defaultKeys: 'f2', description: 'open the trajectory' })
+  assert.deepEqual(table.resolve('\x1bOQ', false), { kind: 'screen', name: 'trajectory' })
+  assert.equal(table.manager.getDefinition('binnacle.screen.trajectory' as keyof Keybindings)?.description, 'open the trajectory')
+  withdraw()
+  assert.deepEqual(table.resolve('\x1bOQ', false), undefined)
+  assert.equal(table.manager.getDefinition('binnacle.screen.trajectory' as keyof Keybindings), undefined)
+})
+
+test('while a placed screen is open, escape and the key that opened it return, the scroll keys read the screen, and quit still answers', () => {
+  const table = keyTable()
+  table.offer('trajectory', { defaultKeys: 'f2', description: 'open the trajectory' })
+  assert.deepEqual(table.resolve('\x1bOQ', false, true), { kind: 'screen', name: 'trajectory' }, 'the same key returns')
+  assert.deepEqual(table.resolve('\x1b', false, true), { kind: 'screen-close' })
+  assert.deepEqual(table.resolve('\x1b', true, true), { kind: 'screen-close' }, 'whatever had focus')
+  assert.deepEqual(table.resolve('\x1b[5~', false, true), { kind: 'screen-scroll', scroll: 'page.up' })
+  assert.deepEqual(table.resolve('\x1b[6~', false, true), { kind: 'screen-scroll', scroll: 'page.down' })
+  assert.deepEqual(table.resolve('\x1b[F', false, true), { kind: 'screen-scroll', scroll: 'end' })
+  assert.deepEqual(table.resolve('\x03', false, true), { kind: 'quit' })
+  assert.deepEqual(table.resolve('\x14', false, true), { kind: 'switch-screens' })
+  assert.deepEqual(table.resolve('\t', true, true), undefined, 'focus does not move on the transcript under a placed screen')
+  assert.deepEqual(table.resolve('\x1b[Z', false, true), undefined, 'the composer under it is not typed into')
 })

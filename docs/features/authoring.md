@@ -1,6 +1,6 @@
 # Authoring
 
-A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry, building on binnacle's drawing or replacing it. Disposing the plugin gives back everything it registered.
+A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry, building on binnacle's drawing or replacing it. A screen a plugin places opens over the transcript with the key its plugin offers. Disposing the plugin gives back everything it registered.
 
 ## How it works
 
@@ -14,3 +14,18 @@ The registrations are the author API (`binnacle:packages/binnacle/src/api.ts#Reg
 - What an author's adapter or view does wrong is drawn by the one beneath, naming the registration and why (`binnacle:packages/binnacle/src/views/entries.ts#drawEntry`); it never takes the surface down.
 
 Why an author reaches what the built-in surface reaches is [ADR 0](../adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)'s.
+
+## Placing a screen
+
+A plugin can place a screen of its own in the transcript's place, opened with a key: a review of the whole session, a settings page, anything a feature wants a person to read at length. `ctx.binnacle.screen(name, screen)` places one (`binnacle:packages/binnacle/src/api.ts#PlacedScreen`): its `draw` returns a node, as a view does, handed the session's facts read-only at each frame; nothing it does reaches the log.
+
+- The screen is drawn over the whole of whichever of pi-tui's screens the person is on, as an overlay — codex opens its transcript so (`codex:codex-rs/tui/src/pager_overlay.rs`). On the main screen the rows already printed stay printed ([ADR 12](../adr/0012-on-the-main-screen-a-printed-row-never-changes.md)): what the session logs while the screen is open prints behind it, plain, and closing reveals it.
+- Its plugin offers the key that opens it — `screen.key`, pi-tui's name for a key — as a binding in the one key table, named `binnacle.screen.<name>` and described by `screen.description`. The same key, or Esc, returns to the transcript as it was: its scroll, focus and folds, exactly. A person can rebind it once rebinding lands ([Keys](keys.md)).
+- While a placed screen is open it takes the keys: the keys the alternate screen scrolls with read the screen, and nothing reaches the transcript or the composer beneath it. What the host answers itself still answers — quitting, switching screens.
+- The newest registration of a name places the screen, as the newest view of a key draws; disposing the plugin takes back its screen and its key, closing it if it is open.
+- What its `draw` does wrong — it throws, or returns no node binnacle can lay out — is drawn, naming its registration, and never takes the surface down.
+
+### Choices
+
+- A placed screen starts at its top, as a pager does, and where a person scrolled it is kept while its registration stands; the key it opens with, and what the key is called in help, are its plugin's choices.
+- A screen's folds are drawn folded and its offers are not answered there: it is a page to read, not a surface to act on, so a screen that wants everything shown draws it without them.

@@ -13,6 +13,8 @@ import type { OpenedSession } from '../../src/host/session.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
 import { FakeSession } from '../support/session.ts'
 import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
+import type { Node } from '../../src/api.ts'
+import type { Fact } from '../../src/facts/adapt.ts'
 
 /** A person's line, as dsh logs it. */
 const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
@@ -31,6 +33,16 @@ const added = (seq: number, text: string): SessionEvent<'user/message'> => ({
 
 /** Let the host's pending promises settle. */
 const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 10))
+
+/** A plugin that places a screen of its own, opened with f2, drawing what it is told. */
+const placesAScreen = (ctx: Context, draw: (facts: readonly Fact[]) => Node, name = 'trajectory') =>
+  ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.screen(name, { key: 'f2', description: 'open the trajectory', draw }) } })
+
+/** A screen that names its rows, so what it drew is plain on the terminal. */
+const namedRows = (count: number): (facts: readonly Fact[]) => Node => _facts => ({
+  kind: 'stack',
+  children: Array.from({ length: count }, (_, row) => ({ kind: 'text' as const, text: `screen ${row + 1}` })),
+})
 
 /**
  * Wait until something holds, as pi-tui draws a frame when it next can, not when asked.
@@ -546,4 +558,176 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
   const after = await terminal.mainScreen()
   assert.deepEqual(after.slice(0, 6), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line'])
   assert.deepEqual(after.slice(6, 12), ['● stat {}', '  running…', '⋯ added by system-prompt', 'a', 'b', '▸ fold it away'])
+})
+
+test('the key a plugin offers opens its screen over the transcript, and the same key returns the transcript as it was', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesAScreen(ctx, namedRows(8))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const before = await terminal.altScreen()
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).every(row => row.startsWith('screen ') || row.trim() === ''))
+  terminal.type('\x1bOQ')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('fix the build')) && rows.every(row => row.startsWith('screen ') === false)
+  })
+  assert.deepEqual(await terminal.altScreen(), before)
+})
+
+test('escape returns to the transcript as it was, its scroll and what it drew unchanged', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession(folded)
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesAScreen(ctx, namedRows(8))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
+  terminal.type('\x1b[5~')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('Jump to latest')))
+  const scrolled = await terminal.altScreen()
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).every(row => row.startsWith('screen ') || row.trim() === ''))
+  terminal.type('\x1b')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('read6') === false) && rows.every(row => row.startsWith('screen ') === false)
+  })
+  assert.deepEqual(await terminal.altScreen(), scrolled)
+})
+
+test('on the main screen, the offered key opens the screen over the viewport, and closing it leaves the printed rows as they were', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  terminal.write('$ dsh --profile binnacle\r\n')
+  const session = new FakeSession([prompt(1, 'one'), prompt(2, 'two'), prompt(3, 'three')])
+  const { ctx, commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  await placesAScreen(ctx, namedRows(8))
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('three')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.mainScreen()).slice(-8).every(row => row.startsWith('screen ')))
+  terminal.type('\x1bOQ')
+  await until(async () => {
+    const rows = await terminal.mainScreen()
+    return rows.some(row => row.includes('three')) && rows.slice(-8).every(row => row.startsWith('screen ') === false)
+  })
+  const after = await terminal.mainScreen()
+  assert.deepEqual(after.slice(0, 4), ['$ dsh --profile binnacle', '› one', '› two', '› three'])
+  assert.equal(after.slice(4).some(row => row.startsWith('screen ')), false)
+})
+
+test('while a placed screen is open on the main screen, what the session logs prints behind it, plain, and closing reveals it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  terminal.write('$ dsh --profile binnacle\r\n')
+  const session = new FakeSession([prompt(1, 'one')])
+  const { ctx, commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  await placesAScreen(ctx, namedRows(8))
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('one')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.mainScreen()).slice(-8).every(row => row.startsWith('screen ')))
+  session.log(prompt(2, 'two'))
+  await settle()
+  await settle()
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('two')))
+  const rows = await terminal.mainScreen()
+  assert.deepEqual(rows.slice(0, 3), ['$ dsh --profile binnacle', '› one', '› two'])
+  assert.equal(rows.some(row => row.includes('screen ')), false)
+})
+
+test('quitting answers on a placed screen, and the session is left printed plain, without it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'one'), prompt(2, 'two'), prompt(3, 'three')])
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
+  await placesAScreen(ctx, namedRows(8))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('three')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).every(row => row.startsWith('screen ') || row.trim() === ''))
+  terminal.type('\x03')
+  await settle()
+  assert.deepEqual(exits, [0])
+  const left = await terminal.mainScreen()
+  assert.deepEqual(left.filter(row => row.startsWith('› ')), ['› one', '› two', '› three'])
+  assert.equal(left.some(row => row.includes('screen ')), false)
+})
+
+test('disposing the plugin closes its screen if it is open, and takes back its key, which reaches the composer typed', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const fiber = await placesAScreen(ctx, namedRows(8))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).every(row => row.startsWith('screen ') || row.trim() === ''))
+  await fiber.dispose()
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('fix the build')) && rows.every(row => row.startsWith('screen ') === false)
+  })
+  terminal.type('\x1bOQ')
+  await settle()
+  assert.equal((await terminal.altScreen()).some(row => row.includes('fix the build')), true, 'the key no longer opens anything')
+})
+
+test('a screen whose drawing throws draws what went wrong, naming its registration, and the surface stays up', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesAScreen(ctx, () => { throw new Error('no phone') })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('✗ binnacle.screen(trajectory) threw: no')))
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'phone'))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('still here')
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['still here'])
+})
+
+test('the keys the alternate screen scrolls with read an open placed screen instead', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesAScreen(ctx, namedRows(12))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).every(row => row.startsWith('screen ') || row.trim() === ''))
+  assert.deepEqual((await terminal.altScreen()).filter(row => row.trim() !== ''), ['screen 1', 'screen 2', 'screen 3', 'screen 4', 'screen 5', 'screen 6', 'screen 7', 'screen 8'])
+  terminal.type('\x1b[6~')
+  await until(async () => (await terminal.altScreen())[0] === 'screen 5')
+  assert.deepEqual((await terminal.altScreen()).filter(row => row.trim() !== ''), ['screen 5', 'screen 6', 'screen 7', 'screen 8', 'screen 9', 'screen 10', 'screen 11', 'screen 12'])
+  terminal.type('\x1b[F')
+  await until(async () => (await terminal.altScreen())[0] === 'screen 5')
+})
+
+test('switching screens while a placed screen is open carries it to the other screen, open as it was', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesAScreen(ctx, namedRows(12))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).every(row => row.startsWith('screen ') || row.trim() === ''))
+  terminal.type('\x1b[6~')
+  await until(async () => (await terminal.altScreen())[0] === 'screen 5')
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === false)
+  await until(async () => (await terminal.mainScreen()).slice(-8).every(row => row.startsWith('screen ') || row.trim() === ''))
+  const onMain = await terminal.mainScreen()
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === true)
+  await until(async () => (await terminal.altScreen()).every(row => row.startsWith('screen ') || row.trim() === ''))
+  assert.equal((await terminal.altScreen())[0], 'screen 5', 'where it was scrolled is carried back')
+  assert.equal(onMain.some(row => row.includes('fix the build')), false, 'the transcript under it is covered')
 })

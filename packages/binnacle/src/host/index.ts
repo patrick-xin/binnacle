@@ -7,7 +7,8 @@
  * the person quits, on the screen they asked for and switch to: the alternate
  * screen, the transcript in a scroll view that follows its end, or the main
  * screen, the transcript printed into the scrollback; the composer below
- * either.
+ * either; and, on the key a plugin offered, a screen it placed drawn over
+ * whichever is live.
  * It provides the `binnacle` service authors register through, and reads the
  * whole log again when an adapter comes or goes. A failure it cannot recover from gives
  * back what it took, a terminal half-started included, says what failed, and
@@ -20,13 +21,15 @@ import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
-import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
+import type { OverlayHandle, OverlayOptions, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
+import type { Fact } from '../facts/adapt.ts'
 import { chrome, editorTheme, tones } from '../ui/theme.ts'
 import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
+import { ScreenPane } from '../panes/screen.ts'
 import { toolCards } from '../plugins/tool-cards/index.ts'
 import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
@@ -109,8 +112,9 @@ function reaching(live: () => TUI): TUI {
  * A switch stops the live pi-tui object and builds the other over the same
  * terminal, as pi does (`pi:packages/coding-agent/src/modes/interactive/interactive-mode.ts`).
  * What the old one held is carried to the new: the pane and the composer,
- * focus, and the one key table's listener. Where the main screen left off is
- * kept for its next turn, as the terminal keeps what it printed.
+ * focus, the one key table's listener, and a placed screen left open. Where
+ * the main screen left off is kept for its next turn, as the terminal keeps
+ * what it printed.
  * @param session - the open session.
  * @param registrations - what authors registered: their adapters and views.
  * @param quit - called once, when the person asks to quit.
@@ -121,6 +125,7 @@ function reaching(live: () => TUI): TUI {
 function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void, first: TuiMode): () => void {
   const terminal = internals.terminal()
   const events: SessionEvent[] = []
+  let facts: readonly Fact[] = []
   let tui: TuiMainScreen | TuiAltScreen
   let left: TuiMainScreenRenderState | undefined
   let scroll: ScrollView | undefined
@@ -136,9 +141,36 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
   })
+  // The screens plugins placed, each in a pane of its own, so what a person did to one — where they scrolled it — is
+  // kept while its registration stands. One is open at a time, drawn over the whole of the screen the person is on.
+  const screenPanes = new Map<string, ScreenPane>()
+  let open: { readonly name: string, readonly pane: ScreenPane, handle: OverlayHandle } | undefined
+  const covering = { anchor: 'top-left', width: '100%', maxHeight: '100%' } as const satisfies OverlayOptions
+  /** Close the placed screen that is open, giving the keyboard back to the composer. */
+  function closeScreen(): void {
+    if (open === undefined) return
+    open.handle.hide()
+    open = undefined
+  }
+  /** Open a placed screen, closing any that is open; its pane is placed again, as its registration now stands. */
+  function openScreen(id: string): void {
+    const placed = registrations.screens.get(id)
+    if (placed === undefined) return
+    closeScreen()
+    let pane = screenPanes.get(id)
+    if (pane === undefined) {
+      pane = new ScreenPane(() => { tui.requestRender() }, () => facts, () => terminal.rows)
+      screenPanes.set(id, pane)
+    }
+    pane.place(id, placed)
+    open = { name: id, pane, handle: tui.showOverlay(pane, covering) }
+  }
   // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
-    if (changed === 'facts') transcript.reset(events.map(event => adapt(event, registrations.adapters)))
+    if (changed === 'facts') {
+      facts = events.map(event => adapt(event, registrations.adapters))
+      transcript.reset(facts)
+    } else if (changed === 'screens') offerScreens()
     else tui.requestRender()
   })
   const composer = new Editor(reaching(() => tui), editorTheme)
@@ -148,15 +180,28 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     session.send(text)
   }
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
-  // wherever keys enter; nothing else in binnacle matches a key.
+  // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()
   setKeybindings(table.manager)
+  const offered = new Map<string, () => void>()
+  /** Take back every key the placed screens offer and offer what they offer now, closing one whose registration went. */
+  function offerScreens(): void {
+    for (const withdraw of offered.values()) withdraw()
+    offered.clear()
+    for (const [id, screen] of registrations.screens) offered.set(id, table.offer(id, { defaultKeys: screen.key, description: screen.description }))
+    if (open === undefined) return
+    const placed = registrations.screens.get(open.name)
+    if (placed === undefined) closeScreen()
+    else open.pane.place(open.name, placed)
+  }
+  offerScreens()
   // Keys arrive ahead of the composer, through pi-tui's input listener. The host answers what is bound to it, quitting
-  // and switching screens; a gesture is the pane's to answer, and a key nothing answers gives the keyboard back to the
-  // composer, reaching it typed, so typing is never lost.
+  // and switching screens; the key that opens a placed screen, and what it answers with, is the host's too; a gesture
+  // is the pane's to answer, and a key nothing answers gives the keyboard back to the composer, reaching it typed, so
+  // typing is never lost. While a placed screen is open it takes the rest: nothing moves on the transcript beneath it,
+  // and nothing reaches the composer it covers, so closing returns the transcript as it was.
   const keys = (data: string): TuiInputListenerResult => {
-    const focused = transcript.focused
-    const resolved = table.resolve(data, focused)
+    const resolved = table.resolve(data, transcript.focused, open !== undefined)
     if (resolved?.kind === 'quit') {
       quit()
       return { consume: true }
@@ -165,6 +210,20 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       show(tui.mode === 'fullscreen' ? 'regular' : 'fullscreen')
       return { consume: true }
     }
+    if (resolved?.kind === 'screen') {
+      if (open?.name === resolved.name) closeScreen()
+      else openScreen(resolved.name)
+      return { consume: true }
+    }
+    if (resolved?.kind === 'screen-close') {
+      closeScreen()
+      return { consume: true }
+    }
+    if (resolved?.kind === 'screen-scroll') {
+      open?.pane.scrollBy(resolved.scroll)
+      return { consume: true }
+    }
+    if (open !== undefined) return undefined
     if (resolved !== undefined && transcript.handleKey({ kind: 'key', binding: resolved.binding })) return { consume: true }
     // Stepping out drops focus, and where the main screen parked it, so what was typed is sent, not answered by focus.
     transcript.handleKey({ kind: 'key', binding: 'focus.out' })
@@ -195,6 +254,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     }
     next.setFocus(composer)
     next.addInputListener(keys)
+    // A placed screen open across a switch of pi-tui's screens is placed on the one built, as the composer and focus are carried.
+    if (open !== undefined) open = { name: open.name, pane: open.pane, handle: next.showOverlay(open.pane, covering) }
     return next
   }
   const leave = (): void => {
@@ -214,7 +275,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   tui = build(first)
   const unfollow = session.follow((event) => {
     events.push(event)
-    transcript.push(adapt(event, registrations.adapters))
+    const fact = adapt(event, registrations.adapters)
+    facts = [...facts, fact]
+    transcript.push(fact)
   })
   let held = true
   let started = false
@@ -223,6 +286,11 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     held = false
     unfollow()
     unregister()
+    // A placed screen open at the quit is closed first, so the session is left where the person can read it, plain.
+    if (open !== undefined) {
+      closeScreen()
+      tui.renderNow()
+    }
     // Quitting from the alternate screen goes by the main screen, as pi's does, so the session is left printed there once, after what it printed before.
     if (started && tui.mode === 'fullscreen') {
       leave()

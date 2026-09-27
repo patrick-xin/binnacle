@@ -5,14 +5,27 @@
  * Removing or renaming an export here breaks every author; its commit says so.
  */
 
-import type { AuthorAdapter } from './facts/adapt.ts'
+import type { AuthorAdapter, Fact } from './facts/adapt.ts'
+import type { KeyId } from './ui/keys.ts'
+import type { Node } from './ui/node.ts'
 import type { View } from './views/entries.ts'
 
 export type { AuthorAdapter, Fact } from './facts/adapt.ts'
 export type { Entry } from './models/transcript.ts'
+export type { KeyId } from './ui/keys.ts'
 export type { Mark } from './ui/theme.ts'
 export type { Node } from './ui/node.ts'
 export type { View, Views } from './views/entries.ts'
+
+/** A screen a plugin places in the transcript's place: the key its plugin offers, and how it draws. */
+export interface PlacedScreen {
+  /** The key that opens it, as pi-tui names keys (`ctrl+shift+t`, `f2`); the binding its plugin offers in the one key table, so a person can rebind it. */
+  readonly key: KeyId
+  /** What the key does, as a person reads it in help. */
+  readonly description: string
+  /** How the screen draws, with nodes as a view draws, handed the session's facts read-only; nothing it does reaches the log. */
+  readonly draw: (facts: readonly Fact[]) => Node
+}
 
 /** The `binnacle` service, `ctx.binnacle`: each registration is an effect of the plugin that made it, gone when that plugin is disposed. */
 export interface Registrations {
@@ -43,6 +56,20 @@ export interface Registrations {
    * @param key - the entry kind or fact name, as it was registered.
    */
   invalidate(key: string): void
+  /**
+   * Place a screen in the transcript's place: drawn with nodes as a view
+   * draws, over the whole of the screen the person is on, handed the
+   * session's facts read-only. Its plugin offers the key that opens it, a
+   * binding in the one key table; the same key, or Esc, returns to the
+   * transcript as it was, and what the host answers itself, quitting
+   * included, still answers on a placed screen. The newest registration of
+   * a name places it; disposing the plugin takes back its screen and its
+   * key, closing it if it is open.
+   * @param name - the screen's name, its registration's and its binding's.
+   * @param screen - the key it offers, and how it draws.
+   * @returns a disposer, for taking it back before the plugin is disposed.
+   */
+  screen(name: string, screen: PlacedScreen): () => void
 }
 
 declare module '@deepseek-ai/cordis' {
