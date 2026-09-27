@@ -36,13 +36,21 @@ function textOf(blocks: readonly Block[]): string {
 }
 
 /**
- * Draw an answer: reasoning folded under a label, text as it was written.
+ * Draw an answer: reasoning folded under a muted label and drawn dim, its text as the markdown document it is.
  */
 function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
   const children = fact.blocks.map((block, index): Node => block.kind === 'reasoning'
-    ? { kind: 'stack', children: [{ kind: 'text', text: '∴ thinking' }, { kind: 'fold', id: `reasoning:${fact.seq}:${index}`, rows: 0, child: { kind: 'text', text: block.text } }] }
-    : { kind: 'text', text: textOf([block]) })
-  return { kind: 'stack', children: fact.interrupted ? [...children, { kind: 'text', text: '(interrupted)' }] : children }
+    ? {
+      kind: 'stack',
+      children: [
+        { kind: 'text', text: '∴ thinking', tone: 'muted' },
+        { kind: 'fold', id: `reasoning:${fact.seq}:${index}`, rows: 0, child: { kind: 'text', text: block.text, tone: 'dim' } },
+      ],
+    }
+    : block.kind === 'text'
+      ? { kind: 'markdown', text: block.text }
+      : { kind: 'text', text: textOf([block]) })
+  return { kind: 'stack', children: fact.interrupted ? [...children, { kind: 'text', text: '(interrupted)', tone: 'dim' }] : children }
 }
 
 /**

@@ -37,6 +37,22 @@ test('expanding the reasoning shows it', () => {
   assert.deepEqual(lines(answer, ['reasoning:8:0']), ['∴ thinking', 'the build fails in tsc', 'The build', '(interrupted)'])
 })
 
+test('an answer\'s text is drawn as the markdown document it is, in the theme\'s styles', () => {
+  const entry: Entry = {
+    kind: 'answer',
+    fact: { ...answer.fact, interrupted: false, blocks: [{ kind: 'text', text: 'Run `pnpm test`, then **ship** it.' }] },
+  }
+  const drawn = layout(drawEntry(entry), 60, { expanded: new Set() }).lines.map(line => line.trimEnd())
+  assert.deepEqual(drawn, ['Run \x1b[33mpnpm test\x1b[39m, then \x1b[1mship\x1b[22m it.'])
+})
+
+test('the reasoning\'s label is muted, the reasoning under it dim, and an interruption dim', () => {
+  const drawn = layout(drawEntry(answer), 40, { expanded: new Set(['reasoning:8:0']) }).lines.map(line => line.trimEnd())
+  assert.equal(drawn[0], '\x1b[90m∴ thinking\x1b[39m')
+  assert.equal(drawn[1], '\x1b[2mthe build fails in tsc\x1b[22m')
+  assert.equal(drawn[3], '\x1b[2m(interrupted)\x1b[22m')
+})
+
 const call = { kind: 'call', seq: 9, time: 21, turn: 1, step: 1, callId: 'c1', name: 'bash', arguments: '{"command":"pnpm build"}' } as const
 
 test('a tool still running says so', () => {
