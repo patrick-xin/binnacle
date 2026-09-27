@@ -1,6 +1,7 @@
 /**
  * The theme binnacle draws in: content in tones, a markdown document in
- * the tones and the attributes, and the composer plain.
+ * the tones and the attributes, and the composer framed in dim with its
+ * select list in accent and muted.
  *
  * A tone is drawn in one of the terminal's own sixteen colours, so a person's
  * palette decides what it looks like, as their terminal already does.
@@ -61,8 +62,12 @@ export const markdownTheme: MarkdownTheme = {
   strikethrough: attributes.strikethrough,
 }
 
-/** The composer's theme. */
+/**
+ * The composer's theme: its border is the dim chrome nobody reads, and in its
+ * select list the chosen row is accent while what supports a choice — the
+ * description, the scroll state, a row that matches nothing — is muted.
+ */
 export const editorTheme: EditorTheme = {
-  borderColor: plain,
-  selectList: { selectedPrefix: plain, selectedText: plain, description: plain, scrollInfo: plain, noMatch: plain },
+  borderColor: tones.dim,
+  selectList: { selectedPrefix: tones.accent, selectedText: tones.accent, description: tones.muted, scrollInfo: tones.muted, noMatch: tones.muted },
 }
