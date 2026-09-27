@@ -26,12 +26,12 @@ export interface Registrations {
    */
   facts(type: string, adapter: AuthorAdapter): () => void
   /**
-   * Draw a kind of entry: a built-in kind, or an authored fact by its name.
-   * The newest view of a key draws, handed what the one beneath it draws —
-   * the view registered before it, or binnacle's own — so it can build on
-   * that, or leave it the entries it does not claim. Disposing one gives its
-   * place back.
-   * @param key - the entry kind or fact name.
+   * Draw a kind of entry: a built-in kind, a quiet kind by its dsh event
+   * type, or an authored fact by its name. The newest view of a key draws,
+   * handed what the one beneath it draws — the view registered before it, or
+   * binnacle's own — so it can build on that, or leave it the entries it does
+   * not claim. Disposing one gives its place back.
+   * @param key - the entry kind, a quiet kind's dsh event type, or the fact name.
    * @param view - how it is drawn.
    * @returns a disposer, for taking it back before the plugin is disposed.
    */
@@ -40,7 +40,7 @@ export interface Registrations {
    * Draw again, at the next frame, every entry the views of a key draw. An
    * entry is drawn once and kept, so a view that reads anything besides its
    * entry — a setting, the time — calls this when what it read has changed.
-   * @param key - the entry kind or fact name, as it was registered.
+   * @param key - the entry kind, quiet kind's dsh event type, or fact name, as it was registered.
    */
   invalidate(key: string): void
 }

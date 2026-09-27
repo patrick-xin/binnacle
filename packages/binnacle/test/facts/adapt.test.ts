@@ -4,6 +4,7 @@ import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
+import { kinds } from '../../src/facts/kinds.ts'
 import { seed as seedEvent } from '../support/events.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -25,8 +26,22 @@ test('a line a person sent is a prompt, carrying its text', () => {
 })
 
 test('a kind no adapter knows is an unknown fact, carrying its type and the raw record', () => {
-  const event: SessionEvent<'session/end-seed'> = { type: 'session/end-seed', seq: SessionSeq(2), time: 900, data: {} }
-  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: event })
+  const event: SessionEvent<'test/marker'> = { type: 'test/marker', seq: SessionSeq(2), time: 900, data: {} }
+  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: event })
+})
+
+test('a kind named unread is left to the fallback on purpose: an unknown fact, as a kind dsh does not know is', () => {
+  // `command/run`'s declaration lives in a dsh package binnacle does not name, so it is not on the union the adapter is typed against — though the run-time set of dsh's kinds counts it, which is what the table is held to.
+  const event = { type: 'command/run' as string, seq: SessionSeq(7), time: 1_500, data: { name: 'compact' } } as SessionEvent
+  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 7, time: 1_500, type: 'command/run', record: event })
+})
+
+test('an event of a quiet kind is a quiet fact, carrying its type and the event for a view an author registers for the kind', () => {
+  for (const [type, treatment] of Object.entries(kinds)) {
+    if (treatment !== 'quiet') continue
+    const event = { type, seq: SessionSeq(4), time: 1_400, data: {} } as SessionEvent
+    assert.deepEqual(adapt(event), { kind: 'quiet', seq: 4, time: 1_400, type, record: event })
+  }
 })
 
 test('a turn opening is a turn fact', () => {
@@ -39,7 +54,7 @@ test('a turn closing is a turn fact naming why it ended', () => {
   assert.deepEqual(adapt(event), { kind: 'turn', seq: 13, time: 2_600, turn: 1, phase: 'end', ending: 'interrupted' })
 })
 
-test('a user-role message from any source but a person is context they did not type, naming its source', () => {
+test('a user/message whose source is not the person is quiet: dsh web shows no row for context they did not type', () => {
   const event: SessionEvent<'user/message'> = {
     type: 'user/message',
     seq: SessionSeq(4),
@@ -47,7 +62,26 @@ test('a user-role message from any source but a person is context they did not t
     surfaceOp: 'append',
     data: { role: 'user', id: MessageId('m2'), source: { kind: 'test-notice' }, content: [{ type: 'text', text: 'src/a.ts changed' }] },
   }
-  assert.deepEqual(adapt(event), { kind: 'context', seq: 4, time: 1_100, source: 'test-notice', blocks: [{ kind: 'text', text: 'src/a.ts changed' }] })
+  assert.deepEqual(adapt(event), { kind: 'quiet', seq: 4, time: 1_100, type: 'user/message', record: event })
+})
+
+test('a user/message that adds or removes tools is context, naming its source, as dsh web keeps its row', () => {
+  const event: SessionEvent<'user/message'> = {
+    type: 'user/message',
+    seq: SessionSeq(4),
+    time: 1_100,
+    surfaceOp: 'append',
+    data: {
+      role: 'user',
+      id: MessageId('m2'),
+      source: { kind: 'test-notice' },
+      content: [{ type: 'text', text: 'the tools changed' }, { type: 'tool-addition', toolName: 'bash' }],
+    },
+  }
+  assert.deepEqual(adapt(event), {
+    kind: 'context', seq: 4, time: 1_100, source: 'test-notice',
+    blocks: [{ kind: 'text', text: 'the tools changed' }, { kind: 'unread', type: 'tool-addition' }],
+  })
 })
 
 test('a block binnacle cannot read yet is kept, named by its type, never read as empty text', () => {
@@ -130,6 +164,21 @@ test('a result that succeeded carries no failure', () => {
   assert.deepEqual(adapt(event), { kind: 'result', seq: 12, time: 2_500, turn: 1, step: 2, callId: 'c2', failed: false, blocks: [], meta: undefined })
 })
 
+test('a developer message is context when it changes the tools, quiet when it does not, as the Chat row it keeps is', () => {
+  const tools: SessionEvent<'developer/message'> = {
+    type: 'developer/message', seq: SessionSeq(6), time: 1_250, surfaceOp: 'append',
+    data: { turn: 1, step: 1, message: { role: 'developer', id: MessageId('m4'), source: { kind: 'tool-registry' }, content: [{ type: 'tool-addition', toolName: 'bash' }] } },
+  }
+  assert.deepEqual(adapt(tools), {
+    kind: 'context', seq: 6, time: 1_250, source: 'tool-registry', blocks: [{ kind: 'unread', type: 'tool-addition' }],
+  })
+  const said: SessionEvent<'developer/message'> = {
+    ...tools, seq: SessionSeq(7),
+    data: { ...tools.data, message: { ...tools.data.message, id: MessageId('m5'), content: [{ type: 'text', text: 'a word from the registry' }] } },
+  }
+  assert.deepEqual(adapt(said), { kind: 'quiet', seq: 7, time: 1_250, type: 'developer/message', record: said })
+})
+
 test('a step opening or closing is a step fact', () => {
   const start: SessionEvent<'step/start'> = { type: 'step/start', seq: SessionSeq(6), time: 1_300, data: { turn: 1, step: 1 } }
   const end: SessionEvent<'step/end'> = { type: 'step/end', seq: SessionSeq(12), time: 2_550, data: { turn: 1, step: 1 } }
@@ -143,19 +192,19 @@ const seed = seedEvent(2, 900)
 const overreaching = { name: 'seeded', data: { from: 'fork' }, kind: 'prompt', seq: 99 }
 
 test('an author\'s fact is its name and data, in the event\'s place; nothing else the adapter returns reaches it', () => {
-  assert.deepEqual(adapt(seed, new Map([['session/end-seed', () => overreaching]])), { kind: 'authored', seq: 2, time: 900, name: 'seeded', data: { from: 'fork' } })
+  assert.deepEqual(adapt(seed, new Map([['test/marker', () => overreaching]])), { kind: 'authored', seq: 2, time: 900, name: 'seeded', data: { from: 'fork' } })
 })
 
 test('an author\'s adapter that throws, or names nothing, leaves the event unknown and says which adapter and why', () => {
-  const threw = new Map([['session/end-seed', () => { throw new Error('no fork recorded') }]])
-  assert.deepEqual(adapt(seed, threw), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: seed, problem: 'binnacle.facts(session/end-seed) threw: no fork recorded' })
-  const nameless = new Map([['session/end-seed', () => ({ data: 1 }) as unknown as { name: string, data: unknown }]])
-  assert.deepEqual(adapt(seed, nameless), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: seed, problem: 'binnacle.facts(session/end-seed) named no fact: it must return { name, data }' })
+  const threw = new Map([['test/marker', () => { throw new Error('no fork recorded') }]])
+  assert.deepEqual(adapt(seed, threw), { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: seed, problem: 'binnacle.facts(test/marker) threw: no fork recorded' })
+  const nameless = new Map([['test/marker', () => ({ data: 1 }) as unknown as { name: string, data: unknown }]])
+  assert.deepEqual(adapt(seed, nameless), { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: seed, problem: 'binnacle.facts(test/marker) named no fact: it must return { name, data }' })
 })
 
 /** An adapter whose result throws when its name is read. */
 const unreadable = (): { name: string, data: unknown } => ({ get name(): string { throw new Error('name unavailable') }, data: {} })
 
 test('an adapter whose result throws when read is fenced like one that throws when called', () => {
-  assert.deepEqual(adapt(seed, new Map([['session/end-seed', unreadable]])), { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: seed, problem: 'binnacle.facts(session/end-seed) threw: name unavailable' })
+  assert.deepEqual(adapt(seed, new Map([['test/marker', unreadable]])), { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: seed, problem: 'binnacle.facts(test/marker) threw: name unavailable' })
 })

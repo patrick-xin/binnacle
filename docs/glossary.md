@@ -7,6 +7,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | Term | Means |
 | --- | --- |
 | **fact** | One session event as binnacle's own type (`binnacle:packages/binnacle/src/facts/adapt.ts#Fact`, [ADR 4](adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)). A kind no adapter reads is an `unknown` fact carrying its raw record. Facts are the only input a model or view reads. |
+| **quiet** | Of a kind of event dsh knows: one the transcript draws as nothing by default — the session's machinery, what dsh web's Chat shows no row for. Every kind dsh knows is named, as read, quiet or unread, in one table (`binnacle:packages/binnacle/src/facts/kinds.ts#kinds`); a view registered for a quiet kind, by its dsh type, draws it again. [Transcript](features/transcript.md). |
 | **model** | A pure fold over facts. Knows no drawing. |
 | **transcript** | The model of a session as turns (`binnacle:packages/binnacle/src/models/transcript.ts#transcript`), folded one fact at a time. |
 | **turn** | What a person sent and everything the agent did about it, and why it ended; a turn numbered `null` holds what the log carries before its first turn. dsh's word, grouped by us. |

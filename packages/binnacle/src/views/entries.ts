@@ -2,7 +2,9 @@
  * The built-in views: how each kind of transcript entry is drawn.
  *
  * Each returns nodes and declares what its content offers; none reads input
- * or holds a pi-tui component.
+ * or holds a pi-tui component. A quiet entry's built-in drawing is no lines
+ * at all — the session's machinery, which an author's view for its kind
+ * draws again — though what a view over it did wrong is still said.
  */
 
 import type { Block, Fact } from '../facts/adapt.ts'
@@ -25,7 +27,7 @@ import type { Node, Span } from '../ui/node.ts'
  */
 export type View = (entry: Entry, next: () => Node) => Node
 
-/** Authors' views, by entry kind or by the name of an authored fact, each key's oldest first: the newest draws, on what the one before it draws. */
+/** Authors' views, by entry kind, quiet kind's dsh type, or the name of an authored fact, each key's oldest first: the newest draws, on what the one before it draws. */
 export type Views = ReadonlyMap<string, readonly View[]>
 
 /**
@@ -82,13 +84,13 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   return { kind: 'stack', children: [head, ...reason, output] }
 }
 
-/** Every kind of entry binnacle draws; a view registered under one of these names draws that kind, so no authored fact may take one. */
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, result: true, authored: true, unknown: true }
+/** Every kind of entry binnacle draws — or, for a quiet one, does not; a view registered under one of these names draws that kind, so no authored fact may take one. */
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, result: true, authored: true, unknown: true, quiet: true }
 
 /**
  * Draw one entry.
  * @param views - authors' views; the newest for the entry's key draws it, and one for a built-in kind builds on or replaces binnacle's.
- * @returns what it draws. When an author's view throws or returns no node binnacle can lay out, what the view beneath it draws, saying what went wrong; when an authored fact is named as a built-in kind, the built-in drawing, saying so.
+ * @returns what it draws, which for a quiet entry no view claims is no lines at all. When an author's view throws or returns no node binnacle can lay out, what the view beneath it draws, saying what went wrong; when an authored fact is named as a built-in kind, the built-in drawing, saying so.
  */
 export function drawEntry(entry: Entry, views: Views = new Map()): Node {
   if (entry.kind === 'authored' && Object.hasOwn(drawnHere, entry.fact.name)) {
@@ -100,10 +102,12 @@ export function drawEntry(entry: Entry, views: Views = new Map()): Node {
 }
 
 /**
- * The key an entry's views are registered under: its kind, or an authored fact's name.
+ * The key an entry's views are registered under: its kind, a quiet kind's dsh
+ * type, or an authored fact's name.
  */
 export function keyOf(entry: Entry): string {
-  return entry.kind === 'authored' ? entry.fact.name : entry.kind
+  if (entry.kind === 'authored') return entry.fact.name
+  return entry.kind === 'quiet' ? entry.fact.type : entry.kind
 }
 
 /**
@@ -150,6 +154,9 @@ function builtIn(entry: Entry, problem?: string): Node {
       return titled([{ mark: 'unknown' } as const, ` ${entry.fact.name}`], { kind: 'fold', id: 'data', rows: 0, child: { kind: 'text', text: shown(entry.fact.data) } }, problem)
     case 'unknown':
       return titled([{ mark: 'unknown' } as const, ` ${entry.fact.type}`], { kind: 'fold', id: 'record', rows: 0, child: { kind: 'text', text: shown(entry.fact.record) } }, problem ?? entry.fact.problem)
+    case 'quiet':
+      // A blank node is a line of its own; a stack of nothing is no lines at all, which is what quiet draws — though what a view over it did wrong is still said.
+      return problem === undefined ? { kind: 'stack', children: [] } : problemLine(problem)
   }
 }
 

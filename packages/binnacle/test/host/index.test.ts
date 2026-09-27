@@ -21,12 +21,15 @@ const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
 })
 
 /** A kind binnacle has no adapter for, as dsh logs it, logged when it was. */
-const seed = (seq: number): SessionEvent<'session/end-seed'> => seedEvent(seq, seq)
+const seed = (seq: number): SessionEvent<'test/marker'> => seedEvent(seq, seq)
 
-/** What was added to the context without the person typing it, as dsh logs it. */
+/** What was added to the context without the person typing it, as dsh logs it: a tool change, which is the context the transcript still draws. */
 const added = (seq: number, text: string): SessionEvent<'user/message'> => ({
   type: 'user/message', seq: SessionSeq(seq), time: seq, surfaceOp: 'append',
-  data: { role: 'user', id: MessageId(`m${seq}`), source: { kind: 'system-prompt' }, content: [{ type: 'text', text }] },
+  data: {
+    role: 'user', id: MessageId(`m${seq}`), source: { kind: 'system-prompt' },
+    content: [{ type: 'text', text }, { type: 'tool-addition', toolName: 'bash' }],
+  },
 })
 
 /** Let the host's pending promises settle. */
@@ -176,12 +179,12 @@ test('a view registered after its entries were drawn draws them again, and dispo
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
   commit()
-  await until(() => /\? session\/end-seed/.test(terminal.written))
+  await until(() => /\? test\/marker/.test(terminal.written))
   const author = ctx.plugin({
     name: 'author',
     inject: ['binnacle'],
     apply: (plugin: Context) => {
-      plugin.binnacle.facts('session/end-seed', () => ({ name: 'seeded', data: {} }))
+      plugin.binnacle.facts('test/marker', () => ({ name: 'seeded', data: {} }))
       plugin.binnacle.view('seeded', () => ({ kind: 'text', text: 'seeded from a fork' }))
     },
   })
@@ -189,7 +192,31 @@ test('an adapter registered after its kind was logged reads what was logged, and
   await until(() => /seeded from a fork/.test(terminal.written))
   terminal.written = ''
   await author.dispose()
-  await until(() => /\? session\/end-seed/.test(terminal.written))
+  await until(() => /\? test\/marker/.test(terminal.written))
+})
+
+test('a quiet kind draws no line, and a view registered for the kind draws it again until its plugin is disposed', async () => {
+  const ended: SessionEvent<'session/end-seed'> = { type: 'session/end-seed', seq: SessionSeq(2), time: 2, data: {} }
+  const { ctx, terminal, commit } = await mount([], new FakeSession([ended]))
+  commit()
+  await settle()
+  assert.equal(terminal.written.includes('session/end-seed'), false)
+  const author = ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.view('session/end-seed', entry => {
+        const seq = entry.kind === 'quiet' ? entry.fact.seq : 0
+        return { kind: 'text', text: `the seed ended at ${seq}` }
+      })
+    },
+  })
+  await author
+  await until(() => /the seed ended at 2/.test(terminal.written))
+  terminal.written = ''
+  await author.dispose()
+  await settle()
+  assert.equal(terminal.written.includes('the seed ended at'), false)
 })
 
 test('a session that cannot be opened is said, and the launcher asked to exit 1, drawing nothing', async () => {
@@ -236,7 +263,7 @@ test('an author invalidating its view draws its entries again on screen, without
     inject: ['binnacle'],
     apply: (plugin: Context) => {
       author = plugin
-      plugin.binnacle.facts('session/end-seed', () => { adapted++; return { name: 'seeded', data: {} } })
+      plugin.binnacle.facts('test/marker', () => { adapted++; return { name: 'seeded', data: {} } })
       plugin.binnacle.view('seeded', () => ({ kind: 'text', text: `${word} from a fork` }))
     },
   })
@@ -536,7 +563,7 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
   commit()
   await until(async () => (await terminal.mainScreen()).some(row => row.includes('⋯ added by ')))
   terminal.type('\x1b[Z')
-  await until(async () => (await terminal.mainScreen()).some(row => row.includes('▸ show 2 more lines')))
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('▸ show 3 more lines')))
   assert.equal(await terminal.onAlternateScreen(), false)
   terminal.type('\r')
   await until(async () => {
@@ -545,5 +572,5 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
   })
   const after = await terminal.mainScreen()
   assert.deepEqual(after.slice(0, 6), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line'])
-  assert.deepEqual(after.slice(6, 12), ['● stat {}', '  running…', '⋯ added by system-prompt', 'a', 'b', '▸ fold it away'])
+  assert.deepEqual(after.slice(6, 13), ['● stat {}', '  running…', '⋯ added by system-prompt', 'a', 'b', '[tool-addition]', '▸ fold it away'])
 })

@@ -189,12 +189,29 @@ test('a title over folded content is muted, whoever wrote the content', () => {
   assert.equal(styled(unknown)[0], '\x1b[90m? goal/change\x1b[39m')
 })
 
+test('a quiet entry draws no line', () => {
+  const entry: Entry = { kind: 'quiet', fact: { kind: 'quiet', seq: 2, time: 900, type: 'session/title', record: { title: 'read readme' } } }
+  assert.deepEqual(lines(entry), [])
+})
+
+test('an author\'s view registered for a quiet kind draws it again', () => {
+  const entry: Entry = { kind: 'quiet', fact: { kind: 'quiet', seq: 2, time: 900, type: 'session/title', record: { title: 'read readme' } } }
+  const views: Views = new Map([['session/title', [() => ({ kind: 'text', text: 'read readme' })]]])
+  assert.deepEqual(drawn(entry, views), ['read readme'])
+})
+
+test('a view for a quiet kind that throws says so over the nothing it would otherwise draw', () => {
+  const entry: Entry = { kind: 'quiet', fact: { kind: 'quiet', seq: 2, time: 900, type: 'session/title', record: { title: 'read readme' } } }
+  const views: Views = new Map([['session/title', [() => { throw new Error('no title recorded') }]]])
+  assert.deepEqual(drawn(entry, views), ['✗ binnacle.view(session/title) threw: no title recorded'])
+})
+
 test('whatever went wrong is drawn in error, under or after what it went wrong with', () => {
   const prompt: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
   const views = new Map<string, View[]>([['prompt', [() => { throw new Error('no blocks') }]]])
-  const unknown: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: {}, problem: 'binnacle.facts(session/end-seed) threw: no fork recorded' } }
+  const unknown: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: {}, problem: 'binnacle.facts(test/marker) threw: no fork recorded' } }
   assert.equal(drawnWide(prompt, views)[1], '\x1b[31m✗ binnacle.view(prompt) threw: no blocks\x1b[39m')
-  assert.equal(drawnWide(unknown)[1], '\x1b[31m✗ binnacle.facts(session/end-seed) threw: no fork recorded\x1b[39m')
+  assert.equal(drawnWide(unknown)[1], '\x1b[31m✗ binnacle.facts(test/marker) threw: no fork recorded\x1b[39m')
 })
 
 test('a result with no call on screen names the call it answers', () => {
@@ -224,8 +241,8 @@ test('an authored fact named as a kind binnacle draws is drawn by the fallback, 
 })
 
 test('an unknown fact carrying a problem says it under its type', () => {
-  const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: {}, problem: 'binnacle.facts(session/end-seed) threw: no fork recorded' } }
-  assert.deepEqual(drawn(entry, new Map()), ['? session/end-seed', '✗ binnacle.facts(session/end-seed) threw: no fork recorded', '… 1 more line'])
+  const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: {}, problem: 'binnacle.facts(test/marker) threw: no fork recorded' } }
+  assert.deepEqual(drawn(entry, new Map()), ['? test/marker', '✗ binnacle.facts(test/marker) threw: no fork recorded', '… 1 more line'])
 })
 
 /** An array of one slot with nothing in it, as a careless view might return. */
