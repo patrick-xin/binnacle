@@ -158,15 +158,7 @@ test('a presenter that throws leaves the call to binnacle\'s card, which says wh
   assert.deepEqual(drawText(pane, 60).slice(4), ['● unstable {}', 'ok', '✗ unstable.presentResult threw: the presenter fell over'])
 })
 
-test('a presenter that returns no view of a kind the cards draw, and a call whose arguments are not JSON, read as they do today', async () => {
-  const hologram = defineTool({
-    name: 'hologram',
-    description: 'Presents a kind binnacle does not draw.',
-    parameters: {},
-    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
-    execute: async () => 'hologrammed',
-    presentCall: () => ({ card: 'hologram', title: 'A hologram' }) as never,
-  })
+test('presentCall returning undefined, and a call whose arguments are not JSON, read as they do today', async () => {
   const voided = defineTool({
     name: 'voided',
     description: 'Presents nothing for these arguments.',
@@ -175,17 +167,78 @@ test('a presenter that returns no view of a kind the cards draw, and a call whos
     execute: async () => 'void',
     presentCall: () => undefined,
   })
-  const { pane } = await withCards(hologram, voided)
-  pane.push(asked('hologram', '{}'))
-  pane.push({ ...asked('voided', '{}'), seq: 5, callId: 'c2' })
+  const { pane } = await withCards(voided)
+  pane.push(asked('voided', '{}'))
   pane.push({ ...asked('read', '{oops'), seq: 6, callId: 'c3' })
   assert.deepEqual(drawText(pane, 60), [
-    '● hologram {}',
-    '  running…',
     '● voided {}',
     '  running…',
     '● read {oops',
     '  running…',
+  ])
+})
+
+test('presentResult returning undefined keeps the presented title and folds the result\'s own text', async () => {
+  const mute = defineTool({
+    name: 'mute',
+    description: 'Presents its calls only.',
+    parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    execute: async () => 'the raw text',
+    presentCall: () => ({ card: 'generic', title: 'Mute' }),
+    presentResult: () => undefined,
+  })
+  const { pane } = await withCards(mute)
+  pane.push(asked('mute', '{}'))
+  pane.push(returned('the raw text'))
+  assert.deepEqual(drawText(pane, 60), ['● Mute', 'the raw text'])
+})
+
+test('a presenter that returns something the cards cannot draw says so under the card beneath', async () => {
+  const hologram = defineTool({
+    name: 'hologram',
+    description: 'Presents a kind binnacle does not draw.',
+    parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    execute: async () => 'hologrammed',
+    presentCall: () => ({ card: 'hologram', title: 'A hologram' }) as never,
+  })
+  const lying = defineTool({
+    name: 'lying',
+    description: 'Presents a bare string.',
+    parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    execute: async () => 'lied',
+    presentCall: () => 'nonsense' as never,
+  })
+  const crooked = defineTool({
+    name: 'crooked',
+    description: 'Presents a result with no title of text.',
+    parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    execute: async () => 'crooked',
+    presentCall: () => ({ card: 'generic', title: 'Crooked' }),
+    presentResult: () => ({ card: 'generic', title: 7 }) as never,
+  })
+  const { pane } = await withCards(hologram, lying, crooked)
+  pane.push(asked('hologram', '{}'))
+  assert.deepEqual(drawText(pane, 100).slice(0, 3), [
+    '● hologram {}',
+    '  running…',
+    '✗ hologram.presentCall returned no drawable view: hologram is no card the tool cards draw',
+  ])
+  pane.push({ ...asked('lying', '{}'), seq: 5, callId: 'c2' })
+  assert.deepEqual(drawText(pane, 100).slice(3, 6), [
+    '● lying {}',
+    '  running…',
+    '✗ lying.presentCall returned no drawable view: it is string',
+  ])
+  pane.push({ ...asked('crooked', '{}'), seq: 6, callId: 'c3' })
+  pane.push({ ...returned('crooked'), callId: 'c3' })
+  assert.deepEqual(drawText(pane, 100).slice(6), [
+    '● crooked {}',
+    'crooked',
+    '✗ crooked.presentResult returned no drawable view: a result view\'s title is not text',
   ])
 })
 

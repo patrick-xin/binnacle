@@ -41,23 +41,27 @@ const resultCards: ReadonlySet<string> = new Set(['generic', 'terminal', 'diff',
 export interface PresentedCall {
   /** Which card the tool declared for the call. */
   readonly card: 'generic' | 'terminal' | 'diff'
-  /** What this call does, as the tool titled it; one line, however the tool wrote it. */
+  /** What this call does, as the tool titled it. */
   readonly title: string
 }
+
+/** What a presenter returned, read as data: the view, or why it cannot be drawn. */
+export type Read<T> = { readonly view: T } | { readonly why: string }
 
 /**
  * Read what a tool's call presenter returned.
  * @param value - what `presentCall` returned.
- * @returns the view it returned, or `undefined` when it returned nothing binnacle draws: not an object, a card binnacle does not draw in this slice, or no title.
+ * @returns the view it returned; `undefined` when it returned undefined, dsh's word for the generic fallback binnacle's own card is; or why the value cannot be drawn.
  */
-export function callViewOf(value: unknown): PresentedCall | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
+export function callViewOf(value: unknown): Read<PresentedCall> | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'object' || value === null) return { why: `it is ${value === null ? 'null' : typeof value}` }
   const record = value as Record<string, unknown>
   const card: unknown = record.card
   const title: unknown = record.title
-  if (typeof card !== 'string' || !callCards.has(card)) return undefined
-  if (typeof title !== 'string') return undefined
-  return { card: card as PresentedCall['card'], title }
+  if (typeof card !== 'string' || !callCards.has(card)) return { why: `${readable(card)} is no card the tool cards draw` }
+  if (typeof title !== 'string') return { why: 'a call view needs its title' }
+  return { view: { card: card as PresentedCall['card'], title } }
 }
 
 /** A result as its tool presented it, read as data. */
@@ -73,21 +77,24 @@ export interface PresentedResult {
 /**
  * Read what a tool's result presenter returned.
  * @param value - what `presentResult` returned.
- * @returns the view it returned, or `undefined` when it returned nothing binnacle draws: not an object, a card binnacle does not draw in this slice, a title that is not one line of text, or content that is not an array of blocks.
+ * @returns the view it returned; `undefined` when it returned undefined, dsh's word for keeping the pending title and the raw result content; or why the value cannot be drawn.
  */
-export function resultViewOf(value: unknown): PresentedResult | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
+export function resultViewOf(value: unknown): Read<PresentedResult> | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'object' || value === null) return { why: `it is ${value === null ? 'null' : typeof value}` }
   const record = value as Record<string, unknown>
   const card: unknown = record.card
   const title: unknown = record.title
   const content: unknown = record.content
-  if (typeof card !== 'string' || !resultCards.has(card)) return undefined
-  if (title !== undefined && typeof title !== 'string') return undefined
-  if (content !== undefined && !Array.isArray(content)) return undefined
+  if (typeof card !== 'string' || !resultCards.has(card)) return { why: `${readable(card)} is no card the tool cards draw` }
+  if (title !== undefined && typeof title !== 'string') return { why: "a result view's title is not text" }
+  if (content !== undefined && !Array.isArray(content)) return { why: "a result view's content is not an array of blocks" }
   return {
-    card: card as PresentedResult['card'],
-    ...title === undefined ? {} : { title },
-    ...content === undefined ? {} : { content },
+    view: {
+      card: card as PresentedResult['card'],
+      ...title === undefined ? {} : { title },
+      ...content === undefined ? {} : { content },
+    },
   }
 }
 

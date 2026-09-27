@@ -55,8 +55,10 @@ function viewOf(tools: ToolRuntime): View {
       return refused(next(), `${entry.call.name}.presentCall threw: ${readable(error)}`)
     }
     if (presented === undefined) return next()
+    if ('why' in presented) return refused(next(), `${entry.call.name}.presentCall returned no drawable view: ${presented.why}`)
+    const call = presented.view
     if (entry.result === undefined) {
-      const head: Node = { kind: 'text', text: [{ text: '●', tone: 'muted' }, ` ${presented.title}`] }
+      const head: Node = { kind: 'text', text: [{ text: '●', tone: 'muted' }, ` ${call.title}`] }
       const waiting: Node = entry.left === undefined
         ? { kind: 'text', text: '  running…', tone: 'muted' }
         : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' }
@@ -71,14 +73,16 @@ function viewOf(tools: ToolRuntime): View {
         // As a throwing call presenter: the entry is the view beneath's, with what did it said beneath.
         return refused(next(), `${entry.call.name}.presentResult threw: ${readable(error)}`)
       }
+      if (completed !== undefined && 'why' in completed) return refused(next(), `${entry.call.name}.presentResult returned no drawable view: ${completed.why}`)
     }
-    const head: Node = { kind: 'text', text: [result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' }, ` ${completed?.title ?? presented.title}`] }
+    const shown = completed === undefined ? undefined : completed.view
+    const head: Node = { kind: 'text', text: [result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' }, ` ${shown?.title ?? call.title}`] }
     const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
     const output: Node = {
       kind: 'fold',
       id: `tool:${entry.call.callId}`,
       rows: 3,
-      child: { kind: 'text', text: completed?.content === undefined ? textOfBlocks(result.blocks) : textOfPresented(completed.content) },
+      child: { kind: 'text', text: shown?.content === undefined ? textOfBlocks(result.blocks) : textOfPresented(shown.content) },
     }
     return { kind: 'stack', children: [head, ...reason, output] }
   }
