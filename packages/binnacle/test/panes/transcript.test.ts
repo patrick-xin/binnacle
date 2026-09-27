@@ -12,6 +12,7 @@ import type { PaneReports } from '../../src/panes/transcript.ts'
 import { prompt as promptFact, call as callFact, returned as returnedFact } from '../support/facts.ts'
 import { called } from '../support/events.ts'
 import { pointer } from '../support/pointer.ts'
+import { foldedAlike } from '../support/views.ts'
 
 const prompt = promptFact(1, 1, 'fix the build')
 
@@ -191,16 +192,6 @@ function counting(): { views: Views, calls: () => number } {
   }
   return { views: new Map([['prompt', [view]]]), calls: () => calls }
 }
-
-/**
- * An author's view that folds every prompt under one name, whatever entry it draws: each prompt's text, folded to its first line.
- */
-const foldedAlike: View = (entry) => ({
-  kind: 'fold',
-  id: 'mine',
-  rows: 1,
-  child: { kind: 'text', text: entry.kind === 'prompt' ? entry.fact.blocks.map(block => block.kind === 'unread' ? '' : block.text).join('\n') : '' },
-})
 
 /** Views holding the one author's view that folds every prompt alike. */
 const alike: Views = new Map([['prompt', [foldedAlike]]])

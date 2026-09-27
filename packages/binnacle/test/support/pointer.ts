@@ -1,6 +1,6 @@
 /**
  * The pointer events a test feeds a pane, as pi-tui's containers deliver
- * them: the event a click on a row becomes, at the width the pane drew it.
+ * them: the event a click on a row becomes, at the width the test names.
  * @module binnacle/test/support/pointer
  */
 import type { TuiMouseEvent } from '@earendil-works/pi-tui'
@@ -10,9 +10,10 @@ import type { TuiMouseEvent } from '@earendil-works/pi-tui'
  * @param type - what the pointer did.
  * @param y - the row, in the pane's own lines.
  * @param x - the column.
+ * @param width - the columns the pane drew the row at.
  * @returns the event.
  */
-export const pointer = (type: TuiMouseEvent['type'], y: number, x = 0): TuiMouseEvent => ({
-  type, button: type === 'wheel' || type === 'move' ? 'none' : 'left', x, y, screenX: x, screenY: y, width: 40, height: 3,
+export const pointer = (type: TuiMouseEvent['type'], y: number, x = 0, width = 40): TuiMouseEvent => ({
+  type, button: type === 'wheel' || type === 'move' ? 'none' : 'left', x, y, screenX: x, screenY: y, width, height: 3,
   shift: false, alt: false, ctrl: false, ...type === 'wheel' ? { wheelDelta: -1 } : {},
 })

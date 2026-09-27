@@ -394,7 +394,7 @@ test('a fold a person opened stays open when the plugin drawing it is disposed, 
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('a\nb\nc\nd\ne'))
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', '… 2 more lines'])
-  assert.deepEqual(pane.handleMouse(pointer('click', 4)), { handled: true })
+  assert.deepEqual(pane.handleMouse(pointer('click', 4, 0, 60)), { handled: true })
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', 'd', 'e'])
   await fiber.dispose()
   assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'a', 'b', 'c', 'd', 'e'])
