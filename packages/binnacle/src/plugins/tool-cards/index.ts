@@ -17,8 +17,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { Node, View } from '../../api.ts'
-import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks } from './presentation.ts'
+import type { CardParts } from './cards.ts'
 import { rowFor } from './cards.ts'
+import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks } from './presentation.ts'
 
 /** The tool-cards plugin, loaded by the host beside the surface it draws on. */
 export const toolCards = {
@@ -58,16 +59,10 @@ function viewOf(tools: ToolRuntime): View {
     if (presented === undefined) return next()
     if ('why' in presented) return refused(next(), `${entry.call.name}.presentCall returned no drawable view: ${presented.why}`)
     const call = presented.view
-    if (entry.result === undefined) {
-      const head: Node = { kind: 'text', text: [{ text: '●', tone: 'muted' }, ` ${titled(call.title)}`] }
-      const waiting: Node = entry.left === undefined
-        ? { kind: 'text', text: '  running…', tone: 'muted' }
-        : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' }
-      return { kind: 'stack', children: [head, ...rowFor(call.card).pending(call), waiting] }
-    }
     const result = entry.result
-    let completed
-    if (tool.presentResult !== undefined) {
+    let shown
+    if (result !== undefined && tool.presentResult !== undefined) {
+      let completed
       try {
         completed = resultViewOf(tool.presentResult(args, handedResult(result)))
       } catch (error) {
@@ -75,17 +70,24 @@ function viewOf(tools: ToolRuntime): View {
         return refused(next(), `${entry.call.name}.presentResult threw: ${readable(error)}`)
       }
       if (completed !== undefined && 'why' in completed) return refused(next(), `${entry.call.name}.presentResult returned no drawable view: ${completed.why}`)
+      shown = completed?.view
     }
-    const shown = completed === undefined ? undefined : completed.view
-    const head: Node = { kind: 'text', text: [result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' }, ` ${titled(shown?.title ?? call.title)}`] }
-    const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
-    const output: Node = {
-      kind: 'fold',
-      id: `tool:${entry.call.callId}`,
-      rows: 3,
-      child: (shown === undefined ? undefined : rowFor(shown.card).folded(shown)) ?? { kind: 'text', text: textOfBlocks(result.blocks) },
+    const parts: CardParts = {
+      call,
+      result: shown,
+      glyph: result === undefined
+        ? { text: '●', tone: 'muted' }
+        : result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' },
+      waiting: result === undefined
+        ? (entry.left === undefined
+            ? { kind: 'text', text: '  running…', tone: 'muted' }
+            : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' })
+        : undefined,
+      reason: result?.failure?.reason,
+      resultText: result === undefined ? '' : textOfBlocks(result.blocks),
+      fold: (child: Node, rows = 3) => ({ kind: 'fold', id: `tool:${entry.call.callId}`, rows, child }),
     }
-    return { kind: 'stack', children: [head, ...reason, output] }
+    return rowFor(shown?.card ?? call.card).draw(parts)
   }
 }
 
@@ -97,14 +99,4 @@ function viewOf(tools: ToolRuntime): View {
  */
 function refused(beneath: Node, what: string): Node {
   return { kind: 'stack', children: [beneath, { kind: 'text', text: `✗ ${what}`, tone: 'error' }] }
-}
-
-/**
- * A presented title as the head shows it: its first line beside the glyph, and each later line indented two columns beneath it, so a command written on more than one line does not read as output.
- * @param title - the title a presenter gave, however many lines it wrote.
- * @returns the head's text.
- */
-function titled(title: string): string {
-  const lines = title.split('\n')
-  return lines.length === 1 ? title : [lines[0], ...lines.slice(1).map(line => `  ${line}`)].join('\n')
 }

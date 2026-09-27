@@ -9,10 +9,14 @@ import { Context } from '@deepseek-ai/cordis'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
+import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Fact } from '../src/facts/adapt.ts'
 import { RegistrationService } from '../src/host/registrations.ts'
 import { TranscriptPane } from '../src/panes/transcript.ts'
 import { drawText } from '../src/ui/draw.ts'
+import { layout } from '../src/ui/layout.ts'
+import type { Node } from '../src/api.ts'
+import type { CardParts, CardRow } from '../src/plugins/tool-cards/cards.ts'
 import { rowFor } from '../src/plugins/tool-cards/cards.ts'
 import { toolCards } from '../src/plugins/tool-cards/index.ts'
 
@@ -287,6 +291,37 @@ test('every other card kind is drawn by its title alone in this slice', async ()
 test('a kind with no row of its own draws through generic\'s', () => {
   assert.equal(rowFor('terminal'), rowFor('generic'))
   assert.equal(rowFor('web'), rowFor('generic'))
+})
+
+test('a row can draw a head of its own and a line under a completed head', () => {
+  const shell: CardRow = {
+    draw: parts => {
+      const head: Node = { kind: 'text', text: [{ text: '$', tone: 'accent' }, ` ${parts.call.title}`] }
+      if (parts.waiting !== undefined) return { kind: 'stack', children: [head, parts.waiting] }
+      const status: Node = { kind: 'text', text: '  exited badly', tone: 'warning' }
+      return { kind: 'stack', children: [head, status, parts.fold({ kind: 'text', text: parts.resultText }, 1)] }
+    },
+  }
+  const drawn = (parts: CardParts): string[] =>
+    layout(shell.draw(parts), 40, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  const running: CardParts = {
+    call: { card: 'generic', title: 'pnpm test' },
+    result: undefined,
+    glyph: { text: '●', tone: 'muted' },
+    waiting: { kind: 'text', text: '  running…', tone: 'muted' },
+    reason: undefined,
+    resultText: '',
+    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'tool:c1', rows, child }),
+  }
+  assert.deepEqual(drawn(running), ['$ pnpm test', '  running…'])
+  const done: CardParts = {
+    ...running,
+    glyph: { text: '✗', tone: 'error' },
+    waiting: undefined,
+    reason: 'the command exited 2',
+    resultText: 'a\nb\nc',
+  }
+  assert.deepEqual(drawn(done), ['$ pnpm test', '  exited badly', 'a', '… 2 more lines'])
 })
 
 test('disposing the plugin gives every call back to binnacle\'s card', async () => {

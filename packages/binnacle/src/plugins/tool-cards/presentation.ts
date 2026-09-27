@@ -6,7 +6,9 @@
  * as no view at all, and nothing a presenter does can take the surface down.
  * The shapes it returns are dsh's presentation vocabulary
  * (`dsh:packages/core/tools/src/presentation.ts`); this module never imports
- * it at run time, only narrows what was already read off a definition.
+ * it at run time, only narrows what was already read off a definition. The
+ * head a presented title draws is read here too, for every row that draws
+ * one.
  */
 
 /**
@@ -99,6 +101,16 @@ export function resultViewOf(value: unknown): Read<PresentedResult> | undefined 
       ...content === undefined ? {} : { content },
     },
   }
+}
+
+/**
+ * A presented title as a head shows it: its first line beside the glyph, and each later line indented two columns beneath it, so a command written on more than one line does not read as output.
+ * @param title - the title a presenter gave, however many lines it wrote.
+ * @returns the head's text.
+ */
+export function titled(title: string): string {
+  const lines = title.split('\n')
+  return lines.length === 1 ? title : [lines[0], ...lines.slice(1).map(line => `  ${line}`)].join('\n')
 }
 
 /**
