@@ -57,17 +57,17 @@ test('a key a plugin offers resolves to the screen it opens, and withdrawing the
   assert.equal(table.manager.getDefinition('binnacle.screen.trajectory' as keyof Keybindings), undefined)
 })
 
-test('while a placed screen is open, escape and the key that opened it return, the scroll keys read the screen, and quit still answers', () => {
+test('while a placed screen is open, escape and the key that opened it return, quit still answers, and nothing moves focus on the transcript beneath', () => {
   const table = keyTable()
   table.offer('trajectory', { defaultKeys: 'f2', description: 'open the trajectory' })
   assert.deepEqual(table.resolve('\x1bOQ', false, true), { kind: 'screen', name: 'trajectory' }, 'the same key returns')
   assert.deepEqual(table.resolve('\x1b', false, true), { kind: 'screen-close' })
   assert.deepEqual(table.resolve('\x1b', true, true), { kind: 'screen-close' }, 'whatever had focus')
-  assert.deepEqual(table.resolve('\x1b[5~', false, true), { kind: 'screen-scroll', scroll: 'page.up' })
-  assert.deepEqual(table.resolve('\x1b[6~', false, true), { kind: 'screen-scroll', scroll: 'page.down' })
-  assert.deepEqual(table.resolve('\x1b[F', false, true), { kind: 'screen-scroll', scroll: 'end' })
   assert.deepEqual(table.resolve('\x03', false, true), { kind: 'quit' })
   assert.deepEqual(table.resolve('\x14', false, true), { kind: 'switch-screens' })
-  assert.deepEqual(table.resolve('\t', true, true), undefined, 'focus does not move on the transcript under a placed screen')
-  assert.deepEqual(table.resolve('\x1b[Z', false, true), undefined, 'the composer under it is not typed into')
+  for (const focused of [false, true]) {
+    assert.deepEqual(table.resolve('\t', focused, true), undefined, 'focus does not move on the transcript beneath')
+    assert.deepEqual(table.resolve('\x1b[Z', focused, true), undefined)
+    assert.deepEqual(table.resolve('\r', focused, true), undefined, 'the composer below it is live, and takes it')
+  }
 })

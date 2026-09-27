@@ -12,7 +12,7 @@
  */
 
 import { isKeyRepeat, isKeyRelease, KeybindingsManager, TUI_KEYBINDINGS } from '@earendil-works/pi-tui'
-import type { Keybinding, KeybindingDefinition, KeybindingDefinitions, Keybindings } from '@earendil-works/pi-tui'
+import type { Keybinding, KeybindingDefinition, KeybindingDefinitions } from '@earendil-works/pi-tui'
 import type { KeyBinding } from '../contract/index.ts'
 
 /** A key as pi-tui names it, re-exported for the author API: what a plugin offers to open a screen with. */
@@ -57,30 +57,6 @@ export type ResolvedKey =
   | { readonly kind: 'switch-screens' }
   | { readonly kind: 'screen', readonly name: string }
   | { readonly kind: 'screen-close' }
-  | { readonly kind: 'screen-scroll', readonly scroll: ScreenScroll }
-
-/** The scrolls a placed screen answers, read from the alternate screen's own bindings while one is open. */
-const SCREEN_SCROLLS: readonly (readonly [binding: keyof Keybindings, scroll: ScreenScroll])[] = [
-  ['tui.altScreen.pageUp', 'page.up'],
-  ['tui.altScreen.pageDown', 'page.down'],
-  ['tui.altScreen.halfPageUp', 'half.up'],
-  ['tui.altScreen.halfPageDown', 'half.down'],
-  ['tui.altScreen.lineUp', 'line.up'],
-  ['tui.altScreen.lineDown', 'line.down'],
-  ['tui.altScreen.top', 'top'],
-  ['tui.altScreen.bottom', 'end'],
-]
-
-/** The scrolls a placed screen answers, by the key that asked for them. */
-export type ScreenScroll =
-  | 'page.up'
-  | 'page.down'
-  | 'half.up'
-  | 'half.down'
-  | 'line.up'
-  | 'line.down'
-  | 'top'
-  | 'end'
 
 /** The binding id a placed screen's key is offered under: the one table's, named for the screen. */
 const offeredBinding = (name: string): string => `binnacle.screen.${name}`
@@ -139,12 +115,10 @@ export function keyTable(): KeyTable {
         if (manager.matches(data, id as Keybinding)) return { kind: 'screen', name: id.slice(offeredBinding('').length) }
       }
       if (open) {
-        // A placed screen takes the keys the transcript would answer: Esc returns, the keys the alternate screen
-        // scrolls with read the screen instead, and nothing reaches the composer under it.
+        // A placed screen takes the keys the transcript would answer: Esc returns to the transcript. Scrolling, search
+        // and selection are the alternate screen's own, over the scroll view the screen sits in; the composer below it
+        // stays live, and focus does not move on the transcript beneath.
         if (manager.matches(data, 'binnacle.stepOut')) return { kind: 'screen-close' }
-        for (const [binding, scroll] of SCREEN_SCROLLS) {
-          if (manager.matches(data, binding)) return { kind: 'screen-scroll', scroll }
-        }
         return undefined
       }
       if (manager.matches(data, 'binnacle.stepIn')) return { kind: 'gesture', binding: 'focus.previous' }

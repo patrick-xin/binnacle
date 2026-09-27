@@ -58,13 +58,14 @@ export interface Registrations {
   invalidate(key: string): void
   /**
    * Place a screen in the transcript's place: drawn with nodes as a view
-   * draws, over the whole of the screen the person is on, handed the
-   * session's facts read-only. Its plugin offers the key that opens it, a
-   * binding in the one key table; the same key, or Esc, returns to the
-   * transcript as it was, and what the host answers itself, quitting
-   * included, still answers on a placed screen. The newest registration of
-   * a name places it; disposing the plugin takes back its screen and its
-   * key, closing it if it is open.
+   * draws, in the alternate screen's scroll view, handed the session's facts
+   * read-only — and from the main screen, opened by switching to the
+   * alternate screen. Its plugin offers the key that opens it, a binding in
+   * the one key table; the same key, or Esc, returns to the transcript as it
+   * was, and what the host answers itself, quitting included, still answers
+   * on a placed screen. The newest registration of a name places it;
+   * disposing the plugin takes back its screen and its key, closing it if it
+   * is open.
    * @param name - the screen's name, its registration's and its binding's.
    * @param screen - the key it offers, and how it draws.
    * @returns a disposer, for taking it back before the plugin is disposed.
