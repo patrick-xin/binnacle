@@ -9,13 +9,15 @@
  * the author API, type-only; the `binnacle` service, to register a view for
  * the `tool` entry kind; and dsh's `tools` service, to reach the definition
  * that presents each call. Where it cannot draw from a presentation it leaves
- * the entry to the view beneath it, binnacle's own card.
+ * the entry to the view beneath it, binnacle's own card; a presenter that
+ * throws also says so beneath that card, naming the tool, the presenter and
+ * why, in error, so the seam never degrades quietly.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { Node, View } from '../../api.ts'
-import { callViewOf, handedResult, resultViewOf, textOfBlocks, textOfPresented } from './presentation.ts'
+import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks, textOfPresented } from './presentation.ts'
 
 /** The tool-cards plugin, loaded by the host beside the surface it draws on. */
 export const toolCards = {
@@ -48,9 +50,9 @@ function viewOf(tools: ToolRuntime): View {
     let presented
     try {
       presented = callViewOf(tool.presentCall(args))
-    } catch {
-      // What a presenter does wrong never takes the surface down, and the failure is the tool's, not the view's; the entry is the view beneath's.
-      return next()
+    } catch (error) {
+      // What a presenter does wrong never takes the surface down, and the failure is the tool's, not the view's; the entry is the view beneath's, with what did it said beneath.
+      return refused(next(), `${entry.call.name}.presentCall threw: ${readable(error)}`)
     }
     if (presented === undefined) return next()
     if (entry.result === undefined) {
@@ -65,9 +67,9 @@ function viewOf(tools: ToolRuntime): View {
     if (tool.presentResult !== undefined) {
       try {
         completed = resultViewOf(tool.presentResult(args, handedResult(result)))
-      } catch {
-        // As a throwing call presenter: the entry is the view beneath's.
-        return next()
+      } catch (error) {
+        // As a throwing call presenter: the entry is the view beneath's, with what did it said beneath.
+        return refused(next(), `${entry.call.name}.presentResult threw: ${readable(error)}`)
       }
     }
     const head: Node = { kind: 'text', text: [result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' }, ` ${completed?.title ?? presented.title}`] }
@@ -80,4 +82,14 @@ function viewOf(tools: ToolRuntime): View {
     }
     return { kind: 'stack', children: [head, ...reason, output] }
   }
+}
+
+/**
+ * The card beneath's drawing, with what a presenter did wrong said beneath it, in error.
+ * @param beneath - what the view beneath drew.
+ * @param what - the tool, the presenter and what went wrong.
+ * @returns the drawing a person reads.
+ */
+function refused(beneath: Node, what: string): Node {
+  return { kind: 'stack', children: [beneath, { kind: 'text', text: `✗ ${what}`, tone: 'error' }] }
 }

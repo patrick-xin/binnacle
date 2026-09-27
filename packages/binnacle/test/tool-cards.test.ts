@@ -47,10 +47,10 @@ const read = defineTool({
 const asked = (name: string, args: string): Extract<Fact, { readonly kind: 'call' }> => ({ kind: 'call', seq: 2, time: 2, turn: 1, step: 1, callId: 'c1', name, arguments: args })
 
 /** What a call returned, as it lands in the log. */
-const returned = (text: string): Fact => ({ kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text }], meta: undefined })
+const returned = (text: string): Extract<Fact, { readonly kind: 'result' }> => ({ kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text }], meta: undefined })
 
 /** What a call returned, having failed, as it lands in the log. */
-const failed = (callId: string): Fact => ({
+const failed = (callId: string): Extract<Fact, { readonly kind: 'result' }> => ({
   kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId, failed: true,
   failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' },
   blocks: [{ kind: 'text', text: 'the model was told' }], meta: undefined,
@@ -138,11 +138,24 @@ test('a presenter that throws leaves the call to binnacle\'s card, which says wh
     execute: async () => 'flaked',
     presentCall: () => { throw new Error('the presenter fell over') },
   })
-  const { pane } = await withCards(flaky)
+  const unstable = defineTool({
+    name: 'unstable',
+    description: 'Presents its result by throwing.',
+    parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    execute: async () => 'unstable',
+    presentCall: () => ({ card: 'generic', title: 'Boom' }),
+    presentResult: () => { throw new Error('the presenter fell over') },
+  })
+  const { pane } = await withCards(flaky, unstable)
   pane.push(asked('flaky', '{}'))
-  assert.deepEqual(drawText(pane, 60), ['● flaky {}', '  running…'])
+  assert.deepEqual(drawText(pane, 60), ['● flaky {}', '  running…', '✗ flaky.presentCall threw: the presenter fell over'])
   pane.push(failed('c1'))
-  assert.deepEqual(drawText(pane, 60), ['✗ flaky {}', '  the command exited 2', 'the model was told'])
+  assert.deepEqual(drawText(pane, 60), ['✗ flaky {}', '  the command exited 2', 'the model was told', '✗ flaky.presentCall threw: the presenter fell over'])
+  pane.push({ ...asked('unstable', '{}'), seq: 5, callId: 'c2' })
+  assert.deepEqual(drawText(pane, 60).slice(4), ['● Boom', '  running…'])
+  pane.push({ ...returned('ok'), callId: 'c2' })
+  assert.deepEqual(drawText(pane, 60).slice(4), ['● unstable {}', 'ok', '✗ unstable.presentResult threw: the presenter fell over'])
 })
 
 test('a presenter that returns no view of a kind the cards draw, and a call whose arguments are not JSON, read as they do today', async () => {

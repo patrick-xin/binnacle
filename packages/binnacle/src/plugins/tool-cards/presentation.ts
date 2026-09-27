@@ -9,6 +9,22 @@
  * it at run time, only narrows what was already read off a definition.
  */
 
+/**
+ * A thrown presenter's error, or a value one returned, as a person reads it:
+ * an error's message, or the value's string form, and something still said
+ * even when reading that throws.
+ * @param value - what a presenter threw, or returned where a shape was asked.
+ * @returns its text.
+ */
+export function readable(value: unknown): string {
+  try {
+    return value instanceof Error ? String(value.message) : String(value)
+  } catch {
+    // A value with no string form, or a message that throws when read: nothing more can be said of it.
+    return 'a value binnacle cannot show'
+  }
+}
+
 import type { ToolResult } from '@deepseek-ai/dsh-tools'
 import type { Fact } from '../../api.ts'
 
