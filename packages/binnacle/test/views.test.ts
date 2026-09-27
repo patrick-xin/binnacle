@@ -64,6 +64,17 @@ test('an answer\'s text is drawn as the markdown document it is, in the theme\'s
   assert.deepEqual(drawn, ['Run \x1b[33mpnpm test\x1b[39m, then \x1b[1mship\x1b[22m it.'])
 })
 
+test('an answer draws no line for a call it made: the call is its tool entry\'s to draw', () => {
+  const entry: Entry = {
+    kind: 'answer',
+    fact: {
+      ...answer.fact, interrupted: false,
+      blocks: [{ kind: 'text', text: 'Let me look.' }, { kind: 'unread', type: 'tool-call' }, { kind: 'text', text: 'Then I will fix it.' }],
+    },
+  }
+  assert.deepEqual(lines(entry), ['Let me look.', 'Then I will fix it.'])
+})
+
 test('the reasoning\'s label is muted, the reasoning under it dim, and an interruption dim', () => {
   const drawn = layout(drawEntry(answer), 40, { expanded: new Set(['reasoning:8:0']) }).lines.map(line => line.trimEnd())
   assert.equal(drawn[0], '\x1b[90m∴ thinking\x1b[39m')
@@ -75,6 +86,13 @@ const call = { kind: 'call', seq: 9, time: 21, turn: 1, step: 1, callId: 'c1', n
 
 test('a tool still running says so', () => {
   assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running…'])
+})
+
+test('a call its turn left without a result says so, and why', () => {
+  const left: Entry = { kind: 'tool', call, left: 'aborted' }
+  assert.deepEqual(lines(left), ['● bash {"command":"pnpm build"}', '  the turn ended without it: aborted'])
+  assert.equal(styled(left)[1], '\x1b[90m  the turn ended without it: aborted\x1b[39m')
+  assert.equal(styled(left)[0], '\x1b[90m●\x1b[39m bash {"command":"pnpm build"}')
 })
 
 test('a tool\'s glyph says how the call stands: muted while it runs, success once it returned, error when it failed', () => {

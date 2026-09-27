@@ -16,11 +16,13 @@ type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, re
 /**
  * One thing a turn holds, in log order: a fact, or a tool call with its
  * result once it has one. A `result` entry is a result whose call is not in
- * its turn, kept rather than dropped.
+ * its turn, kept rather than dropped. A tool entry is `left` when its turn
+ * ended without the call's result: how the turn ended, as dsh names it, and
+ * gone again once a late result answers the call.
  */
 export type Entry =
   | Single<'prompt' | 'context' | 'answer' | 'result' | 'authored' | 'unknown'>
-  | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'> }
+  | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'>, readonly left?: string }
 
 /** A turn: what a person sent and everything the agent did about it. */
 export interface Turn {
@@ -64,7 +66,10 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     if (fact.phase === 'start') return { turns: [...model.turns, { turn: fact.turn, entries: [] }] }
     const last = model.turns.at(-1)
     if (last === undefined) return model
-    return { turns: [...model.turns.slice(0, -1), { ...last, ...fact.ending === undefined ? {} : { ending: fact.ending } }] }
+    // A call still without its result when its turn ends is left: nothing later in this turn will answer it.
+    const ending = fact.ending
+    const entries = ending === undefined ? last.entries : last.entries.map(entry => entry.kind === 'tool' && entry.result === undefined ? Object.freeze({ ...entry, left: ending }) : entry)
+    return { turns: [...model.turns.slice(0, -1), { ...last, entries, ...ending === undefined ? {} : { ending } }] }
   }
   const last = model.turns.at(-1) ?? { turn: null, entries: [] }
   const turns = model.turns.length === 0 ? [] : model.turns.slice(0, -1)
@@ -74,7 +79,7 @@ export function fold(model: Transcript, fact: Fact): Transcript {
   } else if (fact.kind === 'result') {
     const at = last.entries.findLastIndex(entry => entry.kind === 'tool' && entry.call.callId === fact.callId)
     const pending = last.entries[at]
-    entries = pending?.kind === 'tool' ? last.entries.with(at, Object.freeze({ ...pending, result: fact })) : [...last.entries, single(fact)]
+    entries = pending?.kind === 'tool' ? last.entries.with(at, Object.freeze({ kind: 'tool', call: pending.call, result: fact })) : [...last.entries, single(fact)]
   } else {
     entries = [...last.entries, single(fact)]
   }

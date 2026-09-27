@@ -58,6 +58,29 @@ test('a turn still running has no ending, and a call still running has no result
   assert.deepEqual(transcript(facts).turns, [{ turn: 1, entries: [{ kind: 'prompt', fact: prompt }, { kind: 'tool', call }] }])
 })
 
+test('a turn\'s end marks its calls left without results, with how the turn ended', () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
+    prompt,
+    call,
+    { kind: 'turn', seq: 6, time: 30, turn: 1, phase: 'end', ending: 'aborted' },
+  ]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    { kind: 'tool', call, left: 'aborted' },
+  ])
+})
+
+test('a result arriving for a left call answers it, and the mark is gone', () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
+    call,
+    { kind: 'turn', seq: 6, time: 30, turn: 1, phase: 'end', ending: 'aborted' },
+    result,
+  ]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'tool', call, result }])
+})
+
 /** A turn starting. */
 const start = (seq: number, turn: number): Fact => ({ kind: 'turn', seq, time: seq, turn, phase: 'start' })
 

@@ -404,3 +404,29 @@ test('on the main screen, reading the log again or pi-tui invalidating the pane 
   pane.invalidate()
   assert.deepEqual(shown(pane), ['yours'])
 })
+
+/**
+ * A pane on the screen asked for, holding a turn whose one call is still unanswered.
+ * @param on - the screen it draws on.
+ * @returns the pane, mid-turn.
+ */
+const unanswered = (on: 'fullscreen' | 'regular'): TranscriptPane => {
+  const pane = new TranscriptPane(() => {})
+  pane.drawOn(on)
+  pane.push({ kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' })
+  pane.push(sent(2, 'one'))
+  pane.push({ ...call, seq: 3 })
+  return pane
+}
+
+test('a call its turn left without a result is drawn that way on both screens', () => {
+  const ended: Fact = { kind: 'turn', seq: 4, time: 4, turn: 1, phase: 'end', ending: 'aborted' }
+  const fullscreen = unanswered('fullscreen')
+  assert.deepEqual(shown(fullscreen), ['› one', '● read {}', '  running…'])
+  fullscreen.push(ended)
+  assert.deepEqual(shown(fullscreen), ['› one', '● read {}', '  the turn ended without it: aborted'])
+  const regular = unanswered('regular')
+  assert.deepEqual(shown(regular), ['› one', '● read {}', '  running…'])
+  regular.push(ended)
+  assert.deepEqual(shown(regular), ['› one', '● read {}', '  the turn ended without it: aborted'])
+})
