@@ -99,7 +99,7 @@ test('focus moves through each entry\'s regions in turn, where two entries name 
 test('an author\'s adapter turns an event kind into a fact of their own, which their view draws', async () => {
   const { registrations, author } = surface()
   await author((ctx) => {
-    ctx.binnacle.facts('session/end-seed', () => ({ name: 'seeded', data: { from: 'fork' } }))
+    ctx.binnacle.facts('test/marker', () => ({ name: 'seeded', data: { from: 'fork' } }))
     ctx.binnacle.view('seeded', () => ({ kind: 'text', text: '— seeded from a fork —' }))
   })
   assert.deepEqual(shown(registrations, seed), ['› fix the build', '— seeded from a fork —'])
@@ -107,7 +107,7 @@ test('an author\'s adapter turns an event kind into a fact of their own, which t
 
 test('a fact of the author\'s own with no view is drawn by the fallback, by its name, never dropped', async () => {
   const { registrations, author } = surface()
-  await author((ctx) => { ctx.binnacle.facts('session/end-seed', () => ({ name: 'seeded', data: { from: 'fork' } })) })
+  await author((ctx) => { ctx.binnacle.facts('test/marker', () => ({ name: 'seeded', data: { from: 'fork' } })) })
   assert.deepEqual(shown(registrations, seed), ['› fix the build', '? seeded', '… 3 more lines'])
 })
 
@@ -150,11 +150,11 @@ test('a view that throws is drawn over by the view beneath it, which says whose 
 test('the newest adapter of a kind reads it, and disposing it gives the kind back to the one before', async () => {
   const { registrations, author } = surface()
   await author((ctx) => {
-    ctx.binnacle.facts('session/end-seed', () => ({ name: 'seeded', data: {} }))
+    ctx.binnacle.facts('test/marker', () => ({ name: 'seeded', data: {} }))
     ctx.binnacle.view('seeded', () => ({ kind: 'text', text: 'seeded' }))
   })
   const forked = await author((ctx) => {
-    ctx.binnacle.facts('session/end-seed', () => ({ name: 'forked', data: {} }))
+    ctx.binnacle.facts('test/marker', () => ({ name: 'forked', data: {} }))
     ctx.binnacle.view('forked', () => ({ kind: 'text', text: 'forked' }))
   })
   assert.deepEqual(shown(registrations, seed), ['› fix the build', 'forked'])

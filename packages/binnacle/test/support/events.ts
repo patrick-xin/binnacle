@@ -8,13 +8,20 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
+declare module '@deepseek-ai/dsh-session' {
+  interface SessionEventMap {
+    /** A kind only this test knows, as an out-of-tree plugin would declare one: a kind dsh does not know. */
+    'test/marker': { readonly note?: string }
+  }
+}
+
 /**
- * An event binnacle has no adapter for: `session/end-seed`, with no data.
+ * An event of a kind dsh does not know, as an out-of-tree plugin logs one: `test/marker`, with no data.
  * @param seq - its place in the log.
  * @param time - when it was logged.
  * @returns the event.
  */
-export const seed = (seq: number, time: number): SessionEvent<'session/end-seed'> => ({ type: 'session/end-seed', seq: SessionSeq(seq), time, data: {} })
+export const seed = (seq: number, time: number): SessionEvent<'test/marker'> => ({ type: 'test/marker', seq: SessionSeq(seq), time, data: {} })
 
 /**
  * A tool the model asked for, as dsh logs it: in turn 1, step 1, with no arguments, its call id taken from its place in the log.

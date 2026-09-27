@@ -9,7 +9,7 @@ What binds is [`AGENTS.md`](../../AGENTS.md). What each layer may import is [`la
 From the bottom up; each knows only the layers beneath it that `layers.json` names.
 
 - **`contract`** is what layers that know nothing of each other share: the affordances content offers, the regions that carry them, the gestures that land on regions and the actions they mean (`binnacle:packages/binnacle/src/contract/index.ts#Action`).
-- **`facts`** is the one place dsh's session events are read. Each event becomes a typed fact (`binnacle:packages/binnacle/src/facts/adapt.ts#adapt`); a kind with no adapter becomes an `unknown` fact, never dropped. Nothing above it knows dsh's event shapes.
+- **`facts`** is the one place dsh's session events are read. Each event becomes a typed fact (`binnacle:packages/binnacle/src/facts/adapt.ts#adapt`); every kind dsh knows is named in one table, as read, quiet or unread (`binnacle:packages/binnacle/src/facts/kinds.ts#kinds`), a quiet kind drawn as nothing and a kind with no adapter — one named unread, or one dsh does not know — becoming an `unknown` fact, never dropped. Nothing above it knows dsh's event shapes.
 - **`models`** folds facts into turns and their entries (`binnacle:packages/binnacle/src/models/transcript.ts#fold`), purely, so a live session and a replayed log reach the same transcript.
 - **`ui`** is what drawing and input are made of, with no knowledge of a session:
   - the nodes a view draws with, as data (`binnacle:packages/binnacle/src/ui/node.ts#Node`), laid out with pi-tui at a width (`binnacle:packages/binnacle/src/ui/layout.ts#layout`) once every string they carry is made inert (`binnacle:packages/binnacle/src/ui/readable.ts#readable`);
@@ -36,7 +36,7 @@ The host opens a session and follows its log. Each event is adapted to a fact an
 
 | To | Change | Tested in |
 |---|---|---|
-| read a kind of dsh event | its adapter, in `binnacle:packages/binnacle/src/facts/adapt.ts#adapt` | `test/facts/adapt.test.ts` |
+| read a kind of dsh event, or quiet one | its adapter, in `binnacle:packages/binnacle/src/facts/adapt.ts#adapt`, and its name in the kinds table | `test/facts/adapt.test.ts`, `test/facts/kinds.test.ts` |
 | draw a kind of entry | binnacle's own drawing, `binnacle:packages/binnacle/src/views/entries.ts#drawEntry`; or a view a feature registers | `test/views/entries.test.ts`, or the feature's |
 | draw a kind of tool card | a row in its own file beside the card table, and the row named in it (`binnacle:packages/binnacle/src/plugins/tool-cards/cards.ts#rowFor`) | `test/plugins/tool-cards/` |
 | change a glyph or a colour | the theme: a mark, a piece of chrome, a tone | the tests of what draws it |

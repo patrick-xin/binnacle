@@ -2,15 +2,19 @@
  * The facts adapter: one dsh session event as one fact.
  *
  * This is where dsh's event shapes are read, and nowhere else below the host;
- * everything above it knows only the facts it returns. A kind with no
- * adapter is an `unknown` fact carrying its raw record, so the fallback view
- * can show it: dsh has already refused any log whose unknown events are not
- * marked ignorable, so what arrives here unadapted is a kind binnacle has
- * not learned yet, never one it may silently drop.
+ * everything above it knows only the facts it returns. Every kind dsh knows
+ * is named in the kinds table (`kinds.ts`): a kind named `read` has an
+ * adapter here; a kind named `quiet` becomes a `quiet` fact, which the
+ * transcript draws as nothing; a kind named `unread`, and a kind dsh does
+ * not know at all, is an `unknown` fact carrying its raw record, so the
+ * fallback view can show it — dsh has already refused any log whose unknown
+ * events are not marked ignorable, so what arrives here unadapted is a kind
+ * binnacle has not learned yet, never one it may silently drop.
  */
 
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { describe } from '../contract/index.ts'
+import { kinds } from './kinds.ts'
 import type { SessionEvent, SessionEventType } from '@deepseek-ai/dsh-session'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
@@ -112,6 +116,13 @@ export type Fact =
     readonly data: unknown
   }
   | Logged & {
+    readonly kind: 'quiet'
+    /** The event's dsh type, the key a view registered for the kind draws it under. */
+    readonly type: string
+    /** The event as dsh logged it, for the view an author registers for the kind. */
+    readonly record: unknown
+  }
+  | Logged & {
     readonly kind: 'unknown'
     /** The event's dsh type. */
     readonly type: string
@@ -136,6 +147,15 @@ function blockOf(block: ContentBlock): Block {
   return { kind: 'unread', type: block.type }
 }
 
+/**
+ * Whether a message's content adds or removes tools: the one context dsh
+ * web's Chat keeps a row for (`dsh:packages/client/ui-chat/src/client/contract/chat-visibility.ts#isVisibleChatNode`),
+ * so the one binnacle draws.
+ */
+function changesTools(content: readonly ContentBlock[]): boolean {
+  return content.some(block => block.type === 'tool-addition' || block.type === 'tool-removal')
+}
+
 /** Every kind binnacle has learned, and how it reads one. */
 const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
   'turn/start': ({ seq, time, data }) => ({ kind: 'turn', seq, time, turn: data.turn, phase: 'start' }),
@@ -147,7 +167,15 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
     const source = event.data.source.kind
     return source === 'user'
       ? { kind: 'prompt', seq: event.seq, time: event.time, blocks }
-      : { kind: 'context', seq: event.seq, time: event.time, source, blocks }
+      : changesTools(event.data.content)
+        ? { kind: 'context', seq: event.seq, time: event.time, source, blocks }
+        : { kind: 'quiet', seq: event.seq, time: event.time, type: 'user/message', record: event }
+  },
+  'developer/message': (event) => {
+    const message = event.data.message
+    return changesTools(message.content)
+      ? { kind: 'context', seq: event.seq, time: event.time, source: message.source.kind, blocks: message.content.map(blockOf) }
+      : { kind: 'quiet', seq: event.seq, time: event.time, type: 'developer/message', record: event }
   },
   'assistant/message': ({ seq, time, data }) => ({
     kind: 'answer',
@@ -210,9 +238,11 @@ export function adapt(event: SessionEvent, authors: ReadonlyMap<string, AuthorAd
   const author = authors.get(event.type)
   if (author !== undefined) return settled(authored(event, author))
   const adapter = adapters[event.type] as Adapter<typeof event.type> | undefined
-  return settled(adapter === undefined
-    ? { kind: 'unknown', seq: event.seq, time: event.time, type: event.type, record: event }
-    : adapter(event))
+  return settled(adapter !== undefined
+    ? adapter(event)
+    : kinds[event.type] === 'quiet'
+      ? { kind: 'quiet', seq: event.seq, time: event.time, type: event.type, record: event }
+      : { kind: 'unknown', seq: event.seq, time: event.time, type: event.type, record: event })
 }
 
 /**

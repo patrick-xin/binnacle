@@ -1,6 +1,6 @@
 # Authoring
 
-A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry, building on binnacle's drawing or replacing it. Disposing the plugin gives back everything it registered.
+A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry — a built-in kind, or a quiet kind by its dsh event type ([Transcript](transcript.md)) — building on binnacle's drawing or replacing it. Disposing the plugin gives back everything it registered.
 
 ## How it works
 

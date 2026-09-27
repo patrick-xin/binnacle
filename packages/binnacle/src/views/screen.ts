@@ -21,7 +21,7 @@ import type { View, Views } from './entries.ts'
 export interface Screen extends Frame {
   /** The regions that offer something, in screen order. */
   readonly focusable: readonly string[]
-  /** For each entry, in log order across turns, the line after its last; the blank line opening a turn is drawn before its first entry, so it is never an entry's own. */
+  /** For each entry, in log order across turns, the line after its last; the blank line opening a turn is drawn before its first entry, so it is never an entry's own. An entry that drew nothing ends where the one before it did, and a turn every entry of which drew nothing draws no line at all, not even the blank one that opens a turn. */
   readonly ends: readonly number[]
 }
 
@@ -141,15 +141,28 @@ export function screens(): DrawScreen {
     const lines: string[] = []
     const regions: Placed[] = []
     const ends: number[] = []
-    for (const [index, turn] of model.turns.entries()) {
-      if (index > 0) lines.push('')
+    let opened = false
+    for (const turn of model.turns) {
+      const turnLines: string[] = []
+      const turnRegions: Placed[] = []
+      const turnEnds: number[] = []
       for (const entry of turn.entries) {
         const frame = frameOf(entry, state, width, views)
-        for (const placed of frame.regions) regions.push({ ...placed, top: placed.top + lines.length })
+        for (const placed of frame.regions) turnRegions.push({ ...placed, top: placed.top + turnLines.length })
         // One line at a time: spreading an entry's lines into `push` throws once it draws more than about a hundred thousand.
-        for (const line of frame.lines) lines.push(line)
-        ends.push(lines.length)
+        for (const line of frame.lines) turnLines.push(line)
+        turnEnds.push(turnLines.length)
       }
+      // A turn whose entries drew nothing — the machinery before the first, a turn of quiet kinds — draws no line at all, not even the blank one that opens a turn.
+      if (turnLines.length === 0) {
+        ends.push(...turnEnds.map(end => end + lines.length))
+        continue
+      }
+      if (opened) lines.push('')
+      opened = true
+      regions.push(...turnRegions.map(placed => ({ ...placed, top: placed.top + lines.length })))
+      lines.push(...turnLines)
+      ends.push(...turnEnds.map(end => end + lines.length - turnLines.length))
     }
     return { lines, regions, focusable: regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id), ends }
   }

@@ -4,7 +4,9 @@ import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Fact } from '../../src/facts/adapt.ts'
 import type { Frame } from '../../src/ui/layout.ts'
 import { initial } from '../../src/ui/state.ts'
+import { adapt } from '../../src/facts/adapt.ts'
 import { screen } from '../../src/views/screen.ts'
+import { logged } from '../support/log.ts'
 import { prompt as promptFact } from '../support/facts.ts'
 
 /** A frame as a person reads it. */
@@ -34,6 +36,76 @@ test('the screen is every turn, a blank line between them, however long the sess
     lines: ['› question 1', 'answer 1', '', '› question 2', 'answer 2', '', '› question 3', 'answer 3'],
     regions: [],
   })
+})
+
+
+test('the screen over a real session\'s log is the conversation: no line for the machinery a session logs', () => {
+  const facts = logged().map(event => adapt(event))
+  const drawn = screen(facts, initial, 60)
+  assert.deepEqual(plain(drawn).lines, [
+    "› read readme",
+    "∴ thinking",
+    "… 1 more line",
+    "I'll read the README file.",
+    "● glob {\"pattern\": \"README*\"}",
+    "node_modules/.pnpm/@earendil-works+pi-tui@0.85.1/node_module",
+    "s/@earendil-works/pi-tui/native/darwin/README.md",
+    "node_modules/.pnpm/@earendil-works+pi-tui@0.85.1/node_module",
+    "… 298 more lines",
+    "∴ thinking",
+    "… 2 more lines",
+    "● bash {\"command\": \"ls -1 | head -50\", \"description\": \"List",
+    "root files\"}",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs",
+    "… 13 more lines",
+    "∴ thinking",
+    "… 1 more line",
+    "● read {\"file_path\": \"README.md\"}",
+    "<path>/workspace/binnacle/README.md</path>",
+    "<type>file</type>",
+    "<content>",
+    "… 27 more lines",
+    "∴ thinking",
+    "… 1 more line",
+    "Here's the README:",
+    "",
+    "binnacle",
+    "",
+    "A terminal surface for DeepSeek Harness (dsh), mounted as a",
+    "profile bundle and drawn with pi-tui.",
+    "",
+    "What is on screen says what can be done with it. A long",
+    "command that was cut can be expanded; one that fits offers",
+    "nothing, and no key or click reaches it. One table gives",
+    "every gesture its meaning, so every screen answers the same",
+    "way. A dsh preset can run a different tool loop, and an",
+    "agent can draw what it logs through the same registrations",
+    "this surface is built from.",
+    "",
+    "How it is built is the architecture, and why is the decision",
+    "records. How to install, test and run it is in AGENTS.md,",
+    "where agents start too.",
+    "",
+    "License",
+    "",
+    "MIT",
+    "",
+    "────────────────────────────────────────────────────────────",
+    "",
+    "The README is deliberately short — 11 lines. It points",
+    "outward for the real detail:",
+    "",
+    "- Concepts and commitments → docs/architecture.md",
+    "- Rationale for binding decisions → docs/adr/",
+    "- Install / test / run commands → AGENTS.md#working-here",
+    "  (pnpm install && pnpm refs, pnpm test, pnpm build, pnpm",
+    "  dsh:profile, pnpm check:boot, dsh --profile binnacle)",
+    "",
+    "Want me to pull any of those up next?",
+  ])
+  assert.deepEqual(drawn.focusable, ['19/reasoning-0', '20/output', '25/reasoning-0', '26/output', '31/reasoning-0', '32/output', '37/reasoning-0'])
 })
 
 test('a region sits on the rows of the whole transcript, and what offers something can take focus, in screen order', () => {
