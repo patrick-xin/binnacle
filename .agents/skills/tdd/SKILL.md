@@ -18,7 +18,7 @@ The rules are `AGENTS.md`'s, under *Tests*: they bind, and this skill does not r
 2. **Run it alone, and read how it fails.** From `packages/binnacle`:
 
    ```sh
-   node --test --test-name-pattern '<its name>' test/<subject>.test.ts
+   node --test --test-name-pattern '<its name>' test/<module>.test.ts
    ```
 
    From the root, a script's test is `node --test scripts/<script>.test.mjs`. It is red only when it fails **at its assertion, for the reason its name gives**. A missing export, a type error or a `TypeError` thrown on the way is not red: add the least code that lets the assertion run — an export that returns nothing — run it again, and read the real failure.
@@ -49,4 +49,4 @@ A commit's message says, for each test it adds, how it failed before the code ma
 | the host | bytes typed into a terminal emulated with xterm, a session's events | the screens read back, what was sent, the exit asked |
 | the built bundle | `dist/` under plain `node`, and the real launcher | it loads; it boots |
 
-The host's tests already build the terminals and the session a test fakes; extend those rather than write another.
+`test/support/` already builds the terminals and the session a test of the host fakes, and the facts more than one test feeds; extend those rather than write another.

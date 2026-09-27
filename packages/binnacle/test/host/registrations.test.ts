@@ -2,18 +2,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { adapt } from '../src/facts/adapt.ts'
-import type { Fact } from '../src/facts/adapt.ts'
-import { RegistrationService } from '../src/host/registrations.ts'
-import { TranscriptPane } from '../src/panes/transcript.ts'
-import { initial } from '../src/ui/state.ts'
-import { screen } from '../src/views/screen.ts'
+import { adapt } from '../../src/facts/adapt.ts'
+import { RegistrationService } from '../../src/host/registrations.ts'
+import { TranscriptPane } from '../../src/panes/transcript.ts'
+import { initial } from '../../src/ui/state.ts'
+import { screen } from '../../src/views/screen.ts'
+import { prompt as promptFact } from '../support/facts.ts'
+import { called, seed as seedEvent } from '../support/events.ts'
 
-const prompt: Fact = { kind: 'prompt', seq: 1, time: 1, blocks: [{ kind: 'text', text: 'fix the build' }] }
-const seed: SessionEvent<'session/end-seed'> = { type: 'session/end-seed', seq: SessionSeq(2), time: 2, data: {} }
+const prompt = promptFact(1, 1, 'fix the build')
+const seed = seedEvent(2, 2)
 
 /**
  * The surface's registrations on a real context, and a way to mount an author's plugin on it.
@@ -103,16 +102,6 @@ test('a view is handed what the view beneath it draws, and builds on it', async 
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('prompt', (_, next) => ({ kind: 'stack', children: [next(), { kind: 'text', text: '  sent from the phone' }] })) })
   assert.deepEqual(shown(registrations), ['› fix the build', '  sent from the phone'])
-})
-
-/**
- * A tool the model asked for, as dsh logs it.
- * @param seq - its place in the log, which also names the call.
- * @param name - the tool.
- * @returns the event.
- */
-const called = (seq: number, name: string): SessionEvent<'tool/call'> => ({
-  type: 'tool/call', seq: SessionSeq(seq), time: seq, data: { turn: 1, step: 1, callId: ToolCallId(`c${seq}`), name, arguments: '{}' },
 })
 
 test('two plugins can each draw one tool\'s card, and every other card stays binnacle\'s', async () => {

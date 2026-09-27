@@ -1,11 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import type { Entry } from '../src/models/transcript.ts'
-import { layout } from '../src/ui/layout.ts'
-import { drawEntry } from '../src/views/entries.ts'
-import type { View, Views } from '../src/views/entries.ts'
-import type { Node } from '../src/ui/node.ts'
+import type { Entry } from '../../src/models/transcript.ts'
+import { layout } from '../../src/ui/layout.ts'
+import { drawEntry } from '../../src/views/entries.ts'
+import type { View, Views } from '../../src/views/entries.ts'
+import type { Node } from '../../src/ui/node.ts'
+import { prompt as promptFact, call as callFact } from '../support/facts.ts'
 
 /**
  * What an entry draws at a width, as a person reads it.
@@ -82,7 +83,7 @@ test('the reasoning\'s label is muted, the reasoning under it dim, and an interr
   assert.equal(drawn[3], '\x1b[2m(interrupted)\x1b[22m')
 })
 
-const call = { kind: 'call', seq: 9, time: 21, turn: 1, step: 1, callId: 'c1', name: 'bash', arguments: '{"command":"pnpm build"}' } as const
+const call = callFact(9, 21, 'c1', 'bash', '{"command":"pnpm build"}')
 
 test('a tool still running says so', () => {
   assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running…'])
@@ -207,7 +208,7 @@ test('a kind nothing draws is its type in one line, and expand shows the raw rec
   assert.deepEqual(lines(entry, ['unknown:2']), ['? goal/change', '{', '  "type": "goal/change",', '  "data": {}', '}'])
 })
 
-const prompt: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
+const prompt: Entry = { kind: 'prompt', fact: promptFact(2, 10, 'fix the build') }
 const drawn = (entry: Entry, views: Views): string[] =>
   layout(drawEntry(entry, views), 80, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
 

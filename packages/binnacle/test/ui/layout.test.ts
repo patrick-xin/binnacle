@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import { layout, under } from '../src/ui/layout.ts'
-import type { Frame } from '../src/ui/layout.ts'
+import { layout, under } from '../../src/ui/layout.ts'
+import type { Frame } from '../../src/ui/layout.ts'
 
 const OPEN = { expanded: new Set<string>() }
 

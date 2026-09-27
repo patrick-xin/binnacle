@@ -5,13 +5,15 @@ import type { TuiMouseEvent } from '@earendil-works/pi-tui'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { adapt } from '../src/facts/adapt.ts'
-import type { Fact } from '../src/facts/adapt.ts'
-import type { View, Views } from '../src/api.ts'
-import { TranscriptPane } from '../src/panes/transcript.ts'
-import type { PaneReports } from '../src/panes/transcript.ts'
+import { adapt } from '../../src/facts/adapt.ts'
+import type { Fact } from '../../src/facts/adapt.ts'
+import type { View, Views } from '../../src/api.ts'
+import { TranscriptPane } from '../../src/panes/transcript.ts'
+import type { PaneReports } from '../../src/panes/transcript.ts'
+import { prompt as promptFact, call as callFact, returned as returnedFact } from '../support/facts.ts'
+import { called } from '../support/events.ts'
 
-const prompt: Fact = { kind: 'prompt', seq: 1, time: 1, blocks: [{ kind: 'text', text: 'fix the build' }] }
+const prompt = promptFact(1, 1, 'fix the build')
 
 /**
  * What a pane shows at a width.
@@ -185,7 +187,7 @@ test('when what is focused settles into the printed rows, focus is dropped rathe
  * @param text - what they wrote.
  * @returns the fact.
  */
-const sent = (seq: number, text: string): Fact => ({ kind: 'prompt', seq, time: seq, blocks: [{ kind: 'text', text }] })
+const sent = (seq: number, text: string): Fact => promptFact(seq, seq, text)
 
 /**
  * An author's view of prompts that counts how often binnacle calls it: each
@@ -249,10 +251,10 @@ test('invalidating the pane calls every view again, as pi-tui asks when the them
 })
 
 /** A tool call, asked in turn 1. */
-const call: Fact = { kind: 'call', seq: 1, time: 1, turn: 1, step: 1, callId: 'c1', name: 'read', arguments: '{}' }
+const call = callFact(1, 1, 'c1', 'read', '{}')
 
 /** A second call, still waiting for its result. */
-const waiting: Fact = { kind: 'call', seq: 4, time: 4, turn: 1, step: 1, callId: 'c2', name: 'stat', arguments: '{}' }
+const waiting: Fact = callFact(4, 4, 'c2', 'stat', '{}')
 
 /** A fold that lands after the waiting call, below what the main screen printed. */
 const below: Fact = { kind: 'context', seq: 5, time: 5, source: 'goal', blocks: [{ kind: 'text', text: 'a\nb' }] }
@@ -261,7 +263,7 @@ const below: Fact = { kind: 'context', seq: 5, time: 5, source: 'goal', blocks: 
 const goal: Fact = { ...context, seq: 2, time: 2 }
 
 /** The call's result, arriving once the fold is on screen: more lines than the call's `running…`. */
-const result: Fact = { kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'w\nx\ny\nz' }], meta: undefined }
+const result = returnedFact(3, 3, 'c1', 'w\nx\ny\nz')
 
 test('a result draws its call again, with it', () => {
   const pane = new TranscriptPane(() => {})
@@ -290,7 +292,7 @@ test('a click at a width nothing was drawn at is answered at that width', () => 
 })
 
 /** A tool call as dsh logs it. */
-const asked: SessionEvent<'tool/call'> = { type: 'tool/call', seq: SessionSeq(1), time: 1, data: { turn: 1, step: 1, callId: ToolCallId('c1'), name: 'read', arguments: '{}' } }
+const asked = called(1, 'read')
 
 /** Its result as dsh logs it. */
 const answered: SessionEvent<'tool/result'> = {

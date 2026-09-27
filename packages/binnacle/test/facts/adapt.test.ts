@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { adapt } from '../src/facts/adapt.ts'
+import { adapt } from '../../src/facts/adapt.ts'
+import { seed as seedEvent } from '../support/events.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -136,7 +137,7 @@ test('a step opening or closing is a step fact', () => {
   assert.deepEqual(adapt(end), { kind: 'step', seq: 12, time: 2_550, turn: 1, step: 1, phase: 'end' })
 })
 
-const seed: SessionEvent<'session/end-seed'> = { type: 'session/end-seed', seq: SessionSeq(2), time: 900, data: {} }
+const seed = seedEvent(2, 900)
 
 /** What an adapter returns beyond its name and data: a kind and a place in the log that are not its to say. */
 const overreaching = { name: 'seeded', data: { from: 'fork' }, kind: 'prompt', seq: 99 }

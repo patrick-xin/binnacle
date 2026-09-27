@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { Region } from '../src/contract/index.ts'
-import { meaning } from '../src/ui/gestures.ts'
+import type { Region } from '../../src/contract/index.ts'
+import { meaning } from '../../src/ui/gestures.ts'
 
 /** A tool card whose command was cut: it offers `expand`, and fits. */
 const card: Region = { id: 'card', affordances: [{ kind: 'expand', label: 'show the whole command' }], overflows: false }

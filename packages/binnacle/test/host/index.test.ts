@@ -3,106 +3,16 @@ import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
-import type { Terminal } from '@earendil-works/pi-tui'
-import xterm from '@xterm/headless'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
-import * as host from '../src/host/index.ts'
-import type { OpenedSession } from '../src/host/session.ts'
-
-/** A terminal that records what is written and lets a test type into it. */
-class FakeTerminal implements Terminal {
-  written = ''
-  started = false
-  #onInput: ((data: string) => void) | undefined
-  start(onInput: (data: string) => void): void { this.started = true; this.#onInput = onInput }
-  stop(): void { this.started = false }
-  async drainInput(): Promise<void> {}
-  write(data: string): void { this.written += data }
-  get columns(): number { return 80 }
-  get rows(): number { return 24 }
-  get kittyProtocolActive(): boolean { return false }
-  moveBy(): void {}
-  hideCursor(): void {}
-  showCursor(): void {}
-  clearLine(): void {}
-  clearFromCursor(): void {}
-  clearScreen(): void {}
-  setTitle(): void {}
-  setProgress(): void {}
-  type(data: string): void { this.#onInput?.(data) }
-}
-
-/**
- * A terminal that emulates one, as pi-tui's own tests do: what binnacle writes
- * lands in xterm's main screen and scrollback, or its alternate screen.
- */
-class XtermTerminal extends FakeTerminal {
-  readonly #xterm: InstanceType<typeof xterm.Terminal>
-  readonly #columns: number
-  readonly #rows: number
-  constructor(columns: number, rows: number) {
-    super()
-    this.#columns = columns
-    this.#rows = rows
-    this.#xterm = new xterm.Terminal({ cols: columns, rows, allowProposedApi: true })
-  }
-  override write(data: string): void { super.write(data); this.#xterm.write(data) }
-  override get columns(): number { return this.#columns }
-  override get rows(): number { return this.#rows }
-  /**
-   * What the main screen holds, its scrollback first, once everything written has landed.
-   * @returns each row, plain, with the empty rows under the last dropped.
-   */
-  async mainScreen(): Promise<string[]> {
-    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
-    const buffer = this.#xterm.buffer.normal
-    const rows = Array.from({ length: buffer.length }, (_, row) => buffer.getLine(row)?.translateToString(true).trimEnd() ?? '')
-    while (rows.at(-1) === '') rows.pop()
-    return rows
-  }
-  /**
-   * Whether the alternate screen is showing.
-   * @returns true when it is.
-   */
-  async onAlternateScreen(): Promise<boolean> {
-    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
-    return this.#xterm.buffer.active.type === 'alternate'
-  }
-
-  /**
-   * What the alternate screen holds, once everything written has landed.
-   * @returns each row of the window, plain, its trailing spaces dropped.
-   * @throws when the alternate screen is not showing.
-   */
-  async altScreen(): Promise<string[]> {
-    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
-    if (this.#xterm.buffer.active.type !== 'alternate') throw new Error('the alternate screen is not showing')
-    return Array.from({ length: this.#rows }, (_, row) => this.#xterm.buffer.active.getLine(row)?.translateToString(true).trimEnd() ?? '')
-  }
-}
-
-/** A session that records what the host does with it; the harness behind it is dsh's, proven by `check:boot`. */
-class FakeSession implements OpenedSession {
-  readonly model = 'deepseek/deepseek-v4'
-  readonly sent: string[] = []
-  closed = false
-  #listener: ((event: SessionEvent) => void) | undefined
-  readonly #logged: SessionEvent[]
-  constructor(logged: SessionEvent[] = []) { this.#logged = logged }
-  follow(listener: (event: SessionEvent) => void): () => void {
-    for (const event of this.#logged) listener(event)
-    this.#listener = listener
-    return () => { this.#listener = undefined }
-  }
-  get following(): boolean { return this.#listener !== undefined }
-  send(text: string): void { this.sent.push(text) }
-  async close(): Promise<void> { this.closed = true }
-  log(event: SessionEvent): void { this.#listener?.(event) }
-}
+import * as host from '../../src/host/index.ts'
+import type { OpenedSession } from '../../src/host/session.ts'
+import { called, seed as seedEvent } from '../support/events.ts'
+import { FakeSession } from '../support/session.ts'
+import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
 
 /** A person's line, as dsh logs it. */
 const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
@@ -110,8 +20,8 @@ const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
   data: { role: 'user', id: MessageId(`m${seq}`), source: { kind: 'user' }, content: [{ type: 'text', text }] },
 })
 
-/** A kind binnacle has no adapter for, as dsh logs it. */
-const seed = (seq: number): SessionEvent<'session/end-seed'> => ({ type: 'session/end-seed', seq: SessionSeq(seq), time: seq, data: {} })
+/** A kind binnacle has no adapter for, as dsh logs it, logged when it was. */
+const seed = (seq: number): SessionEvent<'session/end-seed'> => seedEvent(seq, seq)
 
 /** What was added to the context without the person typing it, as dsh logs it. */
 const added = (seq: number, text: string): SessionEvent<'user/message'> => ({
@@ -133,14 +43,6 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
   while (!await holds()) {
     if (Date.now() > deadline) throw new Error(`did not hold within ${within} ms`)
     await settle()
-  }
-}
-
-/** A terminal that starts, then fails before it is ready, as one that cannot enter raw mode does. */
-class FailingTerminal extends FakeTerminal {
-  override start(onInput: (data: string) => void): void {
-    super.start(onInput)
-    throw new Error('stdin is not a terminal')
   }
 }
 
@@ -368,11 +270,6 @@ test('a session\'s call draws its presented title', async () => {
   session.log(returned(3, 2, 'the file'))
   await until(() => /the file/.test(terminal.written))
   assert.equal(stripTerminalSequences(terminal.written).includes('● read'), false)
-})
-
-/** A tool the model asked for, as dsh logs it, named for its place in the log. */
-const called = (seq: number, name: string): SessionEvent<'tool/call'> => ({
-  type: 'tool/call', seq: SessionSeq(seq), time: seq, data: { turn: 1, step: 1, callId: ToolCallId(`c${seq}`), name, arguments: '{}' },
 })
 
 /** What a call returned, as dsh logs it. */
