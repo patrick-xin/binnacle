@@ -73,7 +73,7 @@ function viewOf(tools: ToolRuntime): View {
     const parts: CardParts = {
       call,
       result: shown,
-      glyph: result === undefined
+      mark: result === undefined
         ? { mark: 'running' }
         : result.failed === true ? { mark: 'failed' } : { mark: 'done' },
       waiting: result === undefined

@@ -65,10 +65,10 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
  * @param left - how the turn that ended without this call's result ended, when it did.
  */
 function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined, left: string | undefined): Node {
-  const glyph: Span = result === undefined
+  const mark: Span = result === undefined
     ? { mark: 'running' }
     : result.failed === true ? { mark: 'failed' } : { mark: 'done' }
-  const head: Node = { kind: 'text', text: [glyph, ` ${call.name} ${call.arguments}`] }
+  const head: Node = { kind: 'text', text: [mark, ` ${call.name} ${call.arguments}`] }
   if (result === undefined) {
     const waiting: Node = left === undefined
       ? { kind: 'text', text: '  running…', tone: 'muted' }

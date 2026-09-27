@@ -23,7 +23,7 @@ export interface CardParts {
   /** The result's presented view, when its presenter gave one; a call still running, or one its turn left, has none. */
   readonly result: PresentedResult | undefined
   /** How the call stands, as the mark its head opens with: `running` while it runs or was left, `done` or `failed` once it returned. */
-  readonly glyph: Span
+  readonly mark: Span
   /** The waiting line — `running…`, or the line saying the turn ended without it; none once the call returned. */
   readonly waiting: Node | undefined
   /** Why the call failed, when it gave a person a reason. */

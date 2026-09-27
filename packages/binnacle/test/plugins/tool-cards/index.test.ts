@@ -315,7 +315,7 @@ test('a row can draw a head of its own and a line under a completed head', () =>
   const running: CardParts = {
     call: { card: 'generic', title: 'pnpm test', returned: {} },
     result: undefined,
-    glyph: { text: '●', tone: 'muted' },
+    mark: { text: '●', tone: 'muted' },
     waiting: { kind: 'text', text: '  running…', tone: 'muted' },
     reason: undefined,
     resultText: '',
@@ -324,7 +324,7 @@ test('a row can draw a head of its own and a line under a completed head', () =>
   assert.deepEqual(drawn(running), ['$ pnpm test', '  running…'])
   const done: CardParts = {
     ...running,
-    glyph: { text: '✗', tone: 'error' },
+    mark: { text: '✗', tone: 'error' },
     waiting: undefined,
     reason: 'the command exited 2',
     resultText: 'a\nb\nc',
@@ -336,7 +336,7 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
   const parts: CardParts = {
     call: { card: 'terminal', title: 'pnpm test', returned: { card: 'terminal', title: 'pnpm test', exitCode: 2 } },
     result: { card: 'terminal', returned: { card: 'terminal', exitCode: 2, output: 'tsc: 1 error' } },
-    glyph: { text: '✗', tone: 'error' },
+    mark: { text: '✗', tone: 'error' },
     waiting: undefined,
     reason: undefined,
     resultText: 'tsc: 1 error',
@@ -344,7 +344,7 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
   }
   const exit: CardRow = {
     draw: current => {
-      const head: Node = { kind: 'text', text: [current.glyph, ` ${current.call.title}`] }
+      const head: Node = { kind: 'text', text: [current.mark, ` ${current.call.title}`] }
       if (current.waiting !== undefined) return { kind: 'stack', children: [head, current.waiting] }
       const code: unknown = current.result?.returned.exitCode
       if (typeof code !== 'number') return { declined: `exitCode is ${code === undefined ? 'absent' : `a ${typeof code}`}` }

@@ -5,7 +5,7 @@ A person reads the session as it happens, turn by turn:
 - what they sent, after the `prompt` mark ([Theme](theme.md));
 - what was added to the context without their typing it, after the `context` mark, as `added by` its source, folded away;
 - the agent's answers, drawn as markdown, with its reasoning folded under a muted `thinking` label and drawn dim; a call an answer made draws as its own entry, never as a line inside it;
-- each tool call, as [Tool cards](tool-cards.md) draws it when its tool presents it, and as its mark and arguments otherwise ([Theme](theme.md)): `running` and `running…` while it runs; `done` once it returned, its result folded to three rows; `failed`, and why, when it failed;
+- each tool call, as [Tool cards](tool-cards.md) draws it when its tool presents it, and as its mark and arguments otherwise ([Theme](theme.md)): the `running` mark and `running…` while it runs; `done` once it returned, its result folded to three rows; `failed`, and why, when it failed;
 - a kind of event binnacle does not draw, as the `unknown` mark and its type, folded to its raw record.
 
 A click on a fold opens it, and a click on an open one folds it again; so does Enter on the focused fold ([Keys](keys.md)). The wheel scrolls, and a drag selects.

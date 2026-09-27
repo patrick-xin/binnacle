@@ -43,7 +43,7 @@ const resultCards: ReadonlySet<string> = new Set(['generic', 'terminal', 'diff',
 export interface PresentedCall {
   /** Which card the tool declared for the call. */
   readonly card: 'generic' | 'terminal' | 'diff'
-  /** What this call does, as the tool titled it: drawn as the card's head, its first line beside the glyph and each later line indented two columns beneath it. */
+  /** What this call does, as the tool titled it: drawn as the card's head, its first line beside the mark and each later line indented two columns beneath it. */
   readonly title: string
   /** A shallow copy of the object the presenter returned, frozen read-only and unread beyond the fields above: a row reads its kind's own fields here, parsing them where it draws, as data from code binnacle does not own. */
   readonly returned: Readonly<Record<string, unknown>>
@@ -122,7 +122,7 @@ function frozenCopy(value: object): Readonly<Record<string, unknown>> {
 }
 
 /**
- * A presented title as a head shows it: its first line beside the glyph, and each later line indented two columns beneath it, so a command written on more than one line does not read as output.
+ * A presented title as a head shows it: its first line beside the mark, and each later line indented two columns beneath it, so a command written on more than one line does not read as output.
  * @param title - the title a presenter gave, however many lines it wrote.
  * @returns the head's text.
  */

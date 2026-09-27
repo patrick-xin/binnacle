@@ -1,8 +1,8 @@
 /**
  * The theme binnacle draws in: content in tones, a glyph as a mark a view
- * names or as the chrome the ui and the host draw themselves, a markdown
- * document in the tones and the attributes, and the composer framed in dim
- * with its select list in accent and muted.
+ * names or as one the chrome draws with, a markdown document in the tones
+ * and the attributes, and the composer framed in dim with its select list in
+ * accent and muted.
  *
  * A tone is drawn in one of the terminal's own sixteen colours, so a person's
  * palette decides what it looks like, as their terminal already does.
@@ -49,10 +49,10 @@ export const marks = {
 export type Mark = keyof typeof marks
 
 /**
- * The theme's chrome: what the ui and the host draw themselves — the focus
- * row's pointer, a cut fold's ellipsis, a card's border, the jump label's
- * arrow — named beside the marks. A view names none of it; the ui and the
- * host do, so what they draw is the theme's as a mark is.
+ * The theme's chrome: the glyphs the chrome — the focus row, a cut fold, a
+ * card's border, the jump label — draws with, named beside the marks. A view
+ * names none of it; the ui and the host do, so what they draw is the theme's
+ * as a mark is.
  */
 export const chrome = {
   /** What a focused region's row, and a focused cut fold's marker, opens with. */
