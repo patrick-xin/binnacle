@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Fact } from '../src/facts/adapt.ts'
-import { transcript } from '../src/models/transcript.ts'
+import { settled, transcript } from '../src/models/transcript.ts'
 
 const prompt: Fact = { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] }
 const answer: Fact = { kind: 'answer', seq: 4, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'text', text: 'Done.' }] }
@@ -56,4 +56,23 @@ test('what the log holds before its first turn opens the transcript, in a turn n
 test('a turn still running has no ending, and a call still running has no result', () => {
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, prompt, call]
   assert.deepEqual(transcript(facts).turns, [{ turn: 1, entries: [{ kind: 'prompt', fact: prompt }, { kind: 'tool', call }] }])
+})
+
+/** A turn starting. */
+const start = (seq: number, turn: number): Fact => ({ kind: 'turn', seq, time: seq, turn, phase: 'start' })
+
+/** The call, asked again under another id. */
+const asked = (seq: number, callId: string): Fact => ({ ...call, seq, callId }) as Fact
+
+/** The result, for a call of another id. */
+const returned = (seq: number, callId: string): Fact => ({ ...result, seq, callId }) as Fact
+
+test('what has settled is every entry, oldest first, up to a call still waiting for its result in a turn still running', () => {
+  const interrupted: Fact = { kind: 'turn', seq: 4, time: 4, turn: 1, phase: 'end', ending: 'aborted' }
+  const facts: Fact[] = [start(1, 1), prompt, asked(3, 'c1'), interrupted, start(5, 2), prompt, answer, asked(8, 'c2'), asked(9, 'c3'), returned(10, 'c3')]
+  // Turn 1 ended with c1 still waiting, so both its entries have settled. In turn 2, c2 waits: the prompt and the answer before it have settled; c2 and c3 after it have not.
+  assert.equal(settled(transcript(facts)), 4)
+  assert.equal(settled(transcript([...facts, returned(11, 'c2')])), 6)
+  assert.equal(settled(transcript([...facts, { kind: 'turn', seq: 11, time: 11, turn: 2, phase: 'end', ending: 'aborted' }])), 6)
+  assert.equal(settled(transcript([asked(1, 'c0')])), 0)
 })

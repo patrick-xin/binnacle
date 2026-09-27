@@ -22,6 +22,8 @@ import type { View, Views } from './entries.ts'
 export interface Screen extends Frame {
   /** The regions that offer something, in screen order. */
   readonly focusable: readonly string[]
+  /** For each entry, in log order across turns, the line after its last; the blank line opening a turn is drawn before its first entry, so it is never an entry's own. */
+  readonly ends: readonly number[]
 }
 
 /** Draws one screen after another from the same session. */
@@ -84,6 +86,7 @@ export function screens(): DrawScreen {
   return (model, state, width, views = new Map()) => {
     const lines: string[] = []
     const regions: Placed[] = []
+    const ends: number[] = []
     for (const [index, turn] of model.turns.entries()) {
       if (index > 0) lines.push('')
       for (const entry of turn.entries) {
@@ -91,9 +94,10 @@ export function screens(): DrawScreen {
         for (const placed of frame.regions) regions.push({ ...placed, top: placed.top + lines.length })
         // One line at a time: spreading an entry's lines into `push` throws once it draws more than about a hundred thousand.
         for (const line of frame.lines) lines.push(line)
+        ends.push(lines.length)
       }
     }
-    return { lines, regions, focusable: regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
+    return { lines, regions, focusable: regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id), ends }
   }
 }
 

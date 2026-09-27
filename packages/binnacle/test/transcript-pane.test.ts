@@ -218,3 +218,54 @@ test('a click on a card\'s border is left to pi-tui, and one inside it reaches w
   assert.deepEqual(pane.handleMouse(pointer('click', 2, 2)), { handled: true })
   assert.deepEqual(shown(pane).slice(1, 4), ['│ ⋯ added by goal                      │', '│ a                                    │', '│ b                                    │'])
 })
+
+/**
+ * A view that draws every entry of its key as one word.
+ * @param word - what it draws.
+ * @returns the view.
+ */
+const drawing = (word: string): View => () => ({ kind: 'text', text: word })
+
+test('on the main screen, what is printed stays as printed; a call still waiting, and what follows it, is drawn anew below until its result arrives', () => {
+  const views = new Map<string, readonly View[]>()
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.drawOn('regular')
+  pane.push(sent(1, 'one'))
+  pane.push(call)
+  pane.push(sent(3, 'three'))
+  assert.deepEqual(shown(pane), ['› one', '● read {}', '  running…', '› three'])
+  views.set('prompt', [drawing('mine')])
+  assert.deepEqual(shown(pane), ['› one', '● read {}', '  running…', 'mine'])
+  pane.push({ ...result, seq: 4, time: 4 })
+  assert.deepEqual(shown(pane), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line', 'mine'])
+  views.set('prompt', [drawing('yours')])
+  assert.deepEqual(shown(pane), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line', 'mine'])
+})
+
+test('on the main screen, a visit to the alternate screen leaves what was printed, and a resize prints it again as it now draws', () => {
+  const views = new Map<string, readonly View[]>()
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.drawOn('regular')
+  pane.push(sent(1, 'one'))
+  assert.deepEqual(shown(pane), ['› one'])
+  views.set('prompt', [drawing('mine')])
+  pane.drawOn('fullscreen')
+  assert.deepEqual(shown(pane), ['mine'])
+  pane.drawOn('regular')
+  assert.deepEqual(shown(pane), ['› one'])
+  assert.deepEqual(pane.render(30).map(line => stripTerminalSequences(line).trimEnd()), ['mine'])
+})
+
+test('on the main screen, reading the log again or pi-tui invalidating the pane prints everything again, as it now draws', () => {
+  const views = new Map<string, readonly View[]>()
+  const pane = new TranscriptPane(() => {}, () => views)
+  pane.drawOn('regular')
+  pane.push(sent(1, 'one'))
+  shown(pane)
+  views.set('prompt', [drawing('mine')])
+  pane.reset([sent(1, 'one')])
+  assert.deepEqual(shown(pane), ['mine'])
+  views.set('prompt', [drawing('yours')])
+  pane.invalidate()
+  assert.deepEqual(shown(pane), ['yours'])
+})

@@ -82,6 +82,22 @@ export function fold(model: Transcript, fact: Fact): Transcript {
 }
 
 /**
+ * How many entries, oldest first and across turns, nothing later in the log
+ * can change: every one before a call still waiting for its result in a turn
+ * still running. Only the last turn is ever folded into, so every turn before
+ * it has settled whole, and so has the last once it ends.
+ * @param model - the transcript so far.
+ * @returns a count of entries, taken in log order.
+ */
+export function settled(model: Transcript): number {
+  const last = model.turns.at(-1)
+  const before = model.turns.slice(0, -1).reduce((count, turn) => count + turn.entries.length, 0)
+  if (last === undefined) return 0
+  const waiting = last.ending === undefined ? last.entries.findIndex(entry => entry.kind === 'tool' && entry.result === undefined) : -1
+  return before + (waiting === -1 ? last.entries.length : waiting)
+}
+
+/**
  * Fold a whole log.
  * @param facts - every fact, in log order.
  * @returns the transcript they make.
