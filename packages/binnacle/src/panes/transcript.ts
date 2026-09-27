@@ -5,8 +5,7 @@
  * draws the screen at the width pi-tui gives it, and answers a pointer or a
  * key through the gesture table on the screen it last drew, which is the one
  * the person acted on. On the main screen it never changes a row it has
- * printed
- * ([ADR 12](../../../../docs/adr/0012-on-the-main-screen-a-printed-row-never-changes.md)).
+ * printed.
  */
 
 import type { Component, TuiMode, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
