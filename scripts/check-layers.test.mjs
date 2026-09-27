@@ -87,7 +87,7 @@ const API = {
   layers: { contract: [], views: ['contract'], 'api.ts': ['views'], plugins: ['api.ts'], host: ['contract', 'views', 'api.ts', 'plugins'] },
   isolated: ['plugins'],
   typeOnly: ['plugins'],
-  external: {},
+  external: { '@deepseek-ai/cordis': ['host', 'plugins'], '@deepseek-ai/dsh-tools': ['plugins'] },
 }
 const source = (path, text) => ({ path, text })
 
@@ -119,4 +119,18 @@ test('a layer typeOnly names reaches other layers only through import type, neve
   const loading = source('src/plugins/probe.ts', "import '../api.ts'\nimport { type View } from '../api.ts'\nexport * from '../api.ts'\nawait import('../api.ts')\n")
   const problem = 'src/plugins/probe.ts: loads api.ts at run time (../api.ts); plugins reaches other layers only through import type or export type — see layers.json'
   assert.deepEqual(checkLayers([loading], API), [problem, problem, problem, problem])
+})
+
+test('a layer typeOnly names imports an external package only through import type, never loading it', () => {
+  const path = 'src/plugins/tool.ts'
+  const allowed = source(path, "import type { Context } from '@deepseek-ai/cordis'\nexport type { ToolRuntime } from '@deepseek-ai/dsh-tools'\n")
+  assert.deepEqual(checkLayers([allowed], API), [])
+  const loading = source(path, "import { Service } from '@deepseek-ai/cordis'\nimport { type ToolRuntime } from '@deepseek-ai/dsh-tools'\nexport * from '@deepseek-ai/dsh-tools'\nawait import('@deepseek-ai/dsh-tools/kinds')\n")
+  const refused = (name, spec) => `${path}: loads ${name} at run time (${spec}); plugins reaches external packages only through import type or export type — see layers.json`
+  assert.deepEqual(checkLayers([loading], API), [
+    refused('@deepseek-ai/cordis', '@deepseek-ai/cordis'),
+    refused('@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tools'),
+    refused('@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tools'),
+    refused('@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tools/kinds'),
+  ])
 })

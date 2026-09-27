@@ -8,10 +8,11 @@
  * module at the root that `layers` names by its file name, `api.ts`, is a
  * layer of its own. In a layer `isolated` names, each file or folder
  * directly under it is a unit that imports only its own files, never a
- * sibling's. A layer `typeOnly` names reaches other layers only through
- * `import type` and `export type`, which load nothing at run time. A key in
- * `external` names one package and its subpaths, unless it ends in `:`, `/`
- * or `-`, when it is a prefix (`node:`). A package no key names is refused
+ * sibling's. A layer `typeOnly` names reaches other layers, and the
+ * external packages it is allowed, only through `import type` and
+ * `export type`, which load nothing at run time. A key in `external`
+ * names one package and its subpaths, unless it ends in `:`, `/` or `-`,
+ * when it is a prefix (`node:`). A package no key names is refused
  * everywhere, so knowing a new package — a new dsh package above all — is a
  * decision written into `layers.json`, not a line slipped into a module.
  * A dynamic import is held as a static one is, and one whose module is
@@ -149,6 +150,8 @@ export function checkLayers(files, rules) {
         problems.push(`${file.path}: imports ${spec}, which no layer is allowed; add it to layers.json if ${who} should know it`)
       } else if (!rules.external[key].includes(layer)) {
         problems.push(`${file.path}: imports ${spec}; only ${rules.external[key].join(', ')} may — see layers.json`)
+      } else if (!typeOnly && rules.typeOnly?.includes(layer)) {
+        problems.push(`${file.path}: loads ${key} at run time (${spec}); ${layer} reaches external packages only through import type or export type — see layers.json`)
       }
     }
   }
