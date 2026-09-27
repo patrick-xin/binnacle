@@ -1,11 +1,9 @@
 /**
  * The tool cards: each tool call drawn from what its tool presents — a title
  * saying what the call does, and once it returns, what it returned folded
- * beneath — rather than as its name and raw JSON
- * ([ADR 15](../../../../../docs/adr/0015-a-tool-call-is-drawn-from-what-its-tool-presents.md)).
+ * beneath — rather than as its name and raw JSON.
  *
- * binnacle's first built-in plugin, holding only what an author holds
- * ([ADR 5](../../../../../docs/adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)):
+ * binnacle's first built-in plugin, holding only what an author holds:
  * the author API, type-only; the `binnacle` service, to register a view for
  * the `tool` entry kind; and dsh's `tools` service, to reach the definition
  * that presents each call. Where it cannot draw from a presentation it leaves

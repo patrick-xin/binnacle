@@ -2,8 +2,7 @@
  * The author API: what an author, or a built-in feature, may depend on — the
  * `binnacle` service and the types its registrations take and return.
  *
- * Removing or renaming an export here breaks every author; its commit says so
- * ([ADR 5](../../../docs/adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)).
+ * Removing or renaming an export here breaks every author; its commit says so.
  */
 
 import type { AuthorAdapter } from './facts/adapt.ts'

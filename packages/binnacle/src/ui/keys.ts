@@ -5,8 +5,7 @@
  * merging and held in one `KeybindingsManager` together with pi-tui's own,
  * so the composer and the alternate screen read the same table. The table
  * answers a press only, once: a repeat or a release, which a kitty-protocol
- * terminal also reports, is answered by nothing binnacle binds
- * ([ADR 13](../../../../docs/adr/0013-a-key-means-something-only-through-the-one-key-table.md)).
+ * terminal also reports, is answered by nothing binnacle binds.
  */
 
 import { isKeyRepeat, isKeyRelease, KeybindingsManager, TUI_KEYBINDINGS } from '@earendil-works/pi-tui'

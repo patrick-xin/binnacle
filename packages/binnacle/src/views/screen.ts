@@ -2,8 +2,7 @@
  * The screen: a session's transcript and the UI state, at a width, as every
  * line of the transcript and the regions on them.
  *
- * It draws the whole transcript, which pi-tui windows, scrolls and selects
- * ([ADR 7](../../../../docs/adr/0007-pi-tui-windows-scrolls-and-selects-the-transcript.md)),
+ * It draws the whole transcript, which pi-tui windows, scrolls and selects,
  * so a frame's cost is kept to what changed: each entry's view is called once
  * and its layout kept while its width and folds stay as they were.
  */

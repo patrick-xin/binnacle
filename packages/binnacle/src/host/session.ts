@@ -5,7 +5,7 @@
  * It composes no preset roster, as dsh's headless bundle does not: the agent
  * reads its rows from the global layer, and its model from the default
  * selection installed in `setup` (`dsh:packages/bundle/headless/src/index.ts`).
- * This is where binnacle reaches dsh's agents (ADR 3); the rest of the host
+ * This is where binnacle reaches dsh's agents; the rest of the host
  * knows only the session it opens.
  */
 

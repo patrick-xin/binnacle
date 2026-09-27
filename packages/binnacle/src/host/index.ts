@@ -7,7 +7,7 @@
  * the person quits, on the screen they asked for and switch to: the alternate
  * screen, the transcript in a scroll view that follows its end, or the main
  * screen, the transcript printed into the scrollback; the composer below
- * either (`binnacle:docs/features/tui-mode.md`).
+ * either.
  * It provides the `binnacle` service authors register through, and reads the
  * whole log again when an adapter comes or goes. A failure it cannot recover from gives
  * back what it took, a terminal half-started included, says what failed, and
@@ -148,7 +148,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     session.send(text)
   }
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
-  // wherever keys enter; nothing else in binnacle matches a key ([ADR 13](../../../../docs/adr/0013-a-key-means-something-only-through-the-one-key-table.md)).
+  // wherever keys enter; nothing else in binnacle matches a key.
   const table = keyTable()
   setKeybindings(table.manager)
   // Keys arrive ahead of the composer, through pi-tui's input listener. The host answers what is bound to it, quitting
