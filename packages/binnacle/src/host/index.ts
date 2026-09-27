@@ -22,7 +22,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
 import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
-import { editorTheme } from '../ui/theme.ts'
+import { editorTheme, tones } from '../ui/theme.ts'
 import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
@@ -169,9 +169,16 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     transcript.handleKey({ kind: 'key', binding: 'focus.out' })
     return undefined
   }
+  // While the fullscreen's scroll view is scrolled away from the end it follows, pi-tui's indicator says so on the
+  // view's last row (`pi:packages/tui/src/tui-alt-screen.ts`): the label names the key the one key table binds to
+  // pi-tui's `tui.altScreen.bottom`, which pi-tui itself — or a click on the label — answers by bringing the end back.
+  const jumpToLatest = (): string => {
+    const bound = table.manager.getKeys('tui.altScreen.bottom').join(', ')
+    return tones.accent(` ↓ Jump to latest · ${bound} `)
+  }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)
-    const next = mode === 'regular' ? new TuiMainScreen(terminal) : new TuiAltScreen(terminal)
+    const next = mode === 'regular' ? new TuiMainScreen(terminal) : new TuiAltScreen(terminal, undefined, undefined, { scrollToEndIndicator: jumpToLatest })
     if (next instanceof TuiMainScreen && left !== undefined) next.restoreRenderState(left)
     next.addChild(transcript)
     next.addChild(composer)

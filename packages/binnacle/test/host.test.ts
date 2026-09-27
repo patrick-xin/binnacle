@@ -481,6 +481,60 @@ test('on the alternate screen, focus brings what it is on into view as it moves 
   }
 })
 
+/** Six calls, each answer folded to four lines, taller together than the window. */
+const folded = Array.from({ length: 6 }, (_, index) => {
+  const seq = (index + 1) * 2
+  return [called(seq, `read${index + 1}`), returned(seq + 1, seq, 'w\nx\ny\nz')]
+}).flat()
+
+test('on the fullscreen, focus scrolled away from the end is said on the last row, naming the key that jumps back, and only then', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession(folded)
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  assert.equal((await terminal.altScreen()).some(row => row.includes('Jump to latest')), false)
+  terminal.type('\x1b[Z')
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('↓ Jump to latest · end')))
+  assert.ok(terminal.written.includes('\x1b[36m ↓ Jump to latest · end '), 'the label is drawn in the accent tone')
+})
+
+test('the key the label names brings the transcript\'s last line back, following again, and the label goes', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession(folded)
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  assert.equal((await terminal.altScreen()).some(row => row.includes('Jump to latest')), false)
+  terminal.type('\x1b[Z')
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('↓ Jump to latest · end')))
+  terminal.type('\x1b[F')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.every(row => row.includes('Jump to latest') === false) && rows[4] === '… 1 more line'
+  })
+})
+
+test('the label names whatever the one key table binds to jump to the end, so a rebinding is named', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession(folded)
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  terminal.type('\x1b[Z')
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('↓ Jump to latest · end')))
+  try {
+    getKeybindings().setUserBindings({ 'tui.altScreen.bottom': 'ctrl+end' })
+    session.log(prompt(7, 'and the tests'))
+    await until(async () => (await terminal.altScreen()).some(row => row.includes('↓ Jump to latest · ctrl+end')))
+  } finally {
+    getKeybindings().setUserBindings({})
+  }
+})
+
 test('from the main screen, a fold in a printed entry opens on the fullscreen by key, in view and focused, and the main screen is as it was after switching back', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build'), called(2, 'read'), returned(3, 2, 'w\nx\ny\nz')])
@@ -531,7 +585,7 @@ test('focus the fullscreen gives back is brought into view, however far up the s
   await until(async () => (await terminal.onAlternateScreen()) === false && (await terminal.mainScreen()).includes('● read6 {}'))
   terminal.type('\x14')
   await until(async () => (await terminal.onAlternateScreen()) === true && (await terminal.altScreen())[0] === 'w')
-  assert.deepEqual((await terminal.altScreen()).slice(0, 5), ['w', 'x', 'y', '▸ show 1 more line', '● read2 {}'])
+  assert.deepEqual((await terminal.altScreen()).slice(0, 5), ['w', 'x', 'y', '▸ show 1 more line', '● read2  ↓ Jump to latest · end'])
 })
 
 test('typing on the main screen forgets where focus was, so enter back on the fullscreen sends what was typed', async () => {
