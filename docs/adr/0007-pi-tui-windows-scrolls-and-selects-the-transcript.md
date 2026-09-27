@@ -1,6 +1,6 @@
 # 7. pi-tui windows, scrolls and selects the transcript
 
-- Status: accepted
+- Status: accepted; which screen it draws on is settled by [ADR 12](0012-binnacle-draws-on-either-screen-and-a-person-switches-between-them.md)
 - Date: 2026-09-26
 
 ## Context

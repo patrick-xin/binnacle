@@ -1,6 +1,6 @@
 # 9. A view is drawn once for each entry, and again when its author invalidates it
 
-- Status: accepted
+- Status: accepted; on the main screen, what is drawn again is narrowed by [ADR 13](0013-on-the-main-screen-a-printed-row-never-changes.md)
 - Date: 2026-09-26
 
 ## Context
