@@ -4,7 +4,7 @@ binnacle is a terminal surface for [DeepSeek Harness](https://github.com/deepsee
 
 It is not a fork of dsh and reaches nothing dsh does not publish.
 
-This page states what binnacle commits to, and why. The rules that follow from it are [`AGENTS.md`](../AGENTS.md)'s; where the code does not yet meet a commitment, that is an issue. What each feature does, and how, is its page in [the feature map](features.md).
+This page states what binnacle commits to, and why. The rules that follow from it are [`AGENTS.md`](../AGENTS.md)'s; where the code does not yet meet a commitment, that is an issue. What each feature does, and how, is its page in [the feature map](features.md); what each layer of the code is for, how a session and a gesture pass through them, and where a change goes is [the package map](../packages/binnacle/README.md).
 
 ## What it stands on
 
@@ -28,15 +28,11 @@ Two more repositories are read and never depended on: `codex` and `eve`, for wha
 - **What binnacle draws, it draws on either of the terminal's screens, and on the main screen a row it has printed never changes** ([ADR 12](adr/0012-on-the-main-screen-a-printed-row-never-changes.md)). On the alternate screen pi-tui holds the window; on the main screen the terminal's scrollback holds the history, and no pointer reaches binnacle. Which one a person reads on is [TUI mode](features/tui-mode.md).
 - **Everything is a registration, and the built-in surface has no private door** ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md), [ADR 5](adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)). What an author may depend on is the author API (`binnacle:packages/binnacle/src/api.ts#Registrations`). A built-in feature is a plugin holding only what an author holds, so for everything that lives in a plugin, the layer gate proves the built-in surface reaches nothing an author cannot.
 
-## How a session reaches the screen
-
-The host opens a session and follows its log (`binnacle:packages/binnacle/src/host/session.ts#openSession`). Each event is adapted to a fact (`binnacle:packages/binnacle/src/facts/adapt.ts#adapt`) and handed to the transcript pane (`binnacle:packages/binnacle/src/panes/transcript.ts#TranscriptPane`), which folds it into turns (`binnacle:packages/binnacle/src/models/transcript.ts#fold`). At each frame the pane draws the screen (`binnacle:packages/binnacle/src/views/screen.ts#screens`): each entry drawn as nodes (`binnacle:packages/binnacle/src/views/entries.ts#drawEntry`), and the nodes laid out with pi-tui at the width it was given (`binnacle:packages/binnacle/src/ui/layout.ts#layout`), so that no text a node carries reaches the terminal as a control ([ADR 14](adr/0014-no-text-a-node-carries-reaches-the-terminal-as-a-control.md)). An entry is drawn once, and drawn again only when it changes, the views of its key change, or their author invalidates them; it is laid out again only at a new width or as a fold in it opens. So a frame costs what changed, and handing pi-tui every line ([ADR 9](adr/0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)). On the main screen, the pane prints each entry once it has settled (`binnacle:packages/binnacle/src/models/transcript.ts#settled`), keeps what it printed as it printed it, and draws the rest below. A pointer event on the pane is read as a gesture, and the gesture table gives it its meaning (`binnacle:packages/binnacle/src/ui/gestures.ts#meaning`).
-
 ## The repository
 
 | Path                                                                | Holds                                                                    |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [`packages/binnacle/`](../packages/binnacle/)                       | the bundle: `src/<layer>/`, the author API, its tests, and the patch dsh stacks |
+| [`packages/binnacle/`](../packages/binnacle/)                       | the bundle: `src/<layer>/`, the author API, its tests, and the patch dsh stacks; [its map](../packages/binnacle/README.md) |
 | [`packages/binnacle/layers.json`](../packages/binnacle/layers.json) | what each layer may import                                               |
 | [`AGENTS.md`](../AGENTS.md)                                         | the standing orders                                                      |
 | [`docs/architecture.md`](architecture.md)                           | this page                                                                |

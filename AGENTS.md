@@ -19,7 +19,7 @@ Standing orders — the one page here that binds. A record is evidence, never a 
 | `pnpm upstream` | list each release upstream has published past a pin |
 | `pnpm pin <name> <tag>` | move a pin, and every package that follows it |
 
-Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.ts`; what each may import is [`layers.json`](packages/binnacle/layers.json), and a gate's error says what to change.
+Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.ts`; what each may import is [`layers.json`](packages/binnacle/layers.json), and a gate's error says what to change. What each layer is for, how they connect, and where a change goes is [the package map](packages/binnacle/README.md).
 
 ## One root
 
@@ -75,7 +75,8 @@ The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/
 
 | Record | Home |
 |---|---|
-| how it is built, and what it commits to | [`docs/architecture.md`](docs/architecture.md) |
+| what it commits to, and why | [`docs/architecture.md`](docs/architecture.md) |
+| how the code is laid out: what each layer is for, how they connect, and where a change goes | [`packages/binnacle/README.md`](packages/binnacle/README.md) |
 | a decision that binds beyond one feature: why, and what it beat | a decision record in [`docs/adr/`](docs/adr/) |
 | what a person can do with a feature, how its parts work together, and its choices | its page in [`docs/features/`](docs/features/), listed in [the feature map](docs/features.md) |
 | what a term means, and whose word it is | [`docs/glossary.md`](docs/glossary.md) |
