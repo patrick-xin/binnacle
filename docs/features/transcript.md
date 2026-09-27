@@ -21,6 +21,7 @@ How a session reaches the screen is [the architecture's](../architecture.md#how-
 - An answer's text is drawn as markdown, by pi-tui's `Markdown`; reasoning stays plain text.
 - Titles are muted, and what went wrong is drawn in error.
 - A kind no view draws is drawn by the fallback, never skipped ([ADR 4](../adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)).
+- A control sequence in what was logged — one that would clear the screen, write the clipboard, set the title or colour the text — never acts on the terminal: it is drawn as its text, and any other control character as a symbol a person can read ([ADR 14](../adr/0014-no-text-a-node-carries-reaches-the-terminal-as-a-control.md)).
 
 ## Open
 
