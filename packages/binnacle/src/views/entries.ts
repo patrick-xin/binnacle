@@ -39,16 +39,18 @@ function textOf(blocks: readonly Block[]): string {
  * Draw an answer: reasoning folded under a muted label and drawn dim, its text as the markdown document it is.
  * A call it made is its tool entry's to draw — dsh logs every kept call, and one kept by a stream cut short there
  * is none (`BlockAssembler.interruptedBlocks`, at dsh-v0.1.7-rc.2) — so its block draws no line here.
+ * Each reasoning fold is named by which reasoning it is, so a person's opening one holds that one alone.
  */
 function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
-  const children = fact.blocks.flatMap((block, index): Node[] => block.kind === 'unread' && block.type === 'tool-call'
+  let reasoning = 0
+  const children = fact.blocks.flatMap((block): Node[] => block.kind === 'unread' && block.type === 'tool-call'
     ? []
     : block.kind === 'reasoning'
       ? [{
         kind: 'stack',
         children: [
           { kind: 'text', text: [{ mark: 'thinking' } as const, ' thinking'], tone: 'muted' },
-          { kind: 'fold', id: `reasoning:${fact.seq}:${index}`, rows: 0, child: { kind: 'text', text: block.text, tone: 'dim' } },
+          { kind: 'fold', id: `reasoning-${reasoning++}`, rows: 0, child: { kind: 'text', text: block.text, tone: 'dim' } },
         ],
       }]
       : block.kind === 'text'
@@ -76,7 +78,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
     return { kind: 'stack', children: [head, waiting] }
   }
   const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
-  const output: Node = { kind: 'fold', id: `tool:${call.callId}`, rows: 3, child: { kind: 'text', text: textOf(result.blocks) } }
+  const output: Node = { kind: 'fold', id: 'output', rows: 3, child: { kind: 'text', text: textOf(result.blocks) } }
   return { kind: 'stack', children: [head, ...reason, output] }
 }
 
@@ -137,17 +139,17 @@ function builtIn(entry: Entry, problem?: string): Node {
     case 'prompt':
       return noted({ kind: 'text', text: [{ mark: 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] }, problem)
     case 'context':
-      return titled([{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'fold', id: `context:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
+      return titled([{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'fold', id: 'context', rows: 0, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'answer':
       return noted(drawAnswer(entry.fact), problem)
     case 'tool':
       return noted(drawTool(entry.call, entry.result, entry.left), problem)
     case 'result':
-      return titled([{ mark: 'done', tone: 'muted' } as const, ` result of call ${entry.fact.callId}`], { kind: 'fold', id: `result:${entry.fact.seq}`, rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
+      return titled([{ mark: 'done', tone: 'muted' } as const, ` result of call ${entry.fact.callId}`], { kind: 'fold', id: 'output', rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'authored':
-      return titled([{ mark: 'unknown' } as const, ` ${entry.fact.name}`], { kind: 'fold', id: `authored:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: shown(entry.fact.data) } }, problem)
+      return titled([{ mark: 'unknown' } as const, ` ${entry.fact.name}`], { kind: 'fold', id: 'data', rows: 0, child: { kind: 'text', text: shown(entry.fact.data) } }, problem)
     case 'unknown':
-      return titled([{ mark: 'unknown' } as const, ` ${entry.fact.type}`], { kind: 'fold', id: `unknown:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: shown(entry.fact.record) } }, problem ?? entry.fact.problem)
+      return titled([{ mark: 'unknown' } as const, ` ${entry.fact.type}`], { kind: 'fold', id: 'record', rows: 0, child: { kind: 'text', text: shown(entry.fact.record) } }, problem ?? entry.fact.problem)
   }
 }
 

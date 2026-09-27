@@ -53,7 +53,7 @@ test('an answer shows its text, folds its reasoning away, and says when it was c
 })
 
 test('expanding the reasoning shows it', () => {
-  assert.deepEqual(lines(answer, ['reasoning:8:0']), ['∴ thinking', 'the build fails in tsc', 'The build', '(interrupted)'])
+  assert.deepEqual(lines(answer, ['reasoning-0']), ['∴ thinking', 'the build fails in tsc', 'The build', '(interrupted)'])
 })
 
 test('an answer\'s text is drawn as the markdown document it is, in the theme\'s styles', () => {
@@ -77,7 +77,7 @@ test('an answer draws no line for a call it made: the call is its tool entry\'s 
 })
 
 test('the reasoning\'s label is muted, the reasoning under it dim, and an interruption dim', () => {
-  const drawn = layout(drawEntry(answer), 40, { expanded: new Set(['reasoning:8:0']) }).lines.map(line => line.trimEnd())
+  const drawn = layout(drawEntry(answer), 40, { expanded: new Set(['reasoning-0']) }).lines.map(line => line.trimEnd())
   assert.equal(drawn[0], '\x1b[90m∴ thinking\x1b[39m')
   assert.equal(drawn[1], '\x1b[2mthe build fails in tsc\x1b[22m')
   assert.equal(drawn[3], '\x1b[2m(interrupted)\x1b[22m')
@@ -205,7 +205,7 @@ test('a result with no call on screen names the call it answers', () => {
 test('a kind nothing draws is its type in one line, and expand shows the raw record', () => {
   const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'goal/change', record: { type: 'goal/change', data: {} } } }
   assert.deepEqual(lines(entry), ['? goal/change', '… 4 more lines'])
-  assert.deepEqual(lines(entry, ['unknown:2']), ['? goal/change', '{', '  "type": "goal/change",', '  "data": {}', '}'])
+  assert.deepEqual(lines(entry, ['record']), ['? goal/change', '{', '  "type": "goal/change",', '  "data": {}', '}'])
 })
 
 const prompt: Entry = { kind: 'prompt', fact: promptFact(2, 10, 'fix the build') }
@@ -296,5 +296,5 @@ test('data with no JSON and no string form is still drawn, as what it is', () =>
   const cycle: Record<string, unknown> = Object.create(null)
   cycle.self = cycle
   const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'seeded', data: cycle } }
-  assert.deepEqual(layout(drawEntry(entry), 80, { expanded: new Set(['authored:3']) }).lines.map(line => stripTerminalSequences(line).trimEnd()), ['? seeded', 'a value binnacle cannot show'])
+  assert.deepEqual(layout(drawEntry(entry), 80, { expanded: new Set(['data']) }).lines.map(line => stripTerminalSequences(line).trimEnd()), ['? seeded', 'a value binnacle cannot show'])
 })

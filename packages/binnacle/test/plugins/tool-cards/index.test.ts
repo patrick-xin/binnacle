@@ -20,6 +20,7 @@ import type { CardParts, CardRow } from '../../../src/plugins/tool-cards/cards.t
 import { rowFor } from '../../../src/plugins/tool-cards/cards.ts'
 import { toolCards } from '../../../src/plugins/tool-cards/index.ts'
 import { call as callFact, returned as returnedFact } from '../../support/facts.ts'
+import { pointer } from '../../support/pointer.ts'
 
 /**
  * The cards applied in a Cordis context, with the `binnacle` service and a
@@ -319,7 +320,7 @@ test('a row can draw a head of its own and a line under a completed head', () =>
     waiting: { kind: 'text', text: '  running…', tone: 'muted' },
     reason: undefined,
     resultText: '',
-    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'tool:c1', rows, child }),
+    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'output', rows, child }),
   }
   assert.deepEqual(drawn(running), ['$ pnpm test', '  running…'])
   const done: CardParts = {
@@ -340,7 +341,7 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
     waiting: undefined,
     reason: undefined,
     resultText: 'tsc: 1 error',
-    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'tool:c1', rows, child }),
+    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'output', rows, child }),
   }
   const exit: CardRow = {
     draw: current => {
@@ -386,6 +387,17 @@ test('disposing the plugin gives every call back to binnacle\'s card', async () 
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'the file'])
   await fiber.dispose()
   assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'the file'])
+})
+
+test('a fold a person opened stays open when the plugin drawing it is disposed, for binnacle\'s card names it alike', async () => {
+  const { fiber, pane } = await withCards(read)
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  pane.push(returned('a\nb\nc\nd\ne'))
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 4, 0, 60)), { handled: true })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', 'd', 'e'])
+  await fiber.dispose()
+  assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'a', 'b', 'c', 'd', 'e'])
 })
 
 test('a call its turn left without a result says so under its presented title', async () => {

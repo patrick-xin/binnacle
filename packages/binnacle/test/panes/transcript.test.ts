@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import type { TuiMouseEvent } from '@earendil-works/pi-tui'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -12,6 +11,8 @@ import { TranscriptPane } from '../../src/panes/transcript.ts'
 import type { PaneReports } from '../../src/panes/transcript.ts'
 import { prompt as promptFact, call as callFact, returned as returnedFact } from '../support/facts.ts'
 import { called } from '../support/events.ts'
+import { pointer } from '../support/pointer.ts'
+import { foldedAlike } from '../support/views.ts'
 
 const prompt = promptFact(1, 1, 'fix the build')
 
@@ -31,18 +32,6 @@ test('the pane draws the facts pushed into it, and asks for a frame each time', 
 })
 
 const context: Fact = { kind: 'context', seq: 2, time: 2, source: 'goal', blocks: [{ kind: 'text', text: 'a\nb' }] }
-
-/**
- * A pointer event on a row of the pane, as pi-tui's containers deliver it.
- * @param type - what the pointer did.
- * @param y - the row, in the pane's own lines.
- * @param x - the column.
- * @returns the event.
- */
-const pointer = (type: TuiMouseEvent['type'], y: number, x = 0): TuiMouseEvent => ({
-  type, button: type === 'wheel' || type === 'move' ? 'none' : 'left', x, y, screenX: x, screenY: y, width: 40, height: 3,
-  shift: false, alt: false, ctrl: false, ...type === 'wheel' ? { wheelDelta: -1 } : {},
-})
 
 test('a click on a fold opens it, and the pane claims the click', () => {
   const pane = new TranscriptPane(() => {})
@@ -204,6 +193,9 @@ function counting(): { views: Views, calls: () => number } {
   return { views: new Map([['prompt', [view]]]), calls: () => calls }
 }
 
+/** Views holding the one author's view that folds every prompt alike. */
+const alike: Views = new Map([['prompt', [foldedAlike]]])
+
 test('a view is called once for each entry, however many frames draw it', () => {
   const { views, calls } = counting()
   const pane = new TranscriptPane(() => {}, () => views)
@@ -229,6 +221,28 @@ test('opening a fold draws its entry again, laid out anew, without calling its v
   assert.deepEqual(pane.handleMouse(pointer('click', 0)), { handled: true })
   assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', '… 1 more line'])
   assert.equal(calls(), 2)
+})
+
+test('a fold a person opened stays open when the adapters change and the log is read again', () => {
+  const pane = new TranscriptPane(() => {}, () => alike)
+  pane.push(sent(1, 'one\nmore'))
+  pane.push(sent(2, 'two\nmore'))
+  assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', '… 1 more line'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 3)), { handled: true })
+  assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', 'more'])
+  pane.reset([sent(1, 'one\nmore'), sent(2, 'two\nmore')])
+  assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', 'more'])
+})
+
+test('a fold a person opened stays open across a switch of screens', () => {
+  const pane = new TranscriptPane(() => {}, () => alike)
+  pane.push(sent(1, 'one\nmore'))
+  pane.push(sent(2, 'two\nmore'))
+  assert.deepEqual(pane.handleMouse(pointer('click', 3)), { handled: true })
+  pane.drawOn('regular')
+  assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', 'more'])
+  pane.drawOn('fullscreen')
+  assert.deepEqual(shown(pane), ['one', '… 1 more line', 'two', 'more'])
 })
 
 test('a resize lays every entry out at the new width, without calling its view', () => {

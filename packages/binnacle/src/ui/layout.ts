@@ -11,7 +11,7 @@ import type { Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
-  /** The ids of the regions a person expanded. */
+  /** The ids of the regions a person expanded, each scoped to the entry that drew it. */
   readonly expanded: ReadonlySet<string>
   /** The id of the focused region, if any. */
   readonly focus?: string

@@ -41,6 +41,6 @@ test('a region sits on the rows of the whole transcript, and what offers somethi
   const [start, ...rest] = session(2)
   const drawn = screen([start as Fact, context, ...rest], initial, 40)
   assert.deepEqual(plain(drawn).lines.slice(0, 3), ['⋯ added by goal', '… 2 more lines', '› question 1'])
-  assert.deepEqual(drawn.regions.map(({ region, top, height }) => [region.id, top, height]), [['context:5', 1, 1]])
-  assert.deepEqual(drawn.focusable, ['context:5'])
+  assert.deepEqual(drawn.regions.map(({ region, top, height }) => [region.id, top, height]), [['5/context', 1, 1]])
+  assert.deepEqual(drawn.focusable, ['5/context'])
 })

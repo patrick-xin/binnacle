@@ -38,7 +38,7 @@ export type Node =
   }
   | {
     readonly kind: 'offer'
-    /** The region's id; stable while its content is on screen. */
+    /** The region's name within the entry this view draws; binnacle scopes it to that entry, stable while its content is on screen. */
     readonly id: string
     /** What the content offers, primary first. */
     readonly affordances: readonly Affordance[]
@@ -54,7 +54,7 @@ export type Node =
   }
   | {
     readonly kind: 'fold'
-    /** The region's id; what `expand` opens and folds. */
+    /** The region's name within the entry this view draws; binnacle scopes it to that entry, so what `expand` opens and folds is this fold's alone. */
     readonly id: string
     /** How many rows it shows while folded. */
     readonly rows: number
