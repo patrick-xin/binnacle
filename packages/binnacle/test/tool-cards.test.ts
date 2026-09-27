@@ -13,6 +13,7 @@ import type { Fact } from '../src/facts/adapt.ts'
 import { RegistrationService } from '../src/host/registrations.ts'
 import { TranscriptPane } from '../src/panes/transcript.ts'
 import { drawText } from '../src/ui/draw.ts'
+import { rowFor } from '../src/plugins/tool-cards/cards.ts'
 import { toolCards } from '../src/plugins/tool-cards/index.ts'
 
 /**
@@ -281,6 +282,11 @@ test('every other card kind is drawn by its title alone in this slice', async ()
   assert.deepEqual(drawText(pane, 60), ['● pnpm test (2 s)', 'ok'])
   pane.push({ ...asked('write', '{"path":"foo.txt"}'), seq: 7, callId: 'c2' })
   assert.deepEqual(drawText(pane, 60).slice(2), ['● Write foo.txt', '  running…'])
+})
+
+test('a kind with no row of its own draws through generic\'s', () => {
+  assert.equal(rowFor('terminal'), rowFor('generic'))
+  assert.equal(rowFor('web'), rowFor('generic'))
 })
 
 test('disposing the plugin gives every call back to binnacle\'s card', async () => {

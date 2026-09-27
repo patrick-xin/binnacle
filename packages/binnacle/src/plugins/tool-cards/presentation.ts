@@ -74,6 +74,9 @@ export interface PresentedResult {
   readonly content?: readonly unknown[]
 }
 
+/** Every card kind dsh's presentation vocabulary names, on a call or on a result. */
+export type CardKind = PresentedCall['card'] | PresentedResult['card']
+
 /**
  * Read what a tool's result presenter returned.
  * @param value - what `presentResult` returned.

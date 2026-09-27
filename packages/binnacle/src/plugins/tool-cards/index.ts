@@ -17,7 +17,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { Node, View } from '../../api.ts'
-import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks, textOfPresented } from './presentation.ts'
+import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks } from './presentation.ts'
+import { rowFor } from './cards.ts'
 
 /** The tool-cards plugin, loaded by the host beside the surface it draws on. */
 export const toolCards = {
@@ -62,7 +63,7 @@ function viewOf(tools: ToolRuntime): View {
       const waiting: Node = entry.left === undefined
         ? { kind: 'text', text: '  running…', tone: 'muted' }
         : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' }
-      return { kind: 'stack', children: [head, waiting] }
+      return { kind: 'stack', children: [head, ...rowFor(call.card).pending(call), waiting] }
     }
     const result = entry.result
     let completed
@@ -82,7 +83,7 @@ function viewOf(tools: ToolRuntime): View {
       kind: 'fold',
       id: `tool:${entry.call.callId}`,
       rows: 3,
-      child: { kind: 'text', text: shown?.content === undefined ? textOfBlocks(result.blocks) : textOfPresented(shown.content) },
+      child: (shown === undefined ? undefined : rowFor(shown.card).folded(shown)) ?? { kind: 'text', text: textOfBlocks(result.blocks) },
     }
     return { kind: 'stack', children: [head, ...reason, output] }
   }
