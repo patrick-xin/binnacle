@@ -14,6 +14,10 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 
 - [Transcript](features/transcript.md): the session log drawn as turns, with what was sent, answered, called and returned.
 
+## Review: what happened?
+
+- [TUI mode](features/tui-mode.md): read the session on the alternate screen or in the terminal's scrollback, and switch between them.
+
 ## Tune: can I make it mine?
 
 - [Theme](features/theme.md): the tones content is drawn in, and their colours.

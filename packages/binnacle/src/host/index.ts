@@ -7,7 +7,7 @@
  * the person quits, on the screen they asked for and switch to: the alternate
  * screen, the transcript in a scroll view that follows its end, or the main
  * screen, the transcript printed into the scrollback; the composer below
- * either ([ADR 12](../../../../docs/adr/0012-binnacle-draws-on-either-screen-and-a-person-switches-between-them.md)).
+ * either (`binnacle:docs/features/tui-mode.md`).
  * It provides the `binnacle` service authors register through, and reads the
  * whole log again when an adapter comes or goes. A failure it cannot recover from gives
  * back what it took, a terminal half-started included, says what failed, and
