@@ -118,6 +118,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     composer.setText('')
     session.send(text)
   }
+  // TODO(#1): these become bindings in the one key table Keys brings, which answers a press only, once for every key.
   // A terminal speaking the kitty protocol, which pi-tui asks for, also reports a key held and let go; only the press is answered, the rest left to pi-tui.
   const keys = (data: string): TuiInputListenerResult => {
     if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
