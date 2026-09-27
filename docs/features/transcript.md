@@ -4,7 +4,7 @@ A person reads the session as it happens, turn by turn:
 
 - what they sent, after an accent `›`;
 - what was added to the context without their typing it, as `⋯ added by` its source, folded away;
-- the agent's answers, drawn as markdown, with its reasoning folded under a muted `∴ thinking` and drawn dim;
+- the agent's answers, drawn as markdown, with its reasoning folded under a muted `∴ thinking` and drawn dim; a call an answer made draws as its own entry, never as a line inside it;
 - each tool call, as [Tool cards](tool-cards.md) draws it when its tool presents it, and as its glyph and arguments otherwise: a muted `●` and `running…` while it runs; `●` in success once it returned, its result folded to three rows; `✗` in error, and why, when it failed;
 - a kind of event binnacle does not draw, as `?` and its type, folded to its raw record.
 
@@ -19,6 +19,7 @@ How a session reaches the screen is [the architecture's](../architecture.md#how-
 - How far each kind is folded: reasoning, context and whatever the fallback draws to nothing; a tool's output, and a result with no call, to three rows.
 - A call and its result are drawn as one entry, the result under its call, and the glyph's tone says how the call stands.
 - An answer's text is drawn as markdown, by pi-tui's `Markdown`; reasoning stays plain text.
+- An answer draws no line for a call it made: every call an answer keeps is also logged as a call of its own, so it is its tool entry's to draw ([Tool cards](tool-cards.md) when its tool presents it).
 - Titles are muted, and what went wrong is drawn in error.
 - A kind no view draws is drawn by the fallback, never skipped ([ADR 4](../adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)).
 - A call whose turn ends without its result says so — `the turn ended without it: aborted` — under its glyph, muted, on both cards and both screens; a late result answers the call and the line is gone.
