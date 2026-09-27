@@ -11,6 +11,9 @@ import type { Affordance } from '../contract/index.ts'
 import { tones } from './theme.ts'
 import type { Tone } from './theme.ts'
 
+/** One run of a text node's line: its text drawn in the node's tone as a bare string, or in a tone of its own. */
+export type Span = string | { readonly text: string, readonly tone: Tone }
+
 /** Something a view draws. */
 export type Node =
   | {
@@ -18,10 +21,15 @@ export type Node =
   }
   | {
     readonly kind: 'text'
-    /** What it says; wrapped at the width it is given. */
-    readonly text: string
+    /** What it says, as one string or as spans, each in a tone; wrapped at the width it is given. */
+    readonly text: string | readonly Span[]
     /** The theme's colour it is drawn in; the terminal's own when it has none. */
     readonly tone?: Tone
+  }
+  | {
+    readonly kind: 'markdown'
+    /** What it says, as a markdown document laid out by pi-tui's component in the theme's markdown styles. */
+    readonly text: string
   }
   | {
     readonly kind: 'stack'
@@ -70,10 +78,15 @@ export function parseNode(value: unknown): Node {
     case 'text': {
       const text = field('text')
       const tone = field('tone')
-      if (typeof text !== 'string') throw new Error('a text node needs its text')
-      if (tone === undefined) return { kind: 'text', text }
-      if (typeof tone !== 'string' || !Object.hasOwn(tones, tone)) throw new Error(`${describe(tone)} is no tone`)
-      return { kind: 'text', text, tone: tone as Tone }
+      if (typeof text !== 'string' && !Array.isArray(text)) throw new Error('a text node needs its text')
+      if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(tones, tone))) throw new Error(`${describe(tone)} is no tone`)
+      const read = typeof text === 'string' ? text : Array.from(text, span => spanOf(span))
+      return tone === undefined ? { kind: 'text', text: read } : { kind: 'text', text: read, tone: tone as Tone }
+    }
+    case 'markdown': {
+      const text = field('text')
+      if (typeof text !== 'string') throw new Error('a markdown block needs text')
+      return { kind: 'markdown', text }
     }
     case 'stack': {
       const children = field('children')
@@ -104,6 +117,23 @@ export function parseNode(value: unknown): Node {
     default:
       throw new Error(`${describe(kind)} is no kind of node`)
   }
+}
+
+/**
+ * Read one span of a text node's line.
+ * @param value - the span, as returned.
+ * @returns it, as data.
+ * @throws when it is neither a bare string nor a text with a tone, or its tone is no tone.
+ */
+function spanOf(value: unknown): Span {
+  if (typeof value === 'string') return value
+  if (typeof value !== 'object' || value === null) throw new Error(`${describe(value)} is no span`)
+  const record = value as Record<string, unknown>
+  const text = record.text
+  const tone = 'tone' in record ? record.tone : undefined
+  if (typeof text !== 'string') throw new Error('a span needs its text')
+  if (typeof tone !== 'string' || !Object.hasOwn(tones, tone)) throw new Error(`${describe(tone)} is no tone`)
+  return { text, tone: tone as Tone }
 }
 
 /**

@@ -15,6 +15,8 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **node** | What a view returns: data, laid out by the ui with pi-tui (`binnacle:packages/binnacle/src/ui/node.ts#Node`). The vocabulary grows a block at a time, as requests need one ([ADR 10](adr/0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md)). |
 | **tone** | A colour of the theme's, named by what the content drawn in it means; pi's names (`binnacle:packages/binnacle/src/ui/theme.ts#tones`). |
 | **card** | A node holding another inside a rounded border, its title on the top edge. |
+| **markdown** | A node that draws its text as a markdown document, laid out by pi-tui's component in the theme's tones. |
+| **span** | One run of a text node's line: its text in the node's tone as a bare string, or in a tone of its own. |
 | **fallback view** | How an entry no view claims is drawn: its type in one line, and `expand` to the raw record. It also says what went wrong when an author's adapter or view failed. |
 | **layer** | A folder of `src`, or the module `api.ts`, and what it may import: [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **contract** | The layer holding what otherwise-independent layers share. |
@@ -35,6 +37,8 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **binding** | A named, rebindable key: focus movement, the primary affordance, or one affordance by kind. |
 | **registration** | What an author or a built-in feature contributes through `ctx.binnacle`, each an effect of the plugin that made it ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **authored fact** | A fact an author's adapter made from an event kind, named by them; drawn by the view registered under its name, or by the fallback. |
+| **settled** | Of an entry: nothing later in the log can change it. Every entry has settled but a call still waiting for its result in a turn still running, and those after it (`binnacle:packages/binnacle/src/models/transcript.ts#settled`). |
+| **printed** | On the main screen, a row binnacle has handed to the scrollback; it never changes again ([ADR 12](adr/0012-on-the-main-screen-a-printed-row-never-changes.md)). What can still change is drawn below the printed rows. |
 | **placement** | Where registered content goes: anywhere binnacle draws, the transcript and the composer included ([ADR 11](adr/0011-placements-reach-the-whole-screen-and-the-built-in-surface-is-placed-through-them.md)). |
 | **grant** | The affordance a person gives an approval with; a key, never a click. Also, in "grants, not the tree": what a plugin is handed instead of pi-tui components, including an effect the host performs for it. |
 | **author** | An agent a person asks to customize binnacle; it registers through the same doors the built-in surface does ([ADR 0](adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). |
@@ -79,4 +83,5 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **component** | Anything with `render(width): string[]`, and optionally input and mouse handlers. |
 | **invalidate** | Drop what a component kept, so its next render draws it again. binnacle's registration of the same name does this for the entries of one key ([ADR 9](adr/0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)). |
 | **main screen** / **alternate screen** | `TuiMainScreen` draws into the terminal's scrollback; `TuiAltScreen` owns a full screen. |
+| **TUI mode**: **regular** / **fullscreen** | pi's words for drawing on the main screen and on the alternate screen (`TuiMode`); a person picks one with `--tui-mode` ([TUI mode](features/tui-mode.md)). |
 | **terminal** | pi-tui's `Terminal`: the one object the host writes to and reads input from. |
