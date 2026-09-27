@@ -11,14 +11,19 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { AuthorAdapter, Registrations, View, Views } from '../api.ts'
+import type { AuthorAdapter, PlacedScreen, Registrations, View, Views } from '../api.ts'
+
+/** What changed in the registrations, for a listener: the adapters, the views, or the placed screens. */
+export type RegistrationsChanged = 'facts' | 'views' | 'screens'
 
 /** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
 export class RegistrationService extends Service implements Registrations {
   private readonly adapterTable = new Map<string, readonly AuthorAdapter[]>()
   private readonly newestAdapters = new Map<string, AuthorAdapter>()
   private readonly viewTable = new Map<string, readonly View[]>()
-  private readonly listeners = new Set<(changed: 'facts' | 'views') => void>()
+  private readonly screenTable = new Map<string, readonly PlacedScreen[]>()
+  private readonly newestScreens = new Map<string, PlacedScreen>()
+  private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
 
   /**
    * @param ctx - the context the service is provided in; its fiber's disposal removes it.
@@ -37,6 +42,11 @@ export class RegistrationService extends Service implements Registrations {
     return this.viewTable
   }
 
+  /** The screens plugins placed, by name: the newest registration of each. */
+  get screens(): ReadonlyMap<string, PlacedScreen> {
+    return this.newestScreens
+  }
+
   /** @inheritDoc */
   facts(type: string, adapter: AuthorAdapter): () => void {
     return this.register(this.adapterTable, type, adapter, `binnacle.facts(${type})`, 'facts')
@@ -45,6 +55,11 @@ export class RegistrationService extends Service implements Registrations {
   /** @inheritDoc */
   view(key: string, view: View): () => void {
     return this.register(this.viewTable, key, view, `binnacle.view(${key})`, 'views')
+  }
+
+  /** @inheritDoc */
+  screen(name: string, screen: PlacedScreen): () => void {
+    return this.register(this.screenTable, name, screen, `binnacle.screen(${name})`, 'screens')
   }
 
   /**
@@ -60,10 +75,10 @@ export class RegistrationService extends Service implements Registrations {
 
   /**
    * Hear when a registration comes or goes, or a key is invalidated, so the screen is drawn again.
-   * @param listener - called on each change, with the table it changed: the adapters, which change the facts, or the views.
+   * @param listener - called on each change, with the table it changed: the adapters, which change the facts; the views; or the placed screens.
    * @returns a function that stops listening.
    */
-  onChange(listener: (changed: 'facts' | 'views') => void): () => void {
+  onChange(listener: (changed: RegistrationsChanged) => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
@@ -76,7 +91,7 @@ export class RegistrationService extends Service implements Registrations {
    * @param table - which table `into` is, for the listeners.
    * @returns the effect's disposer.
    */
-  private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string, table: 'facts' | 'views'): () => void {
+  private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string, table: RegistrationsChanged): () => void {
     return this.ctx.effect(() => {
       into.set(key, [...into.get(key) ?? [], value])
       this.changed(table)
@@ -91,12 +106,17 @@ export class RegistrationService extends Service implements Registrations {
     }, label)
   }
 
-  /** Take the newest adapter of each type, and tell every listener which table changed. */
-  private changed(table: 'facts' | 'views'): void {
+  /** Take the newest adapter of each type and the newest screen of each name, and tell every listener which table changed. */
+  private changed(table: RegistrationsChanged): void {
     this.newestAdapters.clear()
     for (const [type, stack] of this.adapterTable) {
       const newest = stack.at(-1)
       if (newest !== undefined) this.newestAdapters.set(type, newest)
+    }
+    this.newestScreens.clear()
+    for (const [name, stack] of this.screenTable) {
+      const newest = stack.at(-1)
+      if (newest !== undefined) this.newestScreens.set(name, newest)
     }
     for (const listener of this.listeners) listener(table)
   }

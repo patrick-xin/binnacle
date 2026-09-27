@@ -6,6 +6,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
 import type { Node } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
+import { ScreenPane } from '../../src/panes/screen.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
 import { initial } from '../../src/ui/state.ts'
 import { screen } from '../../src/views/screen.ts'
@@ -193,4 +194,33 @@ test('a view that read something besides its entry invalidates its key, and only
   registrations.invalidate('prompt')
   assert.deepEqual(lines(), ['» 1', '⋯ added by goal', '… 1 more line'])
   assert.equal(calls, 1)
+})
+
+test('a plugin places a screen, read back as lines, and disposing its plugin takes it back', async () => {
+  const { registrations, author } = surface()
+  const changes: string[] = []
+  registrations.onChange((changed) => { changes.push(changed) })
+  const fiber = await author((ctx) => {
+    ctx.binnacle.screen('trajectory', { key: 'f2', description: 'open the trajectory', draw: () => ({ kind: 'text', text: 'the turns' }) })
+  })
+  assert.deepEqual(changes, ['screens'])
+  const placed = registrations.screens.get('trajectory')
+  assert.equal(placed?.key, 'f2')
+  const pane = new ScreenPane(() => [prompt])
+  pane.place('trajectory', placed ?? { draw: () => ({ kind: 'blank' }) })
+  assert.deepEqual(pane.render(40).map(line => stripTerminalSequences(line).trimEnd()), ['the turns'])
+  await fiber.dispose()
+  assert.equal(registrations.screens.has('trajectory'), false)
+})
+
+test('the newest plugin to place a name places it, and disposing it gives the name back', async () => {
+  const { registrations, author } = surface()
+  const first = await author((ctx) => { ctx.binnacle.screen('trajectory', { key: 'f2', description: 'first', draw: () => ({ kind: 'text', text: 'first' }) }) })
+  await author((ctx) => { ctx.binnacle.screen('trajectory', { key: 'f3', description: 'second', draw: () => ({ kind: 'text', text: 'second' }) }) })
+  assert.equal(registrations.screens.get('trajectory')?.description, 'second')
+  await first.dispose()
+  assert.equal(registrations.screens.get('trajectory')?.description, 'second')
+  const fiber = await author((ctx) => { ctx.binnacle.screen('trajectory', { key: 'f3', description: 'second', draw: () => ({ kind: 'text', text: 'second' }) }) })
+  await fiber.dispose()
+  assert.equal(registrations.screens.get('trajectory')?.description, 'second', 'disposing one of two alike gives the other back')
 })

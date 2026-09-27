@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import type { Keybindings } from '@earendil-works/pi-tui'
 import { keyTable } from '../../src/ui/keys.ts'
 
 /** The one key table. */
@@ -43,5 +44,30 @@ test('a key binnacle does not bind resolves to nothing, whatever has focus', () 
     assert.deepEqual(resolve('x', focused), undefined)
     assert.deepEqual(resolve('\x7f', focused), undefined)
     assert.deepEqual(resolve('\x1b[13;2u', focused), undefined)
+  }
+})
+
+test('a key a plugin offers resolves to the screen it opens, and withdrawing the offer stops it resolving', () => {
+  const table = keyTable()
+  const withdraw = table.offer('trajectory', { defaultKeys: 'f2', description: 'open the trajectory' })
+  assert.deepEqual(table.resolve('\x1bOQ', false), { kind: 'screen', name: 'trajectory' })
+  assert.equal(table.manager.getDefinition('binnacle.screen.trajectory' as keyof Keybindings)?.description, 'open the trajectory')
+  withdraw()
+  assert.deepEqual(table.resolve('\x1bOQ', false), undefined)
+  assert.equal(table.manager.getDefinition('binnacle.screen.trajectory' as keyof Keybindings), undefined)
+})
+
+test('while a placed screen is open, escape and the key that opened it return, quit still answers, and nothing moves focus on the transcript beneath', () => {
+  const table = keyTable()
+  table.offer('trajectory', { defaultKeys: 'f2', description: 'open the trajectory' })
+  assert.deepEqual(table.resolve('\x1bOQ', false, true), { kind: 'screen', name: 'trajectory' }, 'the same key returns')
+  assert.deepEqual(table.resolve('\x1b', false, true), { kind: 'screen-close' })
+  assert.deepEqual(table.resolve('\x1b', true, true), { kind: 'screen-close' }, 'whatever had focus')
+  assert.deepEqual(table.resolve('\x03', false, true), { kind: 'quit' })
+  assert.deepEqual(table.resolve('\x14', false, true), { kind: 'switch-screens' })
+  for (const focused of [false, true]) {
+    assert.deepEqual(table.resolve('\t', focused, true), undefined, 'focus does not move on the transcript beneath')
+    assert.deepEqual(table.resolve('\x1b[Z', focused, true), undefined)
+    assert.deepEqual(table.resolve('\r', focused, true), undefined, 'the composer below it is live, and takes it')
   }
 })
