@@ -32,7 +32,7 @@ export type DrawScreen = (model: Transcript, state: UiState, width: number, view
 interface Drawing {
   /** The views of its key that drew it, as they stood; none when binnacle's own did. */
   readonly by: readonly View[] | undefined
-  /** What its views returned. */
+  /** What its views returned, its regions scoped to the entry. */
   readonly node: Node
   /** The id of every fold in it, in the order `layout` cuts them. */
   readonly folds: readonly string[]
@@ -62,6 +62,37 @@ function foldsIn(node: Node): string[] {
 }
 
 /**
+ * What scopes the regions an entry draws: its first fact's place in the log, stable as the log is — across a redraw, a change of adapters that reads the log again, and a switch of screens. A tool entry's first fact is its call, which no result of its own replaces.
+ * @param entry - the entry.
+ * @returns the scope every region it draws is named within.
+ */
+function scopeOf(entry: Entry): string {
+  return String(entry.kind === 'tool' ? entry.call.seq : entry.fact.seq)
+}
+
+/**
+ * A node with every region id scoped to the entry that drew it, so one name in two entries is two regions, and two views of one entry that name a region alike share what a person did to it.
+ * @param node - what the entry's views drew, its regions named within it.
+ * @param scope - the entry's scope.
+ * @returns the node, its regions named for the whole screen.
+ */
+function scopedWithin(node: Node, scope: string): Node {
+  switch (node.kind) {
+    case 'blank':
+    case 'text':
+    case 'markdown':
+      return node
+    case 'stack':
+      return { ...node, children: node.children.map(child => scopedWithin(child, scope)) }
+    case 'offer':
+    case 'fold':
+      return { ...node, id: `${scope}/${node.id}`, child: scopedWithin(node.child, scope) }
+    case 'card':
+      return { ...node, child: scopedWithin(node.child, scope) }
+  }
+}
+
+/**
  * The id of every region in a node, however deep, cut or not: any of them can take focus.
  */
 function regionsIn(node: Node): string[] {
@@ -81,7 +112,7 @@ function regionsIn(node: Node): string[] {
 }
 
 /**
- * A way to draw screens that keeps what each entry drew. An entry is a value
+ * A way to draw screens that keeps what each entry drew, its regions scoped to it — one name in two entries is two regions, and a region's state is kept under its scoped id across redraws, adapter changes that read the log again, and switches of screens. An entry is a value
  * the transcript replaces when it changes, so what it drew is kept against
  * the entry itself, and against the views of its key, which are replaced as
  * a whole when one is registered, disposed or invalidated; the layout is kept
@@ -95,7 +126,7 @@ export function screens(): DrawScreen {
     const by = views.get(keyOf(entry))
     let drawing = drawings.get(entry)
     if (drawing === undefined || drawing.by !== by) {
-      const node = drawEntry(entry, views)
+      const node = scopedWithin(drawEntry(entry, views), scopeOf(entry))
       drawing = { by, node, folds: foldsIn(node), regions: regionsIn(node) }
     }
     const laid = drawing.laid
@@ -125,7 +156,7 @@ export function screens(): DrawScreen {
 }
 
 /**
- * Draw the whole transcript at a width, once.
+ * Draw the whole transcript at a width, once, each entry's regions scoped to it so their ids name them across the whole screen.
  * @param facts - the session's facts, in log order.
  * @param state - what the person has changed about the screen.
  * @param width - the columns it is given.

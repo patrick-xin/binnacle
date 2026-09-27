@@ -4,13 +4,14 @@ import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
-import type { Node } from '../../src/api.ts'
+import type { Node, View } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
 import { initial } from '../../src/ui/state.ts'
 import { screen } from '../../src/views/screen.ts'
 import { prompt as promptFact } from '../support/facts.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
+import { pointer } from '../support/pointer.ts'
 
 const prompt = promptFact(1, 1, 'fix the build')
 const seed = seedEvent(2, 2)
@@ -49,6 +50,59 @@ test('an author\'s view replaces a built-in one, until the author\'s plugin is d
   assert.deepEqual(shown(registrations), ['ME: 1 block'])
   await fiber.dispose()
   assert.deepEqual(shown(registrations), ['› fix the build'])
+})
+
+/**
+ * An author's view that names one fold, alike, in every entry it draws: the view whose regions only the entry it draws can tell apart. Each prompt's text, folded to its first line.
+ */
+const alike: View = (entry) => ({
+  kind: 'fold',
+  id: 'mine',
+  rows: 1,
+  child: { kind: 'text', text: entry.kind === 'prompt' ? entry.fact.blocks.map(block => block.kind === 'unread' ? '' : block.text).join('\n') : '' },
+})
+
+/**
+ * A pane on the registrations as they stand, holding two prompts an author's view folds alike, and its lines.
+ * @param registrations - the surface's registrations.
+ * @returns the pane, and its lines at width 40.
+ */
+function foldedAlike(registrations: RegistrationService): { pane: TranscriptPane, lines: () => string[] } {
+  const pane = new TranscriptPane(() => {}, () => registrations.views)
+  pane.push(promptFact(1, 1, 'one\nmore'))
+  pane.push(promptFact(2, 2, 'two\nmore'))
+  return { pane, lines: () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd()) }
+}
+
+test('an author\'s view that names one fold in every entry opens only the fold a person clicked', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('prompt', alike) })
+  const { pane, lines } = foldedAlike(registrations)
+  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '… 1 more line'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 3)), { handled: true })
+  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', 'more'])
+})
+
+test('enter on the fold a person focused opens only that entry\'s, wherever its name is shared', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('prompt', alike) })
+  const { pane, lines } = foldedAlike(registrations)
+  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '… 1 more line'])
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
+  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '▸ show 1 more line'])
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'primary' }), true)
+  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', 'more', '▸ fold to 1 line'])
+})
+
+test('focus moves through each entry\'s regions in turn, where two entries name theirs alike', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('prompt', alike) })
+  const { pane, lines } = foldedAlike(registrations)
+  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '… 1 more line'])
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '▸ show 1 more line'])
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(lines(), ['one', '▸ show 1 more line', 'two', '… 1 more line'])
 })
 
 test('an author\'s adapter turns an event kind into a fact of their own, which their view draws', async () => {

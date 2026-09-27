@@ -9,7 +9,7 @@ import type { Action } from '../contract/index.ts'
 
 /** What a person has changed about the screen. */
 export interface UiState {
-  /** The ids of the regions they expanded. */
+  /** The ids of the regions they expanded, each scoped to the entry that drew it. */
   readonly expanded: ReadonlySet<string>
   /** The region the keys act on; absent until a person moves focus. */
   readonly focus?: string
