@@ -51,7 +51,7 @@ test('an author\'s view replaces a built-in one, until the author\'s plugin is d
   })
   assert.deepEqual(shown(registrations), ['ME: 1 block'])
   await fiber.dispose()
-  assert.deepEqual(shown(registrations), ['› fix the build'])
+  assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
 })
 
 /**
@@ -70,31 +70,31 @@ test('an author\'s view that names one fold in every entry opens only the fold a
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('prompt', foldedAlike) })
   const { pane, lines } = alikePane(registrations)
-  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '… 1 more line'])
-  assert.deepEqual(pane.handleMouse(pointer('click', 3)), { handled: true })
-  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', 'more'])
+  assert.deepEqual(lines(), ['one', '… 1 more line', '', 'two', '… 1 more line'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 4)), { handled: true })
+  assert.deepEqual(lines(), ['one', '… 1 more line', '', 'two', 'more'])
 })
 
 test('enter on the fold a person focused opens only that entry\'s, wherever its name is shared', async () => {
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('prompt', foldedAlike) })
   const { pane, lines } = alikePane(registrations)
-  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '… 1 more line'])
+  assert.deepEqual(lines(), ['one', '… 1 more line', '', 'two', '… 1 more line'])
   assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
-  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '▸ show 1 more line'])
+  assert.deepEqual(lines(), ['one', '… 1 more line', '', 'two', '▸ show 1 more line'])
   assert.equal(pane.handleKey({ kind: 'key', binding: 'primary' }), true)
-  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', 'more', '▸ fold to 1 line'])
+  assert.deepEqual(lines(), ['one', '… 1 more line', '', 'two', 'more', '▸ fold to 1 line'])
 })
 
 test('focus moves through each entry\'s regions in turn, where two entries name theirs alike', async () => {
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('prompt', foldedAlike) })
   const { pane, lines } = alikePane(registrations)
-  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '… 1 more line'])
+  assert.deepEqual(lines(), ['one', '… 1 more line', '', 'two', '… 1 more line'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(lines(), ['one', '… 1 more line', 'two', '▸ show 1 more line'])
+  assert.deepEqual(lines(), ['one', '… 1 more line', '', 'two', '▸ show 1 more line'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(lines(), ['one', '▸ show 1 more line', 'two', '… 1 more line'])
+  assert.deepEqual(lines(), ['one', '▸ show 1 more line', '', 'two', '… 1 more line'])
 })
 
 test('an author\'s adapter turns an event kind into a fact of their own, which their view draws', async () => {
@@ -103,13 +103,13 @@ test('an author\'s adapter turns an event kind into a fact of their own, which t
     ctx.binnacle.facts('test/marker', () => ({ name: 'seeded', data: { from: 'fork' } }))
     ctx.binnacle.view('seeded', () => ({ kind: 'text', text: '— seeded from a fork —' }))
   })
-  assert.deepEqual(shown(registrations, seed), ['› fix the build', '— seeded from a fork —'])
+  assert.deepEqual(shown(registrations, seed), ['', ' › fix the build', '', '', '— seeded from a fork —'])
 })
 
 test('a fact of the author\'s own with no view is drawn by the fallback, by its name, never dropped', async () => {
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.facts('test/marker', () => ({ name: 'seeded', data: { from: 'fork' } })) })
-  assert.deepEqual(shown(registrations, seed), ['› fix the build', '? seeded', '… 3 more lines'])
+  assert.deepEqual(shown(registrations, seed), ['', ' › fix the build', '', '', '? seeded', '… 3 more lines'])
 })
 
 test('the newest plugin to draw a key draws it, on what the one before drew, and disposing either gives its place back', async () => {
@@ -118,9 +118,9 @@ test('the newest plugin to draw a key draws it, on what the one before drew, and
   const second = await author((ctx) => { ctx.binnacle.view('prompt', (_, next) => ({ kind: 'stack', children: [next(), { kind: 'text', text: 'second' }] })) })
   assert.deepEqual(shown(registrations), ['first', 'second'])
   await first.dispose()
-  assert.deepEqual(shown(registrations), ['› fix the build', 'second'])
+  assert.deepEqual(shown(registrations), ['', ' › fix the build', '', 'second'])
   await second.dispose()
-  assert.deepEqual(shown(registrations), ['› fix the build'])
+  assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
 })
 
 test('an author\'s view may name a mark, and the theme draws its glyph in the mark\'s tone', async () => {
@@ -138,7 +138,7 @@ test('an author\'s view naming a mark the theme has not is drawn by the view ben
   await author((ctx) => {
     ctx.binnacle.view('prompt', () => ({ kind: 'text', text: [{ mark: 'shrug' }, ' the build'] }) as unknown as Node)
   })
-  assert.deepEqual(shown(registrations), ['› fix the build', '✗ binnacle.view(prompt) returned no', 'drawable node: shrug is no mark'])
+  assert.deepEqual(shown(registrations), ['', ' › fix the build', '', '✗ binnacle.view(prompt) returned no', 'drawable node: shrug is no mark'])
 })
 
 test('a view that throws is drawn over by the view beneath it, which says whose view failed and why', async () => {
@@ -158,22 +158,22 @@ test('the newest adapter of a kind reads it, and disposing it gives the kind bac
     ctx.binnacle.facts('test/marker', () => ({ name: 'forked', data: {} }))
     ctx.binnacle.view('forked', () => ({ kind: 'text', text: 'forked' }))
   })
-  assert.deepEqual(shown(registrations, seed), ['› fix the build', 'forked'])
+  assert.deepEqual(shown(registrations, seed), ['', ' › fix the build', '', '', 'forked'])
   await forked.dispose()
-  assert.deepEqual(shown(registrations, seed), ['› fix the build', 'seeded'])
+  assert.deepEqual(shown(registrations, seed), ['', ' › fix the build', '', '', 'seeded'])
 })
 
 test('a view is handed what the view beneath it draws, and builds on it', async () => {
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('prompt', (_, next) => ({ kind: 'stack', children: [next(), { kind: 'text', text: '  sent from the phone' }] })) })
-  assert.deepEqual(shown(registrations), ['› fix the build', '  sent from the phone'])
+  assert.deepEqual(shown(registrations), ['', ' › fix the build', '', '  sent from the phone'])
 })
 
 test('two plugins can each draw one tool\'s card, and every other card stays binnacle\'s', async () => {
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'bash' ? { kind: 'text', text: '$ make' } : next()) })
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'read' ? { kind: 'text', text: 'read a file' } : next()) })
-  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['› fix the build', '$ make', 'read a file', '● grep {}', '  running…'])
+  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['', ' › fix the build', '', '', '$ make', '', 'read a file', '', '● grep {}', '  running…'])
 })
 
 test('a view that read something besides its entry invalidates its key, and only that key\'s entries are drawn again', async () => {
@@ -188,11 +188,11 @@ test('a view that read something besides its entry invalidates its key, and only
   pane.push(prompt)
   pane.push({ kind: 'context', seq: 2, time: 2, source: 'goal', blocks: [{ kind: 'text', text: 'ship it' }] })
   const lines = () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
-  assert.deepEqual(lines(), ['› 1', '⋯ added by goal', '… 1 more line'])
+  assert.deepEqual(lines(), ['› 1', '', '⋯ added by goal', '… 1 more line'])
   marker = '»'
-  assert.deepEqual(lines(), ['› 1', '⋯ added by goal', '… 1 more line'])
+  assert.deepEqual(lines(), ['› 1', '', '⋯ added by goal', '… 1 more line'])
   registrations.invalidate('prompt')
-  assert.deepEqual(lines(), ['» 1', '⋯ added by goal', '… 1 more line'])
+  assert.deepEqual(lines(), ['» 1', '', '⋯ added by goal', '… 1 more line'])
   assert.equal(calls, 1)
 })
 

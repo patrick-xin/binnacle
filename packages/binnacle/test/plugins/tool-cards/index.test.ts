@@ -141,7 +141,7 @@ test('a call to a tool binnacle cannot find, or that presents nothing, reads as 
   pane.push({ ...asked('missing', '{}'), seq: 4, callId: 'c2' })
   assert.deepEqual(drawText(pane, 60).slice(0, 2), ['● missing {}', '  running…'])
   pane.push(asked('silent', '{}'))
-  assert.deepEqual(drawText(pane, 60).slice(2), ['● silent {}', '  running…'])
+  assert.deepEqual(drawText(pane, 60).slice(2), ['', '● silent {}', '  running…'])
 })
 
 test('a presenter that throws leaves the call to binnacle\'s card, which says what went wrong', async () => {
@@ -168,9 +168,9 @@ test('a presenter that throws leaves the call to binnacle\'s card, which says wh
   pane.push(failed('c1'))
   assert.deepEqual(drawText(pane, 60), ['✗ flaky {}', '  the command exited 2', 'the model was told', '✗ flaky.presentCall threw: the presenter fell over'])
   pane.push({ ...asked('unstable', '{}'), seq: 5, callId: 'c2' })
-  assert.deepEqual(drawText(pane, 60).slice(4), ['● Boom', '  running…'])
+  assert.deepEqual(drawText(pane, 60).slice(4), ['', '● Boom', '  running…'])
   pane.push({ ...returned('ok'), callId: 'c2' })
-  assert.deepEqual(drawText(pane, 60).slice(4), ['● unstable {}', 'ok', '✗ unstable.presentResult threw: the presenter fell over'])
+  assert.deepEqual(drawText(pane, 60).slice(4), ['', '● unstable {}', 'ok', '✗ unstable.presentResult threw: the presenter fell over'])
 })
 
 test('presentCall returning undefined, and a call whose arguments are not JSON, read as they do today', async () => {
@@ -188,6 +188,7 @@ test('presentCall returning undefined, and a call whose arguments are not JSON, 
   assert.deepEqual(drawText(pane, 60), [
     '● voided {}',
     '  running…',
+    '',
     '● read {oops',
     '  running…',
   ])
@@ -243,14 +244,16 @@ test('a presenter that returns something the cards cannot draw says so under the
     '✗ hologram.presentCall returned no drawable view: hologram is no card the tool cards draw',
   ])
   pane.push({ ...asked('lying', '{}'), seq: 5, callId: 'c2' })
-  assert.deepEqual(drawText(pane, 100).slice(3, 6), [
+  assert.deepEqual(drawText(pane, 100).slice(3, 7), [
+    '',
     '● lying {}',
     '  running…',
     '✗ lying.presentCall returned no drawable view: it is string',
   ])
   pane.push({ ...asked('crooked', '{}'), seq: 6, callId: 'c3' })
   pane.push({ ...returned('crooked'), callId: 'c3' })
-  assert.deepEqual(drawText(pane, 100).slice(6), [
+  assert.deepEqual(drawText(pane, 100).slice(7), [
+    '',
     '● crooked {}',
     'crooked',
     '✗ crooked.presentResult returned no drawable view: a result view\'s title is not text',
@@ -295,7 +298,7 @@ test('every other card kind is drawn by its title alone in this slice', async ()
   pane.push(returned('ok'))
   assert.deepEqual(drawText(pane, 60), ['● pnpm test (2 s)', 'ok'])
   pane.push({ ...asked('write', '{"path":"foo.txt"}'), seq: 7, callId: 'c2' })
-  assert.deepEqual(drawText(pane, 60).slice(2), ['● Write foo.txt', '  running…'])
+  assert.deepEqual(drawText(pane, 60).slice(2), ['', '● Write foo.txt', '  running…'])
 })
 
 test('a kind with no row of its own draws through generic\'s', () => {

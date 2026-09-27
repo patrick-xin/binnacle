@@ -21,7 +21,7 @@ import type { View, Views } from './entries.ts'
 export interface Screen extends Frame {
   /** The regions that offer something, in screen order. */
   readonly focusable: readonly string[]
-  /** For each entry, in log order across turns, the line after its last; the blank line opening a turn is drawn before its first entry, so it is never an entry's own. An entry that drew nothing ends where the one before it did, and a turn every entry of which drew nothing draws no line at all, not even the blank one that opens a turn. */
+  /** For each entry, in log order across turns, the line after its last; the blank line between two entries that draw something is neither's own. An entry that drew nothing ends where the one before it did, and a run of entries that drew nothing draws no line at all, not even a blank one. */
   readonly ends: readonly number[]
 }
 
@@ -55,6 +55,7 @@ function foldsIn(node: Node): string[] {
       return node.children.flatMap(foldsIn)
     case 'offer':
     case 'card':
+    case 'band':
       return foldsIn(node.child)
     case 'fold':
       return [node.id, ...foldsIn(node.child)]
@@ -88,6 +89,7 @@ function scopedWithin(node: Node, scope: string): Node {
     case 'fold':
       return { ...node, id: `${scope}/${node.id}`, child: scopedWithin(node.child, scope) }
     case 'card':
+    case 'band':
       return { ...node, child: scopedWithin(node.child, scope) }
   }
 }
@@ -107,6 +109,7 @@ function regionsIn(node: Node): string[] {
     case 'fold':
       return [node.id, ...regionsIn(node.child)]
     case 'card':
+    case 'band':
       return regionsIn(node.child)
   }
 }
@@ -141,29 +144,20 @@ export function screens(): DrawScreen {
     const lines: string[] = []
     const regions: Placed[] = []
     const ends: number[] = []
-    let opened = false
+    let drew = false
     for (const turn of model.turns) {
-      const turnLines: string[] = []
-      const turnRegions: Placed[] = []
-      const turnEnds: number[] = []
       for (const entry of turn.entries) {
         const frame = frameOf(entry, state, width, views)
-        for (const placed of frame.regions) turnRegions.push({ ...placed, top: placed.top + turnLines.length })
+        // One blank line separates two entries that draw something, whichever turns they sit in — so a turn's gap falls before its prompt, the first entry it drew. An entry that draws nothing takes none, and a turn every entry of which drew nothing draws no line at all.
+        const draws = frame.lines.length > 0
+        if (draws && drew) lines.push('')
+        drew = drew || draws
+        const top = lines.length
+        for (const placed of frame.regions) regions.push({ ...placed, top: placed.top + top })
         // One line at a time: spreading an entry's lines into `push` throws once it draws more than about a hundred thousand.
-        for (const line of frame.lines) turnLines.push(line)
-        turnEnds.push(turnLines.length)
+        for (const line of frame.lines) lines.push(line)
+        ends.push(lines.length)
       }
-      // A turn whose entries drew nothing — the machinery before the first, a turn of quiet kinds — draws no line at all, not even the blank one that opens a turn.
-      if (turnLines.length === 0) {
-        for (const end of turnEnds) ends.push(end + lines.length)
-        continue
-      }
-      if (opened) lines.push('')
-      opened = true
-      for (const placed of turnRegions) regions.push({ ...placed, top: placed.top + lines.length })
-      // One line at a time: spreading a turn's lines into `push` throws once it draws more than about a hundred thousand, as an entry's do.
-      for (const line of turnLines) lines.push(line)
-      for (const end of turnEnds) ends.push(end + lines.length - turnLines.length)
     }
     return { lines, regions, focusable: regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id), ends }
   }

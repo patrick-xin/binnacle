@@ -35,9 +35,15 @@ const styled = (entry: Entry, expanded: string[] = []): string[] =>
 const drawnWide = (entry: Entry, views: Views = new Map()): string[] =>
   layout(drawEntry(entry, views), 80, { expanded: new Set() }).lines.map(line => line.trimEnd())
 
-test('the prompt\'s mark is the theme\'s accent, what the person wrote plain', () => {
+test('a prompt heads its turn in a band: padded, and filled with the theme\'s background, its mark accent and what the person wrote plain within it', () => {
   const entry: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
-  assert.deepEqual(styled(entry), ['\x1b[36m›\x1b[39m fix the build'])
+  // As pi draws a person's message — a padded band of its own background, one column each side and one line above and below (`pi:packages/coding-agent/src/modes/interactive/components/user-message.ts#UserMessageComponent`) — and every line of the band is filled: 40 columns, one of padding, fifteen of content.
+  assert.deepEqual(lines(entry), ['', ' › fix the build', ''])
+  assert.deepEqual(styled(entry), [
+    `\x1b[100m${' '.repeat(40)}\x1b[49m`,
+    `\x1b[100m \x1b[36m›\x1b[39m fix the build${' '.repeat(24)}\x1b[49m`,
+    `\x1b[100m${' '.repeat(40)}\x1b[49m`,
+  ])
 })
 
 const answer: Entry = {
@@ -210,7 +216,7 @@ test('whatever went wrong is drawn in error, under or after what it went wrong w
   const prompt: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
   const views = new Map<string, View[]>([['prompt', [() => { throw new Error('no blocks') }]]])
   const unknown: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: {}, problem: 'binnacle.facts(test/marker) threw: no fork recorded' } }
-  assert.equal(drawnWide(prompt, views)[1], '\x1b[31m✗ binnacle.view(prompt) threw: no blocks\x1b[39m')
+  assert.equal(drawnWide(prompt, views)[3], '\x1b[31m✗ binnacle.view(prompt) threw: no blocks\x1b[39m')
   assert.equal(drawnWide(unknown)[1], '\x1b[31m✗ binnacle.facts(test/marker) threw: no fork recorded\x1b[39m')
 })
 
@@ -231,7 +237,7 @@ const drawn = (entry: Entry, views: Views): string[] =>
 
 test('an author\'s view that throws is drawn over by the built-in one, which says whose view failed and why', () => {
   const views = new Map<string, View[]>([['prompt', [() => { throw new Error('no blocks') }]]])
-  assert.deepEqual(drawn(prompt, views), ['› fix the build', '✗ binnacle.view(prompt) threw: no blocks'])
+  assert.deepEqual(drawn(prompt, views), ['', ' › fix the build', '', '✗ binnacle.view(prompt) threw: no blocks'])
 })
 
 test('an authored fact named as a kind binnacle draws is drawn by the fallback, never by that kind\'s view', () => {
@@ -249,33 +255,42 @@ test('an unknown fact carrying a problem says it under its type', () => {
 const hole = <T>(): T[] => Object.assign<T[], { length: number }>([], { length: 1 })
 
 test('an author\'s view that returns what binnacle cannot lay out is drawn over, saying what was wrong with it', () => {
+  const band = ['', ' › fix the build', '']
   const nothing = new Map<string, View[]>([['prompt', [() => undefined as unknown as Node]]])
-  assert.deepEqual(drawn(prompt, nothing), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: it is undefined'])
+  assert.deepEqual(drawn(prompt, nothing), [...band, '✗ binnacle.view(prompt) returned no drawable node: it is undefined'])
   const unreadable = new Map<string, View[]>([['prompt', [() => ({ kind: 'stack', children: [{ kind: 'text', get text(): string { throw new Error('text unavailable') } }] })]]])
-  assert.deepEqual(drawn(prompt, unreadable), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: text unavailable'])
+  assert.deepEqual(drawn(prompt, unreadable), [...band, '✗ binnacle.view(prompt) returned no drawable node: text unavailable'])
   const holed = new Map<string, View[]>([['prompt', [() => ({ kind: 'stack', children: hole<Node>() })]]])
-  assert.deepEqual(drawn(prompt, holed), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: it is undefined'])
+  assert.deepEqual(drawn(prompt, holed), [...band, '✗ binnacle.view(prompt) returned no drawable node: it is undefined'])
   const unlabelled = new Map<string, View[]>([['prompt', [() => ({ kind: 'offer', id: 'o', affordances: hole(), child: { kind: 'blank' } })]]])
-  assert.deepEqual(drawn(prompt, unlabelled), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: undefined is no affordance'])
+  assert.deepEqual(drawn(prompt, unlabelled), [...band, '✗ binnacle.view(prompt) returned no drawable node: undefined is no affordance'])
   const folded = new Map<string, View[]>([['prompt', [() => ({ kind: 'fold', id: 'f', rows: -1, child: { kind: 'blank' } })]]])
-  assert.deepEqual(drawn(prompt, folded), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a fold\'s rows are -1'])
+  assert.deepEqual(drawn(prompt, folded), [...band, '✗ binnacle.view(prompt) returned no drawable node: a fold\'s rows are -1'])
   const loud = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: 'hi', tone: 'shouting' }) as unknown as Node]]])
-  assert.deepEqual(drawn(prompt, loud), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: shouting is no tone'])
+  assert.deepEqual(drawn(prompt, loud), [...band, '✗ binnacle.view(prompt) returned no drawable node: shouting is no tone'])
   const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'card', title: 'two\nlines', child: { kind: 'blank' } })]]])
-  assert.deepEqual(drawn(prompt, titled), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a card\'s title is one line'])
+  assert.deepEqual(drawn(prompt, titled), [...band, '✗ binnacle.view(prompt) returned no drawable node: a card\'s title is one line'])
   const undocumented = new Map<string, View[]>([['prompt', [() => ({ kind: 'markdown' }) as unknown as Node]]])
-  assert.deepEqual(drawn(prompt, undocumented), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a markdown block needs text'])
+  assert.deepEqual(drawn(prompt, undocumented), [...band, '✗ binnacle.view(prompt) returned no drawable node: a markdown block needs text'])
   const unspanned = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: ['fix', 3] }) as unknown as Node]]])
-  assert.deepEqual(drawn(prompt, unspanned), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: 3 is no span'])
+  assert.deepEqual(drawn(prompt, unspanned), [...band, '✗ binnacle.view(prompt) returned no drawable node: 3 is no span'])
   const untone = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: 'fix' }] }) as unknown as Node]]])
-  assert.deepEqual(drawn(prompt, untone), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: undefined is no tone'])
+  assert.deepEqual(drawn(prompt, untone), [...band, '✗ binnacle.view(prompt) returned no drawable node: undefined is no tone'])
   const untext = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ tone: 'error' }] }) as unknown as Node]]])
-  assert.deepEqual(drawn(prompt, untext), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a span needs its text'])
+  assert.deepEqual(drawn(prompt, untext), [...band, '✗ binnacle.view(prompt) returned no drawable node: a span needs its text'])
 })
 
 test('an author\'s view may draw a line of spans, each drawn in its tone', () => {
   const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: '›', tone: 'accent' }, ' fix the build'] }) as unknown as Node]]])
   assert.deepEqual(drawnWide(prompt, views), ['\x1b[36m›\x1b[39m fix the build'])
+})
+
+test('an author\'s band is filled with the background it names, and one naming a background the theme has not is drawn by the view beneath, saying why', () => {
+  const banded = new Map<string, View[]>([['prompt', [() => ({ kind: 'band', background: 'prompt', child: { kind: 'text', text: [{ mark: 'prompt' } as const, ' asked again'] } })]]])
+  // 80 columns, one of padding, thirteen of content
+  assert.deepEqual(drawnWide(prompt, banded), [`\x1b[100m${' '.repeat(80)}\x1b[49m`, `\x1b[100m \x1b[36m›\x1b[39m asked again${' '.repeat(66)}\x1b[49m`, `\x1b[100m${' '.repeat(80)}\x1b[49m`])
+  const unbacked = new Map<string, View[]>([['prompt', [() => ({ kind: 'band', background: 'shouting', child: { kind: 'text', text: 'asked again' } }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, unbacked), ['', ' › fix the build', '', '✗ binnacle.view(prompt) returned no drawable node: shouting is no background'])
 })
 
 /**

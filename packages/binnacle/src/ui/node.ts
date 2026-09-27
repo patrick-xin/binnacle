@@ -8,8 +8,8 @@
 
 import { affordances, describe } from '../contract/index.ts'
 import type { Affordance } from '../contract/index.ts'
-import { marks, tones } from './theme.ts'
-import type { Mark, Tone } from './theme.ts'
+import { backgrounds, marks, tones } from './theme.ts'
+import type { Background, Mark, Tone } from './theme.ts'
 
 /** One run of a text node's line: its text drawn in the node's tone as a bare string, or in a tone of its own; or one of the theme's marks, whose glyph the theme draws in the mark's tone, or in a tone of the span's own. */
 export type Span = string | { readonly text: string, readonly tone: Tone } | { readonly mark: Mark, readonly tone?: Tone }
@@ -50,6 +50,13 @@ export type Node =
     /** One line on its top edge, left off whole where the edge is too narrow for it. */
     readonly title?: string
     /** What it holds, inside a rounded border; drawn without one where the width leaves no room inside it. */
+    readonly child: Node
+  }
+  | {
+    readonly kind: 'band'
+    /** The theme's background the band is filled with, named by what the content it holds means, as a view names a tone or a mark. */
+    readonly background: Background
+    /** What it holds, padded within the band. */
     readonly child: Node
   }
   | {
@@ -106,6 +113,11 @@ export function parseNode(value: unknown): Node {
       if (typeof title === 'string' && /[\r\n]/.test(title)) throw new Error('a card\'s title is one line')
       const child = parseNode(field('child'))
       return title === undefined ? { kind: 'card', child } : { kind: 'card', title, child }
+    }
+    case 'band': {
+      const background = field('background')
+      if (typeof background !== 'string' || !Object.hasOwn(backgrounds, background)) throw new Error(`${describe(background)} is no background`)
+      return { kind: 'band', background: background as Background, child: parseNode(field('child')) }
     }
     case 'fold': {
       const id = field('id')

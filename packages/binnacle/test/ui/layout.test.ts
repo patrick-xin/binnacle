@@ -163,6 +163,22 @@ test('a card with no column inside its border draws what it holds without one', 
   assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'ok' } }, 4, OPEN)).lines, ['ok'])
 })
 
+test('what a band holds is a region inside its padding, by its rows and by its columns', () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
+  const { regions } = layout({ kind: 'band', background: 'prompt', child: held }, 20, OPEN)
+  assert.deepEqual(regions.map(({ region, top, height, left, width }) => [region.id, top, height, left, width]), [['o', 1, 1, 1, 18]])
+  assert.deepEqual([0, 1, 18, 19].map(column => under(regions, 1, column).map(region => region.id)), [[], ['o'], ['o'], []])
+  assert.deepEqual(under(regions, 0, 1), [])
+})
+
+test('a band with no column inside it draws what it holds without its padding', () => {
+  assert.deepEqual(plain(layout({ kind: 'band', background: 'prompt', child: { kind: 'text', text: 'ok' } }, 2, OPEN)).lines, ['ok'])
+})
+
+test('a band around what draws nothing draws nothing itself, not empty padding rows', () => {
+  assert.deepEqual(plain(layout({ kind: 'band', background: 'prompt', child: { kind: 'stack', children: [] } }, 20, OPEN)).lines, [])
+})
+
 /** A document with one of each part, laid out at 20 columns. */
 const document = { kind: 'markdown', text: '## Ship it\n\nRun `pnpm test` first.\n\n- one\n- two\n\n> quoted\n\n```\nx = 1\n```\n\n---' } as const
 

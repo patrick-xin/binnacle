@@ -141,7 +141,8 @@ function drawnBy(entry: Entry, key: string, stack: readonly View[], height: numb
 function builtIn(entry: Entry, problem?: string): Node {
   switch (entry.kind) {
     case 'prompt':
-      return noted({ kind: 'text', text: [{ mark: 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] }, problem)
+      // The prompt heads its turn in a band: padded, and filled with the theme's background for what the person sent.
+      return noted({ kind: 'band', background: 'prompt', child: { kind: 'text', text: [{ mark: 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] } }, problem)
     case 'context':
       return titled([{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'fold', id: 'context', rows: 0, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'answer':
