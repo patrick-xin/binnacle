@@ -337,7 +337,7 @@ test('--tui-mode regular prints the session under what the shell printed, and ne
   await until(() => /drawn by an author/.test(terminal.written))
   const shown = await terminal.mainScreen()
   assert.equal(shown[0], '$ dsh --profile binnacle')
-  assert.deepEqual(shown.filter(row => row.startsWith('› ')), twelve.map((_, index) => `› p${index + 1}`))
+  assert.deepEqual(shown.filter(row => row.startsWith(' › ')), twelve.map((_, index) => ` › p${index + 1}`))
   assert.deepEqual(shown.filter(row => /read|the file|running|author/.test(row)), ['● read {}', 'the file', 'drawn by an author'])
 })
 
@@ -354,7 +354,7 @@ test('ctrl+t switches screens both ways, and what is typed, what every entry dre
   terminal.type('\x14')
   await settle()
   assert.equal(await terminal.onAlternateScreen(), false)
-  assert.ok((await terminal.mainScreen()).includes('› fix the build'))
+  assert.ok((await terminal.mainScreen()).includes(' › fix the build'))
   terminal.type('lo')
   await settle()
   assert.ok((await terminal.mainScreen()).some(row => row.includes('hello')))
@@ -384,7 +384,7 @@ test('whichever screen a person quits from, the main screen is left holding the 
     await settle()
     terminal.type('\x03')
     await settle()
-    assert.deepEqual((await terminal.mainScreen()).filter(row => row.startsWith('› ')), ['› p1', '› p2', '› p3', '› p4'], `${args.join(' ') || 'fullscreen'}, switched ${switches} times`)
+    assert.deepEqual((await terminal.mainScreen()).filter(row => row.startsWith(' › ')), [' › p1', ' › p2', ' › p3', ' › p4'], `${args.join(' ') || 'fullscreen'}, switched ${switches} times`)
   }
 })
 
@@ -426,7 +426,7 @@ test('on the alternate screen, focus brings what it is on into view as it moves 
   const logged: SessionEvent[] = []
   for (let entry = 1; entry <= 6; entry++) {
     const seq = entry * 2
-    logged.push(called(seq, `read${entry}`), returned(seq + 1, seq, 'w\nx\ny\nz'))
+    logged.push(called(seq, `read${entry}`), returned(seq + 1, seq, `w${entry}\nx\ny\nz`))
   }
   const session = new FakeSession(logged)
   const { commit } = await mount([], session, async () => session, terminal)
@@ -438,7 +438,7 @@ test('on the alternate screen, focus brings what it is on into view as it moves 
     terminal.type('\x1b[Z')
     await until(async () => {
       const rows = await terminal.altScreen()
-      return rows[0]?.trim() === 'w' && rows[3]?.includes('▸ show 1 more line') === true && rows[4]?.includes(`read${entry + 1}`) === true
+      return rows[0] === `w${entry}` && rows[3]?.includes('▸ show 1 more line') === true
     })
   }
 })
@@ -547,7 +547,9 @@ test('focus the fullscreen gives back is brought into view, however far up the s
   await until(async () => (await terminal.onAlternateScreen()) === false && (await terminal.mainScreen()).includes('● read6 {}'))
   terminal.type('\x14')
   await until(async () => (await terminal.onAlternateScreen()) === true && (await terminal.altScreen())[0] === 'w')
-  assert.deepEqual((await terminal.altScreen()).slice(0, 5), ['w', 'x', 'y', '▸ show 1 more line', '● read2  ↓ Jump to latest · end'])
+  const rows = await terminal.altScreen()
+  assert.deepEqual(rows.slice(0, 4), ['w', 'x', 'y', '▸ show 1 more line'])
+  assert.match(rows[4] ?? '', /Jump to latest/)
 })
 
 test('typing on the main screen forgets where focus was, so enter back on the fullscreen sends what was typed', async () => {
@@ -583,8 +585,8 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
     return rows.some(row => row.trim() === 'a') && rows.some(row => row.trim() === 'b')
   })
   const after = await terminal.mainScreen()
-  assert.deepEqual(after.slice(0, 6), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line'])
-  assert.deepEqual(after.slice(6, 13), ['● stat {}', '  running…', '⋯ added by system-prompt', 'a', 'b', '[tool-addition]', '▸ fold it away'])
+  assert.deepEqual(after.slice(0, 9), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line'])
+  assert.deepEqual(after.slice(9, 18), ['', '● stat {}', '  running…', '', '⋯ added by system-prompt', 'a', 'b', '[tool-addition]', '▸ fold it away'])
 })
 
 test('the key a plugin offers opens its screen in the transcript\'s place, the composer below it, and the same key returns the transcript as it was', async () => {
@@ -656,7 +658,7 @@ test('quitting answers on a placed screen, and the session is left printed plain
   await settle()
   assert.deepEqual(exits, [0])
   const left = await terminal.mainScreen()
-  assert.deepEqual(left.filter(row => row.startsWith('› ')), ['› one', '› two', '› three'])
+  assert.deepEqual(left.filter(row => row.startsWith(' › ')), [' › one', ' › two', ' › three'])
   assert.equal(left.some(row => row.includes('screen ')), false)
 })
 

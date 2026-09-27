@@ -2,11 +2,11 @@
  * Layout: a node at a width, as the lines it draws and the regions on them.
  */
 
-import { Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
+import { Box, Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node } from './node.ts'
 import { readable } from './readable.ts'
-import { chrome, markdownTheme, marks, tones } from './theme.ts'
+import { backgrounds, chrome, markdownTheme, marks, tones } from './theme.ts'
 import type { Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
@@ -33,6 +33,9 @@ export interface Placed {
 
 /** Columns a card spends on each side: its border, and a column of air inside it. */
 const CARD_SIDE = 2
+
+/** What a band pads around what it holds, in columns each side and lines above and below: as pi pads a person's message (`pi:packages/coding-agent/src/modes/interactive/components/user-message.ts#UserMessageComponent`). */
+const BAND_PAD = 1
 
 /** What a node draws: its lines, and every region on them, outermost first. */
 export interface Frame {
@@ -135,6 +138,8 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
     }
     case 'card':
       return card(node, width, state)
+    case 'band':
+      return band(node, width, state)
     case 'fold': {
       const frame = drawn(node.child, width, state)
       const cut = frame.lines.length - node.rows
@@ -178,6 +183,26 @@ function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, sta
   return {
     lines: [top, ...body, edge(`${border.bottomLeft}${border.horizontal.repeat(width - 2)}${border.bottomRight}`)],
     regions: frame.regions.map(placed => ({ ...placed, top: placed.top + 1, left: placed.left + CARD_SIDE })),
+  }
+}
+
+/**
+ * Lay a band out: what it holds, padded a column each side and a line above
+ * and below, every line filled with the background it names. pi-tui's `Box`
+ * draws the padding and the fill, as `Text` draws a text node's wrapped
+ * line; what it holds is laid out here, for its regions are binnacle's.
+ * @returns the padded lines, and what it holds's regions moved inside the padding; what it holds alone where the width leaves no column inside it, and nothing at all — not empty padding — when it holds nothing.
+ */
+function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, state: LayoutState): Frame {
+  const inner = width - 2 * BAND_PAD
+  if (inner < 1) return drawn(node.child, width, state)
+  const frame = drawn(node.child, inner, state)
+  const box = new Box(BAND_PAD, BAND_PAD, backgrounds[node.background])
+  // What it holds is laid out already, at exactly the width Box asks of it, so its render hands the lines back as they are; nothing is cached, for a band is laid out anew whenever the node it holds is.
+  box.addChild({ render: () => [...frame.lines], invalidate: () => {} })
+  return {
+    lines: box.render(width),
+    regions: frame.regions.map(placed => ({ ...placed, top: placed.top + BAND_PAD, left: placed.left + BAND_PAD })),
   }
 }
 

@@ -1,11 +1,12 @@
 /**
  * The theme binnacle draws in: content in tones, a glyph as a mark a view
- * names or as one the chrome draws with, a markdown document in the tones
- * and the attributes, and the composer framed in dim with its select list in
- * accent and muted.
+ * names or as one the chrome draws with, a band in a background a view
+ * names, a markdown document in the tones and the attributes, and the
+ * composer framed in dim with its select list in accent and muted.
  *
  * A tone is drawn in one of the terminal's own sixteen colours, so a person's
- * palette decides what it looks like, as their terminal already does.
+ * palette decides what it looks like, as their terminal already does; so is
+ * a background, in one of the sixteen the terminal fills with.
  */
 
 import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
@@ -28,6 +29,18 @@ export const tones = {
 
 /** A colour of the theme's, by what the content drawn in it means. */
 export type Tone = keyof typeof tones
+
+/**
+ * The theme's backgrounds: what a band is filled with, named by what the
+ * content it holds means, as a tone is named by what content drawn in it
+ * means.
+ */
+export const backgrounds = {
+  prompt: (text: string): string => `\x1b[100m${text}\x1b[49m`, // what the person sent, headed in a band
+} as const satisfies Record<string, (text: string) => string>
+
+/** A background of the theme's, by what the content drawn on it means. */
+export type Background = keyof typeof backgrounds
 
 /**
  * The theme's marks: the glyphs that stand for what a thing is — how a call

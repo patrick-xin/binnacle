@@ -14,6 +14,7 @@ export type { AuthorAdapter, Fact } from './facts/adapt.ts'
 export type { Entry } from './models/transcript.ts'
 export type { KeyId } from './ui/keys.ts'
 export type { Mark } from './ui/theme.ts'
+export type { Background } from './ui/theme.ts'
 export type { Node } from './ui/node.ts'
 export type { View, Views } from './views/entries.ts'
 

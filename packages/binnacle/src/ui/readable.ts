@@ -36,6 +36,8 @@ export function readable(node: Node): Node {
       const child = readable(node.child)
       return node.title === undefined ? { ...node, child } : { ...node, title: treated(node.title), child }
     }
+    case 'band':
+      return { ...node, child: readable(node.child) }
     case 'fold':
       return { ...node, child: readable(node.child) }
   }

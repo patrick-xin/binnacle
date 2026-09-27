@@ -22,5 +22,5 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 
 ## Tune: can I make it mine?
 
-- [Theme](features/theme.md): the tones content is drawn in, and their colours.
+- [Theme](features/theme.md): the tones content is drawn in, a band's background, and their colours.
 - [Authoring](features/authoring.md): a plugin in the profile reads the session's events its own way and draws any kind of entry its own way.
