@@ -7,10 +7,12 @@ import type { Region } from '../contract/index.ts'
 import type { Node } from './node.ts'
 import { markdownTheme, tones } from './theme.ts'
 
-/** UI state layout reads: which collapsible regions are open. */
+/** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
   /** The ids of the regions a person expanded. */
   readonly expanded: ReadonlySet<string>
+  /** The id of the focused region, if any. */
+  readonly focus?: string
 }
 
 /** A region, and the rows and columns it covers. */
@@ -45,6 +47,16 @@ export interface Frame {
  */
 function line(count: number): string {
   return count === 1 ? 'line' : 'lines'
+}
+
+/**
+ * The row a focused region draws under it: `▸` and what Enter will do, in accent.
+ * @param label - the primary affordance's label, which says what Enter will do.
+ * @param width - the columns it is given.
+ * @returns the row, wrapped as text is.
+ */
+function focusRow(label: string, width: number): string[] {
+  return new Text(tones.accent(`▸ ${label}`), 0, 0).render(width)
 }
 
 /**
@@ -91,7 +103,11 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
     case 'offer': {
       const frame = layout(node.child, width, state)
       const region = { id: node.id, affordances: node.affordances, overflows: false }
-      return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length, left: 0, width }, ...frame.regions] }
+      const placed = { region, top: 0, height: frame.lines.length, left: 0, width }
+      const primary = node.affordances[0]
+      if (state.focus !== node.id || primary === undefined) return { lines: frame.lines, regions: [placed, ...frame.regions] }
+      const row = focusRow(primary.label, width)
+      return { lines: [...frame.lines, ...row], regions: [{ ...placed, height: frame.lines.length + row.length }, ...frame.regions] }
     }
     case 'card':
       return card(node, width, state)
@@ -102,11 +118,15 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
       if (state.expanded.has(node.id)) {
         const label = node.rows === 0 ? 'fold it away' : `fold to ${node.rows} ${line(node.rows)}`
         const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
-        return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length, left: 0, width }, ...frame.regions] }
+        if (state.focus !== node.id) return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length, left: 0, width }, ...frame.regions] }
+        const row = focusRow(label, width)
+        return { lines: [...frame.lines, ...row], regions: [{ region, top: 0, height: frame.lines.length + row.length, left: 0, width }, ...frame.regions] }
       }
       const shown = frame.lines.slice(0, node.rows)
-      const marker = new Text(`… ${cut} more ${line(cut)}`, 0, 0).render(width)
-      const region = { id: node.id, affordances: [{ kind: 'expand' as const, label: `show ${cut} more ${line(cut)}` }], overflows: false }
+      const label = `show ${cut} more ${line(cut)}`
+      // The marker row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing.
+      const marker = new Text(state.focus === node.id ? tones.accent(`▸ ${label}`) : `… ${cut} more ${line(cut)}`, 0, 0).render(width)
+      const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
       const inside = frame.regions
         .filter(placed => placed.top < node.rows)
         .map(placed => ({ ...placed, height: Math.min(placed.height, node.rows - placed.top) }))

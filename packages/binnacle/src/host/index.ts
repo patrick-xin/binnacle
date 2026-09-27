@@ -19,10 +19,12 @@ import { Command, Option } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { Editor, isKeyRelease, isKeyRepeat, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
+import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
 import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
+import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
+import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { RegistrationService } from './registrations.ts'
@@ -56,6 +58,19 @@ export const internals: {
 type Mode = 'check' | TuiMode
 
 /**
+ * The keys as `--help` names them: each binding's keys and what it does, read from the one table, never restated.
+ * @returns the help text under its heading.
+ */
+function keysHelp(): string {
+  const { manager } = keyTable()
+  const named = Object.entries(BINNACLE_BINDINGS).map(([id, definition]) => {
+    const keys = manager.getKeys(id as keyof BinnacleKeybindings).join(', ')
+    return `  ${keys === '' ? '(unbound)' : keys}  ${definition.description ?? ''}`
+  })
+  return `Keys:\n${named.join('\n')}`
+}
+
+/**
  * This surface's command: its flags and help.
  * @param chosen - receives the mode when the invocation parses.
  * @returns a fresh program, so one process can parse more than once.
@@ -65,6 +80,7 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
     .name('dsh --profile binnacle')
     .description('Open a terminal session with an agent. Ctrl+T switches screens; Ctrl+C quits.')
     .helpOption('-h, --help', 'show this help')
+    .addHelpText('after', `\n${keysHelp()}`)
     .option('--check', 'open a session on the default model, report it, close it, and exit, drawing nothing')
     .addOption(new Option('--tui-mode <mode>', 'the screen to start on: fullscreen, the alternate screen, or regular, the main screen and its scrollback').choices(['regular', 'fullscreen']).default('fullscreen'))
     .action((options: { check?: boolean, tuiMode: TuiMode }) => { chosen(options.check === true ? 'check' : options.tuiMode) })
@@ -92,7 +108,7 @@ function reaching(live: () => TUI): TUI {
  * A switch stops the live pi-tui object and builds the other over the same
  * terminal, as pi does (`pi:packages/coding-agent/src/modes/interactive/interactive-mode.ts`).
  * What the old one held is carried to the new: the pane and the composer,
- * focus, and the keys the host answers. Where the main screen left off is
+ * focus, and the one key table's listener. Where the main screen left off is
  * kept for its next turn, as the terminal keeps what it printed.
  * @param session - the open session.
  * @param registrations - what authors registered: their adapters and views.
@@ -106,7 +122,19 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const events: SessionEvent[] = []
   let tui: TuiMainScreen | TuiAltScreen
   let left: TuiMainScreenRenderState | undefined
-  const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views)
+  let scroll: ScrollView | undefined
+  // A focus the pane brings on screen is brought into view by the scroll view that windows it, on the alternate screen.
+  const intoView = (top: number, height: number): void => {
+    const view = scroll
+    if (view === undefined) return
+    tui.renderNow()
+    if (top < view.scrollTop) view.scrollTo(top)
+    else if (top + height > view.scrollTop + view.viewportHeight) view.scrollTo(top + height - view.viewportHeight)
+  }
+  const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
+    inView: intoView,
+    fullscreen: () => { show('fullscreen') },
+  })
   // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
     if (changed === 'facts') transcript.reset(events.map(event => adapt(event, registrations.adapters)))
@@ -118,14 +146,28 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     composer.setText('')
     session.send(text)
   }
-  // TODO(#1): these become bindings in the one key table Keys brings, which answers a press only, once for every key.
-  // A terminal speaking the kitty protocol, which pi-tui asks for, also reports a key held and let go; only the press is answered, the rest left to pi-tui.
+  // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
+  // wherever keys enter; nothing else in binnacle matches a key ([ADR 13](../../../../docs/adr/0013-a-key-means-something-only-through-the-one-key-table.md)).
+  const table = keyTable()
+  setKeybindings(table.manager)
+  // Keys arrive ahead of the composer, through pi-tui's input listener. The host answers what is bound to it, quitting
+  // and switching screens; a gesture is the pane's to answer, and a key nothing answers gives the keyboard back to the
+  // composer, reaching it typed, so typing is never lost.
   const keys = (data: string): TuiInputListenerResult => {
-    if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
-    if (matchesKey(data, 'ctrl+c')) quit()
-    else if (matchesKey(data, 'ctrl+t')) show(tui.mode === 'fullscreen' ? 'regular' : 'fullscreen')
-    else return undefined
-    return { consume: true }
+    const focused = transcript.focused
+    const resolved = table.resolve(data, focused)
+    if (resolved?.kind === 'quit') {
+      quit()
+      return { consume: true }
+    }
+    if (resolved?.kind === 'switch-screens') {
+      show(tui.mode === 'fullscreen' ? 'regular' : 'fullscreen')
+      return { consume: true }
+    }
+    if (resolved !== undefined && transcript.handleKey({ kind: 'key', binding: resolved.binding })) return { consume: true }
+    // Stepping out drops focus, and where the main screen parked it, so what was typed is sent, not answered by focus.
+    transcript.handleKey({ kind: 'key', binding: 'focus.out' })
+    return undefined
   }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)
@@ -134,10 +176,14 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     next.addChild(transcript)
     next.addChild(composer)
     if (next instanceof TuiAltScreen) {
+      const followed = new ScrollView(transcript, { follow: 'end', primary: true })
+      scroll = followed
       next.setLayoutRoot(new VStack([
-        { component: new ScrollView(transcript, { follow: 'end', primary: true }), basis: 0, grow: 1, shrink: 1, minSize: 1 },
+        { component: followed, basis: 0, grow: 1, shrink: 1, minSize: 1 },
         { component: composer, basis: 'auto', grow: 0, shrink: 1, minSize: 3 },
       ]))
+    } else {
+      scroll = undefined
     }
     next.setFocus(composer)
     next.addInputListener(keys)
@@ -154,6 +200,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     leave()
     tui = build(mode)
     tui.start()
+    // Focus the main screen parked comes back with the fullscreen, and is brought into view there.
+    if (mode === 'fullscreen') transcript.reveal()
   }
   tui = build(first)
   const unfollow = session.follow((event) => {

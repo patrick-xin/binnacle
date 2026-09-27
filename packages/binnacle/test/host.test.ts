@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
-import { stripTerminalSequences } from '@earendil-works/pi-tui'
+import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Terminal } from '@earendil-works/pi-tui'
 import xterm from '@xterm/headless'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -70,6 +70,17 @@ class XtermTerminal extends FakeTerminal {
     await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
     return this.#xterm.buffer.active.type === 'alternate'
   }
+
+  /**
+   * What the alternate screen holds, once everything written has landed.
+   * @returns each row of the window, plain, its trailing spaces dropped.
+   * @throws when the alternate screen is not showing.
+   */
+  async altScreen(): Promise<string[]> {
+    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
+    if (this.#xterm.buffer.active.type !== 'alternate') throw new Error('the alternate screen is not showing')
+    return Array.from({ length: this.#rows }, (_, row) => this.#xterm.buffer.active.getLine(row)?.translateToString(true).trimEnd() ?? '')
+  }
 }
 
 /** A session that records what the host does with it; the harness behind it is dsh's, proven by `check:boot`. */
@@ -100,6 +111,12 @@ const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
 /** A kind binnacle has no adapter for, as dsh logs it. */
 const seed = (seq: number): SessionEvent<'session/end-seed'> => ({ type: 'session/end-seed', seq: SessionSeq(seq), time: seq, data: {} })
 
+/** What was added to the context without the person typing it, as dsh logs it. */
+const added = (seq: number, text: string): SessionEvent<'user/message'> => ({
+  type: 'user/message', seq: SessionSeq(seq), time: seq, surfaceOp: 'append',
+  data: { role: 'user', id: MessageId(`m${seq}`), source: { kind: 'system-prompt' }, content: [{ type: 'text', text }] },
+})
+
 /** Let the host's pending promises settle. */
 const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 10))
 
@@ -109,9 +126,9 @@ const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 1
  * @param within - how long to wait, in milliseconds.
  * @throws when it does not hold in time.
  */
-async function until(holds: () => boolean, within = 2_000): Promise<void> {
+async function until(holds: () => boolean | Promise<boolean>, within = 2_000): Promise<void> {
   const deadline = Date.now() + within
-  while (!holds()) {
+  while (!await holds()) {
     if (Date.now() > deadline) throw new Error(`did not hold within ${within} ms`)
     await settle()
   }
@@ -165,9 +182,11 @@ test('--check opens a session on the default model once startup commits, reports
   assert.equal(terminal.started, false)
 })
 
-test('--help prints the usage and exits 0 without holding the terminal', async () => {
+test('--help prints the usage and the keys, and exits 0 without holding the terminal', async () => {
   const { exits, out, terminal } = await mount(['--help'])
   assert.match(out.join(''), /Usage: dsh --profile binnacle/)
+  assert.match(out.join(''), /Keys:/)
+  for (const named of ['shift+tab', 'tab, down', 'up', 'enter', 'escape', 'ctrl+c', 'ctrl+t']) assert.ok(out.join('').includes(named), named)
   assert.deepEqual(exits, [0])
   assert.equal(terminal.started, false)
 })
@@ -201,6 +220,16 @@ test('ctrl+c gives the terminal back, closes the session, and asks to exit 0', a
   assert.equal(terminal.started, false)
   assert.equal(session.closed, true)
   assert.deepEqual(exits, [0])
+})
+
+test('the host installs the one key table, so the composer reads binnacle\'s bindings beside pi-tui\'s own', async () => {
+  const { commit } = await mount([])
+  commit()
+  await settle()
+  const keys = getKeybindings()
+  assert.equal(keys.matches('\x03', 'binnacle.quit'), true)
+  assert.equal(keys.matches('\x14', 'binnacle.switchScreens'), true)
+  assert.equal(keys.matches('\r', 'tui.input.submit'), true)
 })
 
 test('disposing the row gives the terminal back, closes the session, and cancels a pending start', async () => {
@@ -412,4 +441,132 @@ test('where the terminal reports holding and releasing a key, as pi-tui asks a k
   terminal.type('\x1b[99;5:3u')
   await settle()
   assert.deepEqual(exits, [0])
+})
+
+test('shift+tab steps in from the composer, enter opens the focused fold, and a key keys does not answer reaches the composer typed', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([called(13, 'read'), returned(14, 13, 'w\nx\ny\nz')])
+  const { session: sent, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('… 1 more line')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
+  terminal.type('x')
+  await until(async () => !(await terminal.altScreen()).some(row => row.includes('▸')))
+  terminal.type('\r')
+  assert.deepEqual(sent.sent, ['x'])
+})
+
+test('on the alternate screen, focus brings what it is on into view as it moves up the session', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const logged: SessionEvent[] = []
+  for (let entry = 1; entry <= 6; entry++) {
+    const seq = entry * 2
+    logged.push(called(seq, `read${entry}`), returned(seq + 1, seq, 'w\nx\ny\nz'))
+  }
+  const session = new FakeSession(logged)
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
+  for (let entry = 5; entry >= 1; entry--) {
+    terminal.type('\x1b[Z')
+    await until(async () => {
+      const rows = await terminal.altScreen()
+      return rows[0]?.trim() === 'w' && rows[3]?.includes('▸ show 1 more line') === true && rows[4]?.includes(`read${entry + 1}`) === true
+    })
+  }
+})
+
+test('from the main screen, a fold in a printed entry opens on the fullscreen by key, in view and focused, and the main screen is as it was after switching back', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build'), called(2, 'read'), returned(3, 2, 'w\nx\ny\nz')])
+  const { commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('… 1 more line')))
+  const before = await terminal.mainScreen()
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.onAlternateScreen()) === true)
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
+  terminal.type('\x14')
+  await settle()
+  const after = await terminal.mainScreen()
+  assert.deepEqual(after, before)
+  assert.equal(after.some(row => row.includes('▸')), false)
+})
+
+test('focus the main screen could not draw comes back with the fullscreen, drawn', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build'), called(2, 'read'), returned(3, 2, 'w\nx\ny\nz')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('… 1 more line')))
+  terminal.type('\x1b[Z')
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ fold to 3 lines')))
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === false && (await terminal.mainScreen()).includes('● read {}'))
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === true)
+  await settle()
+  assert.deepEqual((await terminal.altScreen()).slice(0, 5), ['w', 'x', 'y', 'z', '▸ fold to 3 lines'])
+})
+
+test('focus the fullscreen gives back is brought into view, however far up the session it sits', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const logged: SessionEvent[] = []
+  for (let entry = 1; entry <= 6; entry++) logged.push(called(entry * 2, `read${entry}`), returned(entry * 2 + 1, entry * 2, 'w\nx\ny\nz'))
+  const session = new FakeSession(logged)
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  for (let step = 0; step < 6; step++) terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen())[3]?.includes('▸ show 1 more line') === true)
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === false && (await terminal.mainScreen()).includes('● read6 {}'))
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === true && (await terminal.altScreen())[0] === 'w')
+  assert.deepEqual((await terminal.altScreen()).slice(0, 5), ['w', 'x', 'y', '▸ show 1 more line', '● read2 {}'])
+})
+
+test('typing on the main screen forgets where focus was, so enter back on the fullscreen sends what was typed', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build'), called(2, 'read'), returned(3, 2, 'w\nx\ny\nz')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('… 1 more line')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === false && (await terminal.mainScreen()).includes('● read {}'))
+  terminal.type('x')
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) === true)
+  terminal.type('\r')
+  await settle()
+  assert.deepEqual(session.sent, ['x'])
+})
+
+test('on the main screen, focus on something not yet printed stays there, drawn, and a fold not yet printed opens in place', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'one'), called(2, 'read'), returned(3, 2, 'w\nx\ny\nz'), called(4, 'stat'), added(5, 'a\nb')])
+  const { commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('⋯ added by ')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('▸ show 2 more lines')))
+  assert.equal(await terminal.onAlternateScreen(), false)
+  terminal.type('\r')
+  await until(async () => {
+    const rows = await terminal.mainScreen()
+    return rows.some(row => row.trim() === 'a') && rows.some(row => row.trim() === 'b')
+  })
+  const after = await terminal.mainScreen()
+  assert.deepEqual(after.slice(0, 6), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line'])
+  assert.deepEqual(after.slice(6, 12), ['● stat {}', '  running…', '⋯ added by system-prompt', 'a', 'b', '▸ fold it away'])
 })

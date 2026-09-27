@@ -17,6 +17,7 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 ## Review: what happened?
 
 - [TUI mode](features/tui-mode.md): read the session on the alternate screen or in the terminal's scrollback, and switch between them.
+- [Keys](features/keys.md): reach what content offers from the keyboard — focus it, open it, on either screen.
 
 ## Tune: can I make it mine?
 

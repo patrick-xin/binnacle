@@ -31,9 +31,11 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **affordance** | Something a person can do with a piece of content, such as `expand` or `grant` (`binnacle:packages/binnacle/src/contract/index.ts#affordances`). Its policy — whether a click may invoke it — belongs to its kind ([ADR 1](adr/0001-content-offers-affordances-the-surface-owns-gestures.md)). |
 | **primary affordance** | The first a region offers; what a click or the primary key invokes. |
 | **region** | A part of the screen a gesture can land on: an id, the affordances it offers, and whether it overflows. Laid out, it covers rows and columns. |
+| **focus** | The region the keys act on (`binnacle:packages/binnacle/src/ui/state.ts#UiState`). binnacle's focus is a region in a pane; pi-tui's is the component taking keys, the composer, which is a different thing. |
+| **key table** | The one table a key is matched in: pi-tui's, extended with binnacle's bindings and held in one manager (`binnacle:packages/binnacle/src/ui/keys.ts#keyTable`, [ADR 13](adr/0013-a-key-means-something-only-through-the-one-key-table.md)). It answers a press only, once; nothing else in binnacle matches a key. |
 | **gesture** | What a person did before it means anything: a click, the wheel, a drag, hovering, or a key resolved to a binding. |
 | **gesture table** | The one place a gesture is given a meaning (`binnacle:packages/binnacle/src/ui/gestures.ts#meaning`). |
-| **action** | What a gesture means: invoke an affordance, scroll a region, select, or move focus. |
+| **action** | What a gesture means: invoke an affordance, scroll a region, select, or move or drop focus. |
 | **binding** | A named, rebindable key: focus movement, the primary affordance, or one affordance by kind. |
 | **registration** | What an author or a built-in feature contributes through `ctx.binnacle`, each an effect of the plugin that made it ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **authored fact** | A fact an author's adapter made from an event kind, named by them; drawn by the view registered under its name, or by the fallback. |

@@ -43,7 +43,7 @@ export interface Region {
 }
 
 /** A binding a key resolves to before it means anything: focus movement, the primary affordance, or one affordance by kind. */
-export type KeyBinding = 'focus.next' | 'focus.previous' | 'primary' | AffordanceKind
+export type KeyBinding = 'focus.next' | 'focus.previous' | 'focus.out' | 'primary' | AffordanceKind
 
 /** What a person did, before it means anything. */
 export type Gesture =
@@ -59,6 +59,7 @@ export type Action =
   | { readonly kind: 'scroll', readonly region: string, readonly delta: number }
   | { readonly kind: 'select' }
   | { readonly kind: 'focus', readonly step: 1 | -1 }
+  | { readonly kind: 'unfocus' }
 
 /**
  * A thrown or foreign value as a person reads it: an error's message, or the value's string form.
