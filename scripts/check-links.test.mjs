@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { brokenLinks } from './check-links.mjs'
+import { brokenLinks, unlistedFeatures } from './check-links.mjs'
 
 const onlyAdr = path => path === 'docs/adr/0001-x.md'
 
@@ -24,4 +24,13 @@ test('a decision record links only other records, as it is never edited to follo
     'docs/adr/0002-y.md:1: ../../packages/binnacle/layers.json is not a decision record; a record links only other records, and names the rest in words',
     'docs/adr/0002-y.md:2: ../glossary.md is not a decision record; a record links only other records, and names the rest in words',
   ])
+})
+
+test('every feature page is listed in the feature map', () => {
+  const files = [
+    { path: 'docs/features.md', text: '- [Screens](features/screens.md#why)' },
+    { path: 'docs/features/screens.md', text: '' },
+    { path: 'docs/features/theme.md', text: '' },
+  ]
+  assert.deepEqual(unlistedFeatures(files), ['docs/features/theme.md: not listed in docs/features.md; list it under the stage it serves'])
 })
