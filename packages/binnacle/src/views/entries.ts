@@ -9,7 +9,7 @@ import type { Block, Fact } from '../facts/adapt.ts'
 import type { Entry } from '../models/transcript.ts'
 import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
-import type { Node } from '../ui/node.ts'
+import type { Node, Span } from '../ui/node.ts'
 
 /**
  * How a kind of entry is drawn: a built-in view, or one an author registered.
@@ -47,7 +47,7 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
       ? [{
         kind: 'stack',
         children: [
-          { kind: 'text', text: '∴ thinking', tone: 'muted' },
+          { kind: 'text', text: [{ mark: 'thinking' } as const, ' thinking'], tone: 'muted' },
           { kind: 'fold', id: `reasoning:${fact.seq}:${index}`, rows: 0, child: { kind: 'text', text: block.text, tone: 'dim' } },
         ],
       }]
@@ -59,15 +59,15 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
 
 /**
  * Draw a tool call: what was asked, then whether it is running, failed, left
- * behind by its turn, or what it returned, folded. The glyph says how the
+ * behind by its turn, or what it returned, folded. Its mark says how the
  * call stands.
  * @param result - its result, once it has one.
  * @param left - how the turn that ended without this call's result ended, when it did.
  */
 function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined, left: string | undefined): Node {
-  const glyph = result === undefined
-    ? { text: '●', tone: 'muted' as const }
-    : result.failed === true ? { text: '✗', tone: 'error' as const } : { text: '●', tone: 'success' as const }
+  const glyph: Span = result === undefined
+    ? { mark: 'running' }
+    : result.failed === true ? { mark: 'failed' } : { mark: 'done' }
   const head: Node = { kind: 'text', text: [glyph, ` ${call.name} ${call.arguments}`] }
   if (result === undefined) {
     const waiting: Node = left === undefined
@@ -135,34 +135,41 @@ function drawnBy(entry: Entry, key: string, stack: readonly View[], height: numb
 function builtIn(entry: Entry, problem?: string): Node {
   switch (entry.kind) {
     case 'prompt':
-      return noted({ kind: 'text', text: [{ text: '›', tone: 'accent' }, ` ${textOf(entry.fact.blocks)}`] }, problem)
+      return noted({ kind: 'text', text: [{ mark: 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] }, problem)
     case 'context':
-      return titled(`⋯ added by ${entry.fact.source}`, { kind: 'fold', id: `context:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
+      return titled([{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'fold', id: `context:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'answer':
       return noted(drawAnswer(entry.fact), problem)
     case 'tool':
       return noted(drawTool(entry.call, entry.result, entry.left), problem)
     case 'result':
-      return titled(`● result of call ${entry.fact.callId}`, { kind: 'fold', id: `result:${entry.fact.seq}`, rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
+      return titled([{ mark: 'done', tone: 'muted' } as const, ` result of call ${entry.fact.callId}`], { kind: 'fold', id: `result:${entry.fact.seq}`, rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'authored':
-      return titled(`? ${entry.fact.name}`, { kind: 'fold', id: `authored:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: shown(entry.fact.data) } }, problem)
+      return titled([{ mark: 'unknown' } as const, ` ${entry.fact.name}`], { kind: 'fold', id: `authored:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: shown(entry.fact.data) } }, problem)
     case 'unknown':
-      return titled(`? ${entry.fact.type}`, { kind: 'fold', id: `unknown:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: shown(entry.fact.record) } }, problem ?? entry.fact.problem)
+      return titled([{ mark: 'unknown' } as const, ` ${entry.fact.type}`], { kind: 'fold', id: `unknown:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: shown(entry.fact.record) } }, problem ?? entry.fact.problem)
   }
 }
 
 /**
- * A line of title, muted, above some content, and what went wrong under it in error.
+ * A line of title spans, muted, above some content, and what went wrong under it in error.
  */
-function titled(title: string, body: Node, problem: string | undefined): Node {
-  return { kind: 'stack', children: problem === undefined ? [{ kind: 'text', text: title, tone: 'muted' }, body] : [{ kind: 'text', text: title, tone: 'muted' }, { kind: 'text', text: `✗ ${problem}`, tone: 'error' }, body] }
+function titled(title: readonly Span[], body: Node, problem: string | undefined): Node {
+  return problem === undefined ? { kind: 'stack', children: [{ kind: 'text', text: title, tone: 'muted' }, body] } : { kind: 'stack', children: [{ kind: 'text', text: title, tone: 'muted' }, problemLine(problem), body] }
 }
 
 /**
  * Content, and what went wrong after it in error, if anything.
  */
 function noted(body: Node, problem: string | undefined): Node {
-  return problem === undefined ? body : { kind: 'stack', children: [body, { kind: 'text', text: `✗ ${problem}`, tone: 'error' }] }
+  return problem === undefined ? body : { kind: 'stack', children: [body, problemLine(problem)] }
+}
+
+/**
+ * What went wrong, said beneath what it concerns: the problem mark and what went wrong beside it, in error.
+ */
+function problemLine(what: string): Node {
+  return { kind: 'text', text: [{ mark: 'problem' } as const, ` ${what}`], tone: 'error' }
 }
 
 /**

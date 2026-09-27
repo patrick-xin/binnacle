@@ -10,7 +10,7 @@
 import type { Node } from '../../api.ts'
 import { genericCard } from './generic.ts'
 import type { CardKind, PresentedCall, PresentedResult } from './presentation.ts'
-/** A run of a text line, as the author API's `Node` draws one: its text, in a tone of its own. */
+/** A run of a text line, as the author API's `Node` draws one: its text in a tone of its own, or one of the theme's marks. */
 export type Span = Exclude<Extract<Node, { readonly kind: 'text' }>['text'], string>[number]
 
 /**
@@ -22,7 +22,7 @@ export interface CardParts {
   readonly call: PresentedCall
   /** The result's presented view, when its presenter gave one; a call still running, or one its turn left, has none. */
   readonly result: PresentedResult | undefined
-  /** The glyph, its tone already saying how the call stands: muted while it runs or was left, success or error once it returned. */
+  /** How the call stands, as the mark its head opens with: `running` while it runs or was left, `done` or `failed` once it returned. */
   readonly glyph: Span
   /** The waiting line — `running…`, or the line saying the turn ended without it; none once the call returned. */
   readonly waiting: Node | undefined

@@ -8,11 +8,11 @@
 
 import { affordances, describe } from '../contract/index.ts'
 import type { Affordance } from '../contract/index.ts'
-import { tones } from './theme.ts'
-import type { Tone } from './theme.ts'
+import { marks, tones } from './theme.ts'
+import type { Mark, Tone } from './theme.ts'
 
-/** One run of a text node's line: its text drawn in the node's tone as a bare string, or in a tone of its own. */
-export type Span = string | { readonly text: string, readonly tone: Tone }
+/** One run of a text node's line: its text drawn in the node's tone as a bare string, or in a tone of its own; or one of the theme's marks, whose glyph the theme draws in the mark's tone, or in a tone of the span's own. */
+export type Span = string | { readonly text: string, readonly tone: Tone } | { readonly mark: Mark, readonly tone?: Tone }
 
 /** Something a view draws. */
 export type Node =
@@ -123,16 +123,24 @@ export function parseNode(value: unknown): Node {
  * Read one span of a text node's line.
  * @param value - the span, as returned.
  * @returns it, as data.
- * @throws when it is neither a bare string nor a text with a tone, or its tone is no tone.
+ * @throws when it is neither a bare string, a text with a tone, nor a mark with a tone; when its mark is no mark or its tone is no tone; or when it names a mark and carries text anyway.
  */
 function spanOf(value: unknown): Span {
   if (typeof value === 'string') return value
   if (typeof value !== 'object' || value === null) throw new Error(`${describe(value)} is no span`)
   const record = value as Record<string, unknown>
-  const text = record.text
   const tone = 'tone' in record ? record.tone : undefined
+  const toned = tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(tones, tone))
+  if ('mark' in record) {
+    const mark = record.mark
+    if (typeof mark !== 'string' || !Object.hasOwn(marks, mark)) throw new Error(`${describe(mark)} is no mark`)
+    if (toned) throw new Error(`${describe(tone)} is no tone`)
+    if ('text' in record) throw new Error('a span that names a mark carries no text')
+    return tone === undefined ? { mark: mark as Mark } : { mark: mark as Mark, tone: tone as Tone }
+  }
+  const text = record.text
   if (typeof text !== 'string') throw new Error('a span needs its text')
-  if (typeof tone !== 'string' || !Object.hasOwn(tones, tone)) throw new Error(`${describe(tone)} is no tone`)
+  if (toned || tone === undefined) throw new Error(`${describe(tone)} is no tone`)
   return { text, tone: tone as Tone }
 }
 

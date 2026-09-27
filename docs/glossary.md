@@ -14,9 +14,11 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **view** | `(entry, next) → Node`: draws one kind of entry, and declares the affordances on what it drew (`binnacle:packages/binnacle/src/views/entries.ts#View`). Views of one key stack; the newest draws, and `next` draws the entry as the view beneath it does, binnacle's own at the bottom ([ADR 8](adr/0008-a-view-builds-on-the-one-beneath-it-and-the-newest-draws.md)). |
 | **node** | What a view returns: data, laid out by the ui with pi-tui (`binnacle:packages/binnacle/src/ui/node.ts#Node`). The vocabulary grows a block at a time, as requests need one ([ADR 10](adr/0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md)). |
 | **tone** | A colour of the theme's, named by what the content drawn in it means; pi's names (`binnacle:packages/binnacle/src/ui/theme.ts#tones`). |
+| **mark** | A glyph of the theme's, named by what it stands for, with the tone it is drawn in (`binnacle:packages/binnacle/src/ui/theme.ts#marks`). A span names a mark and the theme draws it; the marks a view may name are the author API's `Mark` (`binnacle:packages/binnacle/src/api.ts`). Our word. |
+| **chrome** | The glyphs the ui and the host draw themselves, beside the marks: the focus row's pointer, a cut fold's ellipsis, a card's border, the jump label's arrow (`binnacle:packages/binnacle/src/ui/theme.ts#chrome`). A view names none of it. Our word. |
 | **card** | A node holding another inside a rounded border, its title on the top edge. |
 | **markdown** | A node that draws its text as a markdown document, laid out by pi-tui's component in the theme's tones. |
-| **span** | One run of a text node's line: its text in the node's tone as a bare string, or in a tone of its own. |
+| **span** | One run of a text node's line: its text in the node's tone as a bare string, in a tone of its own, or one of the theme's marks, whose glyph the theme draws in the mark's tone or the span's own. |
 | **fallback view** | How an entry no view claims is drawn: its type in one line, and `expand` to the raw record. It also says what went wrong when an author's adapter or view failed. |
 | **layer** | A folder of `src`, or the module `api.ts`, and what it may import: [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **contract** | The layer holding what otherwise-independent layers share. |

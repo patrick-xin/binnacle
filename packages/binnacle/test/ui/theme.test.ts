@@ -1,6 +1,19 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { editorTheme, markdownTheme } from '../../src/ui/theme.ts'
+import { editorTheme, markdownTheme, marks } from '../../src/ui/theme.ts'
+
+test('each mark is the glyph and tone it has always drawn', () => {
+  assert.deepEqual(marks, {
+    running: { glyph: '●', tone: 'muted' },
+    done: { glyph: '●', tone: 'success' },
+    failed: { glyph: '✗', tone: 'error' },
+    problem: { glyph: '✗', tone: 'error' },
+    prompt: { glyph: '›', tone: 'accent' },
+    thinking: { glyph: '∴', tone: 'muted' },
+    context: { glyph: '⋯', tone: 'muted' },
+    unknown: { glyph: '?', tone: 'muted' },
+  })
+})
 
 test('the markdown theme gives each part of a document the terminal theme\'s style for it', () => {
   assert.equal(markdownTheme.heading('x'), '\x1b[1mx\x1b[22m')

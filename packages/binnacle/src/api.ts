@@ -10,6 +10,7 @@ import type { View } from './views/entries.ts'
 
 export type { AuthorAdapter, Fact } from './facts/adapt.ts'
 export type { Entry } from './models/transcript.ts'
+export type { Mark } from './ui/theme.ts'
 export type { Node } from './ui/node.ts'
 export type { View, Views } from './views/entries.ts'
 

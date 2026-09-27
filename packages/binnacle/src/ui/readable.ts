@@ -42,12 +42,14 @@ export function readable(node: Node): Node {
 }
 
 /**
- * One span of a text node's line, its text treated, its tone as it was.
+ * One span of a text node's line: a text span's text treated, its tone as it was; a mark span left as it is, for the theme's glyph is not a string a view carried.
  * @param span - the span a view drew.
- * @returns the span, its text readable and inert.
+ * @returns the span, its carried text readable and inert.
  */
 function readableSpan(span: Span): Span {
-  return typeof span === 'string' ? treated(span) : { ...span, text: treated(span.text) }
+  if (typeof span === 'string') return treated(span)
+  if ('mark' in span) return span
+  return { ...span, text: treated(span.text) }
 }
 
 /**

@@ -1,7 +1,8 @@
 /**
- * The theme binnacle draws in: content in tones, a markdown document in
- * the tones and the attributes, and the composer framed in dim with its
- * select list in accent and muted.
+ * The theme binnacle draws in: content in tones, a glyph as a mark a view
+ * names or as the chrome the ui and the host draw themselves, a markdown
+ * document in the tones and the attributes, and the composer framed in dim
+ * with its select list in accent and muted.
  *
  * A tone is drawn in one of the terminal's own sixteen colours, so a person's
  * palette decides what it looks like, as their terminal already does.
@@ -27,6 +28,42 @@ export const tones = {
 
 /** A colour of the theme's, by what the content drawn in it means. */
 export type Tone = keyof typeof tones
+
+/**
+ * The theme's marks: the glyphs that stand for what a thing is — how a call
+ * stands, what went wrong, what a person sent — each with the tone it is
+ * drawn in, so a view names a mark and the theme draws it.
+ */
+export const marks = {
+  running: { glyph: '●', tone: 'muted' }, // a call waiting for its result
+  done: { glyph: '●', tone: 'success' }, // a call that returned
+  failed: { glyph: '✗', tone: 'error' }, // a call that failed
+  problem: { glyph: '✗', tone: 'error' }, // what went wrong, said beneath what it concerns
+  prompt: { glyph: '›', tone: 'accent' }, // what the person sent
+  thinking: { glyph: '∴', tone: 'muted' }, // reasoning
+  context: { glyph: '⋯', tone: 'muted' }, // what something added to the context
+  unknown: { glyph: '?', tone: 'muted' }, // a kind binnacle has no view for, an author's fact included
+} as const satisfies Record<string, { readonly glyph: string, readonly tone: Tone }>
+
+/** A mark of the theme's, named by what it stands for. */
+export type Mark = keyof typeof marks
+
+/**
+ * The theme's chrome: what the ui and the host draw themselves — the focus
+ * row's pointer, a cut fold's ellipsis, a card's border, the jump label's
+ * arrow — named beside the marks. A view names none of it; the ui and the
+ * host do, so what they draw is the theme's as a mark is.
+ */
+export const chrome = {
+  /** What a focused region's row, and a focused cut fold's marker, opens with. */
+  focus: '▸',
+  /** What an unfocused cut fold's marker opens with, saying lines were cut. */
+  cut: '…',
+  /** A card's rounded border, in its pieces. */
+  border: { topLeft: '╭', horizontal: '─', topRight: '╮', side: '│', bottomLeft: '╰', bottomRight: '╯' },
+  /** What the jump label names, to come down to the end. */
+  jump: '↓',
+} as const
 
 /**
  * The theme's attributes, each closed by the parameter that ends it alone, so
