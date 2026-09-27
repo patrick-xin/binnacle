@@ -45,6 +45,7 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 - **The conversation transcript derives from the session log.** Model-visible conversation content is logged, and logged events remain inspectable. Other interface state arrives through named grants and is not implicitly logged.
 - **A plugin gets grants, not the tree.** Widen a seam with a named grant, never by handing out pi-tui components.
 - **What an author may depend on is `src/api.ts`.** Removing or renaming an export there breaks every author, and its commit says so.
+- **A view names a tone or a mark, never a colour or a glyph.** The theme holds both, and a span that names a mark draws the mark's glyph in the mark's tone ([the Theme page](docs/features/theme.md)).
 - **A built-in feature is a plugin in `src/plugins/<feature>`** holding only what an author holds: the author API, type-only; the dsh services it names in `inject`; grants for its effects ([ADR 5](docs/adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)). What more than one feature needs moves down into the layers.
 - **Only the host touches the terminal or the process.** A plugin reaches dsh only through services it names in `inject`.
 - **Outside the host, nothing reads the clock, randomness or the environment.** Time, ids and size arrive as arguments, so the same facts draw the same screen.

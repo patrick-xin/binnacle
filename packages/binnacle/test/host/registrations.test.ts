@@ -4,6 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
+import type { Node } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
 import { initial } from '../../src/ui/state.ts'
@@ -74,6 +75,24 @@ test('the newest plugin to draw a key draws it, on what the one before drew, and
   assert.deepEqual(shown(registrations), ['› fix the build', 'second'])
   await second.dispose()
   assert.deepEqual(shown(registrations), ['› fix the build'])
+})
+
+test('an author\'s view may name a mark, and the theme draws its glyph in the mark\'s tone', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: [{ mark: 'failed' }, ' the build'] }))
+  })
+  assert.deepEqual(shown(registrations), ['✗ the build'])
+  const raw = screen([prompt], initial, 40, registrations.views).lines.map(line => line.trimEnd())
+  assert.equal(raw[0], '\x1b[31m✗\x1b[39m the build')
+})
+
+test('an author\'s view naming a mark the theme has not is drawn by the view beneath, which names the mark', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: [{ mark: 'shrug' }, ' the build'] }) as unknown as Node)
+  })
+  assert.deepEqual(shown(registrations), ['› fix the build', '✗ binnacle.view(prompt) returned no', 'drawable node: shrug is no mark'])
 })
 
 test('a view that throws is drawn over by the view beneath it, which says whose view failed and why', async () => {

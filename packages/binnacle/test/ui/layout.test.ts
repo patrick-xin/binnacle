@@ -117,6 +117,21 @@ test('a text node of spans draws each span in its own tone, and a bare span in t
   assert.deepEqual(layout(node, 40, OPEN).lines.map(line => line.trimEnd()), ['\x1b[36m›\x1b[39m\x1b[90m fix the \x1b[39m\x1b[2mbuild\x1b[22m'])
 })
 
+test('a span naming a mark draws its glyph, in the mark\'s tone', () => {
+  const node = { kind: 'text', text: [{ mark: 'done' }, ' shipped'] } as const
+  assert.deepEqual(layout(node, 40, OPEN).lines.map(line => line.trimEnd()), ['\x1b[32m●\x1b[39m shipped'])
+})
+
+test('a span naming a mark and a tone draws the mark\'s glyph in the tone it names', () => {
+  const node = { kind: 'text', text: [{ mark: 'done', tone: 'muted' }, ' c9'] } as const
+  assert.deepEqual(layout(node, 40, OPEN).lines.map(line => line.trimEnd()), ['\x1b[90m●\x1b[39m c9'])
+})
+
+test('a mark and the spans beside it in one tone draw as one styled run, as the line always was', () => {
+  const node = { kind: 'text', text: [{ mark: 'done', tone: 'muted' }, ' result of call c9'], tone: 'muted' } as const
+  assert.deepEqual(layout(node, 40, OPEN).lines.map(line => line.trimEnd()), ['\x1b[90m● result of call c9\x1b[39m'])
+})
+
 test('a span that wraps keeps its tone on every line it wraps to', () => {
   const node = { kind: 'text', text: ['the build ', { text: 'failed to finish', tone: 'error' }] } as const
   const frame = layout(node, 10, OPEN)

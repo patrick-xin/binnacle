@@ -29,7 +29,7 @@ export const toolCards = {
 }
 
 /**
- * The view of a tool entry this plugin registers: the call as its glyph and
+ * The view of a tool entry this plugin registers: the call as its mark and
  * the title its tool presented, and once it returns, what it returned folded
  * beneath, as its tool presents it.
  * @param tools - dsh's tool registry, reached through the `tools` service.
@@ -73,9 +73,9 @@ function viewOf(tools: ToolRuntime): View {
     const parts: CardParts = {
       call,
       result: shown,
-      glyph: result === undefined
-        ? { text: '●', tone: 'muted' }
-        : result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' },
+      mark: result === undefined
+        ? { mark: 'running' }
+        : result.failed === true ? { mark: 'failed' } : { mark: 'done' },
       waiting: result === undefined
         ? (entry.left === undefined
             ? { kind: 'text', text: '  running…', tone: 'muted' }
@@ -93,11 +93,11 @@ function viewOf(tools: ToolRuntime): View {
 }
 
 /**
- * The card beneath's drawing, with what a presenter did wrong said beneath it, in error.
+ * The card beneath's drawing, with what a presenter did wrong said beneath it: the problem mark and what did it, in error.
  * @param beneath - what the view beneath drew.
  * @param what - the tool, the presenter and what went wrong.
  * @returns the drawing a person reads.
  */
 function refused(beneath: Node, what: string): Node {
-  return { kind: 'stack', children: [beneath, { kind: 'text', text: `✗ ${what}`, tone: 'error' }] }
+  return { kind: 'stack', children: [beneath, { kind: 'text', text: [{ mark: 'problem' }, ` ${what}`], tone: 'error' }] }
 }

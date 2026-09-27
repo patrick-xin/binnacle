@@ -6,7 +6,8 @@ import { Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node } from './node.ts'
 import { readable } from './readable.ts'
-import { markdownTheme, tones } from './theme.ts'
+import { chrome, markdownTheme, marks, tones } from './theme.ts'
+import type { Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
@@ -51,27 +52,37 @@ function line(count: number): string {
 }
 
 /**
- * The row a focused region draws under it: `▸` and what Enter will do, in accent.
+ * The row a focused region draws under it: the chrome's focus pointer and what Enter will do, in accent.
  * @param label - the primary affordance's label, which says what Enter will do.
  * @param width - the columns it is given.
  * @returns the row, wrapped as text is.
  */
 function focusRow(label: string, width: number): string[] {
-  return new Text(tones.accent(`▸ ${label}`), 0, 0).render(width)
+  return new Text(tones.accent(`${chrome.focus} ${label}`), 0, 0).render(width)
 }
 
 /**
- * What a text node's spans draw: joined into one line, each span in its tone, a bare span in the node's.
+ * What a text node's spans draw: joined into one line, each span in its tone,
+ * a bare span in the node's, a mark's glyph in the mark's tone or the span's
+ * own — and adjacent runs in one tone drawn as one, so a line all in one tone
+ * is the one styled run it always was.
  * @param node - the text node.
  * @returns its line, styled for the terminal.
  */
 function written(node: Extract<Node, { readonly kind: 'text' }>): string {
   if (typeof node.text === 'string') return node.tone === undefined ? node.text : tones[node.tone](node.text)
-  return node.text
-    .map(span => typeof span === 'string'
-      ? node.tone === undefined ? span : tones[node.tone](span)
-      : tones[span.tone](span.text))
-    .join('')
+  const runs: { text: string, tone: Tone | undefined }[] = []
+  for (const span of node.text) {
+    const run = typeof span === 'string'
+      ? { text: span, tone: node.tone }
+      : 'mark' in span
+        ? { text: marks[span.mark].glyph, tone: span.tone ?? marks[span.mark].tone }
+        : { text: span.text, tone: span.tone }
+    const last = runs.at(-1)
+    if (last !== undefined && last.tone === run.tone) last.text += run.text
+    else runs.push(run)
+  }
+  return runs.map(run => run.tone === undefined ? run.text : tones[run.tone](run.text)).join('')
 }
 
 /**
@@ -138,7 +149,7 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
       const shown = frame.lines.slice(0, node.rows)
       const label = `show ${cut} more ${line(cut)}`
       // The marker row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing.
-      const marker = new Text(state.focus === node.id ? tones.accent(`▸ ${label}`) : `… ${cut} more ${line(cut)}`, 0, 0).render(width)
+      const marker = new Text(state.focus === node.id ? tones.accent(`${chrome.focus} ${label}`) : `${chrome.cut} ${cut} more ${line(cut)}`, 0, 0).render(width)
       const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
       const inside = frame.regions
         .filter(placed => placed.top < node.rows)
@@ -157,14 +168,15 @@ function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, sta
   if (inner < 1) return drawn(node.child, width, state)
   const frame = drawn(node.child, inner, state)
   const edge = tones.dim
+  const border = chrome.border
   // A title is left off whole, never cut, where it would leave no rule beside it: a cut title reads as another one.
   const title = node.title !== undefined && visibleWidth(node.title) <= width - 6 ? node.title : undefined
   const top = title === undefined
-    ? edge(`╭${'─'.repeat(width - 2)}╮`)
-    : `${edge('╭─ ')}${title}${edge(` ${'─'.repeat(width - 5 - visibleWidth(title))}╮`)}`
-  const body = frame.lines.map(row => `${edge('│')} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge('│')}`)
+    ? edge(`${border.topLeft}${border.horizontal.repeat(width - 2)}${border.topRight}`)
+    : `${edge(`${border.topLeft}${border.horizontal} `)}${title}${edge(` ${border.horizontal.repeat(width - 5 - visibleWidth(title))}${border.topRight}`)}`
+  const body = frame.lines.map(row => `${edge(border.side)} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge(border.side)}`)
   return {
-    lines: [top, ...body, edge(`╰${'─'.repeat(width - 2)}╯`)],
+    lines: [top, ...body, edge(`${border.bottomLeft}${border.horizontal.repeat(width - 2)}${border.bottomRight}`)],
     regions: frame.regions.map(placed => ({ ...placed, top: placed.top + 1, left: placed.left + CARD_SIDE })),
   }
 }
