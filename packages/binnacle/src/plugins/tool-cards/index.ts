@@ -58,7 +58,7 @@ function viewOf(tools: ToolRuntime): View {
     if ('why' in presented) return refused(next(), `${entry.call.name}.presentCall returned no drawable view: ${presented.why}`)
     const call = presented.view
     if (entry.result === undefined) {
-      const head: Node = { kind: 'text', text: [{ text: '●', tone: 'muted' }, ` ${call.title}`] }
+      const head: Node = { kind: 'text', text: [{ text: '●', tone: 'muted' }, ` ${titled(call.title)}`] }
       const waiting: Node = entry.left === undefined
         ? { kind: 'text', text: '  running…', tone: 'muted' }
         : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' }
@@ -76,7 +76,7 @@ function viewOf(tools: ToolRuntime): View {
       if (completed !== undefined && 'why' in completed) return refused(next(), `${entry.call.name}.presentResult returned no drawable view: ${completed.why}`)
     }
     const shown = completed === undefined ? undefined : completed.view
-    const head: Node = { kind: 'text', text: [result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' }, ` ${shown?.title ?? call.title}`] }
+    const head: Node = { kind: 'text', text: [result.failed === true ? { text: '✗', tone: 'error' } : { text: '●', tone: 'success' }, ` ${titled(shown?.title ?? call.title)}`] }
     const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
     const output: Node = {
       kind: 'fold',
@@ -96,4 +96,14 @@ function viewOf(tools: ToolRuntime): View {
  */
 function refused(beneath: Node, what: string): Node {
   return { kind: 'stack', children: [beneath, { kind: 'text', text: `✗ ${what}`, tone: 'error' }] }
+}
+
+/**
+ * A presented title as the head shows it: its first line beside the glyph, and each later line indented two columns beneath it, so a command written on more than one line does not read as output.
+ * @param title - the title a presenter gave, however many lines it wrote.
+ * @returns the head's text.
+ */
+function titled(title: string): string {
+  const lines = title.split('\n')
+  return lines.length === 1 ? title : [lines[0], ...lines.slice(1).map(line => `  ${line}`)].join('\n')
 }

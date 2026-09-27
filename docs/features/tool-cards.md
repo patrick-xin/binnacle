@@ -12,7 +12,7 @@ What a presenter returns is the tool's code, not binnacle's: it is read as data 
 
 ## Choices
 
-- What the head shows: the glyph and the presented title, one line; the tool's name and arguments stay on binnacle's own card, beneath.
+- What the head shows: the glyph and the presented title — its first line beside the glyph, and each later line indented two columns beneath it, so a command written on more than one line does not read as output; the tool's name and arguments stay on binnacle's own card, beneath.
 - The glyphs and their tones are the transcript's (`●` muted while running, `●` success, `✗` error), so a presented card reads at a glance beside an unpresented one.
 - What it returned folds to three rows, as a tool's output does today ([Transcript](transcript.md)); a presented `content` is folded when the tool gives one, the result's own text when not.
 - A failure's reason stays, in error, above the fold; so does what a presenter did wrong stay, beneath binnacle's own card: `✗ read.presentCall threw: …`, naming the tool and the presenter.

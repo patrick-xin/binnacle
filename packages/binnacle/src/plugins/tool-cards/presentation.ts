@@ -41,7 +41,7 @@ const resultCards: ReadonlySet<string> = new Set(['generic', 'terminal', 'diff',
 export interface PresentedCall {
   /** Which card the tool declared for the call. */
   readonly card: 'generic' | 'terminal' | 'diff'
-  /** What this call does, as the tool titled it. */
+  /** What this call does, as the tool titled it: drawn as the card's head, its first line beside the glyph and each later line indented two columns beneath it. */
   readonly title: string
 }
 
@@ -68,7 +68,7 @@ export function callViewOf(value: unknown): Read<PresentedCall> | undefined {
 export interface PresentedResult {
   /** Which card the tool declared for the completed call. */
   readonly card: 'generic' | 'terminal' | 'diff' | 'read' | 'search' | 'web'
-  /** The title the completed call reads as, when the tool presented one; the call's own title when it did not. */
+  /** The title the completed call reads as, when the tool presented one; the call's own title when it did not. Drawn as the head, as a call title is. */
   readonly title?: string
   /** The content the completed call folds beneath it, when the tool presented some; the result's own text when it did not. */
   readonly content?: readonly unknown[]

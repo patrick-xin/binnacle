@@ -242,6 +242,20 @@ test('a presenter that returns something the cards cannot draw says so under the
   ])
 })
 
+test('a presented title of more than one line indents its later lines under the head', async () => {
+  const heredoc = defineTool({
+    name: 'bash',
+    description: 'Run a heredoc.',
+    parameters: { command: { type: 'string', required: true } },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    execute: async () => 'wrote',
+    presentCall: () => ({ card: 'terminal', title: 'cat > greet.txt <<EOF\nhello\nEOF' }),
+  })
+  const { pane } = await withCards(heredoc)
+  pane.push(asked('bash', '{"command":"cat > greet.txt <<EOF"}'))
+  assert.deepEqual(drawText(pane, 60), ['● cat > greet.txt <<EOF', '  hello', '  EOF', '  running…'])
+})
+
 test('every other card kind is drawn by its title alone in this slice', async () => {
   const bash = defineTool({
     name: 'bash',
