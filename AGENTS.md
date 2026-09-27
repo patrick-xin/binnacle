@@ -57,6 +57,8 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 
 ## Tests
 
+The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/skills/tdd/SKILL.md)); load it before the first test of a change.
+
 - **Red before green.** Write the failing test first, watch it fail for the reason it names, then write the least code that passes it. One test at a time; the next responds to what the last taught.
 - **Test at a seam, never inside one.** A seam is a public boundary: a registration, what a view draws, the gesture table, a script's exported function. Name the seam before writing the test.
 - **Expected values come from outside the code** — a literal, a worked example, upstream's behaviour — never recomputed the way the code computes them.
