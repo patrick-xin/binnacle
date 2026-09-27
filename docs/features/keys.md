@@ -7,7 +7,7 @@ A person reaches what content offers from the keyboard, on either screen. On the
 - **Open.** Enter does what the focused thing offers first: it opens a cut fold, or folds an open one again.
 - **Step out.** Esc gives the keyboard back to the composer. So does any key Keys does not answer, and that key reaches the composer as typed, so typing is never lost.
 - **See focus.** A row in the accent tone is drawn under the focused thing: `▸` and what Enter will do, in its affordance's label (`▸ show 12 more lines`, `▸ fold to 3 lines`). A cut fold's `… 12 more lines` row becomes that row, so focusing it moves nothing. On the fullscreen, focus brings what it is on into view.
-- **On the main screen**, focus that reaches an entry already printed switches to the fullscreen, with that entry in view and focused. Enter opens it in place there, and Ctrl+T back finds the main screen as it was. Focus on something not yet printed stays on the main screen, drawn there; when printing catches up to it, focus is dropped rather than a printed row changed. Switching to the main screen drops focus that sits on a printed entry.
+- **On the main screen**, focus that reaches an entry already printed switches to the fullscreen, with that entry in view and focused. Enter opens it in place there, and Ctrl+T back finds the main screen as it was. Focus on something not yet printed stays on the main screen, drawn there. Focus the main screen cannot draw, on an entry printed before a switch to it or as printing catches up, is set aside rather than a printed row changed, and the keyboard goes back to the composer. Ctrl+T back to the fullscreen gives it back, drawn and in view, unless a key was pressed in between: then it is forgotten, so Enter sends what was typed.
 - Ctrl+C quits and Ctrl+T switches screens, as ever.
 
 ## How it works
@@ -29,6 +29,7 @@ One key table (`binnacle:packages/binnacle/src/ui/keys.ts#KEYBINDINGS`), held wi
 
 - Focus is drawn as one row in the accent tone under the focused thing, saying what Enter will do in the thing's own words, so nothing moves when a cut fold takes focus.
 - Step in lands on the nearest thing that offers something — the last on screen, by the composer.
+- Focus set aside by the main screen comes back with the fullscreen only if nothing was pressed in between, so a line typed there is never answered by focus.
 - On the main screen, focus reaching a printed entry switches to the fullscreen rather than reprint the scrollback ([ADR 12](../adr/0012-on-the-main-screen-a-printed-row-never-changes.md)); bringing what is focused into view scrolls only when it is out of view.
 
 ## Open

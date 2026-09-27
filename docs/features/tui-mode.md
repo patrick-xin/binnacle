@@ -5,7 +5,7 @@ A person reads the session on either of the terminal's screens, which pi calls T
 - **fullscreen**, the alternate screen. binnacle holds the window: the transcript scrolls in it above the composer, a click opens a fold, and a drag selects.
 - **regular**, the main screen. The session is printed into the terminal's own scrollback, so the person scrolls, searches and selects with the terminal they already know. No pointer reaches binnacle there; a key is the only way to reach what content offers ([Keys](keys.md)).
 
-`--tui-mode regular` or `--tui-mode fullscreen` picks the screen at start, and Ctrl+T switches while it runs. A switch keeps what was drawn, and what is typed in the composer. Whichever screen a person quits from, the terminal is left holding the session, printed once.
+`--tui-mode regular` or `--tui-mode fullscreen` picks the screen at start, and Ctrl+T switches while it runs. A switch keeps what was drawn, what is typed in the composer, and where focus was ([Keys](keys.md)). Whichever screen a person quits from, the terminal is left holding the session, printed once.
 
 ## How it works
 

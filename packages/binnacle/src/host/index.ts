@@ -133,10 +133,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
-    fullscreen: (top, height) => {
-      show('fullscreen')
-      intoView(top, height)
-    },
+    fullscreen: () => { show('fullscreen') },
   })
   // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
@@ -168,7 +165,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       return { consume: true }
     }
     if (resolved !== undefined && transcript.handleKey({ kind: 'key', binding: resolved.binding })) return { consume: true }
-    if (focused) transcript.handleKey({ kind: 'key', binding: 'focus.out' })
+    // Stepping out drops focus, and where the main screen parked it, so what was typed is sent, not answered by focus.
+    transcript.handleKey({ kind: 'key', binding: 'focus.out' })
     return undefined
   }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
@@ -202,6 +200,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     leave()
     tui = build(mode)
     tui.start()
+    // Focus the main screen parked comes back with the fullscreen, and is brought into view there.
+    if (mode === 'fullscreen') transcript.reveal()
   }
   tui = build(first)
   const unfollow = session.follow((event) => {

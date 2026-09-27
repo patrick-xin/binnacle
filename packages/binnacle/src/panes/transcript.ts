@@ -53,6 +53,8 @@ export class TranscriptPane implements Component {
   #drawn: { readonly width: number, readonly screen: Screen } | undefined
   #on: TuiMode = 'fullscreen'
   #printed: Printed | undefined
+  /** Focus the main screen dropped from a printed entry, given back when the fullscreen is. */
+  #parked: string | undefined
 
   /**
    * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
@@ -89,12 +91,17 @@ export class TranscriptPane implements Component {
   /**
    * Draw for one of pi-tui's screens from the next frame on. What it printed
    * on the main screen is kept while it draws on the alternate one, as the
-   * terminal keeps the main screen.
+   * terminal keeps the main screen, and so is where focus was: focus the main
+   * screen dropped from a printed entry comes back with the fullscreen.
    * @param mode - `regular` for the main screen, `fullscreen` for the alternate one; `fullscreen` until told.
    */
   drawOn(mode: TuiMode): void {
     this.#on = mode
     if (mode === 'regular') this.#dropPrintedFocus()
+    else if (this.#parked !== undefined) {
+      this.#state = { ...this.#state, focus: this.#parked }
+      this.#parked = undefined
+    }
   }
 
   /**
@@ -106,9 +113,16 @@ export class TranscriptPane implements Component {
     const drawn = this.#drawn
     if (focus === undefined || drawn === undefined) return
     const placed = drawn.screen.regions.find(candidate => candidate.region.id === focus)
-    if (placed !== undefined && placed.top < this.#printedThrough(drawn.width, drawn.screen)) {
-      this.#state = act(this.#state, { kind: 'unfocus' }, drawn.screen)
-    }
+    if (placed !== undefined && placed.top < this.#printedThrough(drawn.width, drawn.screen)) this.#park(drawn.screen)
+  }
+
+  /**
+   * Drop focus the main screen cannot draw, keeping where it was for the fullscreen.
+   * @param screen - the screen as drawn now, which bounds the action.
+   */
+  #park(screen: Screen): void {
+    this.#parked = this.#state.focus
+    this.#state = act(this.#state, { kind: 'unfocus' }, screen)
   }
 
   /**
@@ -124,7 +138,7 @@ export class TranscriptPane implements Component {
       const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
       const placed = screen.regions.find(candidate => candidate.region.id === this.#state.focus)
       if (placed !== undefined && placed.top < through(now)) {
-        this.#state = act(this.#state, { kind: 'unfocus' }, screen)
+        this.#park(screen)
         screen = this.#draw(this.#transcript, this.#state, width, this.#views())
       }
     }
@@ -137,6 +151,15 @@ export class TranscriptPane implements Component {
       : now > was.entries ? { width, entries: now, lines: [...was.lines, ...screen.lines.slice(through(was.entries), through(now))] } : was
     this.#printed = printed
     return [...printed.lines, ...screen.lines.slice(through(printed.entries))]
+  }
+
+  /** Report the rows focus sits on, to be brought into view, as when the fullscreen gives it back; nothing when nothing has focus. */
+  reveal(): void {
+    const drawn = this.#drawn
+    const focus = this.#state.focus
+    if (drawn === undefined || focus === undefined) return
+    const placed = this.#draw(this.#transcript, this.#state, drawn.width, this.#views()).regions.find(candidate => candidate.region.id === focus)
+    if (placed !== undefined) this.#inView(placed.top, placed.height)
   }
 
   /** Whether something on screen has focus. */
@@ -163,11 +186,14 @@ export class TranscriptPane implements Component {
 
   /**
    * Answer a key gesture through the gesture table, on the screen last drawn:
-   * a key lands on the focused region.
+   * a key lands on the focused region. Any key forgets focus the main screen
+   * parked, so the fullscreen gives it back only to a person who did nothing
+   * else in between.
    * @param gesture - the gesture a resolved key became.
    * @returns whether the pane answered it, so the key is consumed; false leaves it to the composer.
    */
   handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>): boolean {
+    this.#parked = undefined
     const drawn = this.#drawn
     if (drawn === undefined) return false
     const focus = this.#state.focus
