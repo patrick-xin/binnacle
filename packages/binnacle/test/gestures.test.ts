@@ -55,6 +55,7 @@ test('the step-out key means focus is dropped, wherever it lands', () => {
   assert.deepEqual(meaning({ kind: 'key', binding: 'focus.out' }, [card]), { kind: 'unfocus' })
   assert.deepEqual(meaning({ kind: 'key', binding: 'focus.out' }, []), { kind: 'unfocus' })
 })
+
 test('the primary key invokes the focused region\'s primary affordance, a grant included', () => {
   assert.deepEqual(meaning({ kind: 'key', binding: 'primary' }, [approval]), { kind: 'invoke', region: 'approval', affordance: 'grant' })
   assert.equal(meaning({ kind: 'key', binding: 'primary' }, []), undefined)

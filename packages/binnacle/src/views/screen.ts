@@ -35,10 +35,12 @@ interface Drawing {
   readonly by: readonly View[] | undefined
   /** What its views returned. */
   readonly node: Node
-  /** The id of every fold in it. */
+  /** The id of every fold in it, in the order `layout` cuts them. */
   readonly folds: readonly string[]
-  /** Its last layout: at what width, which of `folds` were open, and what it drew. */
-  readonly laid?: { readonly width: number, readonly open: readonly boolean[], readonly frame: Frame }
+  /** The id of every region in it, cut or not. */
+  readonly regions: readonly string[]
+  /** Its last layout: at what width, which of `folds` were open, which region in it had focus, and what it drew. */
+  readonly laid?: { readonly width: number, readonly open: readonly boolean[], readonly focus: string | undefined, readonly frame: Frame }
 }
 
 /**
@@ -61,6 +63,25 @@ function foldsIn(node: Node): string[] {
 }
 
 /**
+ * The id of every region in a node, however deep, cut or not: any of them can take focus.
+ */
+function regionsIn(node: Node): string[] {
+  switch (node.kind) {
+    case 'blank':
+    case 'text':
+    case 'markdown':
+      return []
+    case 'stack':
+      return node.children.flatMap(regionsIn)
+    case 'offer':
+    case 'fold':
+      return [node.id, ...regionsIn(node.child)]
+    case 'card':
+      return regionsIn(node.child)
+  }
+}
+
+/**
  * A way to draw screens that keeps what each entry drew. An entry is a value
  * the transcript replaces when it changes, so what it drew is kept against
  * the entry itself, and against the views of its key, which are replaced as
@@ -76,12 +97,14 @@ export function screens(): DrawScreen {
     let drawing = drawings.get(entry)
     if (drawing === undefined || drawing.by !== by) {
       const node = drawEntry(entry, views)
-      drawing = { by, node, folds: foldsIn(node) }
+      drawing = { by, node, folds: foldsIn(node), regions: regionsIn(node) }
     }
     const laid = drawing.laid
-    if (laid?.width === width && drawing.folds.every((id, index) => state.expanded.has(id) === laid.open[index])) return laid.frame
+    // The layout is kept against all of the state layout reads: the width, which folds are open, and focus, which draws its own row.
+    const focus = state.focus !== undefined && drawing.regions.includes(state.focus) ? state.focus : undefined
+    if (laid?.width === width && drawing.folds.every((id, index) => state.expanded.has(id) === laid.open[index]) && laid.focus === focus) return laid.frame
     const frame = layout(drawing.node, width, state)
-    drawings.set(entry, { ...drawing, laid: { width, open: drawing.folds.map(id => state.expanded.has(id)), frame } })
+    drawings.set(entry, { ...drawing, laid: { width, open: drawing.folds.map(id => state.expanded.has(id)), focus, frame } })
     return frame
   }
   return (model, state, width, views = new Map()) => {

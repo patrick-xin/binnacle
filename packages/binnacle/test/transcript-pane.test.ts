@@ -9,6 +9,7 @@ import { adapt } from '../src/facts/adapt.ts'
 import type { Fact } from '../src/facts/adapt.ts'
 import type { View, Views } from '../src/api.ts'
 import { TranscriptPane } from '../src/panes/transcript.ts'
+import type { PaneReports } from '../src/panes/transcript.ts'
 
 const prompt: Fact = { kind: 'prompt', seq: 1, time: 1, blocks: [{ kind: 'text', text: 'fix the build' }] }
 
@@ -48,6 +49,82 @@ test('a click on a fold opens it, and the pane claims the click', () => {
   assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', '… 2 more lines'])
   assert.deepEqual(pane.handleMouse(pointer('click', 2)), { handled: true })
   assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', 'a', 'b'])
+})
+
+test('stepping in from the composer focuses the nearest thing that offers something, drawn as its accent row', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(prompt)
+  pane.push(context)
+  assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', '… 2 more lines'])
+  assert.equal(pane.focused, false)
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
+  assert.equal(pane.focused, true)
+  assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', '▸ show 2 more lines'])
+})
+
+test('while something has focus, tab moves to the next thing and shift+tab to the previous, wrapping', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(prompt)
+  pane.push(context)
+  pane.push({ ...context, seq: 3, time: 3 })
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(shown(pane).slice(1), ['⋯ added by goal', '… 2 more lines', '⋯ added by goal', '▸ show 2 more lines'])
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(shown(pane).slice(1), ['⋯ added by goal', '▸ show 2 more lines', '⋯ added by goal', '… 2 more lines'])
+  pane.handleKey({ kind: 'key', binding: 'focus.next' })
+  pane.handleKey({ kind: 'key', binding: 'focus.next' })
+  assert.deepEqual(shown(pane).slice(1), ['⋯ added by goal', '▸ show 2 more lines', '⋯ added by goal', '… 2 more lines'])
+})
+
+test('enter does what the focused thing offers first: it opens a cut fold, and folds an open one again', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(prompt)
+  pane.push(context)
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  pane.handleKey({ kind: 'key', binding: 'primary' })
+  assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', 'a', 'b', '▸ fold it away'])
+  pane.handleKey({ kind: 'key', binding: 'primary' })
+  assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', '▸ show 2 more lines'])
+})
+
+test('escape gives the keyboard back to the composer: focus is dropped, and its row with it', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(prompt)
+  pane.push(context)
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.out' }), true)
+  assert.equal(pane.focused, false)
+  assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', '… 2 more lines'])
+})
+
+test('a key bound to an affordance the focused thing does not offer is not answered', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.push(prompt)
+  pane.push(context)
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'copy' }), false)
+  assert.equal(pane.focused, true)
+  assert.deepEqual(shown(pane), ['› fix the build', '⋯ added by goal', '▸ show 2 more lines'])
+})
+
+test('a focus that lands on something reports the rows it covers, to be brought into view, and opening what is focused reports nothing', () => {
+  const inView: [number, number][] = []
+  const reports: PaneReports = { inView: (top, height) => { inView.push([top, height]) } }
+  const pane = new TranscriptPane(() => {}, () => new Map(), reports)
+  pane.push(prompt)
+  pane.push(context)
+  pane.push({ ...context, seq: 3, time: 3 })
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(inView, [[4, 1]])
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(inView, [[4, 1], [2, 1]])
+  pane.handleKey({ kind: 'key', binding: 'primary' })
+  assert.deepEqual(inView, [[4, 1], [2, 1]])
 })
 
 /**

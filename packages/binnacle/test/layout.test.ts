@@ -47,6 +47,26 @@ test('a fold whose content fits offers nothing, so no gesture reaches it', () =>
   assert.deepEqual(plain(layout({ ...long, rows: 4 }, 20, OPEN)), { lines: ['l1', 'l2', 'l3', 'l4'], regions: [] })
 })
 
+test('the row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing', () => {
+  const frame = layout(long, 20, { expanded: new Set(), focus: 'tool:c1' })
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['l1', 'l2', '▸ show 2 more lines'])
+  assert.equal(frame.lines[2]?.trimEnd(), '\x1b[36m▸ show 2 more lines\x1b[39m')
+})
+
+test('a focused open fold draws the accent row under it, saying what Enter will do, and its region covers the row', () => {
+  const frame = layout(long, 20, { expanded: new Set(['tool:c1']), focus: 'tool:c1' })
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['l1', 'l2', 'l3', 'l4', '▸ fold to 2 lines'])
+  assert.equal(frame.lines[4]?.trimEnd(), '\x1b[36m▸ fold to 2 lines\x1b[39m')
+  assert.deepEqual(frame.regions.map(({ region, top, height }) => [region.id, top, height]), [['tool:c1', 0, 5]])
+})
+
+test('a focused region that offers, an offer node, draws the same accent row under it', () => {
+  const node = { kind: 'offer', id: 'answer:4', affordances: [{ kind: 'copy', label: 'copy the answer' }], child: { kind: 'text', text: 'an answer' } } as const
+  const frame = layout(node, 20, { expanded: new Set(), focus: 'answer:4' })
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['an answer', '▸ copy the answer'])
+  assert.equal(frame.lines[1]?.trimEnd(), '\x1b[36m▸ copy the answer\x1b[39m')
+})
+
 test('a folded region hides the regions it cut, and clips one it cut through', () => {
   const copy = [{ kind: 'copy', label: 'copy' }] as const
   const node = {

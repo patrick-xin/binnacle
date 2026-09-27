@@ -70,6 +70,17 @@ class XtermTerminal extends FakeTerminal {
     await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
     return this.#xterm.buffer.active.type === 'alternate'
   }
+
+  /**
+   * What the alternate screen holds, once everything written has landed.
+   * @returns each row of the window, plain, its trailing spaces dropped.
+   * @throws when the alternate screen is not showing.
+   */
+  async altScreen(): Promise<string[]> {
+    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
+    if (this.#xterm.buffer.active.type !== 'alternate') throw new Error('the alternate screen is not showing')
+    return Array.from({ length: this.#rows }, (_, row) => this.#xterm.buffer.active.getLine(row)?.translateToString(true).trimEnd() ?? '')
+  }
 }
 
 /** A session that records what the host does with it; the harness behind it is dsh's, proven by `check:boot`. */
@@ -109,9 +120,9 @@ const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 1
  * @param within - how long to wait, in milliseconds.
  * @throws when it does not hold in time.
  */
-async function until(holds: () => boolean, within = 2_000): Promise<void> {
+async function until(holds: () => boolean | Promise<boolean>, within = 2_000): Promise<void> {
   const deadline = Date.now() + within
-  while (!holds()) {
+  while (!await holds()) {
     if (Date.now() > deadline) throw new Error(`did not hold within ${within} ms`)
     await settle()
   }
@@ -422,4 +433,42 @@ test('where the terminal reports holding and releasing a key, as pi-tui asks a k
   terminal.type('\x1b[99;5:3u')
   await settle()
   assert.deepEqual(exits, [0])
+})
+
+test('shift+tab steps in from the composer, enter opens the focused fold, and a key keys does not answer reaches the composer typed', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([called(13, 'read'), returned(14, 13, 'w\nx\ny\nz')])
+  const { session: sent, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('… 1 more line')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
+  terminal.type('x')
+  await until(async () => !(await terminal.altScreen()).some(row => row.includes('▸')))
+  terminal.type('\r')
+  assert.deepEqual(sent.sent, ['x'])
+})
+
+test('on the alternate screen, focus brings what it is on into view as it moves up the session', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const logged: SessionEvent[] = []
+  for (let entry = 1; entry <= 6; entry++) {
+    const seq = entry * 2
+    logged.push(called(seq, `read${entry}`), returned(seq + 1, seq, 'w\nx\ny\nz'))
+  }
+  const session = new FakeSession(logged)
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
+  for (let entry = 5; entry >= 1; entry--) {
+    terminal.type('\x1b[Z')
+    await until(async () => {
+      const rows = await terminal.altScreen()
+      return rows[0]?.trim() === 'w' && rows[3]?.includes('▸ show 1 more line') === true && rows[4]?.includes(`read${entry + 1}`) === true
+    })
+  }
 })

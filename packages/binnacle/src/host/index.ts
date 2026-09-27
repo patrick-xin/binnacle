@@ -107,7 +107,17 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const events: SessionEvent[] = []
   let tui: TuiMainScreen | TuiAltScreen
   let left: TuiMainScreenRenderState | undefined
-  const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views)
+  let scroll: ScrollView | undefined
+  // A focus the pane brings on screen is brought into view by the scroll view that windows it, on the alternate screen.
+  const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
+    inView: (top, height) => {
+      const view = scroll
+      if (view === undefined) return
+      tui.renderNow()
+      if (top < view.scrollTop) view.scrollTo(top)
+      else if (top + height > view.scrollTop + view.viewportHeight) view.scrollTo(top + height - view.viewportHeight)
+    },
+  })
   // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
     if (changed === 'facts') transcript.reset(events.map(event => adapt(event, registrations.adapters)))
@@ -124,13 +134,22 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const table = keyTable()
   setKeybindings(table.manager)
   // Keys arrive ahead of the composer, through pi-tui's input listener. The host answers what is bound to it, quitting
-  // and switching screens; a gesture is the pane's to answer, and what the table does not resolve the composer keeps.
+  // and switching screens; a gesture is the pane's to answer, and a key nothing answers gives the keyboard back to the
+  // composer, reaching it typed, so typing is never lost.
   const keys = (data: string): TuiInputListenerResult => {
-    const resolved = table.resolve(data, false)
-    if (resolved?.kind === 'quit') quit()
-    else if (resolved?.kind === 'switch-screens') show(tui.mode === 'fullscreen' ? 'regular' : 'fullscreen')
-    else return undefined
-    return { consume: true }
+    const focused = transcript.focused
+    const resolved = table.resolve(data, focused)
+    if (resolved?.kind === 'quit') {
+      quit()
+      return { consume: true }
+    }
+    if (resolved?.kind === 'switch-screens') {
+      show(tui.mode === 'fullscreen' ? 'regular' : 'fullscreen')
+      return { consume: true }
+    }
+    if (resolved !== undefined && transcript.handleKey({ kind: 'key', binding: resolved.binding })) return { consume: true }
+    if (focused) transcript.handleKey({ kind: 'key', binding: 'focus.out' })
+    return undefined
   }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)
@@ -139,10 +158,14 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     next.addChild(transcript)
     next.addChild(composer)
     if (next instanceof TuiAltScreen) {
+      const followed = new ScrollView(transcript, { follow: 'end', primary: true })
+      scroll = followed
       next.setLayoutRoot(new VStack([
-        { component: new ScrollView(transcript, { follow: 'end', primary: true }), basis: 0, grow: 1, shrink: 1, minSize: 1 },
+        { component: followed, basis: 0, grow: 1, shrink: 1, minSize: 1 },
         { component: composer, basis: 'auto', grow: 0, shrink: 1, minSize: 3 },
       ]))
+    } else {
+      scroll = undefined
     }
     next.setFocus(composer)
     next.addInputListener(keys)

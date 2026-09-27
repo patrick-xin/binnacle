@@ -2,14 +2,16 @@
  * The transcript pane: the screen as a pi-tui component, on either of pi-tui's screens.
  *
  * It folds the session's facts into turns as they arrive, holds the UI state,
- * draws the screen at the width pi-tui gives it, and answers a pointer through
- * the gesture table on the screen it last drew, which is the one the person
- * pointed at. On the main screen it never changes a row it has printed
+ * draws the screen at the width pi-tui gives it, and answers a pointer or a
+ * key through the gesture table on the screen it last drew, which is the one
+ * the person acted on. On the main screen it never changes a row it has
+ * printed
  * ([ADR 12](../../../../docs/adr/0012-on-the-main-screen-a-printed-row-never-changes.md)).
  */
 
 import type { Component, TuiMode, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
 import type { Fact } from '../facts/adapt.ts'
+import type { Gesture } from '../contract/index.ts'
 import { empty, fold, settled, transcript } from '../models/transcript.ts'
 import type { Transcript } from '../models/transcript.ts'
 import { meaning } from '../ui/gestures.ts'
@@ -31,11 +33,18 @@ interface Printed {
   readonly lines: readonly string[]
 }
 
+/** What the pane reports about the screen it drew, for the host to act on beyond drawing. */
+export interface PaneReports {
+  /** Something to bring into view: the rows a focused thing covers, on the screen as now drawn. */
+  readonly inView?: (top: number, height: number) => void
+}
+
 /** The screen, as a component pi-tui lays out and scrolls. */
 export class TranscriptPane implements Component {
   #transcript: Transcript = empty
   readonly #changed: () => void
   readonly #views: () => Views
+  readonly #inView: (top: number, height: number) => void
   #state: UiState = initial
   #draw: DrawScreen = screens()
   #drawn: { readonly width: number, readonly screen: Screen } | undefined
@@ -45,10 +54,12 @@ export class TranscriptPane implements Component {
   /**
    * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
    * @param views - authors' views as they stand, read at every frame; an entry is drawn again when the views of its key change.
+   * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
    */
-  constructor(changed: () => void, views: () => Views = () => new Map()) {
+  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}) {
     this.#changed = changed
     this.#views = views
+    this.#inView = reports.inView ?? (() => {})
   }
 
   /**
@@ -100,6 +111,11 @@ export class TranscriptPane implements Component {
     return [...printed.lines, ...screen.lines.slice(through(printed.entries))]
   }
 
+  /** Whether something on screen has focus. */
+  get focused(): boolean {
+    return this.#state.focus !== undefined
+  }
+
   /**
    * Answer the pointer through the gesture table.
    * @param event - pi-tui's event, its row one of this view's lines.
@@ -115,6 +131,33 @@ export class TranscriptPane implements Component {
     if (next === this.#state) return undefined
     this.#state = next
     return { handled: true }
+  }
+
+  /**
+   * Answer a key gesture through the gesture table, on the screen last drawn:
+   * a key lands on the focused region.
+   * @param gesture - the gesture a resolved key became.
+   * @returns whether the pane answered it, so the key is consumed; false leaves it to the composer.
+   */
+  handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>): boolean {
+    const drawn = this.#drawn
+    if (drawn === undefined) return false
+    const focus = this.#state.focus
+    const focused = focus === undefined ? undefined : drawn.screen.regions.find(placed => placed.region.id === focus)
+    const action = meaning(gesture, focused === undefined ? [] : [focused.region])
+    if (action === undefined) return false
+    const next = act(this.#state, action, drawn.screen)
+    if (next !== this.#state) {
+      const moved = next.focus !== undefined && next.focus !== this.#state.focus
+      this.#state = next
+      if (moved && this.#on === 'fullscreen') {
+        const screen = this.#draw(this.#transcript, next, drawn.width, this.#views())
+        const placed = next.focus === undefined ? undefined : screen.regions.find(candidate => candidate.region.id === next.focus)
+        if (placed !== undefined) this.#inView(placed.top, placed.height)
+      }
+      this.#changed()
+    }
+    return true
   }
 
   /** Draw every entry again, as pi-tui asks when the theme changes, on the main screen what it printed included. */
