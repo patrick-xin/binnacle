@@ -44,3 +44,10 @@ export interface Registrations {
    */
   invalidate(key: string): void
 }
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** What an author registers with the surface: `ctx.binnacle`, typed for anything that imports the author API, as the host provides it. */
+    binnacle: Registrations
+  }
+}

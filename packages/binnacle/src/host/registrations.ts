@@ -13,13 +13,6 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AuthorAdapter, Registrations, View, Views } from '../api.ts'
 
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    /** What an author registers with the surface. */
-    binnacle: Registrations
-  }
-}
-
 /** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
 export class RegistrationService extends Service implements Registrations {
   private readonly adapterTable = new Map<string, readonly AuthorAdapter[]>()

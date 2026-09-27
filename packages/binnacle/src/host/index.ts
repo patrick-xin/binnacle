@@ -27,6 +27,7 @@ import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
+import { toolCards } from '../plugins/tool-cards/index.ts'
 import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
@@ -239,6 +240,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
  */
 export function apply(ctx: Context): void {
   const registrations = new RegistrationService(ctx)
+  // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
+  ctx.plugin(toolCards)
   let parsed: Mode | undefined
   parseCmdline(ctx, surfaceCommand((chosen) => { parsed = chosen }))
   if (parsed === undefined) return

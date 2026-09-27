@@ -57,7 +57,8 @@
   ],
   "external": {
     "@deepseek-ai/cordis": [
-      "host"
+      "host",
+      "plugins"
     ],
     "@deepseek-ai/dsh-agent": [
       "host"
@@ -75,6 +76,9 @@
     "@deepseek-ai/dsh-session": [
       "facts",
       "host"
+    ],
+    "@deepseek-ai/dsh-tools": [
+      "plugins"
     ],
     "@earendil-works/pi-tui": [
       "ui",

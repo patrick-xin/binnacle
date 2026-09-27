@@ -58,6 +58,8 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | Term | Means |
 | --- | --- |
 | **harness** | dsh: the agent loop, the session log, tools, commands, settings, credentials, presets. |
+| **card** | The kind of view a tool presents one of its calls or results as: the `card` field of a `ToolCallView` or a `ToolResultView` (`dsh:packages/core/tools/src/presentation.ts`). dsh's word, for tool calls; binnacle's card node is another thing. |
+| **presenter** | One of a tool's `presentCall` and `presentResult`: pure functions saying how one of its calls renders, in a UI and on replay alike (`dsh:packages/core/tools/src/index.ts#ToolDefinition`). dsh's word. |
 | **launcher** | The `dsh` binary, from `@deepseek-ai/dsh`; it composes a profile and mounts it. |
 | **bundle** | A package whose `package.json` names a Cordis patch under `dsh.bundle`; binnacle is one. |
 | **profile** | A directory under `$DSH_HOME/profiles/` stacking bundles; `binnacle` stacks `dsh-base`, then binnacle. |

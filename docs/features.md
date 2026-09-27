@@ -13,6 +13,7 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 ## Watch: what is it doing?
 
 - [Transcript](features/transcript.md): the session log drawn as turns, with what was sent, answered, called and returned.
+- [Tool cards](features/tool-cards.md): each tool call read as its tool presents it — its title, and what it returned folded beneath.
 
 ## Review: what happened?
 

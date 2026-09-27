@@ -8,6 +8,8 @@ import xterm from '@xterm/headless'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import * as host from '../src/host/index.ts'
 import type { OpenedSession } from '../src/host/session.ts'
 
@@ -143,7 +145,7 @@ class FailingTerminal extends FakeTerminal {
 }
 
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
-async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal()) {
+async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}) {
   const exits: number[] = []
   const out: string[] = []
   let ready: (() => void) | undefined
@@ -154,6 +156,7 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   host.internals.stderr = { write: (chunk: string) => { out.push(chunk); return true } }
   host.internals.open = open
   const ctx = new Context()
+  await provide(ctx)
   provideCmdline(ctx, {
     args,
     exit: code => { exits.push(code) },
@@ -342,6 +345,29 @@ test('an author invalidating its view draws its entries again on screen, without
   author?.binnacle.invalidate('seeded')
   await until(() => /grown from a fork/.test(terminal.written))
   assert.equal(adapted, read)
+})
+
+test('a session\'s call draws its presented title', async () => {
+  const session = new FakeSession([])
+  const { terminal, commit } = await mount([], session, async () => session, new FakeTerminal(), async (ctx) => {
+    await ctx.plugin(SystemPrompt, {})
+    const tools = new ToolRuntime(ctx)
+    tools.register(defineTool({
+      name: 'read',
+      description: 'Read a file.',
+      parameters: { path: { type: 'string' } },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+      execute: async () => 'the file',
+      presentCall: args => ({ card: 'generic', title: `Read ${args.path}` }),
+    }))
+  })
+  commit()
+  await settle()
+  session.log({ type: 'tool/call', seq: SessionSeq(2), time: 2, data: { turn: 1, step: 1, callId: ToolCallId('c2'), name: 'read', arguments: '{"path":"src/api.ts"}' } })
+  await until(() => /Read src\/api\.ts/.test(terminal.written))
+  session.log(returned(3, 2, 'the file'))
+  await until(() => /the file/.test(terminal.written))
+  assert.equal(stripTerminalSequences(terminal.written).includes('● read'), false)
 })
 
 /** A tool the model asked for, as dsh logs it, named for its place in the log. */
