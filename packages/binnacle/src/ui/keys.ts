@@ -5,13 +5,13 @@
  * merging and held in one `KeybindingsManager` together with pi-tui's own,
  * so the composer and the alternate screen read the same table; the keys
  * plugins offer for screens they placed join it as bindings of their own,
- * and the manager is rebuilt as offers come and go, so one table still
- * answers every key. The table answers a press only, once: a repeat or a
- * release, which a kitty-protocol terminal also reports, is answered by
- * nothing binnacle binds.
+ * and the manager is rebuilt as offers come and go. Installing the manager
+ * is the host's, again whenever an offer changes it. The table answers a
+ * press only, once: a repeat or a release, which a kitty-protocol terminal
+ * also reports, is answered by nothing binnacle binds.
  */
 
-import { isKeyRepeat, isKeyRelease, KeybindingsManager, setKeybindings, TUI_KEYBINDINGS } from '@earendil-works/pi-tui'
+import { isKeyRepeat, isKeyRelease, KeybindingsManager, TUI_KEYBINDINGS } from '@earendil-works/pi-tui'
 import type { Keybinding, KeybindingDefinition, KeybindingDefinitions, Keybindings } from '@earendil-works/pi-tui'
 import type { KeyBinding } from '../contract/index.ts'
 
@@ -98,8 +98,8 @@ export interface KeyTable {
    */
   readonly resolve: (data: string, focused: boolean, open?: boolean) => ResolvedKey | undefined
   /**
-   * Offer the key that opens a placed screen, as a binding in this table, so a person can rebind it.
-   * The manager is rebuilt with the offer and installed again, still the one table.
+   * Offer the key that opens a placed screen, as a binding in this table, so a person can rebind it. The manager is
+   * rebuilt with the offer; installing it is the host's, which reads `manager` as it now stands.
    * @param name - the placed screen's name.
    * @param definition - the key it opens with, and its description, as any binding's.
    * @returns a function that withdraws the offer.
@@ -115,10 +115,8 @@ export function keyTable(): KeyTable {
   const offered = new Map<string, KeybindingDefinition>()
   let manager = new KeybindingsManager(KEYBINDINGS)
   const rebuild = (): void => {
-    // A new manager is the only way a binding joins the table; what the person rebound is carried to it, and it is
-    // installed again, so the composer and the alternate screen keep reading the one table.
+    // A new manager is the only way a binding joins the table; what the person rebound is carried to it.
     manager = new KeybindingsManager({ ...KEYBINDINGS, ...Object.fromEntries(offered) }, manager.getUserBindings())
-    setKeybindings(manager)
   }
   return {
     get manager(): KeybindingsManager {

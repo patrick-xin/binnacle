@@ -184,11 +184,12 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const table = keyTable()
   setKeybindings(table.manager)
   const offered = new Map<string, () => void>()
-  /** Take back every key the placed screens offer and offer what they offer now, closing one whose registration went. */
+  /** Take back every key the placed screens offer and offer what they offer now, closing one whose registration went, and install the manager the offers rebuilt. */
   function offerScreens(): void {
     for (const withdraw of offered.values()) withdraw()
     offered.clear()
     for (const [id, screen] of registrations.screens) offered.set(id, table.offer(id, { defaultKeys: screen.key, description: screen.description }))
+    setKeybindings(table.manager)
     if (open === undefined) return
     const placed = registrations.screens.get(open.name)
     if (placed === undefined) closeScreen()
