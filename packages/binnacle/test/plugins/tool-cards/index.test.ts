@@ -315,7 +315,7 @@ test('a row can draw a head of its own and a line under a completed head', () =>
   const running: CardParts = {
     call: { card: 'generic', title: 'pnpm test', returned: {} },
     result: undefined,
-    mark: { text: '●', tone: 'muted' },
+    mark: { mark: 'running' },
     waiting: { kind: 'text', text: '  running…', tone: 'muted' },
     reason: undefined,
     resultText: '',
@@ -324,7 +324,7 @@ test('a row can draw a head of its own and a line under a completed head', () =>
   assert.deepEqual(drawn(running), ['$ pnpm test', '  running…'])
   const done: CardParts = {
     ...running,
-    mark: { text: '✗', tone: 'error' },
+    mark: { mark: 'failed' },
     waiting: undefined,
     reason: 'the command exited 2',
     resultText: 'a\nb\nc',
@@ -336,7 +336,7 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
   const parts: CardParts = {
     call: { card: 'terminal', title: 'pnpm test', returned: { card: 'terminal', title: 'pnpm test', exitCode: 2 } },
     result: { card: 'terminal', returned: { card: 'terminal', exitCode: 2, output: 'tsc: 1 error' } },
-    mark: { text: '✗', tone: 'error' },
+    mark: { mark: 'failed' },
     waiting: undefined,
     reason: undefined,
     resultText: 'tsc: 1 error',
