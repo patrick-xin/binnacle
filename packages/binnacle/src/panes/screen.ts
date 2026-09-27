@@ -20,13 +20,13 @@ import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-wo
 import { describe } from '../contract/index.ts'
 import type { Fact } from '../facts/adapt.ts'
 import type { Gesture } from '../contract/index.ts'
-import { meaning } from '../ui/gestures.ts'
+import { answer } from '../ui/answer.ts'
 import { layout, under } from '../ui/layout.ts'
 import type { Frame } from '../ui/layout.ts'
 import type { Node, Span } from '../ui/node.ts'
 import { parseNode } from '../ui/node.ts'
 import { gestureOf } from '../ui/pointer.ts'
-import { act, initial } from '../ui/state.ts'
+import { initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
 
 /** What the pane reports about the screen it drew, for the host to act on beyond drawing. */
@@ -109,11 +109,9 @@ export class ScreenPane implements Component {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
     const laid = this.laidAt(event.width, this.#state)
-    const action = meaning(gesture, under(laid.frame.regions, event.y, event.x))
-    if (action === undefined) return undefined
-    const next = act(this.#state, action, laid)
-    if (next === this.#state) return undefined
-    this.#state = next
+    const next = answer(this.#state, gesture, under(laid.frame.regions, event.y, event.x), laid)
+    if (next === undefined || next.state === this.#state) return undefined
+    this.#state = next.state
     this.#changed()
     return { handled: true }
   }
@@ -129,14 +127,12 @@ export class ScreenPane implements Component {
     if (drawn === undefined) return false
     const focus = this.#state.focus
     const focused = focus === undefined ? undefined : drawn.frame.regions.find(placed => placed.region.id === focus)
-    const action = meaning(gesture, focused === undefined ? [] : [focused.region])
-    if (action === undefined) return false
-    const next = act(this.#state, action, drawn)
-    if (next !== this.#state) {
-      const moved = next.focus !== undefined && next.focus !== this.#state.focus
-      this.#state = next
-      if (moved) {
-        const screen = this.laidAt(drawn.width, next)
+    const next = answer(this.#state, gesture, focused === undefined ? [] : [focused.region], drawn)
+    if (next === undefined) return false
+    if (next.state !== this.#state) {
+      this.#state = next.state
+      if (next.focus !== undefined) {
+        const screen = this.laidAt(drawn.width, next.state)
         const placed = screen.frame.regions.find(candidate => candidate.region.id === next.focus)
         if (placed !== undefined) this.#inView(placed.top, placed.height)
       }

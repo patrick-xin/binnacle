@@ -13,7 +13,7 @@ import type { Fact } from '../facts/adapt.ts'
 import type { Gesture } from '../contract/index.ts'
 import { empty, fold, settled, transcript } from '../models/transcript.ts'
 import type { Transcript } from '../models/transcript.ts'
-import { meaning } from '../ui/gestures.ts'
+import { answer } from '../ui/answer.ts'
 import { under } from '../ui/layout.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { act, initial } from '../ui/state.ts'
@@ -175,11 +175,9 @@ export class TranscriptPane implements Component {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
     const drawn = this.#drawn?.width === event.width ? this.#drawn.screen : this.#draw(this.#transcript, this.#state, event.width, this.#views())
-    const action = meaning(gesture, under(drawn.regions, event.y, event.x))
-    if (action === undefined) return undefined
-    const next = act(this.#state, action, drawn)
-    if (next === this.#state) return undefined
-    this.#state = next
+    const next = answer(this.#state, gesture, under(drawn.regions, event.y, event.x), drawn)
+    if (next === undefined || next.state === this.#state) return undefined
+    this.#state = next.state
     return { handled: true }
   }
 
@@ -197,15 +195,13 @@ export class TranscriptPane implements Component {
     if (drawn === undefined) return false
     const focus = this.#state.focus
     const focused = focus === undefined ? undefined : drawn.screen.regions.find(placed => placed.region.id === focus)
-    const action = meaning(gesture, focused === undefined ? [] : [focused.region])
-    if (action === undefined) return false
-    const next = act(this.#state, action, drawn.screen)
-    if (next !== this.#state) {
-      const moved = next.focus !== undefined && next.focus !== this.#state.focus
-      this.#state = next
-      if (moved) {
-        const screen = this.#draw(this.#transcript, next, drawn.width, this.#views())
-        const placed = next.focus === undefined ? undefined : screen.regions.find(candidate => candidate.region.id === next.focus)
+    const next = answer(this.#state, gesture, focused === undefined ? [] : [focused.region], drawn.screen)
+    if (next === undefined) return false
+    if (next.state !== this.#state) {
+      this.#state = next.state
+      if (next.focus !== undefined) {
+        const screen = this.#draw(this.#transcript, next.state, drawn.width, this.#views())
+        const placed = screen.regions.find(candidate => candidate.region.id === next.focus)
         if (placed !== undefined) {
           // On the fullscreen the focused thing is brought into view; on the main screen, focus that reaches a printed entry asks for the fullscreen.
           if (this.#on === 'fullscreen') this.#inView(placed.top, placed.height)
