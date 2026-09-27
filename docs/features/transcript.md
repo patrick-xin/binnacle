@@ -12,7 +12,7 @@ A click on a fold opens it, and a click on an open one folds it again; so does E
 
 ## How it works
 
-How a session reaches the screen is [the architecture's](../architecture.md#how-a-session-reaches-the-screen). binnacle's own drawing of each kind of entry is its built-in views (`binnacle:packages/binnacle/src/views/entries.ts#drawEntry`); each tool call whose tool presents it is drawn by the tool-cards plugin over them ([Tool cards](tool-cards.md)). A fold is laid out cut to its rows and offers `expand` (`binnacle:packages/binnacle/src/ui/layout.ts#layout`). A click, the wheel and a drag reach the gesture table through the pane (`binnacle:packages/binnacle/src/panes/transcript.ts#TranscriptPane`), and pi-tui windows, scrolls and selects the lines ([ADR 7](../adr/0007-pi-tui-windows-scrolls-and-selects-the-transcript.md)).
+How a session reaches the screen is [the package map's](../../packages/binnacle/README.md#how-a-session-reaches-the-screen). binnacle's own drawing of each kind of entry is its built-in views (`binnacle:packages/binnacle/src/views/entries.ts#drawEntry`); each tool call whose tool presents it is drawn by the tool-cards plugin over them ([Tool cards](tool-cards.md)). A fold is laid out cut to its rows and offers `expand` (`binnacle:packages/binnacle/src/ui/layout.ts#layout`). A click, the wheel and a drag reach the gesture table through the pane (`binnacle:packages/binnacle/src/panes/transcript.ts#TranscriptPane`), and pi-tui windows, scrolls and selects the lines ([ADR 7](../adr/0007-pi-tui-windows-scrolls-and-selects-the-transcript.md)).
 
 ## Choices
 

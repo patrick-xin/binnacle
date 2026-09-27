@@ -28,6 +28,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **author API** | What an author may depend on: the `binnacle` service and the types its registrations take (`binnacle:packages/binnacle/src/api.ts#Registrations`). |
 | **feature** | What a person can do with binnacle, named as they would ask for it, wherever it is built: the host, a pane, or a built-in feature. Each has a page, listed in the feature map; its own choices are a person's to change ([ADR 0](adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). |
 | **feature map** | [`docs/features.md`](features.md): every feature's page, under the stage it serves. |
+| **package map** | [`packages/binnacle/README.md`](../packages/binnacle/README.md): what each layer of the code is for, how a session and a gesture pass through them, and where a change goes. |
 | **stage** | A step of a person's journey through a session — arrive, ask, watch, decide, steer, review, leave, tune — which the feature map groups features by. |
 | **built-in feature** | A Cordis plugin in `src/plugins` holding only what an author holds ([ADR 5](adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)). |
 | **affordance** | Something a person can do with a piece of content, such as `expand` or `grant` (`binnacle:packages/binnacle/src/contract/index.ts#affordances`). Its policy — whether a click may invoke it — belongs to its kind ([ADR 1](adr/0001-content-offers-affordances-the-surface-owns-gestures.md)). |
