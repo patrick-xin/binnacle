@@ -18,7 +18,7 @@ A feature — signing in, exporting a session, settings, a slash command — is 
 - It reads no clock, randomness, environment or process, and imports no `node:` module. An effect is a grant: a service the host provides and names, as a seam into dsh is named.
 - What more than one feature needs moves down into the layers. What a feature needs from them at run time joins the author API by an explicit decision, since every author depends on that API.
 
-[`layers.json`](../../packages/binnacle/layers.json) states the `plugins` layer, and `check:layers` holds it.
+`layers.json` states the `plugins` layer, and `check:layers` holds it.
 
 ## Alternatives considered
 

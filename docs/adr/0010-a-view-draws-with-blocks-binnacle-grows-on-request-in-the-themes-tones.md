@@ -9,13 +9,13 @@
 
 A region knew only its rows. Once something sits inside a border, or beside something else, the rows alone no longer say what a pointer landed on.
 
-pi styles what its extensions draw through a theme whose colours are named by what content means: `accent`, `muted`, `dim`, `success`, `error`, `warning` (`pi:packages/coding-agent/docs/themes.md`). It hands an extension components to draw with (`pi:packages/coding-agent/docs/tui.md`).
+pi styles what its extensions draw through a theme whose colours are named by what content means: `accent`, `muted`, `dim`, `success`, `error`, `warning` (pi's themes guide, at v0.87.1). It hands an extension components to draw with (pi's TUI guide, at v0.87.1).
 
 ## Decision
 
 **A view draws with blocks: data that binnacle lays out, and grows by a block when a request needs one. Styling is a tone the theme colours, never a colour a view chooses.**
 
-- Text takes a tone, by pi's names for what content means. The theme picks the colour, in the terminal's own palette.
+- Text takes a tone, by pi's names for what content means. The theme picks the colour.
 - A card holds a block inside a rounded border, with its title on the top edge.
 - A region knows its columns as well as its rows, so what sits inside a border is pointed at where it is drawn.
 - A request the blocks cannot draw is binnacle's defect (ADR 0), met by a new block. Where pi-tui has a component that draws it, the block is laid out by that component.

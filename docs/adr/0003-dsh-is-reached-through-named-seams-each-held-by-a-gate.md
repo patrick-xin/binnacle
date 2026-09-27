@@ -7,7 +7,7 @@
 
 dsh is a preview: every release so far has renamed, moved or reshaped something a bundle reaches. binnacle compiles against one release and runs inside whatever launcher mounts it, and much of what it depends on is not a type the compiler sees — a service name in `inject`, a row id in a patch, a package the lockfile resolves as a peer of a peer.
 
-Several of those fail silently. A patch naming a row no layer composed is skipped (`applyEntryPatches`, `dsh:vendor/include/src/index.ts`), and at `dsh-v0.1.7-rc.2` the launcher prints nothing about it and exits 0 from `--check` — probed with a renamed row. A package nobody declared moves with nothing to compare it to. A dependency on dsh that nobody listed is found at the next upgrade, one compile error at a time.
+Several of those fail silently. A patch naming a row no layer composed is skipped (dsh's `applyEntryPatches`), and at `dsh-v0.1.7-rc.2` the launcher prints nothing about it and exits 0 from `--check` — probed with a renamed row. A package nobody declared moves with nothing to compare it to. A dependency on dsh that nobody listed is found at the next upgrade, one compile error at a time.
 
 ## Decision
 
@@ -15,10 +15,10 @@ Several of those fail silently. A patch naming a row no layer composed is skippe
 
 | Seam | Named in | Held by |
 | --- | --- | --- |
-| each dsh package imported, and the layer that may import it | [`layers.json`](../../packages/binnacle/layers.json), by exact name | `check:layers` |
+| each dsh package imported, and the layer that may import it | `layers.json`, by exact name | `check:layers` |
 | each `@deepseek-ai` package the tree materializes, at one version | the manifests, exact | `check:pins`, against the lockfile, the dsh tag and what dsh vendors |
 | each service a row injects | `inject`, `satisfies (keyof Context)[]` | `typecheck` |
-| each row the patch names | [`cordis.patch.yml`](../../packages/binnacle/cordis.patch.yml) | `check:patch`, composing dsh-base's patch at the pin with dsh's own `applyEntryPatches` |
+| each row the patch names | `cordis.patch.yml` | `check:patch`, composing dsh-base's patch at the pin with dsh's own `applyEntryPatches` |
 | the launcher that mounts the bundle | the `dsh` reference's tag | `check:boot`, in CI with `@deepseek-ai/dsh` installed at the pin |
 | a shape restated rather than imported | its JSDoc, naming upstream's type | a type-level test asserting upstream's type is assignable to ours |
 

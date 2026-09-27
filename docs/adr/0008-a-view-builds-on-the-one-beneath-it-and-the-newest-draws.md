@@ -9,7 +9,7 @@
 
 A view was keyed by an entry kind and replaced binnacle's drawing of that kind whole, and a second plugin registering the same key was refused. So changing one tool's card meant redrawing every tool's card, and two plugins could not both touch tool cards.
 
-Cordis already has a shape for this: a `waterfall` listener receives `next`, calls it to delegate, and returns without it to short-circuit (`dsh:docs/cordis-primer.md`).
+Cordis already has a shape for this: a `waterfall` listener receives `next`, calls it to delegate, and returns without it to short-circuit (dsh's Cordis primer, at dsh-v0.1.7-rc.2).
 
 ## Decision
 

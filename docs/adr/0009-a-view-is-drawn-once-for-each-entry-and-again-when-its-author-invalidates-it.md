@@ -9,7 +9,7 @@ pi-tui draws a frame on every keystroke, and binnacle hands it the whole transcr
 
 Keeping a drawing makes a view a function of its entry alone. A view that reads anything else, such as a setting a person toggles, the time, or state its plugin keeps, is never drawn again when that changes. [ADR 0](0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md) wants such views: a person asks for compact tool cards behind a key, or a running call that counts its seconds.
 
-pi meets the same tension in its components: they cache by width and content, and an extension that changes what one reads calls `invalidate()`, then asks for a render (`pi:packages/coding-agent/docs/tui.md`).
+pi meets the same tension in its components: they cache by width and content, and an extension that changes what one reads calls `invalidate()`, then asks for a render (pi's TUI guide, at v0.87.1).
 
 ## Decision
 
