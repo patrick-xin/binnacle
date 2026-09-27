@@ -7,9 +7,9 @@
 
 [ADR 2](0002-five-layers-and-the-registrations-an-author-shares.md) names five doors, and the fifth, placements, puts content in a screen or a side panel. [ADR 0](0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md) puts more within an author's reach: the composer and the rest of the chrome, and the dialogs and screens a feature opens, such as signing in and settings.
 
-The host lays the screen out itself, the transcript in pi-tui's `ScrollView` above its `Editor` (`binnacle:packages/binnacle/src/host/index.ts`). So no author can replace the composer, add a line under it, or open a dialog. That layout is also a door the built-in surface has and an author does not, and the layer gate cannot see it, because it holds only what lives in a plugin ([ADR 5](0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)).
+The host lays the screen out itself, the transcript in pi-tui's `ScrollView` above its `Editor`. So no author can replace the composer, add a line under it, or open a dialog. That layout is also a door the built-in surface has and an author does not, and the layer gate cannot see it, because it holds only what lives in a plugin ([ADR 5](0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)).
 
-pi lets an extension replace its header, footer and editor, place a widget near the editor, and open an overlay or a screen of its own (`pi:packages/coding-agent/docs/tui.md`).
+pi lets an extension replace its header, footer and editor, place a widget near the editor, and open an overlay or a screen of its own (pi's TUI guide, at v0.87.1).
 
 ## Decision
 

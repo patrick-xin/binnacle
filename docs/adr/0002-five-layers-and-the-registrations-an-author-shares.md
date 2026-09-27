@@ -21,7 +21,7 @@ The repository is maintained by agents. An agent has to find where a behaviour l
 | ui     | the nodes a view draws with, layout, the gesture table ([ADR 1](0001-content-offers-affordances-the-surface-owns-gestures.md)), UI state |
 | host   | the terminal and the harness runtime; the only impure layer |
 
-A view draws with a few kinds of node — data, never a component — each laid out by the pi-tui component that already draws it. The vocabulary layers share without owning lives in a leaf, `contract`, that imports nothing of ours and that every layer may know. [`layers.json`](../../packages/binnacle/layers.json) states exactly what each layer may import, and `pnpm test` holds it.
+A view draws with a few kinds of node — data, never a component — each laid out by the pi-tui component that already draws it. The vocabulary layers share without owning lives in a leaf, `contract`, that imports nothing of ours and that every layer may know. `layers.json` states exactly what each layer may import, and `pnpm test` holds it.
 
 **An author and the built-in surface register through the same five doors**, each an effect disposed with its plugin:
 

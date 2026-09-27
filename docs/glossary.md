@@ -24,6 +24,9 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **pane** | A pi-tui component that draws views and holds UI state, deterministic in what it was given ([ADR 6](adr/0006-a-pane-joins-views-to-pi-tui-and-the-host-keeps-only-what-is-impure.md)); the transcript is one. |
 | **host** | The one layer that touches the terminal and the process. |
 | **author API** | What an author may depend on: the `binnacle` service and the types its registrations take (`binnacle:packages/binnacle/src/api.ts#Registrations`). |
+| **feature** | What a person can do with binnacle, named as they would ask for it, wherever it is built: the host, a pane, or a built-in feature. Each has a page, listed in the feature map; its own choices are a person's to change ([ADR 0](adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). |
+| **feature map** | [`docs/features.md`](features.md): every feature's page, under the stage it serves. |
+| **stage** | A step of a person's journey through a session — arrive, ask, watch, decide, steer, review, leave, tune — which the feature map groups features by. |
 | **built-in feature** | A Cordis plugin in `src/plugins` holding only what an author holds ([ADR 5](adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)). |
 | **affordance** | Something a person can do with a piece of content, such as `expand` or `grant` (`binnacle:packages/binnacle/src/contract/index.ts#affordances`). Its policy — whether a click may invoke it — belongs to its kind ([ADR 1](adr/0001-content-offers-affordances-the-surface-owns-gestures.md)). |
 | **primary affordance** | The first a region offers; what a click or the primary key invokes. |
@@ -44,7 +47,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **gate** | A check `pnpm test` runs that refuses a class of defect: `check:*`, `lint`, `typecheck`. |
 | **reference** | A repository read and never written, fetched into `.refs/<name>` at its pin ([`references.json`](../references.json)). |
 | **pin** | The commit, and for a release line the tag, a reference is read at; packages that follow it are pinned to match. |
-| **citation** | `` `name:path` ``, naming a file in a reference, resolved at its pin, or in this repository under the name `binnacle`; an optional `#symbol` must be found there. |
+| **citation** | `` `name:path` ``, naming a file in a reference, resolved at its pin, or in this repository under the name `binnacle`; an optional `#symbol` must be found there. Never in a decision record, which is not edited to follow a move. |
 | **upstream branch** | `upstream/<reference>/<version>`: a release past a pin, carried by the upstream job with the canary's verdict in its commit. |
 | **canary** | Moving a pin, then the tests and the boot, as the upstream job runs them; green, or red with the log of where it stopped. |
 

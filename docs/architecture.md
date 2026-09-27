@@ -4,7 +4,7 @@ binnacle is a terminal surface for [DeepSeek Harness](https://github.com/deepsee
 
 It is not a fork of dsh and reaches nothing dsh does not publish.
 
-This page states what binnacle commits to, and why. The rules that follow from it are [`AGENTS.md`](../AGENTS.md)'s; where the code does not yet meet a commitment, that is an issue.
+This page states what binnacle commits to, and why. The rules that follow from it are [`AGENTS.md`](../AGENTS.md)'s; where the code does not yet meet a commitment, that is an issue. What each feature does, and how, is its page in [the feature map](features.md).
 
 ## What it stands on
 
@@ -41,6 +41,7 @@ The host opens a session and follows its log (`binnacle:packages/binnacle/src/ho
 | [`AGENTS.md`](../AGENTS.md)                                         | the standing orders                                                      |
 | [`docs/architecture.md`](architecture.md)                           | this page                                                                |
 | [`docs/adr/`](adr/)                                                 | the decisions, why, and what each beat                                   |
+| [`docs/features.md`](features.md), [`docs/features/`](features/)    | every feature: what a person can do with it, how it works, its choices   |
 | [`docs/glossary.md`](glossary.md)                                   | every term, whose word it is, and what it means                          |
 | [`references.json`](../references.json)                             | every repository read here, by url, pinned commit, and the tag it is at  |
 | `.refs/`                                                            | those repositories, fetched by `pnpm refs`; read, never written          |

@@ -16,6 +16,9 @@
  * repository's TypeScript and JavaScript it must be a name the module exports,
  * its star re-exports followed.
  *
+ * A decision record cites nothing. It is never edited to follow a move, so it
+ * names what it read, and at which version, in words.
+ *
  * A reference only this machine declares is skipped where it is not fetched,
  * which is everywhere but here; a public one that is not fetched fails.
  * @module binnacle/scripts/check-citations
@@ -24,6 +27,7 @@ import { execFileSync } from 'node:child_process'
 import { dirname, join, posix } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseSync } from 'oxc-parser'
+import { RECORDS } from './check-links.mjs'
 import { repositoryFiles } from './check-paths.mjs'
 import { fetchedAt, references } from './refs.mjs'
 
@@ -83,9 +87,13 @@ export function checkCitations(files, manifest, read) {
   for (const file of files) {
     for (const citation of findCitations(file.text, Object.keys(manifest))) {
       const ref = manifest[citation.name]
-      const text = read(citation.name, citation.path)
       const where = `${file.path}:${citation.line}`
       const cited = `${citation.name}:${citation.path}`
+      if (file.path.startsWith(RECORDS)) {
+        problems.push(`${where}: ${cited} is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words`)
+        continue
+      }
+      const text = read(citation.name, citation.path)
       if (text === undefined) {
         if (ref.local) skipped += 1
         else problems.push(`${where}: ${citation.name} is not fetched; run \`pnpm refs\``)

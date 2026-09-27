@@ -24,8 +24,8 @@ Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.t
 ## One root
 
 - **Everything you read is under this checkout.** `pnpm refs` fetches each repository in [`references.json`](references.json) into `.refs/<name>` at its pin. **Never write under `.refs/`.**
-- **Cite another repository as `` `name:path` ``** (`` `pi:packages/tui/src/tui.ts` ``, optionally `#symbol`), never as a path on a machine. `pnpm test` resolves every citation at its pin and refuses a home directory in any file.
-- **Cite this repository's code the same way, by the name `binnacle`** (`` `binnacle:packages/binnacle/src/api.ts#Registrations` ``), wherever prose points at it. A symbol in code must be one its module exports, so a rename fails the gate instead of leaving the prose stale.
+- **Cite another repository as `` `name:path` ``** (`` `pi:packages/tui/src/tui.ts` ``, optionally `#symbol`), never as a path on a machine, and never in a decision record (below). `pnpm test` resolves every citation at its pin and refuses a home directory in any file.
+- **Cite this repository's code the same way, by the name `binnacle`** (`` `binnacle:packages/binnacle/src/api.ts#Registrations` ``), wherever prose outside a decision record points at it. A symbol in code must be one its module exports, so a rename fails the gate instead of leaving the prose stale.
 - **The source is the authority.** `dsh` on the harness contract; `pi` for pi-tui's API and for what pi composes from it; `codex` and `eve` for what a terminal can do. A limitation is a reading: name the reference it was read in.
 - **A reference only one machine has** is declared in its `references.local.json`, never in a tracked file, and never cited from one.
 
@@ -73,14 +73,17 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 | Record | Home |
 |---|---|
 | how it is built, and what it commits to | [`docs/architecture.md`](docs/architecture.md) |
-| why, and what it beat | a decision record in [`docs/adr/`](docs/adr/) |
+| a decision that binds beyond one feature: why, and what it beat | a decision record in [`docs/adr/`](docs/adr/) |
+| what a person can do with a feature, how its parts work together, and its choices | its page in [`docs/features/`](docs/features/), listed in [the feature map](docs/features.md) |
 | what a term means, and whose word it is | [`docs/glossary.md`](docs/glossary.md) |
 | what is wrong, missing, being read, or not built yet | a GitHub issue |
 | what one change did and why | its commit message |
 
 - **Each fact has one home; everywhere else links to it.** What code or config states — the layers, the affordances, what a gate refuses — is linked or cited, never restated.
 - **No implementation status or progress in prose, and no inventory restated from code or config.** The architecture states commitments, which may run ahead of the code; where the code falls short, that is an issue.
-- **A decision a maintainer may revisit is a decision record**: `docs/adr/NNNN-title.md`, numbered in order, from [the template](docs/adr/template.md), one decision each. The decision stays short and states a principle, not an inventory; the alternatives are real ones, never invented. A record is not edited into a different decision; a new one supersedes it, and both say so.
+- **A decision record is for a decision that binds beyond one feature**: a seam, a layer, the author API, or what every view or plugin must keep, taken over a real alternative that would be costly to switch to later. It is `docs/adr/NNNN-title.md`, numbered in order, from [the template](docs/adr/template.md), one decision each. The decision stays short and states a principle, not an inventory; the alternatives are real ones, never invented. A record is not edited into a different decision; a new one supersedes it, and both say so.
+- **A record is frozen, so it points at nothing that moves.** It names what it read, and at which version, in words (pi's TUI guide, at v0.87.1), and links only other records; `pnpm test` refuses a citation in one and a link out of one. A reading worth pointing at goes on its issue.
+- **A feature has a page**, `docs/features/<feature>.md`, listed in [the feature map](docs/features.md) under the stage it serves; `pnpm test` refuses a page the map leaves out. It says what a person can do with the feature, how its parts work together, cited, and its own choices — a default, a key, a flag, a colour. Those are a person's to change (ADR 0), so they are the page's, never a record's. A page exists when its feature does, and changes with it in the same commit; what a feature lacks is an issue, linked from its page.
 - **A reading — a survey, a probe, a limitation found — goes on the issue it informs**, naming the reference it was read in.
 - **Use the owner's term** — dsh's, Cordis's, pi-tui's — and check [the glossary](docs/glossary.md) before coining one; a new term is added there in the same change.
 - **Durable prose carries no change history**; the story goes in the commit message.
