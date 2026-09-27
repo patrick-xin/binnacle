@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
-import { stripTerminalSequences } from '@earendil-works/pi-tui'
+import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Terminal } from '@earendil-works/pi-tui'
 import xterm from '@xterm/headless'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -201,6 +201,16 @@ test('ctrl+c gives the terminal back, closes the session, and asks to exit 0', a
   assert.equal(terminal.started, false)
   assert.equal(session.closed, true)
   assert.deepEqual(exits, [0])
+})
+
+test('the host installs the one key table, so the composer reads binnacle\'s bindings beside pi-tui\'s own', async () => {
+  const { commit } = await mount([])
+  commit()
+  await settle()
+  const keys = getKeybindings()
+  assert.equal(keys.matches('\x03', 'binnacle.quit'), true)
+  assert.equal(keys.matches('\x14', 'binnacle.switchScreens'), true)
+  assert.equal(keys.matches('\r', 'tui.input.submit'), true)
 })
 
 test('disposing the row gives the terminal back, closes the session, and cancels a pending start', async () => {

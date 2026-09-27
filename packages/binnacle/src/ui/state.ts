@@ -51,5 +51,10 @@ export function act(state: UiState, action: Action, bounds: Bounds): UiState {
     case 'scroll':
     case 'select':
       return state
+    case 'unfocus': {
+      if (state.focus === undefined) return state
+      const { focus: _dropped, ...screen } = state
+      return screen
+    }
   }
 }

@@ -33,6 +33,7 @@ export function meaning(gesture: Gesture, under: readonly Region[]): Action | un
     case 'key': {
       if (gesture.binding === 'focus.next') return { kind: 'focus', step: 1 }
       if (gesture.binding === 'focus.previous') return { kind: 'focus', step: -1 }
+      if (gesture.binding === 'focus.out') return { kind: 'unfocus' }
       const focused = under[0]
       const offered = gesture.binding === 'primary'
         ? focused?.affordances[0]
