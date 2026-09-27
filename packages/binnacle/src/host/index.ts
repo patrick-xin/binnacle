@@ -125,7 +125,7 @@ function reaching(live: () => TUI): TUI {
 function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void, first: TuiMode): () => void {
   const terminal = internals.terminal()
   const events: SessionEvent[] = []
-  let facts: readonly Fact[] = []
+  const facts: Fact[] = []
   let tui: TuiMainScreen | TuiAltScreen
   let left: TuiMainScreenRenderState | undefined
   let scroll: ScrollView | undefined
@@ -168,7 +168,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
     if (changed === 'facts') {
-      facts = events.map(event => adapt(event, registrations.adapters))
+      // The whole log is read again, into the same array the placed screens are handed, so they see it as it now stands.
+      facts.length = 0
+      for (const event of events) facts.push(adapt(event, registrations.adapters))
       transcript.reset(facts)
     } else if (changed === 'screens') offerScreens()
     else tui.requestRender()
@@ -277,7 +279,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const unfollow = session.follow((event) => {
     events.push(event)
     const fact = adapt(event, registrations.adapters)
-    facts = [...facts, fact]
+    facts.push(fact)
     transcript.push(fact)
   })
   let held = true
