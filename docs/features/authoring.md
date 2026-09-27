@@ -17,16 +17,16 @@ Why an author reaches what the built-in surface reaches is [ADR 0](../adr/0000-e
 
 ## Placing a screen
 
-A plugin can place a screen of its own in the transcript's place, opened with a key: a review of the whole session, a settings page, anything a feature wants a person to read at length. `ctx.binnacle.screen(name, screen)` places one (`binnacle:packages/binnacle/src/api.ts#PlacedScreen`): its `draw` returns a node, as a view does, handed the session's facts read-only at each frame; nothing it does reaches the log.
+A plugin can place a screen of its own in the transcript's place, opened with a key: a review of the whole session, a settings page, anything a feature wants a person to read at length. `ctx.binnacle.screen(name, screen)` places one (`binnacle:packages/binnacle/src/api.ts#PlacedScreen`): its `draw` returns a node, as a view does, handed the session's facts read-only, and called again as they arrive, the width changes, a person opens something on the screen or the registration changes — not at every frame, so a frame costs what changed; nothing it does reaches the log.
 
 - A placed screen is drawn in the alternate screen's scroll view, where the transcript is: pi-tui windows it, and its scrolling, search and selection are the alternate screen's own — nothing of them is restated. The composer below stays, and stays live: a line typed while a screen is open is sent as ever. This is codex's reading (`codex:codex-rs/tui/src/app_backtrack.rs`): its owned viewport shows the detailed transcript in place, and from an inline session it enters the alternate screen for it.
 - From the main screen, opening switches to the fullscreen, and closing returns to the main screen as it was, its printed rows untouched. Leaving the fullscreen by Ctrl+T closes a placed screen too: it lives in the alternate screen's scroll view. Reopening finds it where it was scrolled, for its scroll view is kept while its registration stands.
 - Its plugin offers the key that opens it — `screen.key`, pi-tui's name for a key — as a binding in the one key table, named `binnacle.screen.<name>` and described by `screen.description`. The same key, or Esc, returns to the transcript as it was: its scroll, focus and folds, exactly. A person can rebind it once rebinding lands ([Keys](keys.md)).
-- While a placed screen is open no gesture moves on the transcript beneath; what the host answers itself still answers — quitting, switching screens.
+- While a placed screen is open it answers the transcript's gestures with UI state of its own — a click, and Enter on a focused fold, open what the screen drew, its folds included — and no gesture moves on the transcript beneath; what the host answers itself still answers — quitting, switching screens. The [Trajectory](trajectory.md) is one, built in.
 - The newest registration of a name places the screen, as the newest view of a key draws; disposing the plugin takes back its screen and its key, closing it if it is open.
 - What its `draw` does wrong — it throws, or returns no node binnacle can lay out — is drawn, naming its registration, and never takes the surface down.
 
 ### Choices
 
-- A placed screen opens from its top, and where a person scrolled it is kept while its registration stands; the key it opens with, and what the key is called in help, are its plugin's choices.
-- A screen's folds are drawn folded and its offers are not answered there: it is a page to read, not a surface to act on, so a screen that wants everything shown draws it without them.
+- A placed screen opens from its top, and where a person scrolled it, what they opened on it and where focus was, are kept while its registration stands; the key it opens with, and what the key is called in help, are its plugin's choices.
+- A screen's folds are drawn folded and open by the gestures above; what it wants always shown, it draws without them.

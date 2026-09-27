@@ -68,7 +68,7 @@ export interface KeyTable {
   /**
    * What a key resolves to.
    * @param data - the key's bytes, as the terminal reported them.
-   * @param focused - whether something on screen has focus, which decides which bindings are live.
+   * @param focused - whether something on the screen being read — the transcript, or a placed screen that is open — has focus, which decides which bindings are live.
    * @param open - whether a placed screen is open, which takes the keys the transcript would answer.
    * @returns what the key resolved to, or undefined when nothing binnacle binds answers it.
    */
@@ -114,13 +114,11 @@ export function keyTable(): KeyTable {
       for (const id of offered.keys()) {
         if (manager.matches(data, id as Keybinding)) return { kind: 'screen', name: id.slice(offeredBinding('').length) }
       }
-      if (open) {
-        // A placed screen takes the keys the transcript would answer: Esc returns to the transcript. Scrolling, search
-        // and selection are the alternate screen's own, over the scroll view the screen sits in; the composer below it
-        // stays live, and focus does not move on the transcript beneath.
-        if (manager.matches(data, 'binnacle.stepOut')) return { kind: 'screen-close' }
-        return undefined
-      }
+      // A placed screen takes the keys the transcript would answer, on itself rather than the transcript beneath;
+      // only Esc differs, returning to the transcript, and it is resolved first so the rest falls through to the
+      // gestures both screens share. Scrolling, search and selection are the alternate screen's own, over the scroll
+      // view the screen sits in; the composer below it stays live, and focus does not move on the transcript beneath.
+      if (open && manager.matches(data, 'binnacle.stepOut')) return { kind: 'screen-close' }
       if (manager.matches(data, 'binnacle.stepIn')) return { kind: 'gesture', binding: 'focus.previous' }
       if (focused) {
         if (manager.matches(data, 'binnacle.focusNext')) return { kind: 'gesture', binding: 'focus.next' }

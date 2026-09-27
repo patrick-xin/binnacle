@@ -24,7 +24,13 @@ export interface PlacedScreen {
   readonly key: KeyId
   /** What the key does, as a person reads it in help. */
   readonly description: string
-  /** How the screen draws, with nodes as a view draws, handed the session's facts read-only; nothing it does reaches the log. */
+  /**
+   * How the screen draws, with nodes as a view draws, handed the session's
+   * facts read-only; nothing it does reaches the log. It is called again as
+   * the facts arrive, the width changes, a person opens something on the
+   * screen or the registration changes — not at every frame — so it is a
+   * function of the facts and nothing else.
+   */
   readonly draw: (facts: readonly Fact[]) => Node
 }
 
@@ -64,7 +70,10 @@ export interface Registrations {
    * alternate screen. Its plugin offers the key that opens it, a binding in
    * the one key table; the same key, or Esc, returns to the transcript as it
    * was, and what the host answers itself, quitting included, still answers
-   * on a placed screen. The newest registration of a name places it;
+   * on a placed screen. The screen answers the transcript's gestures — a
+   * click, and Enter on a focused fold — with UI state of its own, and is
+   * drawn again as its facts arrive or a person opens something on it, so a
+   * frame costs what changed. The newest registration of a name places it;
    * disposing the plugin takes back its screen and its key, closing it if it
    * is open.
    * @param name - the screen's name, its registration's and its binding's.

@@ -18,6 +18,7 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 ## Review: what happened?
 
 - [TUI mode](features/tui-mode.md): read the session on the alternate screen or in the terminal's scrollback, and switch between them.
+- [Trajectory](features/trajectory.md): every event the session logged, machinery included, on a screen of its own — one line each, grouped by turn, any one opening to its record.
 - [Keys](features/keys.md): reach what content offers from the keyboard — focus it, open it, on either screen.
 
 ## Tune: can I make it mine?
