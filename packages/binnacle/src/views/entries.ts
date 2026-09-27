@@ -10,6 +10,7 @@ import type { Entry } from '../models/transcript.ts'
 import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
 import type { Node } from '../ui/node.ts'
+import { tones } from '../ui/theme.ts'
 
 /**
  * How a kind of entry is drawn: a built-in view, or one an author registered.
@@ -54,13 +55,14 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
 }
 
 /**
- * Draw a tool call: what was asked, then whether it is running, failed, or what it returned, folded.
+ * Draw a tool call: what was asked, then whether it is running, failed, or what it returned, folded. The glyph says how the call stands.
  * @param result - its result, once it has one.
  */
 function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined): Node {
-  const head: Node = { kind: 'text', text: `${result?.failed === true ? '✗' : '●'} ${call.name} ${call.arguments}` }
-  if (result === undefined) return { kind: 'stack', children: [head, { kind: 'text', text: '  running…' }] }
-  const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}` }]
+  const glyph = result === undefined ? tones.muted('●') : result.failed === true ? tones.error('✗') : tones.success('●')
+  const head: Node = { kind: 'text', text: `${glyph} ${call.name} ${call.arguments}` }
+  if (result === undefined) return { kind: 'stack', children: [head, { kind: 'text', text: '  running…', tone: 'muted' }] }
+  const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
   const output: Node = { kind: 'fold', id: `tool:${call.callId}`, rows: 3, child: { kind: 'text', text: textOf(result.blocks) } }
   return { kind: 'stack', children: [head, ...reason, output] }
 }
@@ -120,7 +122,7 @@ function drawnBy(entry: Entry, key: string, stack: readonly View[], height: numb
 function builtIn(entry: Entry, problem?: string): Node {
   switch (entry.kind) {
     case 'prompt':
-      return noted({ kind: 'text', text: `› ${textOf(entry.fact.blocks)}` }, problem)
+      return noted({ kind: 'text', text: `${tones.accent('›')} ${textOf(entry.fact.blocks)}` }, problem)
     case 'context':
       return titled(`⋯ added by ${entry.fact.source}`, { kind: 'fold', id: `context:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'answer':
@@ -137,17 +139,17 @@ function builtIn(entry: Entry, problem?: string): Node {
 }
 
 /**
- * A line of title above some content, and what went wrong under the title.
+ * A line of title, muted, above some content, and what went wrong under it in error.
  */
 function titled(title: string, body: Node, problem: string | undefined): Node {
-  return { kind: 'stack', children: problem === undefined ? [{ kind: 'text', text: title }, body] : [{ kind: 'text', text: title }, { kind: 'text', text: `✗ ${problem}` }, body] }
+  return { kind: 'stack', children: problem === undefined ? [{ kind: 'text', text: title, tone: 'muted' }, body] : [{ kind: 'text', text: title, tone: 'muted' }, { kind: 'text', text: `✗ ${problem}`, tone: 'error' }, body] }
 }
 
 /**
- * Content, and what went wrong after it, if anything.
+ * Content, and what went wrong after it in error, if anything.
  */
 function noted(body: Node, problem: string | undefined): Node {
-  return problem === undefined ? body : { kind: 'stack', children: [body, { kind: 'text', text: `✗ ${problem}` }] }
+  return problem === undefined ? body : { kind: 'stack', children: [body, { kind: 'text', text: `✗ ${problem}`, tone: 'error' }] }
 }
 
 /**
