@@ -16,6 +16,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **tone** | A colour of the theme's, named by what the content drawn in it means; pi's names (`binnacle:packages/binnacle/src/ui/theme.ts#tones`). |
 | **card** | A node holding another inside a rounded border, its title on the top edge. |
 | **markdown** | A node that draws its text as a markdown document, laid out by pi-tui's component in the theme's tones. |
+| **span** | One run of a text node's line: its text in the node's tone as a bare string, or in a tone of its own. |
 | **fallback view** | How an entry no view claims is drawn: its type in one line, and `expand` to the raw record. It also says what went wrong when an author's adapter or view failed. |
 | **layer** | A folder of `src`, or the module `api.ts`, and what it may import: [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **contract** | The layer holding what otherwise-independent layers share. |

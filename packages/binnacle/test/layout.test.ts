@@ -92,6 +92,19 @@ test('text in a tone opens every line it wraps to in the theme\'s style for that
   for (const line of frame.lines) assert.ok(line.startsWith('\x1b[31m'), JSON.stringify(line))
 })
 
+test('a text node of spans draws each span in its own tone, and a bare span in the node\'s', () => {
+  const node = { kind: 'text', text: [{ text: '›', tone: 'accent' }, ' fix the ', { text: 'build', tone: 'dim' }], tone: 'muted' } as const
+  assert.deepEqual(layout(node, 40, OPEN).lines.map(line => line.trimEnd()), ['\x1b[36m›\x1b[39m\x1b[90m fix the \x1b[39m\x1b[2mbuild\x1b[22m'])
+})
+
+test('a span that wraps keeps its tone on every line it wraps to', () => {
+  const node = { kind: 'text', text: ['the build ', { text: 'failed to finish', tone: 'error' }] } as const
+  const frame = layout(node, 10, OPEN)
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['the build', 'failed to', 'finish'])
+  assert.ok(frame.lines[1]?.startsWith('\x1b[31m'), JSON.stringify(frame.lines[1]))
+  assert.ok(frame.lines[2]?.startsWith('\x1b[31m'), JSON.stringify(frame.lines[2]))
+})
+
 test('a card draws what it holds inside a rounded border, its title on the top edge', () => {
   assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'exit 0' } }, 20, OPEN)), {
     lines: ['╭─ bash ───────────╮', '│ exit 0           │', '╰──────────────────╯'],

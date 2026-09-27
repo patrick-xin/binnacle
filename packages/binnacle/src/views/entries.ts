@@ -10,7 +10,6 @@ import type { Entry } from '../models/transcript.ts'
 import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
 import type { Node } from '../ui/node.ts'
-import { tones } from '../ui/theme.ts'
 
 /**
  * How a kind of entry is drawn: a built-in view, or one an author registered.
@@ -59,8 +58,10 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
  * @param result - its result, once it has one.
  */
 function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined): Node {
-  const glyph = result === undefined ? tones.muted('●') : result.failed === true ? tones.error('✗') : tones.success('●')
-  const head: Node = { kind: 'text', text: `${glyph} ${call.name} ${call.arguments}` }
+  const glyph = result === undefined
+    ? { text: '●', tone: 'muted' as const }
+    : result.failed === true ? { text: '✗', tone: 'error' as const } : { text: '●', tone: 'success' as const }
+  const head: Node = { kind: 'text', text: [glyph, ` ${call.name} ${call.arguments}`] }
   if (result === undefined) return { kind: 'stack', children: [head, { kind: 'text', text: '  running…', tone: 'muted' }] }
   const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
   const output: Node = { kind: 'fold', id: `tool:${call.callId}`, rows: 3, child: { kind: 'text', text: textOf(result.blocks) } }
@@ -122,7 +123,7 @@ function drawnBy(entry: Entry, key: string, stack: readonly View[], height: numb
 function builtIn(entry: Entry, problem?: string): Node {
   switch (entry.kind) {
     case 'prompt':
-      return noted({ kind: 'text', text: `${tones.accent('›')} ${textOf(entry.fact.blocks)}` }, problem)
+      return noted({ kind: 'text', text: [{ text: '›', tone: 'accent' }, ` ${textOf(entry.fact.blocks)}`] }, problem)
     case 'context':
       return titled(`⋯ added by ${entry.fact.source}`, { kind: 'fold', id: `context:${entry.fact.seq}`, rows: 0, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'answer':

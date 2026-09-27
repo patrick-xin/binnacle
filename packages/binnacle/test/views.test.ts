@@ -179,6 +179,17 @@ test('an author\'s view that returns what binnacle cannot lay out is drawn over,
   assert.deepEqual(drawn(prompt, titled), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a card\'s title is one line'])
   const undocumented = new Map<string, View[]>([['prompt', [() => ({ kind: 'markdown' }) as unknown as Node]]])
   assert.deepEqual(drawn(prompt, undocumented), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a markdown block needs text'])
+  const unspanned = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: ['fix', 3] }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, unspanned), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: 3 is no span'])
+  const untone = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: 'fix' }] }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, untone), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: undefined is no tone'])
+  const untext = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ tone: 'error' }] }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, untext), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a span needs its text'])
+})
+
+test('an author\'s view may draw a line of spans, each drawn in its tone', () => {
+  const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: '›', tone: 'accent' }, ' fix the build'] }) as unknown as Node]]])
+  assert.deepEqual(drawnWide(prompt, views), ['\x1b[36m›\x1b[39m fix the build'])
 })
 
 test('data with no JSON and no string form is still drawn, as what it is', () => {
