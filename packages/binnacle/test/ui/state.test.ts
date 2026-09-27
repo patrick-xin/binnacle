@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { act, initial } from '../src/ui/state.ts'
+import { act, initial } from '../../src/ui/state.ts'
 
 const BOUNDS = { focusable: ['tool:c1', 'reasoning:8:0', 'unknown:2'] }
 

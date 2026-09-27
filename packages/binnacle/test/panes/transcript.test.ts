@@ -5,11 +5,11 @@ import type { TuiMouseEvent } from '@earendil-works/pi-tui'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { adapt } from '../src/facts/adapt.ts'
-import type { Fact } from '../src/facts/adapt.ts'
-import type { View, Views } from '../src/api.ts'
-import { TranscriptPane } from '../src/panes/transcript.ts'
-import type { PaneReports } from '../src/panes/transcript.ts'
+import { adapt } from '../../src/facts/adapt.ts'
+import type { Fact } from '../../src/facts/adapt.ts'
+import type { View, Views } from '../../src/api.ts'
+import { TranscriptPane } from '../../src/panes/transcript.ts'
+import type { PaneReports } from '../../src/panes/transcript.ts'
 
 const prompt: Fact = { kind: 'prompt', seq: 1, time: 1, blocks: [{ kind: 'text', text: 'fix the build' }] }
 

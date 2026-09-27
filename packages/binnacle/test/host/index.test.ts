@@ -10,8 +10,8 @@ import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
-import * as host from '../src/host/index.ts'
-import type { OpenedSession } from '../src/host/session.ts'
+import * as host from '../../src/host/index.ts'
+import type { OpenedSession } from '../../src/host/session.ts'
 
 /** A terminal that records what is written and lets a test type into it. */
 class FakeTerminal implements Terminal {

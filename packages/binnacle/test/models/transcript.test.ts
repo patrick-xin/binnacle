@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { Fact } from '../src/facts/adapt.ts'
-import { settled, transcript } from '../src/models/transcript.ts'
+import type { Fact } from '../../src/facts/adapt.ts'
+import { settled, transcript } from '../../src/models/transcript.ts'
 
 const prompt: Fact = { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] }
 const answer: Fact = { kind: 'answer', seq: 4, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'text', text: 'Done.' }] }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { adapt } from '../src/facts/adapt.ts'
+import { adapt } from '../../src/facts/adapt.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {

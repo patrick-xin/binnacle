@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import type { Entry } from '../src/models/transcript.ts'
-import { layout } from '../src/ui/layout.ts'
-import { drawEntry } from '../src/views/entries.ts'
-import type { View, Views } from '../src/views/entries.ts'
-import type { Node } from '../src/ui/node.ts'
+import type { Entry } from '../../src/models/transcript.ts'
+import { layout } from '../../src/ui/layout.ts'
+import { drawEntry } from '../../src/views/entries.ts'
+import type { View, Views } from '../../src/views/entries.ts'
+import type { Node } from '../../src/ui/node.ts'
 
 /**
  * What an entry draws at a width, as a person reads it.

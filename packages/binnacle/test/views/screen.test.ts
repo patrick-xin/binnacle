@@ -1,10 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import type { Fact } from '../src/facts/adapt.ts'
-import type { Frame } from '../src/ui/layout.ts'
-import { initial } from '../src/ui/state.ts'
-import { screen } from '../src/views/screen.ts'
+import type { Fact } from '../../src/facts/adapt.ts'
+import type { Frame } from '../../src/ui/layout.ts'
+import { initial } from '../../src/ui/state.ts'
+import { screen } from '../../src/views/screen.ts'
 
 /** A frame as a person reads it. */
 const plain = (frame: Frame): Frame => ({ lines: frame.lines.map(line => stripTerminalSequences(line).trimEnd()), regions: frame.regions })

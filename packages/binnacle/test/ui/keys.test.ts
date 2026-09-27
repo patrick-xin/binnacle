@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { keyTable } from '../src/ui/keys.ts'
+import { keyTable } from '../../src/ui/keys.ts'
 
 /** The one key table. */
 const { resolve } = keyTable()
