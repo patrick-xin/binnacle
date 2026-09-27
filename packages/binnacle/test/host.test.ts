@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { Terminal } from '@earendil-works/pi-tui'
-import { MessageId } from '@deepseek-ai/dsh-llm'
+import xterm from '@xterm/headless'
+import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import * as host from '../src/host/index.ts'
@@ -30,6 +31,44 @@ class FakeTerminal implements Terminal {
   setTitle(): void {}
   setProgress(): void {}
   type(data: string): void { this.#onInput?.(data) }
+}
+
+/**
+ * A terminal that emulates one, as pi-tui's own tests do: what binnacle writes
+ * lands in xterm's main screen and scrollback, or its alternate screen.
+ */
+class XtermTerminal extends FakeTerminal {
+  readonly #xterm: InstanceType<typeof xterm.Terminal>
+  readonly #columns: number
+  readonly #rows: number
+  constructor(columns: number, rows: number) {
+    super()
+    this.#columns = columns
+    this.#rows = rows
+    this.#xterm = new xterm.Terminal({ cols: columns, rows, allowProposedApi: true })
+  }
+  override write(data: string): void { super.write(data); this.#xterm.write(data) }
+  override get columns(): number { return this.#columns }
+  override get rows(): number { return this.#rows }
+  /**
+   * What the main screen holds, its scrollback first, once everything written has landed.
+   * @returns each row, plain, with the empty rows under the last dropped.
+   */
+  async mainScreen(): Promise<string[]> {
+    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
+    const buffer = this.#xterm.buffer.normal
+    const rows = Array.from({ length: buffer.length }, (_, row) => buffer.getLine(row)?.translateToString(true).trimEnd() ?? '')
+    while (rows.at(-1) === '') rows.pop()
+    return rows
+  }
+  /**
+   * Whether the alternate screen is showing.
+   * @returns true when it is.
+   */
+  async onAlternateScreen(): Promise<boolean> {
+    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
+    return this.#xterm.buffer.active.type === 'alternate'
+  }
 }
 
 /** A session that records what the host does with it; the harness behind it is dsh's, proven by `check:boot`. */
@@ -272,4 +311,86 @@ test('an author invalidating its view draws its entries again on screen, without
   author?.binnacle.invalidate('seeded')
   await until(() => /grown from a fork/.test(terminal.written))
   assert.equal(adapted, read)
+})
+
+/** A tool the model asked for, as dsh logs it, named for its place in the log. */
+const called = (seq: number, name: string): SessionEvent<'tool/call'> => ({
+  type: 'tool/call', seq: SessionSeq(seq), time: seq, data: { turn: 1, step: 1, callId: ToolCallId(`c${seq}`), name, arguments: '{}' },
+})
+
+/** What a call returned, as dsh logs it. */
+const returned = (seq: number, callSeq: number, text: string): SessionEvent<'tool/result'> => ({
+  type: 'tool/result', seq: SessionSeq(seq), time: seq, surfaceOp: 'append',
+  data: { turn: 1, step: 1, message: { role: 'tool', id: MessageId(`m${seq}`), source: { kind: 'tool', callId: ToolCallId(`c${callSeq}`) }, toolCallId: ToolCallId(`c${callSeq}`), content: [{ type: 'text', text }] } },
+})
+
+/** Twelve lines a person sent, taller together than the terminal. */
+const twelve = Array.from({ length: 12 }, (_, index) => prompt(index + 1, `p${index + 1}`))
+
+test('--tui-mode regular prints the session under what the shell printed, and neither a result nor a view registered after clears it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  terminal.write('$ dsh --profile binnacle\r\n')
+  const session = new FakeSession(twelve)
+  const { ctx, commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(() => /p12/.test(terminal.written))
+  session.log(called(13, 'read'))
+  await until(() => /running…/.test(terminal.written))
+  session.log(returned(14, 13, 'the file'))
+  await until(() => /the file/.test(terminal.written))
+  const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.view('prompt', () => ({ kind: 'text', text: 'drawn by an author' })) } })
+  await author
+  session.log(prompt(15, 'p15'))
+  await until(() => /drawn by an author/.test(terminal.written))
+  const shown = await terminal.mainScreen()
+  assert.equal(shown[0], '$ dsh --profile binnacle')
+  assert.deepEqual(shown.filter(row => row.startsWith('› ')), twelve.map((_, index) => `› p${index + 1}`))
+  assert.deepEqual(shown.filter(row => /read|the file|running|author/.test(row)), ['● read {}', 'the file', 'drawn by an author'])
+})
+
+test('ctrl+t switches screens both ways, and what is typed, what every entry drew, and ctrl+c come along', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
+  let calls = 0
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.view('prompt', (_, next) => { calls++; return next() }) } })
+  commit()
+  await until(() => /fix the build/.test(terminal.written))
+  assert.equal(await terminal.onAlternateScreen(), true)
+  terminal.type('hel')
+  terminal.type('\x14')
+  await settle()
+  assert.equal(await terminal.onAlternateScreen(), false)
+  assert.ok((await terminal.mainScreen()).includes('› fix the build'))
+  terminal.type('lo')
+  await settle()
+  assert.ok((await terminal.mainScreen()).some(row => row.includes('hello')))
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['hello'])
+  terminal.type('\x14')
+  assert.equal(await terminal.onAlternateScreen(), true)
+  assert.equal(calls, 1)
+  terminal.type('\x03')
+  await settle()
+  assert.equal(terminal.started, false)
+  assert.deepEqual(exits, [0])
+})
+
+test('whichever screen a person quits from, the main screen is left holding the session, printed once', async () => {
+  for (const [args, switches] of [[[], 0], [['--tui-mode', 'regular'], 1], [['--tui-mode', 'regular'], 2]] as const) {
+    const terminal = new XtermTerminal(40, 8)
+    const session = new FakeSession(twelve.slice(0, 3))
+    const { commit } = await mount([...args], session, async () => session, terminal)
+    commit()
+    await until(() => /p3/.test(terminal.written))
+    for (let turn = 0; turn < switches; turn++) {
+      terminal.type('\x14')
+      await settle()
+    }
+    session.log(prompt(4, 'p4'))
+    await settle()
+    terminal.type('\x03')
+    await settle()
+    assert.deepEqual((await terminal.mainScreen()).filter(row => row.startsWith('› ')), ['› p1', '› p2', '› p3', '› p4'], `${args.join(' ') || 'fullscreen'}, switched ${switches} times`)
+  }
 })

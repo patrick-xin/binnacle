@@ -3,22 +3,24 @@
  *
  * It reads the invocation through dsh's command line, and once the launcher
  * commits startup it opens a session on the default model. With `--check`
- * it reports the model and closes it; otherwise it takes the terminal through
- * pi-tui's alternate screen — the transcript in a scroll view that follows
- * its end, the composer below — until the person quits. It provides the
- * `binnacle` service authors register through, and reads the whole log again
- * when a registration comes or goes. A failure it cannot recover from gives
+ * it reports the model and closes it; otherwise it takes the terminal until
+ * the person quits, on the screen they asked for and switch to: the alternate
+ * screen, the transcript in a scroll view that follows its end, or the main
+ * screen, the transcript printed into the scrollback; the composer below
+ * either ([ADR 12](../../../../docs/adr/0012-binnacle-draws-on-either-screen-and-a-person-switches-between-them.md)).
+ * It provides the `binnacle` service authors register through, and reads the
+ * whole log again when an adapter comes or goes. A failure it cannot recover from gives
  * back what it took, a terminal half-started included, says what failed, and
  * asks the launcher to exit 1. Every layer below it is a function of facts,
  * UI state and a size; this is where those meet a real process.
  */
 
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, VStack } from '@earendil-works/pi-tui'
-import type { Terminal } from '@earendil-works/pi-tui'
+import { Editor, matchesKey, ProcessTerminal, ScrollView, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
+import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
 import { describe } from '../contract/index.ts'
@@ -50,8 +52,8 @@ export const internals: {
   open: openSession,
 }
 
-/** What this invocation asked for. */
-type Mode = 'check' | 'interactive'
+/** What this invocation asked for: a check, or the terminal on a screen, in pi's words for them. */
+type Mode = 'check' | TuiMode
 
 /**
  * This surface's command: its flags and help.
@@ -61,61 +63,118 @@ type Mode = 'check' | 'interactive'
 function surfaceCommand(chosen: (mode: Mode) => void): Command {
   return new Command()
     .name('dsh --profile binnacle')
-    .description('Open a terminal session with an agent.')
+    .description('Open a terminal session with an agent. Ctrl+T switches screens; Ctrl+C quits.')
     .helpOption('-h, --help', 'show this help')
     .option('--check', 'open a session on the default model, report it, close it, and exit, drawing nothing')
-    .action((options: { check?: boolean }) => { chosen(options.check === true ? 'check' : 'interactive') })
+    .addOption(new Option('--tui-mode <mode>', 'the screen to start on: fullscreen, the alternate screen, or regular, the main screen and its scrollback').choices(['regular', 'fullscreen']).default('fullscreen'))
+    .action((options: { check?: boolean, tuiMode: TuiMode }) => { chosen(options.check === true ? 'check' : options.tuiMode) })
 }
 
 /**
- * Draw a session on the terminal until the person quits.
+ * A pi-tui object that reaches whichever is live, for a component built with
+ * one, as pi's are (`pi:packages/coding-agent/src/modes/interactive/tui-renderer.ts#createInteractiveTuiReference`).
+ * @param live - the one live now.
+ * @returns the reference.
+ */
+function reaching(live: () => TUI): TUI {
+  return new Proxy({} as TUI, {
+    get: (_target, property) => {
+      const tui = live()
+      const value: unknown = Reflect.get(tui, property, tui)
+      return typeof value === 'function' ? value.bind(tui) : value
+    },
+  })
+}
+
+/**
+ * Draw a session on the terminal until the person quits, on either screen.
+ *
+ * A switch stops the live pi-tui object and builds the other over the same
+ * terminal, as pi does (`pi:packages/coding-agent/src/modes/interactive/interactive-mode.ts`).
+ * What the old one held is carried to the new: the pane and the composer,
+ * focus, and the keys the host answers. Where the main screen left off is
+ * kept for its next turn, as the terminal keeps what it printed.
  * @param session - the open session.
  * @param registrations - what authors registered: their adapters and views.
  * @param quit - called once, when the person asks to quit.
- * @returns a disposer that gives the terminal back.
+ * @param first - the screen to start on.
+ * @returns a disposer that gives the terminal back, the session left printed on the main screen.
  * @throws what starting the terminal threw, having given back what it took.
  */
-function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void): () => void {
-  const tui = new TuiAltScreen(internals.terminal())
+function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void, first: TuiMode): () => void {
+  const terminal = internals.terminal()
   const events: SessionEvent[] = []
+  let tui: TuiMainScreen | TuiAltScreen
+  let left: TuiMainScreenRenderState | undefined
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views)
   // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
     if (changed === 'facts') transcript.reset(events.map(event => adapt(event, registrations.adapters)))
     else tui.requestRender()
   })
-  const composer = new Editor(tui, editorTheme)
+  const composer = new Editor(reaching(() => tui), editorTheme)
   composer.onSubmit = (text) => {
     if (text.trim() === '') return
     composer.setText('')
     session.send(text)
   }
-  tui.addChild(transcript)
-  tui.addChild(composer)
-  tui.setLayoutRoot(new VStack([
-    { component: new ScrollView(transcript, { follow: 'end', primary: true }), basis: 0, grow: 1, shrink: 1, minSize: 1 },
-    { component: composer, basis: 'auto', grow: 0, shrink: 1, minSize: 3 },
-  ]))
-  tui.setFocus(composer)
-  tui.addInputListener((data) => {
-    if (!matchesKey(data, 'ctrl+c')) return undefined
-    quit()
+  const keys = (data: string): TuiInputListenerResult => {
+    if (matchesKey(data, 'ctrl+c')) quit()
+    else if (matchesKey(data, 'ctrl+t')) show(tui.mode === 'fullscreen' ? 'regular' : 'fullscreen')
+    else return undefined
     return { consume: true }
-  })
+  }
+  const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
+    transcript.drawOn(mode)
+    const next = mode === 'regular' ? new TuiMainScreen(terminal) : new TuiAltScreen(terminal)
+    if (next instanceof TuiMainScreen && left !== undefined) next.restoreRenderState(left)
+    next.addChild(transcript)
+    next.addChild(composer)
+    if (next instanceof TuiAltScreen) {
+      next.setLayoutRoot(new VStack([
+        { component: new ScrollView(transcript, { follow: 'end', primary: true }), basis: 0, grow: 1, shrink: 1, minSize: 1 },
+        { component: composer, basis: 'auto', grow: 0, shrink: 1, minSize: 3 },
+      ]))
+    }
+    next.setFocus(composer)
+    next.addInputListener(keys)
+    return next
+  }
+  const leave = (): void => {
+    if (tui instanceof TuiMainScreen) left = tui.captureRenderState()
+    tui.stop({ preserveScreen: true })
+    tui.setFocus(null)
+    tui.clear()
+    if (tui instanceof TuiAltScreen) tui.setLayoutRoot(undefined)
+  }
+  function show(mode: TuiMode): void {
+    leave()
+    tui = build(mode)
+    tui.start()
+  }
+  tui = build(first)
   const unfollow = session.follow((event) => {
     events.push(event)
     transcript.push(adapt(event, registrations.adapters))
   })
   let held = true
+  let started = false
   const release = (): void => {
     if (!held) return
     held = false
     unfollow()
     unregister()
+    // Quitting from the alternate screen goes by the main screen, as pi's does, so the session is left printed there once, after what it printed before.
+    if (started && tui.mode === 'fullscreen') {
+      leave()
+      tui = build('regular')
+      tui.renderNow()
+    }
     tui.stop()
   }
   try {
     tui.start()
+    started = true
   } catch (error) {
     release()
     throw error
@@ -129,9 +188,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
  */
 export function apply(ctx: Context): void {
   const registrations = new RegistrationService(ctx)
-  let mode: Mode | undefined
-  parseCmdline(ctx, surfaceCommand((chosen) => { mode = chosen }))
-  if (mode === undefined) return
+  let parsed: Mode | undefined
+  parseCmdline(ctx, surfaceCommand((chosen) => { parsed = chosen }))
+  if (parsed === undefined) return
+  const mode: Mode = parsed
   const exit = ctx.get('appExit')
   const ready = ctx.get('appReady')
   if (exit === undefined || ready === undefined) {
@@ -170,7 +230,7 @@ export function apply(ctx: Context): void {
       quit()
       return
     }
-    release = takeTerminal(opened, registrations, quit)
+    release = takeTerminal(opened, registrations, quit, mode)
   }
   const cancel = ready.onReady(() => {
     void internals.open(ctx).then(show, fail('could not open a session on the default model')).catch(fail('could not take the terminal'))
