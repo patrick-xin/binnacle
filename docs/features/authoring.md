@@ -6,7 +6,7 @@ A plugin in a person's profile, written by them or by an author agent they ask, 
 
 The registrations are the author API (`binnacle:packages/binnacle/src/api.ts#Registrations`), provided by the host's `binnacle` service (`binnacle:packages/binnacle/src/host/registrations.ts#RegistrationService`).
 
-- A view draws with blocks in the theme's tones (`binnacle:packages/binnacle/src/ui/node.ts#Node`, [ADR 10](../adr/0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md)).
+- A view draws with blocks in the theme's tones (`binnacle:packages/binnacle/src/ui/node.ts#Node`, [ADR 10](../adr/0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md)), and no text it returns reaches the terminal as a control: every string a node carries is drawn as text ([ADR 14](../adr/0014-no-text-a-node-carries-reaches-the-terminal-as-a-control.md)).
 - Views of one key stack, and the newest draws on what the one beneath it draws ([ADR 8](../adr/0008-a-view-builds-on-the-one-beneath-it-and-the-newest-draws.md)).
 - A view is drawn once for each entry, and again when its author invalidates its key ([ADR 9](../adr/0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)).
 - A change of adapters reads the whole log again.

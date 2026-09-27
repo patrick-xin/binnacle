@@ -104,6 +104,56 @@ test('a failed tool is marked, with the reason dsh gave a person', () => {
   assert.deepEqual(lines({ kind: 'tool', call, result }), ['✗ bash {"command":"pnpm build"}', '  the command exited 2', 'tsc: 1 error'])
 })
 
+/** A tool call with a result whose blocks are one text block, as an output a test reads. */
+const toolWith = (output: string): Entry => {
+  const result = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: output }], meta: undefined } as const
+  return { kind: 'tool', call, result }
+}
+
+/**
+ * An entry's lines as they reach the terminal, styling and all: what a test reads back to say no line carries a control the theme did not put there.
+ * @param entry - the entry.
+ * @param focus - the region focused, if any.
+ * @returns its lines, raw.
+ */
+const raw = (entry: Entry, focus?: string): string[] =>
+  layout(drawEntry(entry), 40, focus === undefined ? { expanded: new Set() } : { expanded: new Set(), focus }).lines.map(line => line.trimEnd())
+
+test('a tool\'s output that clears the screen is drawn as its text, and clears nothing', () => {
+  assert.deepEqual(raw(toolWith('wiped\x1b[2Jclean'))[1], 'wipedclean')
+})
+
+test('a sequence that writes the clipboard or sets the title is dropped, its visible text kept', () => {
+  assert.deepEqual(raw(toolWith('copied \x1b]52;c;aGVsbG8=\x07 by \x1b]0;owned\x1b\\ one'))[1], 'copied  by  one')
+})
+
+test('a colour in a tool\'s output is dropped, and the rows after it are drawn in the theme\'s tones', () => {
+  const result = {
+    kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: true,
+    failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' }, blocks: [{ kind: 'text', text: '\x1b[31mred\x1b[39m and plain' }], meta: undefined,
+  } as const
+  assert.deepEqual(raw({ kind: 'tool', call, result }), ['\x1b[31m✗\x1b[39m bash {"command":"pnpm build"}', '\x1b[31m  the command exited 2\x1b[39m', 'red and plain'])
+})
+
+test('a bell, and any other control character, is drawn as a symbol a person can see', () => {
+  assert.deepEqual(raw(toolWith('a\x07b\x7fc\x9bd\x00e'))[1], 'a␇b␡c�d␀e')
+})
+
+test('a line ending with a carriage return reads as a line ending, and one anywhere else is drawn ␍', () => {
+  assert.deepEqual(raw(toolWith('done\r\nnext\ralso')).slice(1), ['done', 'next␍also'])
+})
+
+test('an answer\'s markdown carrying an escape is drawn without it, in the theme\'s styles', () => {
+  const entry: Entry = {
+    kind: 'answer',
+    fact: {
+      kind: 'answer', seq: 8, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false,
+      blocks: [{ kind: 'text', text: 'See \x1b[2Jthis, **then** that.' }],
+    },
+  }
+  assert.deepEqual(raw(entry), ['See this, \x1b[1mthen\x1b[22m that.'])
+})
+
 test('context the person did not type names who added it, folded away', () => {
   const entry: Entry = { kind: 'context', fact: { kind: 'context', seq: 0, time: 1, source: 'agent-instructions', blocks: [{ kind: 'text', text: 'AGENTS.md\nsays' }] } }
   assert.deepEqual(lines(entry), ['⋯ added by agent-instructions', '… 2 more lines'])
@@ -190,6 +240,37 @@ test('an author\'s view that returns what binnacle cannot lay out is drawn over,
 test('an author\'s view may draw a line of spans, each drawn in its tone', () => {
   const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: '›', tone: 'accent' }, ' fix the build'] }) as unknown as Node]]])
   assert.deepEqual(drawnWide(prompt, views), ['\x1b[36m›\x1b[39m fix the build'])
+})
+
+/**
+ * What an entry and any views of its key draw at a width, raw: styling and all, as the lines reach the terminal.
+ * @param entry - the entry.
+ * @param views - authors' views, as `drawEntry` takes them.
+ * @param width - the columns it is drawn at.
+ * @param focus - the region focused, if any.
+ * @returns its lines, raw.
+ */
+const rawWith = (entry: Entry, views: Views, width: number, focus?: string): string[] =>
+  layout(drawEntry(entry, views), width, focus === undefined ? { expanded: new Set() } : { expanded: new Set(), focus }).lines.map(line => line.trimEnd())
+
+test('a span carrying a control sequence is drawn as its text, in its tone', () => {
+  const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: 'wiped\x1b[2Jclean', tone: 'error' }, ' \x1b]0;owned\x07kept'] }) as unknown as Node]]])
+  assert.deepEqual(rawWith(prompt, views, 40), ['\x1b[31mwipedclean\x1b[39m kept'])
+})
+
+test('an author\'s card title and affordance label carrying a control sequence are drawn as their text', () => {
+  const views = new Map<string, View[]>([['prompt', [() => ({
+    kind: 'offer',
+    id: 'theirs',
+    affordances: [{ kind: 'open', label: 'open \x1b]0;owned\x07wide' }],
+    child: { kind: 'card', title: 'to\x1b[2Jdo', child: { kind: 'text', text: 'the body' } },
+  }) as unknown as Node]]])
+  assert.deepEqual(rawWith(prompt, views, 20, 'theirs'), [
+    '\x1b[2m╭─ \x1b[22mtodo\x1b[2m ───────────╮\x1b[22m',
+    '\x1b[2m│\x1b[22m the body         \x1b[2m│\x1b[22m',
+    '\x1b[2m╰──────────────────╯\x1b[22m',
+    '\x1b[36m▸ open wide\x1b[39m',
+  ])
 })
 
 test('data with no JSON and no string form is still drawn, as what it is', () => {

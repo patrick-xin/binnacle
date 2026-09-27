@@ -5,6 +5,7 @@
 import { Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node } from './node.ts'
+import { readable } from './readable.ts'
 import { markdownTheme, tones } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
@@ -74,13 +75,25 @@ function written(node: Extract<Node, { readonly kind: 'text' }>): string {
 }
 
 /**
- * Lay a node out.
+ * Lay a node out: every string it carries is treated first, so none of it
+ * reaches the terminal as a control.
  * @param node - what to draw.
  * @param width - the columns it is given.
  * @param state - the UI state it is drawn in.
  * @returns its lines and regions.
  */
 export function layout(node: Node, width: number, state: LayoutState): Frame {
+  return drawn(readable(node), width, state)
+}
+
+/**
+ * Lay out a node whose carried strings are already treated.
+ * @param node - what to draw, already treated.
+ * @param width - the columns it is given.
+ * @param state - the UI state it is drawn in.
+ * @returns its lines and regions.
+ */
+function drawn(node: Node, width: number, state: LayoutState): Frame {
   switch (node.kind) {
     case 'blank':
       return { lines: [''], regions: [] }
@@ -94,14 +107,14 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
       const lines: string[] = []
       const regions: Placed[] = []
       for (const child of node.children) {
-        const frame = layout(child, width, state)
+        const frame = drawn(child, width, state)
         regions.push(...frame.regions.map(placed => ({ ...placed, top: placed.top + lines.length })))
         lines.push(...frame.lines)
       }
       return { lines, regions }
     }
     case 'offer': {
-      const frame = layout(node.child, width, state)
+      const frame = drawn(node.child, width, state)
       const region = { id: node.id, affordances: node.affordances, overflows: false }
       const placed = { region, top: 0, height: frame.lines.length, left: 0, width }
       const primary = node.affordances[0]
@@ -112,7 +125,7 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
     case 'card':
       return card(node, width, state)
     case 'fold': {
-      const frame = layout(node.child, width, state)
+      const frame = drawn(node.child, width, state)
       const cut = frame.lines.length - node.rows
       if (cut <= 0) return frame
       if (state.expanded.has(node.id)) {
@@ -141,8 +154,8 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
  */
 function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, state: LayoutState): Frame {
   const inner = width - 2 * CARD_SIDE
-  if (inner < 1) return layout(node.child, width, state)
-  const frame = layout(node.child, inner, state)
+  if (inner < 1) return drawn(node.child, width, state)
+  const frame = drawn(node.child, inner, state)
   const edge = tones.dim
   // A title is left off whole, never cut, where it would leave no rule beside it: a cut title reads as another one.
   const title = node.title !== undefined && visibleWidth(node.title) <= width - 6 ? node.title : undefined
