@@ -37,6 +37,8 @@ interface Printed {
 export interface PaneReports {
   /** Something to bring into view: the rows a focused thing covers, on the screen as now drawn. */
   readonly inView?: (top: number, height: number) => void
+  /** A printed entry focus reached on the main screen, asking for the fullscreen, with the rows to bring into view there. */
+  readonly fullscreen?: (top: number, height: number) => void
 }
 
 /** The screen, as a component pi-tui lays out and scrolls. */
@@ -45,6 +47,7 @@ export class TranscriptPane implements Component {
   readonly #changed: () => void
   readonly #views: () => Views
   readonly #inView: (top: number, height: number) => void
+  readonly #fullscreen: (top: number, height: number) => void
   #state: UiState = initial
   #draw: DrawScreen = screens()
   #drawn: { readonly width: number, readonly screen: Screen } | undefined
@@ -60,6 +63,7 @@ export class TranscriptPane implements Component {
     this.#changed = changed
     this.#views = views
     this.#inView = reports.inView ?? (() => {})
+    this.#fullscreen = reports.fullscreen ?? (() => {})
   }
 
   /**
@@ -90,6 +94,21 @@ export class TranscriptPane implements Component {
    */
   drawOn(mode: TuiMode): void {
     this.#on = mode
+    if (mode === 'regular') this.#dropPrintedFocus()
+  }
+
+  /**
+   * Drop focus that sits within the rows printed on the main screen, which a switch to it finds: its row
+   * could not be drawn there without changing a row already printed.
+   */
+  #dropPrintedFocus(): void {
+    const focus = this.#state.focus
+    const drawn = this.#drawn
+    if (focus === undefined || drawn === undefined) return
+    const placed = drawn.screen.regions.find(candidate => candidate.region.id === focus)
+    if (placed !== undefined && placed.top < this.#printedThrough(drawn.width, drawn.screen)) {
+      this.#state = act(this.#state, { kind: 'unfocus' }, drawn.screen)
+    }
   }
 
   /**
@@ -98,11 +117,20 @@ export class TranscriptPane implements Component {
    * @returns on the alternate screen, every line of the transcript as it now draws; on the main screen, what it printed, then what has not settled as it now draws. A new width prints everything again.
    */
   render(width: number): string[] {
-    const screen = this.#draw(this.#transcript, this.#state, width, this.#views())
+    const now = settled(this.#transcript)
+    let screen = this.#draw(this.#transcript, this.#state, width, this.#views())
+    if (this.#on === 'regular' && this.#state.focus !== undefined) {
+      // Focus never sits within the rows this render prints: its own row could not be drawn without changing a row already printed.
+      const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
+      const placed = screen.regions.find(candidate => candidate.region.id === this.#state.focus)
+      if (placed !== undefined && placed.top < through(now)) {
+        this.#state = act(this.#state, { kind: 'unfocus' }, screen)
+        screen = this.#draw(this.#transcript, this.#state, width, this.#views())
+      }
+    }
     this.#drawn = { width, screen }
     if (this.#on === 'fullscreen') return [...screen.lines]
     const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
-    const now = settled(this.#transcript)
     const was = this.#printed
     const printed = was === undefined || was.width !== width
       ? { width, entries: now, lines: screen.lines.slice(0, through(now)) }
@@ -150,14 +178,28 @@ export class TranscriptPane implements Component {
     if (next !== this.#state) {
       const moved = next.focus !== undefined && next.focus !== this.#state.focus
       this.#state = next
-      if (moved && this.#on === 'fullscreen') {
+      if (moved) {
         const screen = this.#draw(this.#transcript, next, drawn.width, this.#views())
         const placed = next.focus === undefined ? undefined : screen.regions.find(candidate => candidate.region.id === next.focus)
-        if (placed !== undefined) this.#inView(placed.top, placed.height)
+        if (placed !== undefined) {
+          // On the fullscreen the focused thing is brought into view; on the main screen, focus that reaches a printed entry asks for the fullscreen.
+          if (this.#on === 'fullscreen') this.#inView(placed.top, placed.height)
+          else if (placed.top < this.#printedThrough(drawn.width, screen)) this.#fullscreen(placed.top, placed.height)
+        }
       }
       this.#changed()
     }
     return true
+  }
+
+  /**
+   * The rows printed on the main screen, among the rows of the screen given; 0 when nothing was printed at its width,
+   * as after a resize, when the next render prints everything again.
+   */
+  #printedThrough(width: number, screen: Screen): number {
+    const printed = this.#printed
+    if (printed === undefined || printed.width !== width) return 0
+    return printed.entries === 0 ? 0 : screen.ends[printed.entries - 1] ?? screen.lines.length
   }
 
   /** Draw every entry again, as pi-tui asks when the theme changes, on the main screen what it printed included. */

@@ -127,6 +127,58 @@ test('a focus that lands on something reports the rows it covers, to be brought 
   assert.deepEqual(inView, [[4, 1], [2, 1]])
 })
 
+test('on the main screen, focus below what was printed stays drawn there, and focus that reaches a printed entry asks for fullscreen', () => {
+  const fullscreen: [number, number][] = []
+  const pane = new TranscriptPane(() => {}, () => new Map(), { fullscreen: (top, height) => { fullscreen.push([top, height]) } })
+  pane.drawOn('regular')
+  pane.push(sent(1, 'one'))
+  pane.push(call)
+  pane.push(result)
+  pane.push(waiting)
+  pane.push(below)
+  assert.deepEqual(shown(pane), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line', '● stat {}', '  running…', '⋯ added by goal', '… 2 more lines'])
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(fullscreen, [])
+  assert.deepEqual(shown(pane).slice(6), ['● stat {}', '  running…', '⋯ added by goal', '▸ show 2 more lines'])
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.deepEqual(fullscreen, [[2, 4]])
+})
+
+test('switching to the main screen drops focus that sits on a printed entry, and the printed rows are as they were', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.drawOn('regular')
+  pane.push(sent(1, 'one'))
+  pane.push(call)
+  pane.push(result)
+  pane.push(waiting)
+  pane.push(below)
+  shown(pane)
+  pane.drawOn('fullscreen')
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  assert.equal(pane.focused, true)
+  pane.drawOn('regular')
+  assert.equal(pane.focused, false)
+  assert.deepEqual(shown(pane), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line', '● stat {}', '  running…', '⋯ added by goal', '… 2 more lines'])
+})
+
+test('when what is focused settles into the printed rows, focus is dropped rather than a printed row changed', () => {
+  const pane = new TranscriptPane(() => {})
+  pane.drawOn('regular')
+  pane.push(sent(1, 'one'))
+  pane.push(call)
+  pane.push(result)
+  pane.push(waiting)
+  pane.push(below)
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  const done: Fact = { kind: 'result', seq: 6, time: 6, turn: 1, step: 1, callId: 'c2', failed: false, blocks: [{ kind: 'text', text: 'done' }], meta: undefined }
+  pane.push(done)
+  assert.equal(pane.focused, true)
+  assert.deepEqual(shown(pane), ['› one', '● read {}', 'w', 'x', 'y', '… 1 more line', '● stat {}', 'done', '⋯ added by goal', '… 2 more lines'])
+  assert.equal(pane.focused, false)
+})
+
 /**
  * A prompt the person sent.
  * @param seq - its place in the log.
@@ -198,6 +250,12 @@ test('invalidating the pane calls every view again, as pi-tui asks when the them
 
 /** A tool call, asked in turn 1. */
 const call: Fact = { kind: 'call', seq: 1, time: 1, turn: 1, step: 1, callId: 'c1', name: 'read', arguments: '{}' }
+
+/** A second call, still waiting for its result. */
+const waiting: Fact = { kind: 'call', seq: 4, time: 4, turn: 1, step: 1, callId: 'c2', name: 'stat', arguments: '{}' }
+
+/** A fold that lands after the waiting call, below what the main screen printed. */
+const below: Fact = { kind: 'context', seq: 5, time: 5, source: 'goal', blocks: [{ kind: 'text', text: 'a\nb' }] }
 
 /** A fold a person can open, after the call. */
 const goal: Fact = { ...context, seq: 2, time: 2 }

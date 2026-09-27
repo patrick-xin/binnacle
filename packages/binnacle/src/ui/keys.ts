@@ -28,16 +28,21 @@ declare module '@earendil-works/pi-tui' {
   interface Keybindings extends BinnacleKeybindings {}
 }
 
+/** binnacle's own bindings alone, in the order a person reads them in help. */
+export const BINNACLE_BINDINGS = {
+  'binnacle.stepIn': { defaultKeys: 'shift+tab', description: 'step in: focus the nearest thing that offers something' },
+  'binnacle.focusNext': { defaultKeys: ['tab', 'down'], description: 'focus the next thing that offers something' },
+  'binnacle.focusPrevious': { defaultKeys: 'up', description: 'focus the previous thing that offers something' },
+  'binnacle.primary': { defaultKeys: 'enter', description: 'do what the focused thing offers first' },
+  'binnacle.stepOut': { defaultKeys: 'escape', description: 'give the keyboard back to the composer' },
+  'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'quit' },
+  'binnacle.switchScreens': { defaultKeys: 'ctrl+t', description: 'switch screens' },
+} as const satisfies KeybindingDefinitions
+
 /** Every binding the table holds: pi-tui's own, then binnacle's. */
 export const KEYBINDINGS = {
   ...TUI_KEYBINDINGS,
-  'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'Quit' },
-  'binnacle.switchScreens': { defaultKeys: 'ctrl+t', description: 'Switch screens' },
-  'binnacle.stepIn': { defaultKeys: 'shift+tab', description: 'Step in: focus the nearest thing that offers something' },
-  'binnacle.focusNext': { defaultKeys: ['tab', 'down'], description: 'Focus the next thing that offers something' },
-  'binnacle.focusPrevious': { defaultKeys: 'up', description: 'Focus the previous thing that offers something' },
-  'binnacle.primary': { defaultKeys: 'enter', description: 'Do what the focused thing offers first' },
-  'binnacle.stepOut': { defaultKeys: 'escape', description: 'Give the keyboard back to the composer' },
+  ...BINNACLE_BINDINGS,
 } as const satisfies KeybindingDefinitions
 
 /** What the table resolves a key to: a key gesture's binding, or one of the host's own. */

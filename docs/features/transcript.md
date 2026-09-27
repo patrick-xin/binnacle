@@ -8,7 +8,7 @@ A person reads the session as it happens, turn by turn:
 - each tool call, a glyph and its arguments: a muted `●` and `running…` while it runs; `●` in success once it returned, its result folded to three rows; `✗` in error, and why, when it failed;
 - a kind of event binnacle does not draw, as `?` and its type, folded to its raw record.
 
-A click on a fold opens it, and a click on an open one folds it again. The wheel scrolls, and a drag selects.
+A click on a fold opens it, and a click on an open one folds it again; so does Enter on the focused fold ([Keys](keys.md)). The wheel scrolls, and a drag selects.
 
 ## How it works
 

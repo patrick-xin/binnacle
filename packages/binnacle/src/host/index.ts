@@ -23,7 +23,8 @@ import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiM
 import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
-import { keyTable } from '../ui/keys.ts'
+import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
+import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { RegistrationService } from './registrations.ts'
@@ -57,6 +58,19 @@ export const internals: {
 type Mode = 'check' | TuiMode
 
 /**
+ * The keys as `--help` names them: each binding's keys and what it does, read from the one table, never restated.
+ * @returns the help text under its heading.
+ */
+function keysHelp(): string {
+  const { manager } = keyTable()
+  const named = Object.entries(BINNACLE_BINDINGS).map(([id, definition]) => {
+    const keys = manager.getKeys(id as keyof BinnacleKeybindings).join(', ')
+    return `  ${keys === '' ? '(unbound)' : keys}  ${definition.description ?? ''}`
+  })
+  return `Keys:\n${named.join('\n')}`
+}
+
+/**
  * This surface's command: its flags and help.
  * @param chosen - receives the mode when the invocation parses.
  * @returns a fresh program, so one process can parse more than once.
@@ -66,6 +80,7 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
     .name('dsh --profile binnacle')
     .description('Open a terminal session with an agent. Ctrl+T switches screens; Ctrl+C quits.')
     .helpOption('-h, --help', 'show this help')
+    .addHelpText('after', `\n${keysHelp()}`)
     .option('--check', 'open a session on the default model, report it, close it, and exit, drawing nothing')
     .addOption(new Option('--tui-mode <mode>', 'the screen to start on: fullscreen, the alternate screen, or regular, the main screen and its scrollback').choices(['regular', 'fullscreen']).default('fullscreen'))
     .action((options: { check?: boolean, tuiMode: TuiMode }) => { chosen(options.check === true ? 'check' : options.tuiMode) })
@@ -93,7 +108,7 @@ function reaching(live: () => TUI): TUI {
  * A switch stops the live pi-tui object and builds the other over the same
  * terminal, as pi does (`pi:packages/coding-agent/src/modes/interactive/interactive-mode.ts`).
  * What the old one held is carried to the new: the pane and the composer,
- * focus, and the keys the host answers. Where the main screen left off is
+ * focus, and the one key table's listener. Where the main screen left off is
  * kept for its next turn, as the terminal keeps what it printed.
  * @param session - the open session.
  * @param registrations - what authors registered: their adapters and views.
@@ -109,13 +124,18 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   let left: TuiMainScreenRenderState | undefined
   let scroll: ScrollView | undefined
   // A focus the pane brings on screen is brought into view by the scroll view that windows it, on the alternate screen.
+  const intoView = (top: number, height: number): void => {
+    const view = scroll
+    if (view === undefined) return
+    tui.renderNow()
+    if (top < view.scrollTop) view.scrollTo(top)
+    else if (top + height > view.scrollTop + view.viewportHeight) view.scrollTo(top + height - view.viewportHeight)
+  }
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
-    inView: (top, height) => {
-      const view = scroll
-      if (view === undefined) return
-      tui.renderNow()
-      if (top < view.scrollTop) view.scrollTo(top)
-      else if (top + height > view.scrollTop + view.viewportHeight) view.scrollTo(top + height - view.viewportHeight)
+    inView: intoView,
+    fullscreen: (top, height) => {
+      show('fullscreen')
+      intoView(top, height)
     },
   })
   // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
