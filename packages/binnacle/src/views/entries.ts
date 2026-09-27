@@ -54,15 +54,23 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
 }
 
 /**
- * Draw a tool call: what was asked, then whether it is running, failed, or what it returned, folded. The glyph says how the call stands.
+ * Draw a tool call: what was asked, then whether it is running, failed, left
+ * behind by its turn, or what it returned, folded. The glyph says how the
+ * call stands.
  * @param result - its result, once it has one.
+ * @param left - how the turn that ended without this call's result ended, when it did.
  */
-function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined): Node {
+function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined, left: string | undefined): Node {
   const glyph = result === undefined
     ? { text: '●', tone: 'muted' as const }
     : result.failed === true ? { text: '✗', tone: 'error' as const } : { text: '●', tone: 'success' as const }
   const head: Node = { kind: 'text', text: [glyph, ` ${call.name} ${call.arguments}`] }
-  if (result === undefined) return { kind: 'stack', children: [head, { kind: 'text', text: '  running…', tone: 'muted' }] }
+  if (result === undefined) {
+    const waiting: Node = left === undefined
+      ? { kind: 'text', text: '  running…', tone: 'muted' }
+      : { kind: 'text', text: `  the turn ended without it: ${left}`, tone: 'muted' }
+    return { kind: 'stack', children: [head, waiting] }
+  }
   const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
   const output: Node = { kind: 'fold', id: `tool:${call.callId}`, rows: 3, child: { kind: 'text', text: textOf(result.blocks) } }
   return { kind: 'stack', children: [head, ...reason, output] }
@@ -129,7 +137,7 @@ function builtIn(entry: Entry, problem?: string): Node {
     case 'answer':
       return noted(drawAnswer(entry.fact), problem)
     case 'tool':
-      return noted(drawTool(entry.call, entry.result), problem)
+      return noted(drawTool(entry.call, entry.result, entry.left), problem)
     case 'result':
       return titled(`● result of call ${entry.fact.callId}`, { kind: 'fold', id: `result:${entry.fact.seq}`, rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } }, problem)
     case 'authored':

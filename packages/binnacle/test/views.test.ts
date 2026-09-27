@@ -77,6 +77,13 @@ test('a tool still running says so', () => {
   assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running…'])
 })
 
+test('a call its turn left without a result says so, and why', () => {
+  const left: Entry = { kind: 'tool', call, left: 'aborted' }
+  assert.deepEqual(lines(left), ['● bash {"command":"pnpm build"}', '  the turn ended without it: aborted'])
+  assert.equal(styled(left)[1], '\x1b[90m  the turn ended without it: aborted\x1b[39m')
+  assert.equal(styled(left)[0], '\x1b[90m●\x1b[39m bash {"command":"pnpm build"}')
+})
+
 test('a tool\'s glyph says how the call stands: muted while it runs, success once it returned, error when it failed', () => {
   const ok = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'ok' }], meta: undefined } as const
   const failed = { ...ok, failed: true, failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' } } as const

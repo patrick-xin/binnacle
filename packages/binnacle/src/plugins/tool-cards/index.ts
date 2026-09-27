@@ -55,7 +55,10 @@ function viewOf(tools: ToolRuntime): View {
     if (presented === undefined) return next()
     if (entry.result === undefined) {
       const head: Node = { kind: 'text', text: [{ text: '●', tone: 'muted' }, ` ${presented.title}`] }
-      return { kind: 'stack', children: [head, { kind: 'text', text: '  running…', tone: 'muted' }] }
+      const waiting: Node = entry.left === undefined
+        ? { kind: 'text', text: '  running…', tone: 'muted' }
+        : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' }
+      return { kind: 'stack', children: [head, waiting] }
     }
     const result = entry.result
     let completed

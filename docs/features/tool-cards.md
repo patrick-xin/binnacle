@@ -17,7 +17,7 @@ What a presenter returns is the tool's code, not binnacle's: it is read as data 
 - What it returned folds to three rows, as a tool's output does today ([Transcript](transcript.md)); a presented `content` is folded when the tool gives one, the result's own text when not.
 - A failure's reason stays, in error, above the fold.
 - Which kind of card draws how is a table the cards grow a row at a time; this slice draws the `generic` card fully, and every other kind — terminal, diff, read, search, web — by its title alone.
-- `running…` stays under a call while it runs, so a presented card says what it is doing the way binnacle's own does.
+- `running…` stays under a call while it runs, so a presented card says what it is doing the way binnacle's own does; a call its turn left without a result says the turn ended without it, and how the turn ended, in that line's place — as binnacle's own card does ([Transcript](transcript.md)).
 
 ## Open
 

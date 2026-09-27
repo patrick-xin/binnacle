@@ -211,3 +211,11 @@ test('disposing the plugin gives every call back to binnacle\'s card', async () 
   await fiber.dispose()
   assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'the file'])
 })
+
+test('a call its turn left without a result says so under its presented title', async () => {
+  const { pane } = await withCards(read)
+  pane.push({ kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' })
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  pane.push({ kind: 'turn', seq: 3, time: 3, turn: 1, phase: 'end', ending: 'aborted' })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '  the turn ended without it: aborted'])
+})
