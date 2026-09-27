@@ -48,6 +48,7 @@ function foldsIn(node: Node): string[] {
   switch (node.kind) {
     case 'blank':
     case 'text':
+    case 'markdown':
       return []
     case 'stack':
       return node.children.flatMap(foldsIn)

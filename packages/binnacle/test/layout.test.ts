@@ -92,6 +92,19 @@ test('text in a tone opens every line it wraps to in the theme\'s style for that
   for (const line of frame.lines) assert.ok(line.startsWith('\x1b[31m'), JSON.stringify(line))
 })
 
+test('a text node of spans draws each span in its own tone, and a bare span in the node\'s', () => {
+  const node = { kind: 'text', text: [{ text: '›', tone: 'accent' }, ' fix the ', { text: 'build', tone: 'dim' }], tone: 'muted' } as const
+  assert.deepEqual(layout(node, 40, OPEN).lines.map(line => line.trimEnd()), ['\x1b[36m›\x1b[39m\x1b[90m fix the \x1b[39m\x1b[2mbuild\x1b[22m'])
+})
+
+test('a span that wraps keeps its tone on every line it wraps to', () => {
+  const node = { kind: 'text', text: ['the build ', { text: 'failed to finish', tone: 'error' }] } as const
+  const frame = layout(node, 10, OPEN)
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['the build', 'failed to', 'finish'])
+  assert.ok(frame.lines[1]?.startsWith('\x1b[31m'), JSON.stringify(frame.lines[1]))
+  assert.ok(frame.lines[2]?.startsWith('\x1b[31m'), JSON.stringify(frame.lines[2]))
+})
+
 test('a card draws what it holds inside a rounded border, its title on the top edge', () => {
   assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'exit 0' } }, 20, OPEN)), {
     lines: ['╭─ bash ───────────╮', '│ exit 0           │', '╰──────────────────╯'],
@@ -113,4 +126,38 @@ test('a title too wide for the top edge is left off whole, never cut', () => {
 
 test('a card with no column inside its border draws what it holds without one', () => {
   assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'ok' } }, 4, OPEN)).lines, ['ok'])
+})
+
+/** A document with one of each part, laid out at 20 columns. */
+const document = { kind: 'markdown', text: '## Ship it\n\nRun `pnpm test` first.\n\n- one\n- two\n\n> quoted\n\n```\nx = 1\n```\n\n---' } as const
+
+test('a markdown block is laid out as a document by pi-tui\'s component, and offers nothing', () => {
+  const frame = layout(document, 20, OPEN)
+  assert.deepEqual(plain(frame).lines, [
+    'Ship it',
+    '',
+    'Run pnpm test first.',
+    '',
+    '- one',
+    '- two',
+    '',
+    '│ quoted',
+    '',
+    '```',
+    '  x = 1',
+    '```',
+    '',
+    '────────────────────',
+  ])
+  assert.deepEqual(frame.regions, [])
+})
+
+test('a document\'s parts are drawn in the theme\'s markdown styles', () => {
+  const lines = layout(document, 20, OPEN).lines.map(line => line.trimEnd())
+  assert.ok(lines[0]?.startsWith('\x1b[1m'), JSON.stringify(lines[0]))
+  assert.equal(lines[2], 'Run \x1b[33mpnpm test\x1b[39m first.')
+  assert.equal(lines[4], '\x1b[36m- \x1b[39mone')
+  assert.ok(lines[7]?.startsWith('\x1b[2m│ \x1b[22m'), JSON.stringify(lines[7]))
+  assert.equal(lines[9], '\x1b[2m```\x1b[22m')
+  assert.equal(lines[13], '\x1b[2m' + '─'.repeat(20) + '\x1b[22m')
 })

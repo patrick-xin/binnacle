@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
+import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Terminal } from '@earendil-works/pi-tui'
 import xterm from '@xterm/headless'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -228,13 +229,14 @@ test('the host provides the binnacle service, and a view an author registers dra
 test('a view registered after its entries were drawn draws them again, and disposing it gives them back', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
   commit()
-  await until(() => /› fix the build/.test(terminal.written))
+  const shown = (): string => stripTerminalSequences(terminal.written)
+  await until(() => /› fix the build/.test(shown()))
   const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.view('prompt', () => ({ kind: 'text', text: 'drawn by an author' })) } })
   await author
-  await until(() => /drawn by an author/.test(terminal.written))
+  await until(() => /drawn by an author/.test(shown()))
   terminal.written = ''
   await author.dispose()
-  await until(() => /› fix the build/.test(terminal.written))
+  await until(() => /› fix the build/.test(shown()))
 })
 
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {

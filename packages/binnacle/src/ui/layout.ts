@@ -2,10 +2,10 @@
  * Layout: a node at a width, as the lines it draws and the regions on them.
  */
 
-import { Text, visibleWidth } from '@earendil-works/pi-tui'
+import { Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node } from './node.ts'
-import { tones } from './theme.ts'
+import { markdownTheme, tones } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open. */
 export interface LayoutState {
@@ -48,6 +48,20 @@ function line(count: number): string {
 }
 
 /**
+ * What a text node's spans draw: joined into one line, each span in its tone, a bare span in the node's.
+ * @param node - the text node.
+ * @returns its line, styled for the terminal.
+ */
+function written(node: Extract<Node, { readonly kind: 'text' }>): string {
+  if (typeof node.text === 'string') return node.tone === undefined ? node.text : tones[node.tone](node.text)
+  return node.text
+    .map(span => typeof span === 'string'
+      ? node.tone === undefined ? span : tones[node.tone](span)
+      : tones[span.tone](span.text))
+    .join('')
+}
+
+/**
  * Lay a node out.
  * @param node - what to draw.
  * @param width - the columns it is given.
@@ -60,7 +74,10 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
       return { lines: [''], regions: [] }
     case 'text':
       // pi-tui wraps styled text, opening each line it wraps to in the style the line before ended in.
-      return { lines: new Text(node.tone === undefined ? node.text : tones[node.tone](node.text), 0, 0).render(width), regions: [] }
+      return { lines: new Text(written(node), 0, 0).render(width), regions: [] }
+    case 'markdown':
+      // pi-tui lays a document out, in the theme's markdown styles; it offers nothing.
+      return { lines: new Markdown(node.text, 0, 0, markdownTheme).render(width), regions: [] }
     case 'stack': {
       const lines: string[] = []
       const regions: Placed[] = []

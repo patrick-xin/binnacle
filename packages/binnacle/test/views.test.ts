@@ -16,9 +16,27 @@ import type { Node } from '../src/ui/node.ts'
 const lines = (entry: Entry, expanded: string[] = []): string[] =>
   layout(drawEntry(entry), 40, { expanded: new Set(expanded) }).lines.map(line => stripTerminalSequences(line).trimEnd())
 
-test('a prompt is what the person sent, marked as theirs', () => {
+/**
+ * What an entry draws at a width, styling and all, each line as it was drawn.
+ * @param entry - the entry.
+ * @param expanded - the regions a person opened.
+ * @returns its lines.
+ */
+const styled = (entry: Entry, expanded: string[] = []): string[] =>
+  layout(drawEntry(entry), 40, { expanded: new Set(expanded) }).lines.map(line => line.trimEnd())
+
+/**
+ * What an entry and any views of its key draw at width 80, styling and all, each line as it was drawn.
+ * @param entry - the entry.
+ * @param views - authors' views, as `drawEntry` takes them.
+ * @returns its lines.
+ */
+const drawnWide = (entry: Entry, views: Views = new Map()): string[] =>
+  layout(drawEntry(entry, views), 80, { expanded: new Set() }).lines.map(line => line.trimEnd())
+
+test('the prompt\'s mark is the theme\'s accent, what the person wrote plain', () => {
   const entry: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
-  assert.deepEqual(lines(entry), ['› fix the build'])
+  assert.deepEqual(styled(entry), ['\x1b[36m›\x1b[39m fix the build'])
 })
 
 const answer: Entry = {
@@ -37,10 +55,40 @@ test('expanding the reasoning shows it', () => {
   assert.deepEqual(lines(answer, ['reasoning:8:0']), ['∴ thinking', 'the build fails in tsc', 'The build', '(interrupted)'])
 })
 
+test('an answer\'s text is drawn as the markdown document it is, in the theme\'s styles', () => {
+  const entry: Entry = {
+    kind: 'answer',
+    fact: { ...answer.fact, interrupted: false, blocks: [{ kind: 'text', text: 'Run `pnpm test`, then **ship** it.' }] },
+  }
+  const drawn = layout(drawEntry(entry), 60, { expanded: new Set() }).lines.map(line => line.trimEnd())
+  assert.deepEqual(drawn, ['Run \x1b[33mpnpm test\x1b[39m, then \x1b[1mship\x1b[22m it.'])
+})
+
+test('the reasoning\'s label is muted, the reasoning under it dim, and an interruption dim', () => {
+  const drawn = layout(drawEntry(answer), 40, { expanded: new Set(['reasoning:8:0']) }).lines.map(line => line.trimEnd())
+  assert.equal(drawn[0], '\x1b[90m∴ thinking\x1b[39m')
+  assert.equal(drawn[1], '\x1b[2mthe build fails in tsc\x1b[22m')
+  assert.equal(drawn[3], '\x1b[2m(interrupted)\x1b[22m')
+})
+
 const call = { kind: 'call', seq: 9, time: 21, turn: 1, step: 1, callId: 'c1', name: 'bash', arguments: '{"command":"pnpm build"}' } as const
 
 test('a tool still running says so', () => {
   assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running…'])
+})
+
+test('a tool\'s glyph says how the call stands: muted while it runs, success once it returned, error when it failed', () => {
+  const ok = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'ok' }], meta: undefined } as const
+  const failed = { ...ok, failed: true, failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' } } as const
+  assert.equal(styled({ kind: 'tool', call })[0], '\x1b[90m●\x1b[39m bash {"command":"pnpm build"}')
+  assert.equal(styled({ kind: 'tool', call, result: ok })[0], '\x1b[32m●\x1b[39m bash {"command":"pnpm build"}')
+  assert.equal(styled({ kind: 'tool', call, result: failed })[0], '\x1b[31m✗\x1b[39m bash {"command":"pnpm build"}')
+})
+
+test('running is muted, and why a tool failed is error', () => {
+  const failed = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: true, failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' }, blocks: [], meta: undefined } as const
+  assert.equal(styled({ kind: 'tool', call })[1], '\x1b[90m  running…\x1b[39m')
+  assert.equal(styled({ kind: 'tool', call, result: failed })[1], '\x1b[31m  the command exited 2\x1b[39m')
 })
 
 test('a finished tool shows its output, folded to three rows', () => {
@@ -59,6 +107,25 @@ test('a failed tool is marked, with the reason dsh gave a person', () => {
 test('context the person did not type names who added it, folded away', () => {
   const entry: Entry = { kind: 'context', fact: { kind: 'context', seq: 0, time: 1, source: 'agent-instructions', blocks: [{ kind: 'text', text: 'AGENTS.md\nsays' }] } }
   assert.deepEqual(lines(entry), ['⋯ added by agent-instructions', '… 2 more lines'])
+})
+
+test('a title over folded content is muted, whoever wrote the content', () => {
+  const context: Entry = { kind: 'context', fact: { kind: 'context', seq: 0, time: 1, source: 'agent-instructions', blocks: [{ kind: 'text', text: 'AGENTS.md' }] } }
+  const result: Entry = { kind: 'result', fact: { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c9', failed: false, blocks: [{ kind: 'text', text: 'ok' }], meta: undefined } }
+  const authored: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'seeded', data: {} } }
+  const unknown: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'goal/change', record: {} } }
+  assert.equal(styled(context)[0], '\x1b[90m⋯ added by agent-instructions\x1b[39m')
+  assert.equal(styled(result)[0], '\x1b[90m● result of call c9\x1b[39m')
+  assert.equal(styled(authored)[0], '\x1b[90m? seeded\x1b[39m')
+  assert.equal(styled(unknown)[0], '\x1b[90m? goal/change\x1b[39m')
+})
+
+test('whatever went wrong is drawn in error, under or after what it went wrong with', () => {
+  const prompt: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
+  const views = new Map<string, View[]>([['prompt', [() => { throw new Error('no blocks') }]]])
+  const unknown: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'session/end-seed', record: {}, problem: 'binnacle.facts(session/end-seed) threw: no fork recorded' } }
+  assert.equal(drawnWide(prompt, views)[1], '\x1b[31m✗ binnacle.view(prompt) threw: no blocks\x1b[39m')
+  assert.equal(drawnWide(unknown)[1], '\x1b[31m✗ binnacle.facts(session/end-seed) threw: no fork recorded\x1b[39m')
 })
 
 test('a result with no call on screen names the call it answers', () => {
@@ -110,6 +177,19 @@ test('an author\'s view that returns what binnacle cannot lay out is drawn over,
   assert.deepEqual(drawn(prompt, loud), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: shouting is no tone'])
   const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'card', title: 'two\nlines', child: { kind: 'blank' } })]]])
   assert.deepEqual(drawn(prompt, titled), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a card\'s title is one line'])
+  const undocumented = new Map<string, View[]>([['prompt', [() => ({ kind: 'markdown' }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, undocumented), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a markdown block needs text'])
+  const unspanned = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: ['fix', 3] }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, unspanned), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: 3 is no span'])
+  const untone = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: 'fix' }] }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, untone), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: undefined is no tone'])
+  const untext = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ tone: 'error' }] }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, untext), ['› fix the build', '✗ binnacle.view(prompt) returned no drawable node: a span needs its text'])
+})
+
+test('an author\'s view may draw a line of spans, each drawn in its tone', () => {
+  const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: '›', tone: 'accent' }, ' fix the build'] }) as unknown as Node]]])
+  assert.deepEqual(drawnWide(prompt, views), ['\x1b[36m›\x1b[39m fix the build'])
 })
 
 test('data with no JSON and no string form is still drawn, as what it is', () => {
