@@ -21,3 +21,7 @@ How a session reaches the screen is [the architecture's](../architecture.md#how-
 - An answer's text is drawn as markdown, by pi-tui's `Markdown`; reasoning stays plain text.
 - Titles are muted, and what went wrong is drawn in error.
 - A kind no view draws is drawn by the fallback, never skipped ([ADR 4](../adr/0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)).
+
+## Open
+
+- [#3](https://github.com/patrick-xin/binnacle/issues/3): a call its turn left without a result reads `running…` for good.
