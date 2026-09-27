@@ -2,14 +2,14 @@
 
 A person reads the session on either of the terminal's screens, which pi calls TUI modes:
 
-- **fullscreen**, the alternate screen. binnacle holds the window: the transcript scrolls in it above the composer, a click opens a fold, and a drag selects.
+- **fullscreen**, the alternate screen. binnacle holds the window: the transcript scrolls in it above the composer, a click opens a fold, and a drag selects. Scrolled away from the end, that window's last row says so and names the key that jumps back.
 - **regular**, the main screen. The session is printed into the terminal's own scrollback, so the person scrolls, searches and selects with the terminal they already know. No pointer reaches binnacle there; a key is the only way to reach what content offers ([Keys](keys.md)).
 
 `--tui-mode regular` or `--tui-mode fullscreen` picks the screen at start, and Ctrl+T switches while it runs. A switch keeps what was drawn, what is typed in the composer, and where focus was ([Keys](keys.md)). Whichever screen a person quits from, the terminal is left holding the session, printed once.
 
 ## How it works
 
-- At each switch, the host stops the live pi-tui screen and builds the other over the same terminal, moving the same pane and composer into it, as pi does (`pi:packages/coding-agent/src/modes/interactive/interactive-mode.ts`). It sets focus and adds the one key table's input listener on each screen it builds, and hands the composer a reference that reaches whichever screen is live. Where the main screen left off is kept for its next turn (`binnacle:packages/binnacle/src/host/index.ts#apply`).
+- At each switch, the host stops the live pi-tui screen and builds the other over the same terminal, moving the same pane and composer into it, as pi does (`pi:packages/coding-agent/src/modes/interactive/interactive-mode.ts`). It sets focus and adds the one key table's input listener on each screen it builds, and hands the composer a reference that reaches whichever screen is live. Where the main screen left off is kept for its next turn (`binnacle:packages/binnacle/src/host/index.ts#apply`). The fullscreen it builds carries pi-tui's jump-to-end indicator, drawn by pi-tui while the window is scrolled away from the end its scroll view follows (`pi:packages/tui/src/tui-alt-screen.ts`).
 - The pane draws for the screen it is told (`binnacle:packages/binnacle/src/panes/transcript.ts#TranscriptPane`). On the main screen it prints an entry once it has settled (`binnacle:packages/binnacle/src/models/transcript.ts#settled`), and never changes a row it printed ([ADR 12](../adr/0012-on-the-main-screen-a-printed-row-never-changes.md)).
 - Quitting from fullscreen switches to regular first, and stops there.
 
@@ -21,3 +21,4 @@ A person reads the session on either of the terminal's screens, which pi calls T
 - pi's words, `regular` and `fullscreen`.
 - A switch moves the pane, not a new one. A new pane would draw every entry again, at a cost that grows with the session ([ADR 9](../adr/0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)), and would lose what a person had opened.
 - Quitting leaves the session printed on the main screen, as pi's fullscreen does by default.
+- While the fullscreen is scrolled away from the end it follows, its last row carries ` ↓ Jump to latest · end ` in the accent tone, pi-tui's own indicator rather than one drawn for it. The key is named as the one key table binds pi-tui's `tui.altScreen.bottom` ([Keys](keys.md)), so a rebinding would be named too; pi-tui answers that key, or a click on the label, by returning to the end, and the label goes. While the window follows its end, there is no label.
