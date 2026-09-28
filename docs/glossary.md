@@ -43,7 +43,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **gesture** | What a person did before it means anything: a click, the wheel, a drag, hovering, or a key resolved to a binding. |
 | **gesture table** | The one place a gesture is given a meaning (`binnacle:packages/binnacle/src/ui/gestures.ts#meaning`). |
 | **action** | What a gesture means: invoke an affordance, scroll a region, select, or move or drop focus. |
-| **binding** | A named, rebindable key: focus movement, the primary affordance, or one affordance by kind. |
+| **binding** | A named key of the one key table, rebindable by its id: pi-tui's own, binnacle's, a placed screen's, or one per affordance kind — unbound until a person binds it ([Keys](features/keys.md)). |
 | **registration** | What an author or a built-in feature contributes through `ctx.binnacle`, each an effect of the plugin that made it ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |
 | **authored fact** | A fact an author's adapter made from an event kind, named by them; drawn by the view registered under its name, or by the fallback. |
 | **settled** | Of an entry: nothing later in the log can change it. Every entry has settled but a call still waiting for its result in a turn still running, and those after it (`binnacle:packages/binnacle/src/models/transcript.ts#settled`). |
@@ -100,3 +100,4 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **main screen** / **alternate screen** | `TuiMainScreen` draws into the terminal's scrollback; `TuiAltScreen` owns a full screen. |
 | **TUI mode**: **regular** / **fullscreen** | pi's words for drawing on the main screen and on the alternate screen (`TuiMode`); a person picks one with `--tui-mode` ([TUI mode](features/tui-mode.md)). |
 | **terminal** | pi-tui's `Terminal`: the one object the host writes to and reads input from. |
+| **user bindings** | The bindings a person has set over the defaults, by id; the manager holds and resolves them (`pi:packages/tui/src/keybindings.ts#KeybindingsManager`). |
