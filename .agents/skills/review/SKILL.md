@@ -42,11 +42,11 @@ Then a verdict: `clean`, or `findings`. A finding you could not make fail is sai
 
 ## Running it with codex
 
-The Sheepdog runs a second reviewer from another model family, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It reviews a Charge in rounds with the Sheep directly, and reports to the Sheepdog once, at the end:
+The Sheepdog runs a second reviewer from another model family, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It reviews a Charge in rounds with the Sheep directly, and reports to the Sheepdog once, at the end. It runs as `gpt-5.6-sol` at high effort, named on every run: codex's own default model may be a heavier one, and a review does not need it.
 
 ```sh
 git worktree add --detach /tmp/review-<charge> charge-<charge>
-codex exec --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>.md \
+codex exec -m gpt-5.6-sol -c model_reasoning_effort=high --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>.md \
   "Load the review skill and review Charge <charge> against issue #<n>, from its base <base>, in rounds with its Sheep. Push nothing; write nothing outside this checkout, where probes and caches are yours."
 git worktree remove --force /tmp/review-<charge>
 ```
