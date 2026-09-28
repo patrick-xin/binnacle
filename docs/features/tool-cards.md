@@ -23,4 +23,4 @@ What a presenter returns is the tool's code, not binnacle's: it is read as data 
 
 ## Open
 
-- [#10](https://github.com/[REDACTED:pii]/binnacle/issues/10): the terminal, diff, read, search and web cards each get their own card.
+- [#10](https://github.com/patrick-xin/binnacle/issues/10): the terminal, diff, read, search and web cards each get their own card.
