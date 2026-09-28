@@ -5,8 +5,9 @@
  * change, and nothing of it runs later.
  */
 
-import { chrome, colours, marks, words } from './theme.ts'
-import type { Colour, FoldStart, Style, ThemeChanges } from './theme.ts'
+import { visibleWidth } from '@earendil-works/pi-tui'
+import { chrome, colours, words } from './theme.ts'
+import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
 /** The parts a theme registration may name. */
 const parts = ['tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds'] as const
@@ -33,7 +34,26 @@ function record(value: unknown, at: string): Readonly<Record<string, unknown>> {
  */
 function text(value: unknown, at: string): string {
   if (typeof value !== 'string') throw new Error(`${at} is ${named(value)}, not a string`)
+  // What a theme says is drawn as it is, never made inert as a node's text is, so a control in it is refused here (ADR 14).
+  if (Array.from(value).some(isControl)) throw new Error(`${at} holds a control character, which would reach the terminal as one`)
   return value
+}
+
+/**
+ * Whether a character is a control: C0, DEL, or C1, any of which a terminal may act on.
+ */
+function isControl(character: string): boolean {
+  const code = character.codePointAt(0) ?? 0
+  return code < 0x20 || (code >= 0x7f && code <= 0x9f)
+}
+
+/**
+ * A border's piece: a string, drawn one column wide, as a card's border is measured.
+ */
+function piece(value: unknown, at: string): string {
+  const read = text(value, at)
+  if (visibleWidth(read) !== 1) throw new Error(`${at} is ${named(read)}, not one column wide`)
+  return read
 }
 
 /**
@@ -92,12 +112,13 @@ function known<T>(value: unknown, at: string, allowed: readonly string[], read: 
 /**
  * Read a theme registration's changes from code binnacle does not own.
  * @param value - what the author registered.
+ * @param theme - the theme it is laid over, as the registrations leave it now: a mark it has may be changed in part, and a tone it gives, or the changes add, may be named.
  * @returns the changes, as data of binnacle's own.
  * @throws an error beginning `binnacle.theme:` and naming, by its path, what binnacle cannot draw and what it accepts there.
  */
-export function parseThemeChanges(value: unknown): ThemeChanges {
+export function parseThemeChanges(value: unknown, theme: Theme): ThemeChanges {
   try {
-    const given = record(value, 'the theme')
+    const given = record(value, 'the theme') as Readonly<Record<string, unknown>> & { readonly tones?: object }
     const read: Record<string, unknown> = {}
     for (const [part, field] of Object.entries(given)) {
       switch (part) {
@@ -113,14 +134,16 @@ export function parseThemeChanges(value: unknown): ThemeChanges {
             const { glyph, tone, ...rest } = record(mark, at)
             const extra = Object.keys(rest)[0]
             if (extra !== undefined) throw new Error(`${at}.${extra} is no part of a mark: glyph, tone`)
-            if (!Object.hasOwn(marks, name) && (glyph === undefined || tone === undefined)) throw new Error(`${at} is a mark binnacle has none of, so it needs a glyph and a tone`)
-            return [name, { ...glyph === undefined ? {} : { glyph: text(glyph, `${at}.glyph`) }, ...tone === undefined ? {} : { tone: text(tone, `${at}.tone`) } }]
+            if (theme.marks[name] === undefined && (glyph === undefined || tone === undefined)) throw new Error(`${at} is a mark the theme has none of, so it needs a glyph and a tone`)
+            const toned = tone === undefined ? undefined : text(tone, `${at}.tone`)
+            if (toned !== undefined && theme.tones[toned] === undefined && !Object.hasOwn(given.tones ?? {}, toned)) throw new Error(`${at}.tone is ${named(toned)}, a tone the theme does not give`)
+            return [name, { ...glyph === undefined ? {} : { glyph: text(glyph, `${at}.glyph`) }, ...toned === undefined ? {} : { tone: toned } }]
           }))
           break
         case 'chrome': {
           const { border, ...rest } = record(field, 'chrome')
           const glyphs = known(rest, 'chrome', Object.keys(chrome).filter(key => key !== 'border'), text)
-          read.chrome = border === undefined ? glyphs : { ...glyphs, border: known(border, 'chrome.border', Object.keys(chrome.border), text) }
+          read.chrome = border === undefined ? glyphs : { ...glyphs, border: known(border, 'chrome.border', Object.keys(chrome.border), piece) }
           break
         }
         case 'words':

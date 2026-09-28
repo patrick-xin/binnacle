@@ -87,9 +87,13 @@ test('a view may name a tone its author\'s theme adds, drawn in the colour the t
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), { message: 'binnacle.theme: tones.accent.color is "purple", not one of the terminal\'s sixteen colours: black, red, green, yellow, blue, magenta, cyan, white, bright-black, bright-red, bright-green, bright-yellow, bright-blue, bright-magenta, bright-cyan, bright-white' })
-  assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★' } } }), { message: 'binnacle.theme: marks.pinned is a mark binnacle has none of, so it needs a glyph and a tone' })
+  assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★' } } }), { message: 'binnacle.theme: marks.pinned is a mark the theme has none of, so it needs a glyph and a tone' })
   assert.throws(() => registrations.theme({ words: { cut: 3 } } as never), { message: 'binnacle.theme: words.cut is 3, not a string' })
   assert.throws(() => registrations.theme({ folds: { tool: { rows: -1 } } }), { message: 'binnacle.theme: folds.tool.rows is -1, not a whole number of rows' })
+  assert.throws(() => registrations.theme({ marks: { prompt: { glyph: '\x1b[2J' } } }), { message: 'binnacle.theme: marks.prompt.glyph holds a control character, which would reach the terminal as one' })
+  assert.throws(() => registrations.theme({ words: { less: 'less\x07' } }), { message: 'binnacle.theme: words.less holds a control character, which would reach the terminal as one' })
+  assert.throws(() => registrations.theme({ chrome: { border: { side: '||' } } }), { message: 'binnacle.theme: chrome.border.side is "||", not one column wide' })
+  assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★', tone: 'nope' } } }), { message: 'binnacle.theme: marks.pinned.tone is "nope", a tone the theme does not give' })
 })
 
 test('a fold its view leaves unsized shows the rows the theme gives its kind, or three', async () => {
@@ -109,6 +113,16 @@ test('a kind whose folds the theme starts open draws them open, and a person\'s 
   const lines = (toggled: ReadonlySet<string>) => screen([prompt], { toggled }, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
   assert.deepEqual(lines(new Set()), ['a', 'b', 'c'])
   assert.deepEqual(lines(new Set(['1/f'])), ['a', '… 2 more lines'])
+})
+
+test('a theme may change in part a mark an earlier theme added, keeping what it leaves out', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ marks: { pinned: { glyph: '★', tone: 'warning' } } })
+    ctx.binnacle.theme({ marks: { pinned: { glyph: '◆' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: [{ mark: 'pinned' }] }))
+  })
+  assert.deepEqual(screen([prompt], initial, 4, registrations.views, registrations.currentTheme).lines, ['\x1b[33m◆\x1b[39m   '])
 })
 
 /**

@@ -314,3 +314,12 @@ test('a card may be filled with a background and edged in a tone, both the theme
     '\x1b[100m\x1b[36m╰────╯\x1b[39m\x1b[49m',
   ])
 })
+
+test('a filled card stays filled around what it holds that is filled otherwise: every cell after an inner fill ends is the card\'s again', () => {
+  const theme = themed(binnacleTheme, [{ backgrounds: { failed: 'red' } }])
+  const card = { kind: 'card', background: 'failed', child: { kind: 'band', background: 'prompt', child: { kind: 'text', text: 'x' } } } as const
+  for (const line of layout(card, 9, { toggled: new Set() }, theme).lines) {
+    const inner = line.slice(0, -'\x1b[49m'.length)
+    assert.equal(inner.split('\x1b[49m').slice(1).every(rest => rest.startsWith('\x1b[41m')), true, JSON.stringify(line))
+  }
+})

@@ -247,6 +247,21 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
 }
 
 /**
+ * A line with its fill opened again wherever what it holds ended a fill of its own, so each cell after an inner band is the outer fill's, not the terminal's: a background ends with the default background's code, which also ends the outer one.
+ * @param line - the line, styled for the terminal.
+ * @param fill - the outer fill, as the theme draws it.
+ * @returns the line, the outer fill's opening after each inner fill's end.
+ */
+function refilled(line: string, fill: (text: string) => string): string {
+  // Every fill is the theme's, drawn from a colour as data, so it opens with one code and closes with the default background's.
+  const opening = fill('').slice(0, -DEFAULT_BACKGROUND.length)
+  return line.replaceAll(DEFAULT_BACKGROUND, `${DEFAULT_BACKGROUND}${opening}`)
+}
+
+/** The code that ends any background, giving the terminal's own back. */
+const DEFAULT_BACKGROUND = '\x1b[49m'
+
+/**
  * Lay a card out: what it holds, inside a rounded border drawn in its edge's tone, dim by default, every line filled with its background when it names one.
  * @returns its lines, and what it holds's regions moved inside the border; what it holds alone where the width leaves no column inside.
  */
@@ -265,7 +280,7 @@ function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, sta
   const body = frame.lines.map(row => `${edge(border.side)} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge(border.side)}`)
   const lines = [top, ...body, edge(`${border.bottomLeft}${border.horizontal.repeat(width - 2)}${border.bottomRight}`)]
   return {
-    lines: fill === undefined ? lines : lines.map(fill),
+    lines: fill === undefined ? lines : lines.map(line => fill(refilled(line, fill))),
     regions: frame.regions.map(placed => ({ ...placed, top: placed.top + 1, left: placed.left + CARD_SIDE })),
   }
 }

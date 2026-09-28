@@ -72,7 +72,7 @@ export class RegistrationService extends Service implements Registrations {
    * @throws when the changes name what binnacle cannot draw, saying what to change.
    */
   theme(changes: ThemeChanges): () => void {
-    return this.register(this.themeTable, 'theme', parseThemeChanges(changes), 'binnacle.theme', 'theme')
+    return this.register(this.themeTable, 'theme', parseThemeChanges(changes, this.drawnIn), 'binnacle.theme', 'theme')
   }
 
   /** @inheritDoc */
