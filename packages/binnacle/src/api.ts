@@ -35,6 +35,34 @@ export interface PlacedScreen {
   readonly draw: (facts: readonly Fact[]) => Node
 }
 
+/**
+ * Where a placement goes on the page, top to bottom: the transcript's place,
+ * lines above the composer, the composer, lines below it. The transcript's
+ * place grows to fill the alternate screen; the rest take their height.
+ */
+export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-composer'
+
+/**
+ * What a placement draws: binnacle's transcript, binnacle's composer, or
+ * lines of the author's own. The transcript goes only in its own slot, and
+ * the composer only in its own; lines go anywhere but the transcript's place,
+ * where a drawing is a placed screen.
+ */
+export type Placement =
+  | { readonly kind: 'transcript' }
+  | { readonly kind: 'composer' }
+  | {
+    readonly kind: 'lines'
+    /**
+     * How the lines draw, with nodes as a view draws, handed the session's
+     * facts read-only. It is called again as the facts arrive, the width or
+     * the theme changes, or the registrations change — not at every frame —
+     * so it is a function of the facts and of what its plugin read at the
+     * last of those.
+     */
+    readonly draw: (facts: readonly Fact[]) => Node
+  }
+
 /** The `binnacle` service, `ctx.binnacle`: each registration is an effect of the plugin that made it, gone when that plugin is disposed. */
 export interface Registrations {
   /**
@@ -82,6 +110,21 @@ export interface Registrations {
    * @returns a disposer, for taking it back before the plugin is disposed.
    */
   screen(name: string, screen: PlacedScreen): () => void
+  /**
+   * Place what draws in a slot of the page. The transcript's and the
+   * composer's slots draw their newest placement, and disposing it gives
+   * back the one before; with none, the slot draws nothing — with no
+   * composer, nothing takes typing, and what the host answers itself,
+   * quitting included, still answers. The lines slots draw every placement,
+   * oldest first, top to bottom. Lines draw no focus and answer no gesture.
+   * A drawing that throws, or returns no node binnacle can lay out, draws
+   * what went wrong, naming its registration.
+   * @param slot - where it goes.
+   * @param placement - what it draws there.
+   * @returns a disposer, for taking it back before the plugin is disposed.
+   * @throws when the placement cannot go in the slot — the transcript or the composer outside its own, or lines in the transcript's place — saying what to change.
+   */
+  place(slot: Slot, placement: Placement): () => void
   /**
    * Change the theme everything is drawn in — a mark's glyph or tone, and the
    * rest of the theme as it joins — without drawing anything again yourself.

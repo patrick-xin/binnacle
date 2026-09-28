@@ -11,13 +11,34 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { AuthorAdapter, PlacedScreen, Registrations, ThemeChanges, View, Views } from '../api.ts'
+import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Slot, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
 import type { Theme } from '../ui/theme.ts'
 
-/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, or the theme. */
-export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'theme'
+/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, or the theme. */
+export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme'
+
+/** The slots of the page, top to bottom. */
+const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer'] satisfies readonly Slot[]
+
+/**
+ * Why a placement cannot go in a slot, as what to change.
+ * @param slot - where it was placed.
+ * @param placement - what was placed.
+ * @returns the reason, or undefined when it may go there.
+ */
+function misplaced(slot: Slot, placement: Placement): string | undefined {
+  // An author's code may be untyped, so what the types say is checked here, where it enters.
+  if (!slots.includes(slot)) return 'no such slot; the slots are transcript, above-composer, composer and below-composer'
+  const kind: unknown = (placement as { readonly kind?: unknown } | undefined)?.kind
+  const drawn = kind === 'lines' && typeof (placement as { readonly draw?: unknown }).draw === 'function'
+  if (kind !== 'transcript' && kind !== 'composer' && !drawn) return 'a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function'
+  if (placement.kind === 'transcript' && slot !== 'transcript') return 'the transcript goes only in the transcript slot'
+  if (placement.kind === 'composer' && slot !== 'composer') return 'the composer goes only in the composer slot'
+  if (placement.kind === 'lines' && slot === 'transcript') return 'lines cannot take the transcript\'s place; place a screen there with binnacle.screen'
+  return undefined
+}
 
 /** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
 export class RegistrationService extends Service implements Registrations {
@@ -26,6 +47,7 @@ export class RegistrationService extends Service implements Registrations {
   private readonly viewTable = new Map<string, readonly View[]>()
   private readonly screenTable = new Map<string, readonly PlacedScreen[]>()
   private readonly newestScreens = new Map<string, PlacedScreen>()
+  private readonly placementTable = new Map<string, readonly Placement[]>()
   private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
   private drawnIn: Theme = binnacleTheme
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
@@ -78,6 +100,22 @@ export class RegistrationService extends Service implements Registrations {
   /** @inheritDoc */
   screen(name: string, screen: PlacedScreen): () => void {
     return this.register(this.screenTable, name, screen, `binnacle.screen(${name})`, 'screens')
+  }
+
+  /** @inheritDoc */
+  place(slot: Slot, placement: Placement): () => void {
+    const refused = misplaced(slot, placement)
+    if (refused !== undefined) throw new Error(`binnacle.place(${slot}): ${refused}`)
+    return this.register(this.placementTable, slot, placement, `binnacle.place(${slot})`, 'placements')
+  }
+
+  /**
+   * What is placed in a slot, oldest first.
+   * @param slot - the slot.
+   * @returns its placements; the transcript's and the composer's slots draw the last.
+   */
+  placed(slot: Slot): readonly Placement[] {
+    return this.placementTable.get(slot) ?? []
   }
 
   /**
