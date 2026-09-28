@@ -91,4 +91,4 @@ The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/
 - **A reading — a survey, a probe, a limitation found — goes on the issue it informs**, naming the reference it was read in.
 - **Use the owner's term** — dsh's, Cordis's, pi-tui's — and check [the glossary](docs/glossary.md) before coining one; a new term is added there in the same change.
 - **Durable prose carries no change history**; the story goes in the commit message.
-- **Work on a branch; merge with `--no-ff`.**
+- **Work on a branch. Finished work — an issue closed, a feature done — is a pull request**, reviewed by a second model as well as the maintainer, `pnpm test` green on it, and merged with a merge commit, never squashed or rebased.
