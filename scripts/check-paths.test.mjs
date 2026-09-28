@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { findLeaks } from './check-paths.mjs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, realpathSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { findLeaks, repositoryFiles } from './check-paths.mjs'
 
 // Built from parts so this file holds none of the paths it tests.
 const path = (...parts) => parts.join('/')
@@ -32,4 +36,13 @@ test('a tool\'s own dot-directory under home is not a leak', () => {
 test('a path that only resembles a home is not a leak', () => {
   const text = 'the route /api/users/42 and a /usr/local/bin'
   assert.deepEqual(findLeaks([{ path: 'e.md', text }]), [])
+})
+
+test('a tracked symlink is read as the link git stores, not as what it points at', () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'binnacle-paths-')))
+  execFileSync('git', ['init', '-q', root])
+  const target = path('', 'Users', 'someone', 'notes.md')
+  symlinkSync(target, join(root, 'notes.md'))
+  execFileSync('git', ['-C', root, 'add', 'notes.md'])
+  assert.deepEqual(repositoryFiles(root), [{ path: 'notes.md', text: target }])
 })
