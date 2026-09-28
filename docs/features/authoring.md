@@ -1,6 +1,6 @@
 # Authoring
 
-A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry — a built-in kind, or a quiet kind by its dsh event type ([Transcript](transcript.md)) — building on binnacle's drawing or replacing it. A screen a plugin places takes the transcript's place, opened with the key its plugin offers. A placement draws around the composer: lines above or below it, or the composer's place itself. A theme registration changes what everything is drawn in, from colours to how a kind's folds start. Disposing the plugin gives back everything it registered.
+A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry — a built-in kind, or a quiet kind by its dsh event type ([Transcript](transcript.md)) — building on binnacle's drawing or replacing it. A screen a plugin places takes the transcript's place, opened with the key its plugin offers. A placement draws around the composer: lines above or below it, or the composer's place itself, deciding what a line submitted there does. A line is sent to the session with `send`, a grant the host performs. A theme registration changes what everything is drawn in, from colours to how a kind's folds start. Disposing the plugin gives back everything it registered.
 
 ## How it works
 
@@ -41,9 +41,14 @@ A plugin can place a screen of its own in the transcript's place, opened with a 
 `ctx.binnacle.place(slot, placement)` places what draws in a slot of the page (`binnacle:packages/binnacle/src/api.ts#Placement`): the transcript's place, lines above the composer, the composer's place, lines below it. The transcript and the composer are binnacle's own placements there — placed by their built-in plugins, as an author's plugin places beside them — and the host lays out what is placed: on the alternate screen the transcript's place grows and the rest sit under it at their height; on the main screen the same order is printed.
 
 - The transcript and the composer go only in their own slots, and their slots draw the newest placement; disposing it gives back the one before. With no composer placed, nothing takes typing, and what the host answers itself — quitting included — still answers. Lines cannot take the transcript's place: a drawing there is a placed screen's job, above.
+- A composer placement carries `submit(text)`: what a line submitted to the composer does. binnacle's composer clears itself either way, and the placement is handed the line as the person wrote it, blank included; the built-in Composer plugin sends a line that is not blank through `send` ([Composer](composer.md)). What a `submit` does wrong is not fenced, as a view's or a `draw`'s is: a submitted line has no line to draw what went wrong on — fencing it waits on a notice with somewhere to be drawn ([#32](https://github.com/patrick-xin/binnacle/issues/32)).
 - The lines slots draw every placement, oldest first, top to bottom; out of the box one line is placed below the composer, the [Status line](status-line.md).
 - A lines placement's `draw` returns a node, as a view does, handed the session's facts read-only, and is drawn again as the facts arrive, the width or the theme changes, or the registrations change — not at every frame. It takes no focus and answers no gesture.
 - A placement that cannot go in its slot is refused where it is registered, saying what to change; what a `draw` does wrong is drawn, naming its registration, and never takes the surface down.
+
+## Sending a line
+
+`ctx.binnacle.send(text)` sends a line from the person to the session: a grant, an effect the host performs on the open session, not a registration, so nothing of it is disposed with the plugin (`binnacle:packages/binnacle/src/api.ts#Registrations`). It steers the agent, reaching a turn already running at its next step, or starting a turn when none runs; in the transcript, a line that steered a running turn is drawn as one ([Transcript](transcript.md)). It throws when no session is open — before it opens, or after it closes — saying so. The built-in Composer plugin sends each line that is not blank through it ([Composer](composer.md)).
 
 ## Binding keys
 
