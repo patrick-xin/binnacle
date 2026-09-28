@@ -11,13 +11,15 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
 import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Slot, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
+import { refusedBindings } from '../ui/keys.ts'
 import type { Theme } from '../ui/theme.ts'
 
 /** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, or the theme. */
-export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme'
+export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys'
 
 /** The slots of the page, top to bottom. */
 const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer'] satisfies readonly Slot[]
@@ -40,6 +42,17 @@ function misplaced(slot: Slot, placement: Placement): string | undefined {
   return undefined
 }
 
+/**
+ * The own entries of each source laid one over the next, latest wins, defined as own properties: `Object.assign` sets,
+ * so an id only an own property carries — `__proto__`, as JSON.parse makes it — reaches the prototype's setter and is
+ * dropped, before it can be refused or layered.
+ * @param sources - the records to lay, oldest first.
+ * @returns their own entries as one record, each id's newest.
+ */
+function overlaid(...sources: readonly Readonly<Record<string, KeyId | readonly KeyId[] | undefined>>[]): KeybindingsConfig {
+  return Object.fromEntries(sources.flatMap(source => Object.entries(source))) as KeybindingsConfig
+}
+
 /** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
 export class RegistrationService extends Service implements Registrations {
   private readonly adapterTable = new Map<string, readonly AuthorAdapter[]>()
@@ -48,6 +61,8 @@ export class RegistrationService extends Service implements Registrations {
   private readonly screenTable = new Map<string, readonly PlacedScreen[]>()
   private readonly newestScreens = new Map<string, PlacedScreen>()
   private readonly placementTable = new Map<string, readonly Placement[]>()
+  private readonly bindingTable = new Map<string, readonly Readonly<Record<string, KeyId | readonly KeyId[]>>[]>()
+  private bound: KeybindingsConfig = {}
   private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
   private drawnIn: Theme = binnacleTheme
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
@@ -100,6 +115,24 @@ export class RegistrationService extends Service implements Registrations {
   /** @inheritDoc */
   screen(name: string, screen: PlacedScreen): () => void {
     return this.register(this.screenTable, name, screen, `binnacle.screen(${name})`, 'screens')
+  }
+
+  /** @inheritDoc */
+  keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void {
+    // An author's code may be untyped, so what the types say is checked here, where it enters.
+    if (typeof bindings !== 'object' || bindings === null || Array.isArray(bindings)) throw new Error(`binnacle.keys: bindings is ${String(bindings)}; bind a record from binding ids to keys, such as { 'binnacle.quit': 'ctrl+q' }`)
+    // An author's code may change the object after handing it over, so what is registered is what stood at entry: the
+    // record copied, and each array in it. Each registration its own object also lets its disposal find its own layer.
+    const given = Object.fromEntries(Object.entries(bindings).map(([id, keys]) => [id, Array.isArray(keys) ? [...keys] : keys]))
+    // What the registrations would bind together with this one, checked before it joins them.
+    const refused = refusedBindings(overlaid(this.bound, given))
+    if (refused !== undefined) throw new Error(`binnacle.keys: ${refused}`)
+    return this.register(this.bindingTable, 'keys', given, 'binnacle.keys', 'keys')
+  }
+
+  /** What the registrations bind, by binding id: each id's newest. */
+  get bindings(): KeybindingsConfig {
+    return this.bound
   }
 
   /** @inheritDoc */
@@ -175,6 +208,8 @@ export class RegistrationService extends Service implements Registrations {
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
     // A new theme object each change, so what was kept against the old one is known stale.
+    // Each id bound by the newest registration that binds it, as one config for pi-tui's manager.
+    if (table === 'keys') this.bound = overlaid(...this.bindingTable.get('keys') ?? [])
     if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
     for (const listener of this.listeners) listener(table)
   }
