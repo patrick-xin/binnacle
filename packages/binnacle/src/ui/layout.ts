@@ -7,7 +7,7 @@ import type { Region } from '../contract/index.ts'
 import type { Node, Span } from './node.ts'
 import { readable } from './readable.ts'
 import { binnacleTheme } from './theme.ts'
-import type { Mark, Theme, Tone } from './theme.ts'
+import type { FoldStart, Mark, Theme, Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
@@ -15,6 +15,8 @@ export interface LayoutState {
   readonly toggled: ReadonlySet<string>
   /** The id of the focused region, if any. */
   readonly focus?: string
+  /** How the folds of what is laid out start, when a fold does not say: the theme's for the kind of entry it is drawn in. */
+  readonly folds?: FoldStart
 }
 
 /** A region, and the rows and columns it covers. */
@@ -192,17 +194,20 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
       return band(node, width, state, theme)
     case 'fold': {
       const frame = drawn(node.child, width, state, theme)
-      const cut = frame.lines.length - node.rows
+      // What the fold says wins; then how its kind's folds start; then three rows, folded.
+      const rows = node.rows ?? state.folds?.rows ?? 3
+      const opened = state.toggled.has(node.id) !== (state.folds?.open ?? false)
+      const cut = frame.lines.length - rows
       // The line the fold names to fold under, laid out as a text node's line in the fold's tone; a fold of no
       // rows answers on it alone, and its marker rides it — what it holds while closed, that it can be folded open.
-      const foldsUnder = node.rows === 0 ? node.title : undefined
+      const foldsUnder = rows === 0 ? node.title : undefined
       const title = node.title === undefined ? [] : new Text(titleLine(node.title, node.tone, theme), 0, 0).render(width)
       const below = frame.regions.map(placed => ({ ...placed, top: placed.top + title.length }))
       if (cut <= 0) return { lines: [...title, ...frame.lines], regions: below }
       const label = theme.words.show(cut)
       const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
-      if (state.toggled.has(node.id)) {
-        const away = node.rows === 0 ? theme.words.away : theme.words.to(node.rows)
+      if (opened) {
+        const away = rows === 0 ? theme.words.away : theme.words.to(rows)
         const open = { id: node.id, affordances: [{ kind: 'expand' as const, label: away }], overflows: false }
         // The heading a fold of no rows answers on: its title saying it can be folded — or, focused, the accent
         // row saying what Enter will do, the title kept on it, so the row a person reads never sits below content
@@ -229,13 +234,13 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
           : new Text(titleLine([...foldsUnder, ` ${theme.chrome.separator} ${theme.words.holds(cut)}`], node.tone, theme), 0, 0).render(width)
         return { lines: marker, regions: [{ region, top: 0, height: marker.length, left: 0, width }] }
       }
-      const shown = frame.lines.slice(0, node.rows)
+      const shown = frame.lines.slice(0, rows)
       // The marker row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing.
       const marker = new Text(state.focus === node.id ? theme.tones.accent(`${theme.chrome.focus} ${label}`) : `${theme.chrome.cut} ${theme.words.cut(cut)}`, 0, 0).render(width)
       const lines = [...title, ...shown, ...marker]
       const inside = frame.regions
-        .filter(placed => placed.top < node.rows)
-        .map(placed => ({ ...placed, top: placed.top + title.length, height: Math.min(placed.height, node.rows - placed.top) }))
+        .filter(placed => placed.top < rows)
+        .map(placed => ({ ...placed, top: placed.top + title.length, height: Math.min(placed.height, rows - placed.top) }))
       return { lines, regions: [{ region, top: 0, height: lines.length, left: 0, width }, ...inside] }
     }
   }

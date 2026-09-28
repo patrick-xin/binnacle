@@ -71,8 +71,8 @@ export type Node =
     readonly title?: readonly Span[]
     /** The theme's colour the title is drawn in; the terminal's own when it has none. */
     readonly tone?: Tone
-    /** How many rows it shows while folded. */
-    readonly rows: number
+    /** How many rows it shows while folded; when absent, what the theme gives the kind of entry it is drawn in, or three. */
+    readonly rows?: number
     /** The content. */
     readonly child: Node
   }
@@ -146,8 +146,8 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
       if (typeof id !== 'string') throw new Error('a fold needs an id')
       if (title !== undefined && !Array.isArray(title)) throw new Error(`a fold's title is ${describe(title)}`)
       if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(theme.tones, tone))) throw new Error(`${describe(tone)} is no tone`)
-      if (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 0) throw new Error(`a fold's rows are ${describe(rows)}`)
-      const fold: { kind: 'fold', id: string, title?: readonly Span[], tone?: Tone, rows: number, child: Node } = { kind: 'fold', id, rows, child: parseNode(field('child'), theme) }
+      if (rows !== undefined && (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 0)) throw new Error(`a fold's rows are ${describe(rows)}`)
+      const fold: { kind: 'fold', id: string, title?: readonly Span[], tone?: Tone, rows?: number, child: Node } = { kind: 'fold', id, ...rows === undefined ? {} : { rows }, child: parseNode(field('child'), theme) }
       if (title !== undefined) fold.title = Array.from(title, span => spanOf(span, theme))
       if (tone !== undefined) fold.tone = tone as Tone
       return fold

@@ -6,10 +6,10 @@
  */
 
 import { chrome, colours, marks, words } from './theme.ts'
-import type { Colour, Style, ThemeChanges } from './theme.ts'
+import type { Colour, FoldStart, Style, ThemeChanges } from './theme.ts'
 
 /** The parts a theme registration may name. */
-const parts = ['tones', 'backgrounds', 'marks', 'chrome', 'words'] as const
+const parts = ['tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds'] as const
 
 /**
  * A value as an error names it: a string quoted, anything else as JSON or its type.
@@ -56,6 +56,23 @@ function style(value: unknown, at: string): Style {
       if (typeof field !== 'boolean') throw new Error(`${at}.${key} is ${named(field)}, not true or false`)
       read[key] = field
     } else throw new Error(`${at}.${key} is no part of a tone's style: color, bold, dim, italic, underline`)
+  }
+  return read
+}
+
+/**
+ * How a kind's folds start: rows a whole number, none or more, and open true or false.
+ */
+function foldStart(value: unknown, at: string): FoldStart {
+  const read: { rows?: number, open?: boolean } = {}
+  for (const [key, field] of Object.entries(record(value, at))) {
+    if (key === 'rows') {
+      if (typeof field !== 'number' || !Number.isInteger(field) || field < 0) throw new Error(`${at}.rows is ${named(field)}, not a whole number of rows`)
+      read.rows = field
+    } else if (key === 'open') {
+      if (typeof field !== 'boolean') throw new Error(`${at}.open is ${named(field)}, not true or false`)
+      read.open = field
+    } else throw new Error(`${at}.${key} is no part of how folds start: rows, open`)
   }
   return read
 }
@@ -108,6 +125,9 @@ export function parseThemeChanges(value: unknown): ThemeChanges {
         }
         case 'words':
           read.words = known(field, 'words', Object.keys(words), text)
+          break
+        case 'folds':
+          read.folds = Object.fromEntries(Object.entries(record(field, 'folds')).map(([key, start]) => [key, foldStart(start, `folds.${key}`)]))
           break
         default:
           throw new Error(`${part} is no part of a theme: ${parts.join(', ')}`)

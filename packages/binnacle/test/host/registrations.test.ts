@@ -89,6 +89,26 @@ test('a theme that names what binnacle cannot draw is refused where it is regist
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), { message: 'binnacle.theme: tones.accent.color is "purple", not one of the terminal\'s sixteen colours: black, red, green, yellow, blue, magenta, cyan, white, bright-black, bright-red, bright-green, bright-yellow, bright-blue, bright-magenta, bright-cyan, bright-white' })
   assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★' } } }), { message: 'binnacle.theme: marks.pinned is a mark binnacle has none of, so it needs a glyph and a tone' })
   assert.throws(() => registrations.theme({ words: { cut: 3 } } as never), { message: 'binnacle.theme: words.cut is 3, not a string' })
+  assert.throws(() => registrations.theme({ folds: { tool: { rows: -1 } } }), { message: 'binnacle.theme: folds.tool.rows is -1, not a whole number of rows' })
+})
+
+test('a fold its view leaves unsized shows the rows the theme gives its kind, or three', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('prompt', () => ({ kind: 'fold', id: 'f', child: { kind: 'text', text: 'a\nb\nc\nd\ne' } })) })
+  assert.deepEqual(shown(registrations), ['a', 'b', 'c', '… 2 more lines'])
+  await author((ctx) => { ctx.binnacle.theme({ folds: { prompt: { rows: 1 } } }) })
+  assert.deepEqual(shown(registrations), ['a', '… 4 more lines'])
+})
+
+test('a kind whose folds the theme starts open draws them open, and a person\'s toggle folds one', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', () => ({ kind: 'fold', id: 'f', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } }))
+    ctx.binnacle.theme({ folds: { prompt: { open: true } } })
+  })
+  const lines = (toggled: ReadonlySet<string>) => screen([prompt], { toggled }, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(new Set()), ['a', 'b', 'c'])
+  assert.deepEqual(lines(new Set(['1/f'])), ['a', '… 2 more lines'])
 })
 
 /**

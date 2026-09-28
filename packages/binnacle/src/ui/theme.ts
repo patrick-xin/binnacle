@@ -170,10 +170,20 @@ export interface Theme {
   readonly words: { readonly [word in Exclude<keyof typeof words, 'less' | 'away'>]: (count: number) => string } & { readonly less: string, readonly away: string }
   /** The styles a markdown document is drawn in. */
   readonly markdown: MarkdownTheme
+  /** How the folds of each kind of entry start, by the key its views are registered under, when a fold does not say. */
+  readonly folds: { readonly [key: string]: FoldStart | undefined }
+}
+
+/** How a kind of entry's folds start, when a fold does not say. */
+export interface FoldStart {
+  /** How many rows each shows while folded. */
+  readonly rows?: number
+  /** Whether each starts open, until a person folds it. */
+  readonly open?: boolean
 }
 
 /** binnacle's own theme, which registrations change. */
-export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme }
+export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: {} }
 
 /**
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.
@@ -189,6 +199,8 @@ export interface ThemeChanges {
    * What a fold says of itself, each a template: `{n}` is the count of lines, and `{lines}` the word for that many (`line` or `lines`). `less` and `away` count nothing.
    */
   readonly words?: { readonly [word in keyof typeof words]?: string }
+  /** How each kind of entry's folds start, by the key its views are registered under — an entry kind, a quiet kind's dsh type, an authored fact's name — when a fold does not say. */
+  readonly folds?: { readonly [key: string]: FoldStart }
   /** Marks, by name: a glyph, a tone, or both. */
   readonly marks?: { readonly [name: string]: { readonly glyph?: string, readonly tone?: Tone } }
 }
@@ -287,6 +299,10 @@ export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
       said = word === 'less' || word === 'away' ? { ...said, [word]: template } : { ...said, [word]: counting(template) }
     }
   }
+  let starts: Theme['folds'] = base.folds
+  for (const change of changes) {
+    for (const [key, start] of Object.entries(change.folds ?? {})) starts = { ...starts, [key]: { ...starts[key], ...start } }
+  }
   const tonesNow = toned as Theme['tones']
-  return { ...base, chrome: glyphs, words: said, tones: tonesNow, backgrounds: filled as Theme['backgrounds'], marks: marked as Theme['marks'], markdown: markdownIn(tonesNow) }
+  return { ...base, folds: starts, chrome: glyphs, words: said, tones: tonesNow, backgrounds: filled as Theme['backgrounds'], marks: marked as Theme['marks'], markdown: markdownIn(tonesNow) }
 }
