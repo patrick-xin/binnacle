@@ -15,7 +15,7 @@ import { trajectory } from '../../../src/plugins/trajectory/index.ts'
 import { drawText } from '../../../src/ui/draw.ts'
 import { layout } from '../../../src/ui/layout.ts'
 import { componentOf } from '../../support/drawn.ts'
-import { call as callFact, prompt as promptFact, returned as returnedFact } from '../../support/facts.ts'
+import { call as callFact, prompt as promptFact, returned as returnedFact, asked as askedFact, decided as decidedFact } from '../../support/facts.ts'
 import { logged } from '../../support/log.ts'
 
 /**
@@ -191,6 +191,23 @@ test('each line folds its record: a read fact\'s opens to the fact binnacle read
     '    "preset": "workspace-write"',
     '  }',
     '}',
+  ])
+})
+
+test('an approval asked and its decision are each one line, naming the tool and the outcome', async () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' },
+    askedFact(2, 2, 'a1', 'bash', 'writes outside the workspace'),
+    decidedFact(3, 3, 'a1', 'allowed-once'),
+    { kind: 'turn', seq: 4, time: 4, turn: 1, phase: 'end', ending: 'completed' },
+  ]
+  const { lines } = await trajectoryOver(facts)
+  assert.deepEqual(titles(lines()), [
+    'turn 1',
+    '1 turn 1 begins',
+    '2 ⚑ bash asks',
+    '3 ⚑ decision allowed-once',
+    '4 turn 1 ended · completed',
   ])
 })
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 import { adapt } from '../../src/facts/adapt.ts'
 import { kinds } from '../../src/facts/kinds.ts'
 import { seed as seedEvent } from '../support/events.ts'
@@ -177,6 +178,24 @@ test('a developer message is context when it changes the tools, quiet when it do
     data: { ...tools.data, message: { ...tools.data.message, id: MessageId('m5'), content: [{ type: 'text', text: 'a word from the registry' }] } },
   }
   assert.deepEqual(adapt(said), { kind: 'quiet', seq: 7, time: 1_250, type: 'developer/message', record: said })
+})
+
+test('an approval the agent asked is a fact carrying dsh\'s request id, the tool, the call it is about, and why it asks', () => {
+  const event: SessionEvent<'approval/asked'> = {
+    type: 'approval/asked', seq: SessionSeq(10), time: 2_000,
+    data: { id: ApprovalRequestId('a1'), toolName: 'bash', callId: ToolCallId('c1'), reason: 'writes outside the workspace' },
+  }
+  assert.deepEqual(adapt(event), {
+    kind: 'asked', seq: 10, time: 2_000, id: ApprovalRequestId('a1'), toolName: 'bash', callId: ToolCallId('c1'), reason: 'writes outside the workspace',
+  })
+})
+
+test('an approval\'s decision is a fact carrying the id of its ask and the outcome, in dsh\'s words', () => {
+  const event: SessionEvent<'approval/decided'> = {
+    type: 'approval/decided', seq: SessionSeq(11), time: 2_050,
+    data: { id: ApprovalRequestId('a1'), outcome: 'rejected' },
+  }
+  assert.deepEqual(adapt(event), { kind: 'decided', seq: 11, time: 2_050, id: ApprovalRequestId('a1'), outcome: 'rejected' })
 })
 
 test('a step opening or closing is a step fact', () => {
