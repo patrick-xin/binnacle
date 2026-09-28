@@ -26,7 +26,7 @@ Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.t
 ## One root
 
 - **Everything you read is under this checkout.** `pnpm refs` fetches each repository in [`references.json`](references.json) into `.refs/<name>` at its pin. **Never write under `.refs/`.**
-- **Cite another repository as `` `name:path` ``** (`` `pi:packages/tui/src/tui.ts` ``, optionally `#symbol`), never as a path on a machine, and never in a decision record (below). `pnpm test` resolves every citation at its pin and refuses a home directory in any file.
+- **Cite another repository as `` `name:path` ``** (`` `pi:packages/tui/src/tui.ts` ``, optionally `#symbol`), never as a path on a machine, and never in a decision record (below). `pnpm test` resolves every citation at its pin and refuses a home directory, or a privacy tool's placeholder, in any file.
 - **Cite this repository's code the same way, by the name `binnacle`** (`` `binnacle:packages/binnacle/src/api.ts#Registrations` ``), wherever prose outside a decision record points at it. A symbol in code must be one its module exports, so a rename fails the gate instead of leaving the prose stale.
 - **The source is the authority.** `dsh` on the harness contract; `pi` for pi-tui's API and for what pi composes from it; `codex` and `eve` for what a terminal can do. A limitation is a reading: name the reference it was read in.
 - **A reference only one machine has** is declared in its `references.local.json`, never in a tracked file, and never cited from one.
