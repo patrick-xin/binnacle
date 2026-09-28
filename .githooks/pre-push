@@ -1,0 +1,5 @@
+#!/bin/sh
+# Every gate and every test before a push: CI runs by hand while the repository is private, so this is what stops a red branch reaching GitHub.
+# An upstream mail branch is pushed by its job, which runs its own canary, so the hook stands aside when it runs there.
+[ -n "$GITHUB_ACTIONS" ] && exit 0
+exec pnpm test

@@ -14,7 +14,7 @@ The rules are `AGENTS.md`'s, under *Tests*: they bind, and this skill does not r
 
 ## One cycle
 
-1. **Write one test**, at one seam, for one behaviour. Its expected value comes from outside the code: a literal, a worked example, what upstream does. What a person sees is lines, written out as literals.
+1. **Write one test**, at one seam, for one behaviour. Its expected value comes from outside the code: a literal, a worked example, what upstream does. What a person sees is lines, written out as literals; where a click lands is regions. A change to what is laid out asserts both, at a width where a line wraps as well as at one where none does: a region's rows go wrong where a line wraps.
 2. **Run it alone, and read how it fails.** From `packages/binnacle`:
 
    ```sh
