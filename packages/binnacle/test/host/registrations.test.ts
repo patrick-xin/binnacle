@@ -461,7 +461,7 @@ test('a line sent before the session opens, or after it closes, is refused, sayi
   const { registrations } = surface()
   assert.throws(() => registrations.send('hello'), { message: 'binnacle.send: no session is open; a line can be sent once the session opens, and until it closes' })
   const sent: string[] = []
-  const close = registrations.open({ send: (text) => { sent.push(text) } })
+  const close = registrations.open({ send: (text) => { sent.push(text) }, command: async () => false })
   registrations.send('hello')
   assert.deepEqual(sent, ['hello'])
   close()
@@ -473,4 +473,15 @@ test('what is no record of binding ids is refused where it is registered, saying
   assert.throws(() => registrations.keys(null as never), { message: 'binnacle.keys: bindings is null; bind a record from binding ids to keys, such as { \'binnacle.quit\': \'ctrl+q\' }' })
   assert.throws(() => registrations.keys('ctrl+q' as never), { message: 'binnacle.keys: bindings is ctrl+q; bind a record from binding ids to keys, such as { \'binnacle.quit\': \'ctrl+q\' }' })
   assert.deepEqual(registrations.bindings, {})
+})
+
+test('a line run as a command before the session opens is refused, saying so; while it is open it reaches the session, which says whether a command ran', async () => {
+  const { registrations } = surface()
+  await assert.rejects(registrations.command('/compact'), { message: 'binnacle.command: no session is open; a command can be run once the session opens, and until it closes' })
+  const run: string[] = []
+  const close = registrations.open({ send: () => {}, command: async (line) => { run.push(line); return line === '/compact' } })
+  assert.equal(await registrations.command('/compact'), true)
+  assert.equal(await registrations.command('/nothing'), false)
+  assert.deepEqual(run, ['/compact', '/nothing'])
+  close()
 })

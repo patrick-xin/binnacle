@@ -91,6 +91,7 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
     },
   })
   ctx.provide('agents', {} as never)
+  ctx.provide('commands', {} as never)
   // The default model the status line names, as dsh's own selection reads it; a test varies it to prove the line follows the service.
   ctx.provide('agentDefaultModel', { currentSelection: () => selection } as never)
   const fiber = ctx.plugin(host)
@@ -98,9 +99,9 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
-test('the row is named binnacle and needs the command line, the agents and the default model', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model and the commands', () => {
   assert.equal(host.name, 'binnacle')
-  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel'])
+  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'])
 })
 
 test('--check opens a session on the default model once startup commits, reports it, closes it, and exits 0 drawing nothing', async () => {
@@ -1161,4 +1162,49 @@ test('a change of the default while the session is opening does not move the lin
   opened?.()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
   assert.equal((await terminal.altScreen()).at(-1), 'first/old')
+})
+
+test('a /name line naming one of the session\'s commands runs it and is not sent, and one naming none is sent as prose', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  session.commands.set('compact', 'summarize the session so far')
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('/compact now')
+  terminal.type('\r')
+  await until(() => session.ran.length > 0)
+  assert.deepEqual(session.ran, ['/compact now'])
+  terminal.type('/nothing here')
+  terminal.type('\r')
+  await until(() => session.sent.length > 0)
+  assert.deepEqual(session.sent, ['/nothing here'])
+})
+
+test('typing / offers the session\'s commands and the skills a person may invoke, as dsh lists them', async () => {
+  const terminal = new XtermTerminal(60, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  session.commands.set('compact', 'summarize the session so far')
+  session.skills.set('review', 'review a change')
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('/')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('compact') && row.includes('summarize the session so far')) && rows.some(row => row.includes('review') && row.includes('review a change'))
+  })
+})
+
+test('what / offers follows dsh: a command registered after the session opened is offered once dsh says so', async () => {
+  const terminal = new XtermTerminal(60, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  session.commands.set('plan', 'plan before acting')
+  session.offersChanged()
+  await settle()
+  terminal.type('/')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('plan before acting')))
 })

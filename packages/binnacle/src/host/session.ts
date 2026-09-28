@@ -11,6 +11,8 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
+import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { AgentHandle, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-model'
@@ -34,6 +36,25 @@ export interface OpenedSession {
    * @param text - what they typed.
    */
   send(text: string): void
+  /**
+   * Run a line as one of dsh's commands for the agent, without sending it to the model
+   * (`dsh:packages/interaction/commands/src/index.ts`).
+   * @param line - the line, as the person wrote it.
+   * @returns whether a command ran, whatever it returned; false when no command has the name.
+   */
+  command(line: string): Promise<boolean>
+  /**
+   * What `/` offers: dsh's commands for the agent, and the skills a person may invoke, as dsh's web lists them
+   * (`dsh:packages/api/session-controller/src/skill-catalog.ts`).
+   * @returns each by name, with what it does.
+   */
+  offers(): Promise<readonly { readonly name: string, readonly description: string }[]>
+  /**
+   * Hear when what `/` offers may have changed: dsh's commands, or its skills.
+   * @param listener - called on each change.
+   * @returns a function that stops listening.
+   */
+  onOffers(listener: () => void): () => void
   /** Whether a turn is running now, as the agent says. */
   readonly running: boolean
   /** Interrupt the running turn, keeping what waits in the agent's inbox, as dsh's web does; with none running, nothing. */
@@ -60,6 +81,7 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     },
   })
   const { session } = handle.agent
+  const commands: CommandRuntime = ctx.commands
   return {
     model: `${selection.provider}/${selection.model}`,
     follow: (listener) => {
@@ -70,6 +92,16 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
     },
+    offers: async () => {
+      const named = commands.list(handle.agent).map(({ name, description }) => ({ name, description }))
+      const skills = await ctx.get('skills')?.list({ cwd: process.cwd(), scope: handle.agent }) ?? []
+      return [...named, ...skills.filter(isUserInvocable).map(({ name, description }) => ({ name, description }))]
+    },
+    onOffers: (listener) => {
+      const stops = [ctx.on('commands/change', listener), ctx.on('skills/change', listener)]
+      return () => { for (const stop of stops) stop() }
+    },
+    command: async (line) => await commands.execute(handle.agent, line, [], new AbortController().signal) !== undefined,
     get running() { return handle.agent.status === 'running' },
     interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
     close: () => handle.dispose(),

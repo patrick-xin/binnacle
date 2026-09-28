@@ -168,6 +168,15 @@ export interface Registrations {
    * @throws when no session is open — before it opens, or after it closes — saying so.
    */
   send(text: string): void
+  /**
+   * Run a line as one of dsh's commands, `/compact`: a grant, performed on
+   * the open session's agent through dsh's own commands. Commands are dsh's;
+   * a plugin registers one with `ctx.commands`, never here.
+   * @param line - the line, as the person wrote it.
+   * @returns whether a command ran, whatever it returned; false when no command has the name, leaving the line to the caller.
+   * @throws when no session is open — before it opens, or after it closes — saying so.
+   */
+  command(line: string): Promise<boolean>
 }
 
 declare module '@deepseek-ai/cordis' {

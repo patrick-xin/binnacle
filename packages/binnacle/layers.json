@@ -90,6 +90,12 @@
     ],
     "node:": [
       "host"
+    ],
+    "@deepseek-ai/dsh-commands": [
+      "host"
+    ],
+    "@deepseek-ai/dsh-skill": [
+      "host"
     ]
   }
 }
