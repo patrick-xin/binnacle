@@ -767,7 +767,7 @@ const click = (terminal: XtermTerminal, column: number, row: number): void => {
   terminal.type(`\x1b[<0;${column};${row}m`)
 }
 
-test('a click on a line\'s fold marker opens the line to its record, and the composer below stays live', async () => {
+test('a click on a line opens it to its record, and the composer below stays live', async () => {
   const terminal = new XtermTerminal(60, 18)
   const session = new FakeSession(trajectorySession())
   const { commit } = await mount([], session, async () => session, terminal)
@@ -775,7 +775,7 @@ test('a click on a line\'s fold marker opens the line to its record, and the com
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
   terminal.type('\x0f')
   await until(async () => (await terminal.altScreen()).some(row => row.includes('before turn 1')))
-  click(terminal, 3, 3)
+  click(terminal, 3, 2)
   await until(async () => (await terminal.altScreen()).some(row => row.trim() === '"type": "test/marker",'))
   const opened = await terminal.altScreen()
   assert.ok(opened.some(row => row.includes('0 ? test/marker')))

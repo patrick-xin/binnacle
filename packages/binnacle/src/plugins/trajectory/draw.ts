@@ -1,7 +1,7 @@
 /**
  * The Trajectory's drawing: every event the session logged, one line each —
- * its kind and what it says in a few words — grouped by turn, each line
- * folding its record.
+ * its kind and what it says in a few words, its record folded on that line —
+ * grouped by turn.
  *
  * It reads only the facts it is handed, never the events: what binnacle has
  * read of an event is the fact, and what it has not — a quiet or unknown
@@ -47,10 +47,10 @@ function recordOf(fact: Fact): Node {
 }
 
 /** What one line says of one fact: its place in the log, dim, then its kind — a mark where one stands for it — and a few words. */
-function lineOf(fact: Fact, words: readonly Span[], mark?: Mark, tone?: 'muted' | 'dim'): Node {
+function lineOf(fact: Fact, words: readonly Span[], mark?: Mark): readonly Span[] {
   const spans: Span[] = [{ text: `${fact.seq} `, tone: 'dim' }]
   if (mark !== undefined) spans.push({ mark })
-  return { kind: 'text', text: [...spans, ...words], ...tone === undefined ? {} : { tone } }
+  return [...spans, ...words]
 }
 
 /**
@@ -64,15 +64,14 @@ function firstLine(blocks: Blocks): string {
 
 /**
  * One line for one fact: its kind, and what it says in a few words, its
- * record folded beneath.
+ * record folded on that line.
  * @param fact - the fact.
  * @param tools - the name of each call in the log, by its id, so a result says what it answered.
  */
 function eventOf(fact: Fact, tools: ReadonlyMap<string, string>): Node {
   const said = wordsOf(fact, tools)
-  const title = lineOf(fact, said.words, said.mark, said.tone)
-  const fold = { kind: 'fold', id: `${fact.seq}`, rows: 0, child: recordOf(fact) } as const
-  return { kind: 'stack', children: [title, fold] }
+  const line = lineOf(fact, said.words, said.mark)
+  return { kind: 'fold', id: `${fact.seq}`, rows: 0, title: line, ...said.tone === undefined ? {} : { tone: said.tone }, child: recordOf(fact) }
 }
 
 /** What one line says of one fact, by its kind. */

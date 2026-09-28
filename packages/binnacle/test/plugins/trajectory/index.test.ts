@@ -54,8 +54,8 @@ function session(): Fact[] {
   ]
 }
 
-/** Every line but the folds' cut markers, which say how much each record holds. */
-const titles = (lines: readonly string[]): readonly string[] => lines.filter(line => !line.startsWith('… '))
+/** Every line as its title reads, the count each line folds left off. */
+const titles = (lines: readonly string[]): readonly string[] => lines.map(line => line.replace(/ · \d+ lines?$/, ''))
 
 /** A second turn, asking again. */
 function secondTurn(): Fact[] {
@@ -147,6 +147,17 @@ test('over a real session\'s log, every event is one line, quiet ones included, 
   ])
 })
 
+test('each event is one line, its record folded on it: the line says how much it holds, and opens to its record under it', async () => {
+  const facts = session()
+  const { placed } = await trajectoryOver(facts)
+  assert.ok(placed !== undefined)
+  const closed = layout(placed.draw(facts), 60, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual([closed[1], closed[4], closed[11]], ['0 permission/preset · 8 lines', '1 turn 1 begins · 7 lines', '8 turn 1 ended · completed · 8 lines'])
+  assert.equal(closed[6], '3 › fix the build · 11 lines')
+  const opened = layout(placed.draw(facts), 60, { expanded: new Set(['3']) }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(opened.slice(6, 10), ['3 › fix the build · show less', '{', '  "kind": "prompt",', '  "seq": 3,'])
+})
+
 test('each line folds its record: a read fact\'s opens to the fact binnacle read, a quiet one to the event as logged, as the fallback shows it', async () => {
   const facts = session()
   const { placed } = await trajectoryOver(facts)
@@ -156,7 +167,7 @@ test('each line folds its record: a read fact\'s opens to the fact binnacle read
     return lines.slice(lines.findIndex(line => line.startsWith(`${id} `)))
   }
   assert.deepEqual(opened('3').slice(0, 12), [
-    '3 › fix the build',
+    '3 › fix the build · show less',
     '{',
     '  "kind": "prompt",',
     '  "seq": 3,',
@@ -170,7 +181,7 @@ test('each line folds its record: a read fact\'s opens to the fact binnacle read
     '}',
   ])
   assert.deepEqual(opened('0').slice(0, 9), [
-    '0 permission/preset',
+    '0 permission/preset · show less',
     '{',
     '  "type": "permission/preset",',
     '  "seq": 0,',
