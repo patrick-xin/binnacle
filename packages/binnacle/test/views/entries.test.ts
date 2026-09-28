@@ -235,6 +235,13 @@ test('a fold\'s title carrying a control sequence is drawn as its text, in its t
   assert.deepEqual(drawnWide(prompt, views), ['\x1b[31mwipedclean\x1b[39m · 1 line'])
 })
 
+test('a result with no call keeps its title a line of its own above the fold, outside it', () => {
+  const entry: Entry = { kind: 'result', fact: { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c9', failed: false, blocks: [{ kind: 'text', text: 'a\nb\nc\nd\ne' }], meta: undefined } }
+  const { lines: drawn, regions } = layout(drawEntry(entry), 40, { expanded: new Set() })
+  assert.deepEqual(drawn.map(line => stripTerminalSequences(line).trimEnd()), ['● result of call c9', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(regions.map(({ region, top, height }) => [region.id, top, height]), [['output', 1, 4]])
+})
+
 test('a kind nothing draws is its type in one line, what it holds beside it, and expand shows the raw record', () => {
   const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'goal/change', record: { type: 'goal/change', data: {} } } }
   assert.deepEqual(lines(entry), ['? goal/change · 4 lines'])

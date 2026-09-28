@@ -150,8 +150,13 @@ function builtIn(entry: Entry, problem?: string): Node {
       return noted(drawAnswer(entry.fact), problem)
     case 'tool':
       return noted(drawTool(entry.call, entry.result, entry.left), problem)
-    case 'result':
-      return noted(folded('output', 3, [{ mark: 'done', tone: 'muted' } as const, ` result of call ${entry.fact.callId}`], { kind: 'text', text: textOf(entry.fact.blocks) }), problem)
+    case 'result': {
+      // A fold that shows rows keeps its marker beneath them, and what shows rows is out of #18: its title stays a
+      // line of its own above the fold, as it always was, a titled fold that shows rows left to #23.
+      const title: Node = { kind: 'text', text: [{ mark: 'done', tone: 'muted' } as const, ` result of call ${entry.fact.callId}`], tone: 'muted' }
+      const fold: Node = { kind: 'fold', id: 'output', rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } }
+      return problem === undefined ? { kind: 'stack', children: [title, fold] } : { kind: 'stack', children: [title, problemLine(problem), fold] }
+    }
     case 'authored':
       return noted(folded('data', 0, [{ mark: 'unknown' } as const, ` ${entry.fact.name}`], { kind: 'text', text: shown(entry.fact.data) }), problem)
     case 'unknown':
