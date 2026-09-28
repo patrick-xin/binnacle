@@ -85,7 +85,9 @@ export interface KeyTable {
   /** The manager holding every binding, for the host to install with pi-tui's `setKeybindings`. */
   readonly manager: KeybindingsManager
   /**
-   * What a key resolves to.
+   * What a key resolves to. The bindings live in the context in a fixed order, and within it a binding the person
+   * set resolves before one that only defaults to the same key, so an explicit binding is never defeated by a
+   * default that shares its key.
    * @param data - the key's bytes, as the terminal reported them.
    * @param focused - whether something on the screen being read — the transcript, or a placed screen that is open — has focus, which decides which bindings are live.
    * @param open - whether a placed screen is open, which takes the keys the transcript would answer.
@@ -115,12 +117,14 @@ export interface KeyTable {
 export function keyTable(): KeyTable {
   const offered = new Map<string, KeybindingDefinition>()
   let manager = new KeybindingsManager(KEYBINDINGS)
+  let set: KeybindingsConfig = {}
   /**
    * Build the manager again: a new manager is the only way a binding joins the table.
    * @param bindings - what the person bound, over the defaults.
    */
   const rebuild = (bindings: KeybindingsConfig = manager.getUserBindings()): void => {
     manager = new KeybindingsManager({ ...KEYBINDINGS, ...Object.fromEntries(offered) }, bindings)
+    set = manager.getUserBindings()
   }
   return {
     get manager(): KeybindingsManager {
@@ -138,27 +142,33 @@ export function keyTable(): KeyTable {
     },
     resolve: (data: string, focused: boolean, open = false): ResolvedKey | undefined => {
       if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
-      if (manager.matches(data, 'binnacle.quit')) return { kind: 'quit' }
-      if (manager.matches(data, 'binnacle.switchScreens')) return { kind: 'switch-screens' }
-      for (const id of offered.keys()) {
-        if (manager.matches(data, id as Keybinding)) return { kind: 'screen', name: id.slice(offeredBinding('').length) }
-      }
-      // A placed screen takes the keys the transcript would answer, on itself rather than the transcript beneath;
-      // only Esc differs, returning to the transcript, and it is resolved first so the rest falls through to the
-      // gestures both screens share. Scrolling, search and selection are the alternate screen's own, over the scroll
-      // view the screen sits in; the composer below it stays live, and focus does not move on the transcript beneath.
-      if (open && manager.matches(data, 'binnacle.stepOut')) return { kind: 'screen-close' }
-      if (manager.matches(data, 'binnacle.stepIn')) return { kind: 'gesture', binding: 'focus.previous' }
+      // The bindings live in this context, in the order the table resolves them: the host's own everywhere, then a
+      // placed screen's key, its closing while one is open, step in, and — while something has focus — moving focus,
+      // the primary and step out, then one binding per affordance kind. A placed screen takes the keys the transcript
+      // would answer, on itself rather than the transcript beneath; only Esc differs, returning to the transcript,
+      // and it is resolved before the gestures both screens share, which the rest of the order gives. Scrolling,
+      // search and selection are the alternate screen's own, over the scroll view the screen sits in; the composer
+      // below it stays live, and focus does not move on the transcript beneath.
+      const live: { readonly id: Keybinding, readonly to: ResolvedKey }[] = [
+        { id: 'binnacle.quit', to: { kind: 'quit' } },
+        { id: 'binnacle.switchScreens', to: { kind: 'switch-screens' } },
+      ]
+      for (const id of offered.keys()) live.push({ id: id as Keybinding, to: { kind: 'screen', name: id.slice(offeredBinding('').length) } })
+      if (open) live.push({ id: 'binnacle.stepOut', to: { kind: 'screen-close' } })
+      live.push({ id: 'binnacle.stepIn', to: { kind: 'gesture', binding: 'focus.previous' } })
       if (focused) {
-        if (manager.matches(data, 'binnacle.focusNext')) return { kind: 'gesture', binding: 'focus.next' }
-        if (manager.matches(data, 'binnacle.focusPrevious')) return { kind: 'gesture', binding: 'focus.previous' }
-        if (manager.matches(data, 'binnacle.primary')) return { kind: 'gesture', binding: 'primary' }
-        if (manager.matches(data, 'binnacle.stepOut')) return { kind: 'gesture', binding: 'focus.out' }
-        for (const kind of Object.keys(affordances) as AffordanceKind[]) {
-          if (manager.matches(data, `binnacle.${kind}`)) return { kind: 'gesture', binding: kind }
-        }
+        live.push(
+          { id: 'binnacle.focusNext', to: { kind: 'gesture', binding: 'focus.next' } },
+          { id: 'binnacle.focusPrevious', to: { kind: 'gesture', binding: 'focus.previous' } },
+          { id: 'binnacle.primary', to: { kind: 'gesture', binding: 'primary' } },
+          { id: 'binnacle.stepOut', to: { kind: 'gesture', binding: 'focus.out' } },
+        )
+        for (const kind of Object.keys(affordances) as AffordanceKind[]) live.push({ id: `binnacle.${kind}` as Keybinding, to: { kind: 'gesture', binding: kind } })
       }
-      return undefined
+      // What the person set resolves before what only defaults to the same key, within that order; two ids the
+      // registrations leave on one key keep the order, whichever the person set.
+      const explicit = live.filter(({ id }) => Object.hasOwn(set, id) && set[id] !== undefined)
+      return (explicit.find(({ id }) => manager.matches(data, id)) ?? live.find(({ id }) => manager.matches(data, id)))?.to
     },
   }
 }

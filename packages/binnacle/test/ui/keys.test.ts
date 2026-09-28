@@ -88,3 +88,10 @@ test('a key bound to what content offers resolves to that affordance while somet
   assert.deepEqual(table.resolve('\x19', true), { kind: 'gesture', binding: 'copy' })
   assert.deepEqual(table.resolve('\x19', false), undefined)
 })
+
+test('a binding a person set resolves as they bound it where a default shares its key: copy on enter wins over primary', () => {
+  const table = keyTable()
+  table.bind({ 'binnacle.copy': 'enter' })
+  assert.deepEqual(table.resolve('\r', true), { kind: 'gesture', binding: 'copy' })
+  assert.deepEqual(table.resolve('\r', false), undefined, 'with nothing focused, copy is not live and enter reaches the composer')
+})
