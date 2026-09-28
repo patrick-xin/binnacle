@@ -164,11 +164,11 @@ export function keyTable(): KeyTable {
 }
 
 /**
- * Why a person's bindings cannot stand, as what to change: an id no binding has, a key that is not a key's name, or
- * two ids come to share one key. A placed screen's id stands whether or not its screen is placed yet. Two ids sharing
- * a key is what pi-tui's manager reports as a conflict among a person's bindings, taken from it rather than found again;
- * whether a string names a key is pi-tui's to say, and it exports nothing that says it, so only a key that is no string
- * is refused here.
+ * Why a person's bindings cannot stand, as what to change: an id no binding of binnacle's or pi-tui's own has — a name
+ * only the prototype chain gives is no binding — a key that is no string, or two ids come to share one key. A placed
+ * screen's id stands whether or not its screen is placed yet. Two ids sharing a key is what pi-tui's manager reports
+ * as a conflict among a person's bindings, taken from it rather than found again; whether a string names a key is
+ * pi-tui's to say, and it exports nothing that says it, so only a key that is no string is refused here.
  * @param bindings - everything a person bound, together.
  * @returns the reason, or undefined when they stand.
  */
@@ -176,7 +176,7 @@ export function refusedBindings(bindings: KeybindingsConfig): string | undefined
   const screens: Record<string, KeybindingDefinition> = {}
   for (const [id, keys] of Object.entries(bindings)) {
     if (id.startsWith(offeredBinding(''))) screens[id] = { defaultKeys: [] }
-    else if (!(id in KEYBINDINGS)) return `${id} is no binding; bind one pi-tui or binnacle has, a placed screen's ${offeredBinding('<name>')}, or an affordance's binnacle.<kind>`
+    else if (!Object.hasOwn(KEYBINDINGS, id)) return `${id} is no binding; bind one pi-tui or binnacle has, a placed screen's ${offeredBinding('<name>')}, or an affordance's binnacle.<kind>`
     const named = Array.isArray(keys) ? keys : [keys]
     if (named.some(key => typeof key !== 'string')) return `${id} is bound to ${String(keys)}; bind it to a key as pi-tui names one, such as ctrl+q, or a list of them`
   }

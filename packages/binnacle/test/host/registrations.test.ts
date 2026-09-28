@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
+import type { KeyId } from '@earendil-works/pi-tui'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
 import type { Fact, Node } from '../../src/api.ts'
@@ -421,11 +422,42 @@ test('a plugin rebinds a key, the newest registration of a binding wins, and dis
   assert.deepEqual(registrations.bindings, {})
 })
 
-test('a binding binnacle has not, a key that is no key\'s name, or two bindings sharing one key is refused where it is registered, saying what to change', async () => {
+test('a registration keeps the bindings as they were handed over: the object changing later, or an array in it, changes nothing', async () => {
+  const { registrations, author } = surface()
+  const given: { 'binnacle.quit': KeyId[] } = { 'binnacle.quit': ['ctrl+q'] }
+  await author((ctx) => { ctx.binnacle.keys(given) })
+  given['binnacle.quit'].push('ctrl+w')
+  await author((ctx) => { ctx.binnacle.keys({ 'binnacle.copy': 'ctrl+y' }) })
+  assert.deepEqual(registrations.bindings, { 'binnacle.quit': ['ctrl+q'], 'binnacle.copy': 'ctrl+y' })
+  given['binnacle.quit'] = ['ctrl+w', 'f10']
+  await author((ctx) => { ctx.binnacle.keys({ 'binnacle.open': 'f2' }) })
+  assert.deepEqual(registrations.bindings, { 'binnacle.quit': ['ctrl+q'], 'binnacle.copy': 'ctrl+y', 'binnacle.open': 'f2' })
+})
+
+test('disposing a registration takes back its own layer: a bindings object handed over twice, disposed, reveals the one between', async () => {
+  const { registrations, author } = surface()
+  const shared: { 'binnacle.quit': KeyId } = { 'binnacle.quit': 'ctrl+q' }
+  await author((ctx) => { ctx.binnacle.keys(shared) })
+  await author((ctx) => { ctx.binnacle.keys({ 'binnacle.quit': 'ctrl+w' }) })
+  const again = await author((ctx) => { ctx.binnacle.keys(shared) })
+  assert.deepEqual(registrations.bindings, { 'binnacle.quit': 'ctrl+q' })
+  await again.dispose()
+  assert.deepEqual(registrations.bindings, { 'binnacle.quit': 'ctrl+w' })
+})
+
+test('a binding binnacle has not — an inherited name among them — a key that is no string, or two bindings sharing one key is refused where it is registered, saying what to change', async () => {
   const { registrations, author } = surface()
   assert.throws(() => registrations.keys({ 'binnacle.nope': 'ctrl+q' }), { message: 'binnacle.keys: binnacle.nope is no binding; bind one pi-tui or binnacle has, a placed screen\'s binnacle.screen.<name>, or an affordance\'s binnacle.<kind>' })
+  assert.throws(() => registrations.keys({ toString: 'ctrl+q' } as never), { message: 'binnacle.keys: toString is no binding; bind one pi-tui or binnacle has, a placed screen\'s binnacle.screen.<name>, or an affordance\'s binnacle.<kind>' })
   assert.throws(() => registrations.keys({ 'binnacle.quit': 3 } as never), { message: 'binnacle.keys: binnacle.quit is bound to 3; bind it to a key as pi-tui names one, such as ctrl+q, or a list of them' })
   await author((ctx) => { ctx.binnacle.keys({ 'binnacle.quit': 'ctrl+q' }) })
   assert.throws(() => registrations.keys({ 'binnacle.screen.trajectory': 'ctrl+q' }), { message: 'binnacle.keys: ctrl+q is bound to both binnacle.quit and binnacle.screen.trajectory; bind one of them to another key' })
   assert.deepEqual(registrations.bindings, { 'binnacle.quit': 'ctrl+q' })
+})
+
+test('what is no record of binding ids is refused where it is registered, saying what to change', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.keys(null as never), { message: 'binnacle.keys: bindings is null; bind a record from binding ids to keys, such as { \'binnacle.quit\': \'ctrl+q\' }' })
+  assert.throws(() => registrations.keys('ctrl+q' as never), { message: 'binnacle.keys: bindings is ctrl+q; bind a record from binding ids to keys, such as { \'binnacle.quit\': \'ctrl+q\' }' })
+  assert.deepEqual(registrations.bindings, {})
 })

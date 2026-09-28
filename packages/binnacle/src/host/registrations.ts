@@ -108,10 +108,15 @@ export class RegistrationService extends Service implements Registrations {
 
   /** @inheritDoc */
   keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void {
+    // An author's code may be untyped, so what the types say is checked here, where it enters.
+    if (typeof bindings !== 'object' || bindings === null || Array.isArray(bindings)) throw new Error(`binnacle.keys: bindings is ${String(bindings)}; bind a record from binding ids to keys, such as { 'binnacle.quit': 'ctrl+q' }`)
+    // An author's code may change the object after handing it over, so what is registered is what stood at entry: the
+    // record copied, and each array in it. Each registration its own object also lets its disposal find its own layer.
+    const given = Object.fromEntries(Object.entries(bindings).map(([id, keys]) => [id, Array.isArray(keys) ? [...keys] : keys]))
     // What the registrations would bind together with this one, checked before it joins them.
-    const refused = refusedBindings(Object.assign({}, this.bound, bindings) as KeybindingsConfig)
+    const refused = refusedBindings(Object.assign({}, this.bound, given) as KeybindingsConfig)
     if (refused !== undefined) throw new Error(`binnacle.keys: ${refused}`)
-    return this.register(this.bindingTable, 'keys', bindings, 'binnacle.keys', 'keys')
+    return this.register(this.bindingTable, 'keys', given, 'binnacle.keys', 'keys')
   }
 
   /** What the registrations bind, by binding id: each id's newest. */
