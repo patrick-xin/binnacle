@@ -50,7 +50,7 @@ test('stepping in from the composer focuses the nearest thing that offers someth
   assert.equal(pane.focused, false)
   assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
   assert.equal(pane.focused, true)
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · show 2 more lines'])
 })
 
 test('while something has focus, tab moves to the next thing and shift+tab to the previous, wrapping', () => {
@@ -60,12 +60,12 @@ test('while something has focus, tab moves to the next thing and shift+tab to th
   pane.push({ ...context, seq: 3, time: 3 })
   shown(pane)
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(shown(pane).slice(3), ['', '⋯ added by goal · 2 lines', '', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane).slice(3), ['', '⋯ added by goal · 2 lines', '', '▸ ⋯ added by goal · show 2 more lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(shown(pane).slice(3), ['', '▸ show 2 more lines', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane).slice(3), ['', '▸ ⋯ added by goal · show 2 more lines', '', '⋯ added by goal · 2 lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.next' })
   pane.handleKey({ kind: 'key', binding: 'focus.next' })
-  assert.deepEqual(shown(pane).slice(3), ['', '▸ show 2 more lines', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane).slice(3), ['', '▸ ⋯ added by goal · show 2 more lines', '', '⋯ added by goal · 2 lines'])
 })
 
 test('enter does what the focused thing offers first: it opens a cut fold, and folds an open one again', () => {
@@ -75,9 +75,9 @@ test('enter does what the focused thing offers first: it opens a cut fold, and f
   shown(pane)
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   pane.handleKey({ kind: 'key', binding: 'primary' })
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal · show less', 'a', 'b', '▸ fold it away'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · fold it away', 'a', 'b'])
   pane.handleKey({ kind: 'key', binding: 'primary' })
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · show 2 more lines'])
 })
 
 test('escape gives the keyboard back to the composer: focus is dropped, and its row with it', () => {
@@ -99,7 +99,7 @@ test('a key bound to an affordance the focused thing does not offer is not answe
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.equal(pane.handleKey({ kind: 'key', binding: 'copy' }), false)
   assert.equal(pane.focused, true)
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · show 2 more lines'])
 })
 
 test('a focus that lands on something reports the rows it covers, to be brought into view, and opening what is focused reports nothing', () => {
@@ -130,7 +130,7 @@ test('on the main screen, focus below what was printed stays drawn there, and fo
   assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running…', '', '⋯ added by goal · 2 lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(fullscreen, [])
-  assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '  running…', '', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '  running…', '', '▸ ⋯ added by goal · show 2 more lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(fullscreen, [[5, 4]])
 })
