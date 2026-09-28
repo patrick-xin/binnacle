@@ -28,6 +28,8 @@ import { parseNode } from '../ui/node.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
+import { binnacleTheme } from '../ui/theme.ts'
+import type { Theme } from '../ui/theme.ts'
 
 /** What the pane reports about the screen it drew, for the host to act on beyond drawing. */
 export interface ScreenReports {
@@ -43,6 +45,8 @@ interface Laid {
   readonly width: number
   /** The UI state it was laid out in, by identity: `act` returns the state itself when nothing changes. */
   readonly state: UiState
+  /** The theme it was laid out in, by identity: the registrations hand a new one at each change. */
+  readonly theme: Theme
   /** What it drew, and the regions on it. */
   readonly frame: Frame
   /** The regions that offer something, in screen order. */
@@ -52,6 +56,7 @@ interface Laid {
 /** A screen a plugin placed, as the pane draws it. */
 export class ScreenPane implements Component {
   readonly #facts: () => readonly Fact[]
+  readonly #theme: () => Theme
   readonly #changed: () => void
   readonly #inView: (top: number, height: number) => void
   #name: string | undefined
@@ -63,9 +68,11 @@ export class ScreenPane implements Component {
   /**
    * @param facts - the session's facts, as they stand, handed to the placed screen's drawing as they change.
    * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
+   * @param theme - the theme as it stands, read at every frame; the screen is laid out again when it changes.
    */
-  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}) {
+  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme) {
     this.#facts = facts
+    this.#theme = theme
     this.#changed = reports.changed ?? (() => {})
     this.#inView = reports.inView ?? (() => {})
   }
@@ -147,16 +154,17 @@ export class ScreenPane implements Component {
   }
 
   /**
-   * What the screen drew at a width in a state, kept while all three stand.
+   * What the screen drew at a width in a state and a theme, kept while all of them stand.
    * @param width - the columns.
    * @param state - the UI state.
    * @returns what it drew, and the regions on it.
    */
   private laidAt(width: number, state: UiState): Laid {
     const laid = this.#laid
-    if (!this.#stale && laid !== undefined && laid.width === width && laid.state === state) return laid
-    const frame = layout(this.#drawn(), width, state)
-    const next: Laid = { width, state, frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
+    const theme = this.#theme()
+    if (!this.#stale && laid !== undefined && laid.width === width && laid.state === state && laid.theme === theme) return laid
+    const frame = layout(this.#drawn(), width, state, theme)
+    const next: Laid = { width, state, theme, frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
     this.#laid = next
     this.#stale = false
     return next
@@ -176,7 +184,7 @@ export class ScreenPane implements Component {
       return this.#refused(`binnacle.screen(${name}) threw: ${describe(error)}`)
     }
     try {
-      return parseNode(returned)
+      return parseNode(returned, this.#theme())
     } catch (error) {
       return this.#refused(`binnacle.screen(${name}) returned no drawable node: ${describe(error)}`)
     }

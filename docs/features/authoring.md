@@ -1,13 +1,13 @@
 # Authoring
 
-A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry — a built-in kind, or a quiet kind by its dsh event type ([Transcript](transcript.md)) — building on binnacle's drawing or replacing it. A screen a plugin places takes the transcript's place, opened with the key its plugin offers. Disposing the plugin gives back everything it registered.
+A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry — a built-in kind, or a quiet kind by its dsh event type ([Transcript](transcript.md)) — building on binnacle's drawing or replacing it. A screen a plugin places takes the transcript's place, opened with the key its plugin offers. A theme registration changes what everything is drawn in, from colours to how a kind's folds start. Disposing the plugin gives back everything it registered.
 
 ## How it works
 
 The registrations are the author API (`binnacle:packages/binnacle/src/api.ts#Registrations`), provided by the host's `binnacle` service (`binnacle:packages/binnacle/src/host/registrations.ts#RegistrationService`).
 
 - A view draws with blocks in the theme's tones (`binnacle:packages/binnacle/src/ui/node.ts#Node`, [ADR 10](../adr/0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md)); a span may name a mark, and the theme draws its glyph in the mark's tone, or in a tone the span names beside it ([Theme](theme.md)); and no text it returns reaches the terminal as a control: every string a node carries is drawn as text ([ADR 14](../adr/0014-no-text-a-node-carries-reaches-the-terminal-as-a-control.md)).
-- A fold may name the line it folds under, and the tone that line is drawn in (`binnacle:packages/binnacle/src/ui/node.ts#Node`): folded to no rows there, its marker rides the line and the fold costs that line alone.
+- A fold may name the line it folds under, and the tone that line is drawn in (`binnacle:packages/binnacle/src/ui/node.ts#Node`): folded to no rows there, its marker rides the line and the fold costs that line alone. Its rows it may name or leave out: left out, the fold starts as the theme gives its entry's key, then its kind, or three rows ([Theme](theme.md)).
 - Views of one key stack, and the newest draws on what the one beneath it draws ([ADR 8](../adr/0008-a-view-builds-on-the-one-beneath-it-and-the-newest-draws.md)).
 - A view names its regions within its entry: binnacle scopes each id a view returns to the entry that drew it, by that entry's first fact's place in the log (`binnacle:packages/binnacle/src/views/screen.ts#screens`), so one name in two entries is two regions, and two views of one entry that name a region alike — binnacle's own card and the tool cards naming a call's result `output` — share what a person did to it, across a redraw, a change of adapters that reads the log again, a switch of screens, and the coming and going of plugins. binnacle's own views and the tool cards name their regions by what they are (`output`, `reasoning-<n>`), never by their entry.
 - A view is drawn once for each entry, and again when its author invalidates its key ([ADR 9](../adr/0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)).
@@ -15,6 +15,10 @@ The registrations are the author API (`binnacle:packages/binnacle/src/api.ts#Reg
 - What an author's adapter or view does wrong is drawn by the one beneath, naming the registration and why (`binnacle:packages/binnacle/src/views/entries.ts#drawEntry`); it never takes the surface down.
 
 Why an author reaches what the built-in surface reaches is [ADR 0](../adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)'s.
+
+## Changing the theme
+
+`ctx.binnacle.theme(changes)` changes what everything is drawn in — a tone's colour, a mark's glyph, a background's colour, the chrome's glyphs, a fold's words, or how a kind's folds start (`binnacle:packages/binnacle/src/ui/theme.ts#ThemeChanges`) — without drawing anything again yourself. The changes are data, never functions or escape codes; each part names only what it changes, so what it leaves out stays as the theme beneath it has it. The newest registration lays over the ones before it, and disposing one gives back what it changed; a theme coming or going draws and lays out every entry again, in the theme that is left. A theme may add names as well as change binnacle's — a tone the author's view then names, a background a card is filled with, a mark a span names. One that names what binnacle cannot draw — a colour not one of the terminal's sixteen, a mark with no glyph, a string holding a control character — is refused where it is registered, saying by its path what to change (`binnacle:packages/binnacle/src/ui/theme-changes.ts#parseThemeChanges`). What the theme holds, and binnacle's own choices among them, are [Theme](theme.md)'s.
 
 ## Placing a screen
 
@@ -30,4 +34,4 @@ A plugin can place a screen of its own in the transcript's place, opened with a 
 ### Choices
 
 - A placed screen opens from its top, and where a person scrolled it, what they opened on it and where focus was, are kept while its registration stands; the key it opens with, and what the key is called in help, are its plugin's choices.
-- A screen's folds are drawn folded and open by the gestures above; what it wants always shown, it draws without them.
+- A screen's folds are drawn folded and open by the gestures above; what it wants always shown, it draws without them. No entry kind gives a placed screen's folds their start, so they name their rows themselves, or show three ([Theme](theme.md)).

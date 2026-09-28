@@ -18,14 +18,14 @@ const fold: Region = { id: 'fold', affordances: [{ kind: 'expand', label: 'show 
 const prose: Region = { id: 'prose', affordances: [], overflows: false }
 
 test('a key on the focused region answers its primary affordance, and focus that did not move is not reported', () => {
-  assert.deepEqual(answer({ expanded: new Set(), focus: 'fold' }, { kind: 'key', binding: 'primary' }, [fold], { focusable: ['fold'] }), {
-    state: { expanded: new Set(['fold']), focus: 'fold' },
+  assert.deepEqual(answer({ toggled: new Set(), focus: 'fold' }, { kind: 'key', binding: 'primary' }, [fold], { focusable: ['fold'] }), {
+    state: { toggled: new Set(['fold']), focus: 'fold' },
   })
 })
 
 test('a key that moves focus says the region it moved to, landing on nothing to do it', () => {
   assert.deepEqual(answer(initial, { kind: 'key', binding: 'focus.previous' }, [], { focusable: ['a', 'b'] }), {
-    state: { expanded: new Set(), focus: 'b' },
+    state: { toggled: new Set(), focus: 'b' },
     focus: 'b',
   })
 })

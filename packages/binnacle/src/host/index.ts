@@ -25,7 +25,7 @@ import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiM
 import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
-import { chrome, editorTheme, tones } from '../ui/theme.ts'
+import { editorTheme } from '../ui/theme.ts'
 import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
@@ -144,7 +144,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
-  })
+  }, () => registrations.currentTheme)
   // The screens plugins placed, each in a pane of its own with a scroll view of its own, so what a person did to
   // one — where they scrolled it — is kept while its registration stands. One is open at a time: it takes the
   // transcript's place in the alternate screen's scroll view, so pi-tui's scrolling, search and selection read it
@@ -193,7 +193,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
-      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView })
+      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme)
       screenPanes.set(id, pane)
     }
     pane.place(id, placed)
@@ -201,7 +201,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (tui instanceof TuiAltScreen) readOn(tui)
     else show('fullscreen')
   }
-  // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
+  // A change of adapters changes the facts, so the log is read again; a change of views or of the theme only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
     if (changed === 'facts') {
       // The whole log is read again, into the same array the placed screens are handed, so they see it as it now stands.
@@ -278,7 +278,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // pi-tui's `tui.altScreen.bottom`, which pi-tui itself — or a click on the label — answers by bringing the end back.
   const jumpToLatest = (): string => {
     const bound = table.manager.getKeys('tui.altScreen.bottom').join(', ')
-    return tones.accent(` ${chrome.jump} Jump to latest · ${bound} `)
+    const theme = registrations.currentTheme
+    return theme.tones.accent(` ${theme.chrome.jump} Jump to latest · ${bound} `)
   }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)

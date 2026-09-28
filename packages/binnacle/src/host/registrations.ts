@@ -11,10 +11,13 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { AuthorAdapter, PlacedScreen, Registrations, View, Views } from '../api.ts'
+import type { AuthorAdapter, PlacedScreen, Registrations, ThemeChanges, View, Views } from '../api.ts'
+import { binnacleTheme, themed } from '../ui/theme.ts'
+import { parseThemeChanges } from '../ui/theme-changes.ts'
+import type { Theme } from '../ui/theme.ts'
 
-/** What changed in the registrations, for a listener: the adapters, the views, or the placed screens. */
-export type RegistrationsChanged = 'facts' | 'views' | 'screens'
+/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, or the theme. */
+export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'theme'
 
 /** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
 export class RegistrationService extends Service implements Registrations {
@@ -23,6 +26,8 @@ export class RegistrationService extends Service implements Registrations {
   private readonly viewTable = new Map<string, readonly View[]>()
   private readonly screenTable = new Map<string, readonly PlacedScreen[]>()
   private readonly newestScreens = new Map<string, PlacedScreen>()
+  private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
+  private drawnIn: Theme = binnacleTheme
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
 
   /**
@@ -55,6 +60,19 @@ export class RegistrationService extends Service implements Registrations {
   /** @inheritDoc */
   view(key: string, view: View): () => void {
     return this.register(this.viewTable, key, view, `binnacle.view(${key})`, 'views')
+  }
+
+  /** The theme drawn in: binnacle's, with each theme registration laid over it, oldest first. */
+  get currentTheme(): Theme {
+    return this.drawnIn
+  }
+
+  /**
+   * @inheritDoc
+   * @throws when the changes name what binnacle cannot draw, saying what to change.
+   */
+  theme(changes: ThemeChanges): () => void {
+    return this.register(this.themeTable, 'theme', parseThemeChanges(changes, this.drawnIn), 'binnacle.theme', 'theme')
   }
 
   /** @inheritDoc */
@@ -106,7 +124,7 @@ export class RegistrationService extends Service implements Registrations {
     }, label)
   }
 
-  /** Take the newest adapter of each type and the newest screen of each name, and tell every listener which table changed. */
+  /** Take the newest adapter of each type, the newest screen of each name and the theme the registrations leave, and tell every listener which table changed. */
   private changed(table: RegistrationsChanged): void {
     this.newestAdapters.clear()
     for (const [type, stack] of this.adapterTable) {
@@ -118,6 +136,8 @@ export class RegistrationService extends Service implements Registrations {
       const newest = stack.at(-1)
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
+    // A new theme object each change, so what was kept against the old one is known stale.
+    if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
     for (const listener of this.listeners) listener(table)
   }
 }

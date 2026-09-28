@@ -188,6 +188,19 @@ test('a view registered after its entries were drawn draws them again, and dispo
   await until(() => /› fix the build/.test(shown()))
 })
 
+test('a theme an author registers after its entries were drawn draws them again, and disposing it gives them back', async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  const shown = (): string => stripTerminalSequences(terminal.written)
+  await until(() => /› fix the build/.test(shown()))
+  const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.theme({ marks: { prompt: { glyph: '>' } } }) } })
+  await author
+  await until(() => /> fix the build/.test(shown()))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => /› fix the build/.test(shown()))
+})
+
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
   commit()
@@ -460,6 +473,18 @@ test('on the fullscreen, focus scrolled away from the end is said on the last ro
   terminal.type('\x1b[Z')
   await until(async () => (await terminal.altScreen()).some(row => row.includes('↓ Jump to latest · end')))
   assert.ok(terminal.written.includes('\x1b[36m ↓ Jump to latest · end '), 'the label is drawn in the accent tone')
+})
+
+test('the jump label is drawn in the chrome an author\'s theme gives it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession(folded)
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.theme({ chrome: { jump: 'v' } }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
+  terminal.type('\x1b[Z')
+  terminal.type('\x1b[Z')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('v Jump to latest · end')))
 })
 
 test('the key the label names brings the transcript\'s last line back, following again, and the label goes', async () => {

@@ -83,8 +83,8 @@ function viewOf(tools: ToolRuntime): View {
         : undefined,
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
-      // Named as binnacle's own card names its result fold, so a fold a person opened is the plugin's and the card's alike: what they opened stays open when the plugin is disposed, or a presenter throws and the card beneath draws the call.
-      fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'output', rows, child }),
+      // Named as binnacle's own card names its result fold, so a fold a person opened is the plugin's and the card's alike: what they opened stays open when the plugin is disposed, or a presenter throws and the card beneath draws the call. Its rows are the theme's for the tool kind, as binnacle's own card's are.
+      fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
     }
     const kind = shown?.card ?? call.card
     const drawn = rowFor(kind).draw(parts)

@@ -14,7 +14,7 @@ What a presenter returns is the tool's code, not binnacle's: it is read as data 
 
 - What the head shows: the mark and the presented title — its first line beside the mark, and each later line indented two columns beneath it, so a command written on more than one line does not read as output; the tool's name and arguments stay on binnacle's own card, beneath.
 - The mark the head stands by is the transcript's (`running`, `done`, `failed`), so a presented card reads at a glance beside an unpresented one ([Theme](theme.md)).
-- What it returned folds to three rows, as a tool's output does today ([Transcript](transcript.md)); a presented `content` is folded when the tool gives one, the result's own text when not.
+- What it returned folds as a tool's output does, its rows the theme's for the tool kind ([Theme](theme.md)); a presented `content` is folded when the tool gives one, the result's own text when not.
 - A failure's reason stays, in error, above the fold; so does what a presenter did wrong stay, beneath binnacle's own card, beside the `problem` mark: `read.presentCall threw: …`, naming the tool and the presenter.
 - A presenter returning undefined is dsh's word for no presentation and stays silent; anything else it returns that the cards cannot draw is said beneath binnacle's own card, beside the `problem` mark, as a throw is: `read.presentCall returned no drawable view: …`.
 - Which kind of card draws how is a table (`binnacle:packages/binnacle/src/plugins/tool-cards/cards.ts#rowFor`), generic its one row; every other kind — terminal, diff, read, search, web — draws through generic's until its own lands, by its title alone.

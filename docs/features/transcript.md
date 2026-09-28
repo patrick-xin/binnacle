@@ -5,7 +5,7 @@ A person reads the session as it happens, turn by turn:
 - what they sent, heading its turn in a band — padded, and filled with the theme's background — after the `prompt` mark ([Theme](theme.md));
 - context that changes the tools — what the harness added or took away without the person typing it — after the `context` mark, as `added by` its source: one line, saying how much it holds, opening there;
 - the agent's answers, drawn as markdown, with its reasoning drawn dim beneath one muted `thinking` line that says how much it holds and opens there; a call an answer made draws as its own entry, never as a line inside it;
-- each tool call, as [Tool cards](tool-cards.md) draws it when its tool presents it, and as its mark and arguments otherwise ([Theme](theme.md)): the `running` mark and `running…` while it runs; `done` once it returned, its result folded to three rows; `failed`, and why, when it failed;
+- each tool call, as [Tool cards](tool-cards.md) draws it when its tool presents it, and as its mark and arguments otherwise ([Theme](theme.md)): the `running` mark and `running…` while it runs; `done` once it returned, its result folded beneath; `failed`, and why, when it failed;
 - a kind of event binnacle has not learned to draw, as the `unknown` mark and its type: one line, its raw record folded on it.
 
 The session's machinery draws no line at all. The transcript is the conversation: what the person asked, what the model said and did. Everything the session logged stays one key away, on the [Trajectory](trajectory.md).
@@ -18,7 +18,7 @@ How a session reaches the screen is [the package map's](../../packages/binnacle/
 
 ## Choices
 
-- How far each kind is folded: reasoning, context and whatever the fallback draws to nothing — each one line, its marker riding the line; a tool's output, and a result with no call, to three rows, their marker beneath.
+- How far each kind is folded is [Theme](theme.md)'s — how many rows each shows, and whether it starts open — a person's to change by asking; the starts binnacle ships are named there.
 - A prompt heads its turn in a band: one column each side, one line above and below, filled with the theme's background for what the person sent ([Theme](theme.md)); the padding is pi's, for its user message is padded the same way (`pi:packages/coding-agent/src/modes/interactive/components/user-message.ts#UserMessageComponent`). This is a default, an author's to change: a view registered for `prompt` draws it otherwise.
 - One blank line separates two entries that draw something, and an entry that draws nothing takes none, so a turn's gap falls before its prompt; a person who wants their session denser asks an author for a view that draws the rhythm otherwise.
 - A call and its result are drawn as one entry, the result under its call, and the mark says how the call stands ([Theme](theme.md)).

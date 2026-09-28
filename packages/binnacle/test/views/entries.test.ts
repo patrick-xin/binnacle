@@ -1,44 +1,57 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import type { Entry } from '../../src/models/transcript.ts'
-import { layout } from '../../src/ui/layout.ts'
-import { drawEntry } from '../../src/views/entries.ts'
-import type { View, Views } from '../../src/views/entries.ts'
+import type { Entry, Transcript } from '../../src/models/transcript.ts'
+import type { UiState } from '../../src/ui/state.ts'
 import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../../src/ui/draw.ts'
-import { componentOf } from '../support/drawn.ts'
+import { screens } from '../../src/views/screen.ts'
+import type { View, Views } from '../../src/views/entries.ts'
 import { prompt as promptFact, call as callFact } from '../support/facts.ts'
+
+/** An entry alone in a turn of its own: what the screen draws it from. */
+const alone = (entry: Entry): Transcript => ({ turns: [{ turn: null, entries: [entry] }] })
+
+/**
+ * An entry's lines on the screen, styling and all: drawn through the screen, the seam that gives each fold the theme's start for its kind and scopes its regions to the entry.
+ * @param entry - the entry.
+ * @param state - the UI state it is drawn in; the regions it names are scoped to the entry, as the screen scopes them.
+ * @param views - authors' views, as the screen takes them.
+ * @param width - the columns it is drawn at.
+ * @returns its lines.
+ */
+const onScreen = (entry: Entry, state: UiState, views: Views, width: number): string[] =>
+  [...screens()(alone(entry), state, width, views).lines]
 
 /**
  * What an entry draws at a width, as a person reads it.
  * @param entry - the entry.
- * @param expanded - the regions a person opened.
+ * @param toggled - the regions a person opened, scoped to the entry as the screen scopes them.
  * @returns its lines.
  */
-const lines = (entry: Entry, expanded: string[] = []): string[] =>
-  layout(drawEntry(entry), 40, { expanded: new Set(expanded) }).lines.map(line => stripTerminalSequences(line).trimEnd())
+const lines = (entry: Entry, toggled: string[] = []): string[] =>
+  onScreen(entry, { toggled: new Set(toggled) }, new Map(), 40).map(line => stripTerminalSequences(line).trimEnd())
 
 /**
  * What an entry draws at a width, as the terminal reads it back: drawn by
- * `drawText` through the real layout, so a line past the width fails the test.
+ * `drawText` through the real screen, so a line past the width fails the test.
  * @param entry - the entry.
- * @param expanded - the regions a person opened.
+ * @param toggled - the regions a person opened, scoped to the entry as the screen scopes them.
  * @param views - authors' views, as `drawEntry` takes them.
  * @param width - the columns it is drawn at.
  * @returns its lines.
  */
-const seen = (entry: Entry, expanded: string[] = [], views: Views = new Map(), width = 40): string[] =>
-  drawText(componentOf(drawEntry(entry, views), { expanded: new Set(expanded) }), width)
+const seen = (entry: Entry, toggled: string[] = [], views: Views = new Map(), width = 40): string[] =>
+  drawText({ render: at => onScreen(entry, { toggled: new Set(toggled) }, views, at), invalidate: () => {} }, width)
 
 /**
  * What an entry draws at a width, styling and all, each line as it was drawn.
  * @param entry - the entry.
- * @param expanded - the regions a person opened.
+ * @param toggled - the regions a person opened, scoped to the entry as the screen scopes them.
  * @returns its lines.
  */
-const styled = (entry: Entry, expanded: string[] = []): string[] =>
-  layout(drawEntry(entry), 40, { expanded: new Set(expanded) }).lines.map(line => line.trimEnd())
+const styled = (entry: Entry, toggled: string[] = []): string[] =>
+  onScreen(entry, { toggled: new Set(toggled) }, new Map(), 40).map(line => line.trimEnd())
 
 /**
  * What an entry and any views of its key draw at width 80, styling and all, each line as it was drawn.
@@ -47,7 +60,7 @@ const styled = (entry: Entry, expanded: string[] = []): string[] =>
  * @returns its lines.
  */
 const drawnWide = (entry: Entry, views: Views = new Map()): string[] =>
-  layout(drawEntry(entry, views), 80, { expanded: new Set() }).lines.map(line => line.trimEnd())
+  onScreen(entry, { toggled: new Set() }, views, 80).map(line => line.trimEnd())
 
 test('a prompt heads its turn in a band: padded, and filled with the theme\'s background, its mark accent and what the person wrote plain within it', () => {
   const entry: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 2, time: 10, blocks: [{ kind: 'text', text: 'fix the build' }] } }
@@ -73,7 +86,7 @@ test('an answer shows its text, folds its reasoning to one line, and says when i
 })
 
 test('expanding the reasoning shows it, the line saying it can be folded', () => {
-  assert.deepEqual(seen(answer, ['reasoning-0']), ['∴ thinking · show less', 'the build fails in tsc', 'The build', '(interrupted)'])
+  assert.deepEqual(seen(answer, ['8/reasoning-0']), ['∴ thinking · show less', 'the build fails in tsc', 'The build', '(interrupted)'])
 })
 
 test('an answer\'s text is drawn as the markdown document it is, in the theme\'s styles', () => {
@@ -81,7 +94,7 @@ test('an answer\'s text is drawn as the markdown document it is, in the theme\'s
     kind: 'answer',
     fact: { ...answer.fact, interrupted: false, blocks: [{ kind: 'text', text: 'Run `pnpm test`, then **ship** it.' }] },
   }
-  const drawn = layout(drawEntry(entry), 60, { expanded: new Set() }).lines.map(line => line.trimEnd())
+  const drawn = onScreen(entry, { toggled: new Set() }, new Map(), 60).map(line => line.trimEnd())
   assert.deepEqual(drawn, ['Run \x1b[33mpnpm test\x1b[39m, then \x1b[1mship\x1b[22m it.'])
 })
 
@@ -97,7 +110,7 @@ test('an answer draws no line for a call it made: the call is its tool entry\'s 
 })
 
 test('the reasoning\'s line is muted, marker and all, the reasoning under it dim, and an interruption dim', () => {
-  const drawn = layout(drawEntry(answer), 40, { expanded: new Set(['reasoning-0']) }).lines.map(line => line.trimEnd())
+  const drawn = onScreen(answer, { toggled: new Set(['8/reasoning-0']) }, new Map(), 40).map(line => line.trimEnd())
   assert.equal(drawn[0], '\x1b[90m∴ thinking · show less\x1b[39m')
   assert.equal(drawn[1], '\x1b[2mthe build fails in tsc\x1b[22m')
   assert.equal(drawn[3], '\x1b[2m(interrupted)\x1b[22m')
@@ -152,11 +165,11 @@ const toolWith = (output: string): Entry => {
 /**
  * An entry's lines as they reach the terminal, styling and all: what a test reads back to say no line carries a control the theme did not put there.
  * @param entry - the entry.
- * @param focus - the region focused, if any.
+ * @param focus - the region focused, if any, scoped to the entry as the screen scopes it.
  * @returns its lines, raw.
  */
 const raw = (entry: Entry, focus?: string): string[] =>
-  layout(drawEntry(entry), 40, focus === undefined ? { expanded: new Set() } : { expanded: new Set(), focus }).lines.map(line => line.trimEnd())
+  onScreen(entry, focus === undefined ? { toggled: new Set() } : { toggled: new Set(), focus }, new Map(), 40).map(line => line.trimEnd())
 
 test('a tool\'s output that clears the screen is drawn as its text, and clears nothing', () => {
   assert.deepEqual(raw(toolWith('wiped\x1b[2Jclean'))[1], 'wipedclean')
@@ -254,18 +267,18 @@ test('a fold\'s title carrying a control sequence is drawn as its text, in its t
 test('a result with no call keeps its title a line of its own above the fold, outside it', () => {
   const entry: Entry = { kind: 'result', fact: { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c9', failed: false, blocks: [{ kind: 'text', text: 'a\nb\nc\nd\ne' }], meta: undefined } }
   assert.deepEqual(seen(entry), ['● result of call c9', 'a', 'b', 'c', '… 2 more lines'])
-  assert.deepEqual(layout(drawEntry(entry), 40, { expanded: new Set() }).regions.map(({ region, top, height }) => [region.id, top, height]), [['output', 1, 4]])
+  assert.deepEqual(screens()(alone(entry), { toggled: new Set() }, 40).regions.map(({ region, top, height }) => [region.id, top, height]), [['11/output', 1, 4]])
 })
 
 test('a kind nothing draws is its type in one line, what it holds beside it, and expand shows the raw record', () => {
   const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'goal/change', record: { type: 'goal/change', data: {} } } }
   assert.deepEqual(seen(entry), ['? goal/change · 4 lines'])
-  assert.deepEqual(seen(entry, ['record']), ['? goal/change · show less', '{', '  "type": "goal/change",', '  "data": {}', '}'])
+  assert.deepEqual(seen(entry, ['2/record']), ['? goal/change · show less', '{', '  "type": "goal/change",', '  "data": {}', '}'])
 })
 
 const prompt: Entry = { kind: 'prompt', fact: promptFact(2, 10, 'fix the build') }
 const drawn = (entry: Entry, views: Views): string[] =>
-  layout(drawEntry(entry, views), 80, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  onScreen(entry, { toggled: new Set() }, views, 80).map(line => stripTerminalSequences(line).trimEnd())
 
 test('an author\'s view that throws is drawn over by the built-in one, which says whose view failed and why', () => {
   const views = new Map<string, View[]>([['prompt', [() => { throw new Error('no blocks') }]]])
@@ -275,7 +288,8 @@ test('an author\'s view that throws is drawn over by the built-in one, which say
 test('an authored fact named as a kind binnacle draws is drawn by the fallback, never by that kind\'s view', () => {
   const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'tool', data: {} } }
   const views = new Map<string, View[]>([['tool', [() => ({ kind: 'text', text: 'a tool card' })]]])
-  assert.deepEqual(seen(entry, [], views, 80), ['? tool · 1 line', '✗ tool is a kind binnacle draws; the adapter must give its fact another name'])
+  // Its name is its key, so the theme\'s start for `tool` reaches its fold; the refusal stops views, not fold starts.
+  assert.deepEqual(seen(entry, [], views, 80), ['? tool', '{}', '✗ tool is a kind binnacle draws; the adapter must give its fact another name'])
 })
 
 test('an unknown fact carrying a problem says it under its one line', () => {
@@ -332,11 +346,11 @@ test('an author\'s band is filled with the background it names, and one naming a
  * @param entry - the entry.
  * @param views - authors' views, as `drawEntry` takes them.
  * @param width - the columns it is drawn at.
- * @param focus - the region focused, if any.
+ * @param focus - the region focused, if any, scoped to the entry as the screen scopes it.
  * @returns its lines, raw.
  */
 const rawWith = (entry: Entry, views: Views, width: number, focus?: string): string[] =>
-  layout(drawEntry(entry, views), width, focus === undefined ? { expanded: new Set() } : { expanded: new Set(), focus }).lines.map(line => line.trimEnd())
+  onScreen(entry, focus === undefined ? { toggled: new Set() } : { toggled: new Set(), focus }, views, width).map(line => line.trimEnd())
 
 test('a span carrying a control sequence is drawn as its text, in its tone', () => {
   const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: [{ text: 'wiped\x1b[2Jclean', tone: 'error' }, ' \x1b]0;owned\x07kept'] }) as unknown as Node]]])
@@ -350,7 +364,7 @@ test('an author\'s card title and affordance label carrying a control sequence a
     affordances: [{ kind: 'open', label: 'open \x1b]0;owned\x07wide' }],
     child: { kind: 'card', title: 'to\x1b[2Jdo', child: { kind: 'text', text: 'the body' } },
   }) as unknown as Node]]])
-  assert.deepEqual(rawWith(prompt, views, 20, 'theirs'), [
+  assert.deepEqual(rawWith(prompt, views, 20, '2/theirs'), [
     '\x1b[2m╭─ \x1b[22mtodo\x1b[2m ───────────╮\x1b[22m',
     '\x1b[2m│\x1b[22m the body         \x1b[2m│\x1b[22m',
     '\x1b[2m╰──────────────────╯\x1b[22m',
@@ -362,5 +376,5 @@ test('data with no JSON and no string form is still drawn, as what it is', () =>
   const cycle: Record<string, unknown> = Object.create(null)
   cycle.self = cycle
   const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'seeded', data: cycle } }
-  assert.deepEqual(seen(entry, ['data'], new Map(), 80), ['? seeded · show less', 'a value binnacle cannot show'])
+  assert.deepEqual(seen(entry, ['3/data'], new Map(), 80), ['? seeded · show less', 'a value binnacle cannot show'])
 })

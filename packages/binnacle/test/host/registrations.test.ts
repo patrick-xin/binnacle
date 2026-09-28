@@ -4,13 +4,13 @@ import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
-import type { Node } from '../../src/api.ts'
+import type { Fact, Node } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
 import { ScreenPane } from '../../src/panes/screen.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
 import { initial } from '../../src/ui/state.ts'
 import { screen } from '../../src/views/screen.ts'
-import { prompt as promptFact } from '../support/facts.ts'
+import { prompt as promptFact, call, returned } from '../support/facts.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
 import { pointer } from '../support/pointer.ts'
 import { foldedAlike } from '../support/views.ts'
@@ -41,7 +41,7 @@ function surface() {
  */
 const shown = (registrations: RegistrationService, ...events: SessionEvent[]): string[] => {
   const facts = [prompt, ...events.map(event => adapt(event, registrations.adapters))]
-  return screen(facts, initial, 40, registrations.views).lines.map(line => stripTerminalSequences(line).trimEnd())
+  return screen(facts, initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
 }
 
 test('an author\'s view replaces a built-in one, until the author\'s plugin is disposed', async () => {
@@ -52,6 +52,159 @@ test('an author\'s view replaces a built-in one, until the author\'s plugin is d
   assert.deepEqual(shown(registrations), ['ME: 1 block'])
   await fiber.dispose()
   assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
+})
+
+test('an author\'s theme draws a mark in its own glyph, until the author\'s plugin is disposed', async () => {
+  const { registrations, author } = surface()
+  const fiber = await author((ctx) => { ctx.binnacle.theme({ marks: { prompt: { glyph: '>' } } }) })
+  assert.deepEqual(shown(registrations), ['', ' > fix the build', ''])
+  await fiber.dispose()
+  assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
+})
+
+test('the transcript pane draws in the theme an author registers, and in binnacle\'s once it is disposed', async () => {
+  const { registrations, author } = surface()
+  const pane = new TranscriptPane(() => {}, () => registrations.views, {}, () => registrations.currentTheme)
+  pane.push(prompt)
+  const lines = () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['', ' › fix the build', ''])
+  const fiber = await author((ctx) => { ctx.binnacle.theme({ marks: { prompt: { glyph: '>' } } }) })
+  assert.deepEqual(lines(), ['', ' > fix the build', ''])
+  await fiber.dispose()
+  assert.deepEqual(lines(), ['', ' › fix the build', ''])
+})
+
+test('a view may name a tone its author\'s theme adds, drawn in the colour the theme gives it', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { highlight: { color: 'magenta' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'asked', tone: 'highlight' }))
+  })
+  const facts = [prompt]
+  assert.deepEqual(screen(facts, initial, 10, registrations.views, registrations.currentTheme).lines, ['\x1b[35masked\x1b[39m     '])
+})
+
+test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), { message: 'binnacle.theme: tones.accent.color is "purple", not one of the terminal\'s sixteen colours: black, red, green, yellow, blue, magenta, cyan, white, bright-black, bright-red, bright-green, bright-yellow, bright-blue, bright-magenta, bright-cyan, bright-white' })
+  assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★' } } }), { message: 'binnacle.theme: marks.pinned is a mark the theme has none of, so it needs a glyph and a tone' })
+  assert.throws(() => registrations.theme({ words: { cut: 3 } } as never), { message: 'binnacle.theme: words.cut is 3, not a string' })
+  assert.throws(() => registrations.theme({ folds: { tool: { rows: -1 } } }), { message: 'binnacle.theme: folds.tool.rows is -1, not a whole number of rows' })
+  assert.throws(() => registrations.theme({ marks: { prompt: { glyph: '\x1b[2J' } } }), { message: 'binnacle.theme: marks.prompt.glyph holds a control character, which would reach the terminal as one' })
+  assert.throws(() => registrations.theme({ words: { less: 'less\x07' } }), { message: 'binnacle.theme: words.less holds a control character, which would reach the terminal as one' })
+  assert.throws(() => registrations.theme({ chrome: { border: { side: '||' } } }), { message: 'binnacle.theme: chrome.border.side is "||", not one column wide' })
+  assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★', tone: 'nope' } } }), { message: 'binnacle.theme: marks.pinned.tone is "nope", a tone the theme does not give' })
+})
+
+test('a fold its view leaves unsized shows the rows the theme gives its kind, or three', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.view('prompt', () => ({ kind: 'fold', id: 'f', child: { kind: 'text', text: 'a\nb\nc\nd\ne' } })) })
+  assert.deepEqual(shown(registrations), ['a', 'b', 'c', '… 2 more lines'])
+  await author((ctx) => { ctx.binnacle.theme({ folds: { prompt: { rows: 1 } } }) })
+  assert.deepEqual(shown(registrations), ['a', '… 4 more lines'])
+})
+
+test('a theme says how many rows a kind\'s built-in folds show, without a view redrawn', async () => {
+  const { registrations, author } = surface()
+  const reasoning: Fact = { kind: 'answer', seq: 2, time: 2, turn: 1, step: 1, provider: 'p', model: 'm', interrupted: false, blocks: [{ kind: 'reasoning', text: 'a\nb\nc' }] }
+  const lines = () => screen([reasoning], initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['∴ thinking · 3 lines'])
+  await author((ctx) => { ctx.binnacle.theme({ folds: { answer: { rows: 1 } } }) })
+  assert.deepEqual(lines(), ['∴ thinking', 'a', '… 2 more lines'])
+})
+
+test('a theme says how many rows the context fold shows, as the thinking fold\'s', async () => {
+  const { registrations, author } = surface()
+  const context: Fact = { kind: 'context', seq: 2, time: 2, source: 'goal', blocks: [{ kind: 'text', text: 'a\nb\nc' }] }
+  const lines = () => screen([context], initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['⋯ added by goal · 3 lines'])
+  await author((ctx) => { ctx.binnacle.theme({ folds: { context: { rows: 1 } } }) })
+  assert.deepEqual(lines(), ['⋯ added by goal', 'a', '… 2 more lines'])
+})
+
+test('a theme says how many rows a tool\'s output fold shows', async () => {
+  const { registrations, author } = surface()
+  const facts: Fact[] = [call(2, 2, 'c1', 'bash', '{}'), returned(3, 3, 'c1', 'a\nb\nc\nd\ne')]
+  const lines = () => screen(facts, initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['● bash {}', 'a', 'b', 'c', '… 2 more lines'])
+  await author((ctx) => { ctx.binnacle.theme({ folds: { tool: { rows: 1 } } }) })
+  assert.deepEqual(lines(), ['● bash {}', 'a', '… 4 more lines'])
+})
+
+test('a theme says how many rows the fold of a result no call claims shows', async () => {
+  const { registrations, author } = surface()
+  const lines = () => screen([returned(2, 2, 'c9', 'a\nb\nc\nd\ne')], initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['● result of call c9', 'a', 'b', 'c', '… 2 more lines'])
+  await author((ctx) => { ctx.binnacle.theme({ folds: { result: { rows: 1 } } }) })
+  assert.deepEqual(lines(), ['● result of call c9', 'a', '… 4 more lines'])
+})
+
+test('a theme says how many rows the fallback\'s fold of a kind nothing draws shows', async () => {
+  const { registrations, author } = surface()
+  const marker: Fact = { kind: 'unknown', seq: 2, time: 2, type: 'goal/change', record: { type: 'goal/change', data: {} } }
+  const lines = () => screen([marker], initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['? goal/change · 4 lines'])
+  await author((ctx) => { ctx.binnacle.theme({ folds: { unknown: { rows: 1 } } }) })
+  assert.deepEqual(lines(), ['? goal/change', '{', '… 3 more lines'])
+})
+
+test('an authored fact\'s fallback fold starts as the theme gives its name, falling back to its kind', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => { ctx.binnacle.facts('test/marker', () => ({ name: 'seeded', data: { one: 'a', two: 'b', three: 'c', four: 'd', five: 'e' } })) })
+  const lines = () => shown(registrations, seed).slice(4)
+  assert.deepEqual(lines(), ['? seeded · 7 lines'])
+  const kind = await author((ctx) => { ctx.binnacle.theme({ folds: { authored: { rows: 2 } } }) })
+  assert.deepEqual(lines(), ['? seeded', '{', '  "one": "a",', '… 5 more lines'])
+  const named = await author((ctx) => { ctx.binnacle.theme({ folds: { seeded: { rows: 1 } } }) })
+  assert.deepEqual(lines(), ['? seeded', '{', '… 6 more lines'])
+  await kind.dispose()
+  assert.deepEqual(lines(), ['? seeded', '{', '… 6 more lines'], 'the name\'s start still wins with the kind\'s gone')
+  await named.dispose()
+  assert.deepEqual(lines(), ['? seeded · 7 lines'], 'disposing both gives the authored kind back its own start')
+})
+
+test('a theme may start the thinking fold open, and a person\'s toggle folds it back', async () => {
+  const { registrations, author } = surface()
+  const reasoning: Fact = { kind: 'answer', seq: 2, time: 2, turn: 1, step: 1, provider: 'p', model: 'm', interrupted: false, blocks: [{ kind: 'reasoning', text: 'a\nb\nc' }] }
+  await author((ctx) => { ctx.binnacle.theme({ folds: { answer: { open: true } } }) })
+  const lines = (toggled: ReadonlySet<string>) => screen([reasoning], { toggled }, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(new Set()), ['∴ thinking · show less', 'a', 'b', 'c'])
+  assert.deepEqual(lines(new Set(['2/reasoning-0'])), ['∴ thinking · 3 lines'])
+})
+
+test('a theme registration draws and lays out every entry again, so an author changes no view of their own for it', async () => {
+  const { registrations, author } = surface()
+  let calls = 0
+  await author((ctx) => { ctx.binnacle.view('prompt', () => { calls++; return { kind: 'text', text: 'one' } }) })
+  const pane = new TranscriptPane(() => {}, () => registrations.views, {}, () => registrations.currentTheme)
+  pane.push(prompt)
+  const lines = () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['one'])
+  assert.equal(calls, 1)
+  await author((ctx) => { ctx.binnacle.theme({ tones: { accent: { color: 'cyan' } } }) })
+  assert.deepEqual(lines(), ['one'])
+  assert.equal(calls, 2)
+})
+
+test('a kind whose folds the theme starts open draws them open, and a person\'s toggle folds one', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', () => ({ kind: 'fold', id: 'f', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } }))
+    ctx.binnacle.theme({ folds: { prompt: { open: true } } })
+  })
+  const lines = (toggled: ReadonlySet<string>) => screen([prompt], { toggled }, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(new Set()), ['a', 'b', 'c'])
+  assert.deepEqual(lines(new Set(['1/f'])), ['a', '… 2 more lines'])
+})
+
+test('a theme may change in part a mark an earlier theme added, keeping what it leaves out', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ marks: { pinned: { glyph: '★', tone: 'warning' } } })
+    ctx.binnacle.theme({ marks: { pinned: { glyph: '◆' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: [{ mark: 'pinned' }] }))
+  })
+  assert.deepEqual(screen([prompt], initial, 4, registrations.views, registrations.currentTheme).lines, ['\x1b[33m◆\x1b[39m   '])
 })
 
 /**

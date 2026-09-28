@@ -11,6 +11,8 @@ import type { Block, Fact } from '../facts/adapt.ts'
 import type { Entry } from '../models/transcript.ts'
 import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
+import { binnacleTheme } from '../ui/theme.ts'
+import type { Theme } from '../ui/theme.ts'
 import type { Node, Span } from '../ui/node.ts'
 
 /**
@@ -38,7 +40,7 @@ function textOf(blocks: readonly Block[]): string {
 }
 
 /**
- * Draw an answer: reasoning drawn dim, folded to nothing under a muted `thinking` line that says how much it holds, and its text as the markdown document it is.
+ * Draw an answer: reasoning drawn dim, folded under a muted `thinking` line as the theme gives the answer kind's folds to start, and its text as the markdown document it is.
  * A call it made is its tool entry's to draw — dsh logs every kept call, and one kept by a stream cut short there
  * is none (`BlockAssembler.interruptedBlocks`, at dsh-v0.1.7-rc.2) — so its block draws no line here.
  * Each reasoning fold is named by which reasoning it is, so a person's opening one holds that one alone.
@@ -53,7 +55,6 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
         id: `reasoning-${reasoning++}`,
         title: [{ mark: 'thinking' } as const, ' thinking'],
         tone: 'muted',
-        rows: 0,
         child: { kind: 'text', text: block.text, tone: 'dim' },
       }]
       : block.kind === 'text'
@@ -81,7 +82,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
     return { kind: 'stack', children: [head, waiting] }
   }
   const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
-  const output: Node = { kind: 'fold', id: 'output', rows: 3, child: { kind: 'text', text: textOf(result.blocks) } }
+  const output: Node = { kind: 'fold', id: 'output', child: { kind: 'text', text: textOf(result.blocks) } }
   return { kind: 'stack', children: [head, ...reason, output] }
 }
 
@@ -91,15 +92,16 @@ const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context
 /**
  * Draw one entry.
  * @param views - authors' views; the newest for the entry's key draws it, and one for a built-in kind builds on or replaces binnacle's.
+ * @param theme - the theme it is drawn in, whose tones, marks and backgrounds are the names a view may use.
  * @returns what it draws, which for a quiet entry no view claims is no lines at all. When an author's view throws or returns no node binnacle can lay out, what the view beneath it draws, saying what went wrong; when an authored fact is named as a built-in kind, the built-in drawing, saying so.
  */
-export function drawEntry(entry: Entry, views: Views = new Map()): Node {
+export function drawEntry(entry: Entry, views: Views = new Map(), theme: Theme = binnacleTheme): Node {
   if (entry.kind === 'authored' && Object.hasOwn(drawnHere, entry.fact.name)) {
     return builtIn(entry, `${entry.fact.name} is a kind binnacle draws; the adapter must give its fact another name`)
   }
   const key = keyOf(entry)
   const stack = views.get(key) ?? []
-  return drawnBy(entry, key, stack, stack.length)
+  return drawnBy(entry, key, stack, stack.length, theme)
 }
 
 /**
@@ -115,20 +117,21 @@ export function keyOf(entry: Entry): string {
  * Draw one entry with the views of its key up to a height, the topmost drawing.
  * @param stack - the key's views, oldest first.
  * @param height - how many of them draw; none is binnacle's own drawing.
+ * @param theme - the theme a view's node is read against.
  * @returns what the topmost draws, or what the one beneath it draws, saying why, when it fails.
  */
-function drawnBy(entry: Entry, key: string, stack: readonly View[], height: number): Node {
+function drawnBy(entry: Entry, key: string, stack: readonly View[], height: number, theme: Theme): Node {
   const view = stack[height - 1]
   if (view === undefined) return builtIn(entry)
-  const beneath = (problem: string): Node => height === 1 ? builtIn(entry, problem) : noted(drawnBy(entry, key, stack, height - 1), problem)
+  const beneath = (problem: string): Node => height === 1 ? builtIn(entry, problem) : noted(drawnBy(entry, key, stack, height - 1, theme), problem)
   let returned: unknown
   try {
-    returned = view(entry, () => drawnBy(entry, key, stack, height - 1))
+    returned = view(entry, () => drawnBy(entry, key, stack, height - 1, theme))
   } catch (error) {
     return beneath(`binnacle.view(${key}) threw: ${describe(error)}`)
   }
   try {
-    return parseNode(returned)
+    return parseNode(returned, theme)
   } catch (error) {
     return beneath(`binnacle.view(${key}) returned no drawable node: ${describe(error)}`)
   }
@@ -145,7 +148,7 @@ function builtIn(entry: Entry, problem?: string): Node {
       // The prompt heads its turn in a band: padded, and filled with the theme's background for what the person sent.
       return noted({ kind: 'band', background: 'prompt', child: { kind: 'text', text: [{ mark: 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] } }, problem)
     case 'context':
-      return noted(folded('context', 0, [{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'text', text: textOf(entry.fact.blocks) }), problem)
+      return noted(folded('context', [{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'text', text: textOf(entry.fact.blocks) }), problem)
     case 'answer':
       return noted(drawAnswer(entry.fact), problem)
     case 'tool':
@@ -154,13 +157,13 @@ function builtIn(entry: Entry, problem?: string): Node {
       // A fold that shows rows keeps its marker beneath them, and what shows rows is out of #18: its title stays a
       // line of its own above the fold, as it always was, a titled fold that shows rows left to #23.
       const title: Node = { kind: 'text', text: [{ mark: 'done', tone: 'muted' } as const, ` result of call ${entry.fact.callId}`], tone: 'muted' }
-      const fold: Node = { kind: 'fold', id: 'output', rows: 3, child: { kind: 'text', text: textOf(entry.fact.blocks) } }
+      const fold: Node = { kind: 'fold', id: 'output', child: { kind: 'text', text: textOf(entry.fact.blocks) } }
       return problem === undefined ? { kind: 'stack', children: [title, fold] } : { kind: 'stack', children: [title, problemLine(problem), fold] }
     }
     case 'authored':
-      return noted(folded('data', 0, [{ mark: 'unknown' } as const, ` ${entry.fact.name}`], { kind: 'text', text: shown(entry.fact.data) }), problem)
+      return noted(folded('data', [{ mark: 'unknown' } as const, ` ${entry.fact.name}`], { kind: 'text', text: shown(entry.fact.data) }), problem)
     case 'unknown':
-      return noted(folded('record', 0, [{ mark: 'unknown' } as const, ` ${entry.fact.type}`], { kind: 'text', text: shown(entry.fact.record) }), problem ?? entry.fact.problem)
+      return noted(folded('record', [{ mark: 'unknown' } as const, ` ${entry.fact.type}`], { kind: 'text', text: shown(entry.fact.record) }), problem ?? entry.fact.problem)
     case 'quiet':
       // A blank node is a line of its own; a stack of nothing is no lines at all, which is what quiet draws — though what a view over it did wrong is still said.
       return problem === undefined ? { kind: 'stack', children: [] } : problemLine(problem)
@@ -168,15 +171,14 @@ function builtIn(entry: Entry, problem?: string): Node {
 }
 
 /**
- * A fold under a muted title line, which it folds to `rows` rows: showing none, its marker rides the title
+ * A fold under a muted title line, folded as the theme gives its kind's folds to start: showing no rows, its marker rides the title
  * and the fold costs that one line.
  * @param id - the fold's region name, by what it is.
- * @param rows - how many rows it shows while folded.
  * @param title - the line it folds under.
  * @param child - what it holds.
  */
-function folded(id: string, rows: number, title: readonly Span[], child: Node): Node {
-  return { kind: 'fold', id, rows, title, tone: 'muted', child }
+function folded(id: string, title: readonly Span[], child: Node): Extract<Node, { readonly kind: 'fold' }> {
+  return { kind: 'fold', id, title, tone: 'muted', child }
 }
 
 /**
