@@ -53,6 +53,7 @@ export const marks = {
   failed: { glyph: '✗', tone: 'error' }, // a call that failed
   problem: { glyph: '✗', tone: 'error' }, // what went wrong, said beneath what it concerns
   prompt: { glyph: '›', tone: 'accent' }, // what the person sent
+  steer: { glyph: '↳', tone: 'accent' }, // what the person sent while a turn ran, reaching it at its next step
   thinking: { glyph: '∴', tone: 'muted' }, // reasoning
   context: { glyph: '⋯', tone: 'muted' }, // what something added to the context
   unknown: { glyph: '?', tone: 'muted' }, // a kind binnacle has no view for, an author's fact included

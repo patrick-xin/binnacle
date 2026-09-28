@@ -1065,3 +1065,34 @@ test('--help names each affordance\'s binding, unbound until a person binds it',
   const { out } = await mount(['--help'])
   assert.match(out.join(''), /  \(unbound\)  copy the focused thing\n/)
 })
+
+test('a plugin\'s composer placement decides what a submitted line does', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const seen: string[] = []
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('composer', { kind: 'composer', submit: (text) => { seen.push(text.toUpperCase()) } }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('hello')
+  terminal.type('\r')
+  assert.deepEqual(seen, ['HELLO'])
+  assert.deepEqual(session.sent, [])
+})
+
+test('escape interrupts a running turn while nothing has focus, and while nothing runs reaches the composer', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  session.running = true
+  terminal.type('\x1b')
+  assert.equal(session.interrupted, 1)
+  session.running = false
+  terminal.type('\x1b')
+  terminal.type('hi')
+  terminal.type('\r')
+  assert.equal(session.interrupted, 1)
+  assert.deepEqual(session.sent, ['hi'])
+})

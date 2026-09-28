@@ -13,6 +13,8 @@ export class FakeSession implements OpenedSession {
   readonly model = 'deepseek/deepseek-v4'
   readonly sent: string[] = []
   closed = false
+  running = false
+  interrupted = 0
   #listener: ((event: SessionEvent) => void) | undefined
   readonly #logged: SessionEvent[]
   constructor(logged: SessionEvent[] = []) { this.#logged = logged }
@@ -23,6 +25,7 @@ export class FakeSession implements OpenedSession {
   }
   get following(): boolean { return this.#listener !== undefined }
   send(text: string): void { this.sent.push(text) }
+  interrupt(): void { this.interrupted += 1 }
   async close(): Promise<void> { this.closed = true }
   log(event: SessionEvent): void { this.#listener?.(event) }
 }

@@ -50,7 +50,15 @@ export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-compose
  */
 export type Placement =
   | { readonly kind: 'transcript' }
-  | { readonly kind: 'composer' }
+  | {
+    readonly kind: 'composer'
+    /**
+     * What a line does once the person submits it: handed the line as they
+     * wrote it, blank included. binnacle's composer clears itself either way.
+     * The built-in Composer plugin sends a line that is not blank.
+     */
+    readonly submit: (text: string) => void
+  }
   | {
     readonly kind: 'lines'
     /**
@@ -151,6 +159,14 @@ export interface Registrations {
    * @throws when an id is none binnacle has, a key is none pi-tui can name, or two ids come to share one key, saying what to change.
    */
   keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void
+  /**
+   * Send a line from the person to the session: a grant, an effect the host
+   * performs, not a registration. It steers the agent, reaching a turn
+   * already running at its next step, or starting a turn when none runs.
+   * @param text - the line, as the person wrote it.
+   * @throws when no session is open — before it opens, or after it closes — saying so.
+   */
+  send(text: string): void
 }
 
 declare module '@deepseek-ai/cordis' {

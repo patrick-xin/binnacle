@@ -292,11 +292,14 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   })
   const composer = new Editor(reaching(() => tui), editorTheme)
   let page = arrange()
+  // A submitted line is the composer placement's to act on: the built-in Composer plugin sends it, through the grant
+  // opened below; binnacle's composer clears itself either way.
   composer.onSubmit = (text) => {
-    if (text.trim() === '') return
     composer.setText('')
-    session.send(text)
+    const placed = registrations.placed('composer').at(-1)
+    if (placed?.kind === 'composer') placed.submit(text)
   }
+  const closeGrants = registrations.open({ send: (text) => { session.send(text) } })
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
   // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()
@@ -349,10 +352,16 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       closeScreen()
       return { consume: true }
     }
-    if (resolved !== undefined && reading?.handleKey({ kind: 'key', binding: resolved.binding }) === true) return { consume: true }
+    // Interrupting is the host's to answer, as quitting is; while nothing runs, the key is the composer's, as any key
+    // nothing answers.
+    if (resolved?.kind === 'interrupt' && session.running) {
+      session.interrupt()
+      return { consume: true }
+    }
+    if (resolved?.kind === 'gesture' && reading?.handleKey({ kind: 'key', binding: resolved.binding }) === true) return { consume: true }
     // A key a person bound to an affordance is answered even where focus offers no such thing: it does nothing there,
     // and focus stays.
-    if (resolved !== undefined && resolved.binding in affordances) return { consume: true }
+    if (resolved?.kind === 'gesture' && resolved.binding in affordances) return { consume: true }
     // Stepping out drops focus, and where the main screen parked it, so what was typed is sent, not answered by focus.
     reading?.handleKey({ kind: 'key', binding: 'focus.out' })
     return undefined
@@ -403,6 +412,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (!held) return
     held = false
     unfollow()
+    closeGrants()
     unregister()
     // A placed screen open at the quit is closed first, so the session is left where the person can read it, plain.
     if (open !== undefined) closeScreen()

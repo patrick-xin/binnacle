@@ -21,6 +21,15 @@ import type { Theme } from '../ui/theme.ts'
 /** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, or the theme. */
 export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys'
 
+/** What the host performs the grants with, on the session it opened. */
+export interface GrantedSession {
+  /**
+   * Send a line from the person, steering the agent.
+   * @param text - the line.
+   */
+  send(text: string): void
+}
+
 /** The slots of the page, top to bottom. */
 const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer'] satisfies readonly Slot[]
 
@@ -35,7 +44,8 @@ function misplaced(slot: Slot, placement: Placement): string | undefined {
   if (!slots.includes(slot)) return 'no such slot; the slots are transcript, above-composer, composer and below-composer'
   const kind: unknown = (placement as { readonly kind?: unknown } | undefined)?.kind
   const drawn = kind === 'lines' && typeof (placement as { readonly draw?: unknown }).draw === 'function'
-  if (kind !== 'transcript' && kind !== 'composer' && !drawn) return 'a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function'
+  const submits = kind === 'composer' && typeof (placement as { readonly submit?: unknown }).submit === 'function'
+  if (kind !== 'transcript' && !submits && !drawn) return 'a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function'
   if (placement.kind === 'transcript' && slot !== 'transcript') return 'the transcript goes only in the transcript slot'
   if (placement.kind === 'composer' && slot !== 'composer') return 'the composer goes only in the composer slot'
   if (placement.kind === 'lines' && slot === 'transcript') return 'lines cannot take the transcript\'s place; place a screen there with binnacle.screen'
@@ -52,6 +62,7 @@ export class RegistrationService extends Service implements Registrations {
   private readonly placementTable = new Map<string, readonly Placement[]>()
   private readonly bindingTable = new Map<string, readonly Readonly<Record<string, KeyId | readonly KeyId[]>>[]>()
   private bound: KeybindingsConfig = {}
+  private granted: GrantedSession | undefined
   private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
   private drawnIn: Theme = binnacleTheme
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
@@ -117,6 +128,23 @@ export class RegistrationService extends Service implements Registrations {
   /** What the registrations bind, by binding id: each id's newest. */
   get bindings(): KeybindingsConfig {
     return this.bound
+  }
+
+  /** @inheritDoc */
+  send(text: string): void {
+    const session = this.granted
+    if (session === undefined) throw new Error('binnacle.send: no session is open; a line can be sent once the session opens, and until it closes')
+    session.send(text)
+  }
+
+  /**
+   * Open the grants onto a session: what they reach until the returned function closes them.
+   * @param session - what the host performs a grant with.
+   * @returns a function that closes them, as the session closes.
+   */
+  open(session: GrantedSession): () => void {
+    this.granted = session
+    return () => { if (this.granted === session) this.granted = undefined }
   }
 
   /** @inheritDoc */

@@ -20,13 +20,13 @@ test('where the terminal reports holding and releasing a key, as a kitty-protoco
   assert.deepEqual(resolve('\x1b[99;5:3u', true), undefined)
 })
 
-test('with nothing focused, only step in is answered: shift+tab; tab, up, down, enter and escape reach the composer', () => {
+test('with nothing focused, step in is answered, shift+tab, and escape is the host\'s to interrupt with; tab, up, down and enter reach the composer', () => {
   assert.deepEqual(resolve('\x1b[Z', false), { kind: 'gesture', binding: 'focus.previous' })
   assert.deepEqual(resolve('\t', false), undefined)
   assert.deepEqual(resolve('\x1b[A', false), undefined)
   assert.deepEqual(resolve('\x1b[B', false), undefined)
   assert.deepEqual(resolve('\r', false), undefined)
-  assert.deepEqual(resolve('\x1b', false), undefined)
+  assert.deepEqual(resolve('\x1b', false), { kind: 'interrupt' })
 })
 
 test('while something has focus, tab and down move to the next, up and shift+tab to the previous, enter is primary, escape steps out', () => {

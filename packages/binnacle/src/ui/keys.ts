@@ -26,6 +26,7 @@ type AffordanceKeybindings = { readonly [Kind in AffordanceKind as `binnacle.${K
 export interface BinnacleKeybindings extends AffordanceKeybindings {
   'binnacle.quit': true
   'binnacle.switchScreens': true
+  'binnacle.interrupt': true
   'binnacle.stepIn': true
   'binnacle.focusNext': true
   'binnacle.focusPrevious': true
@@ -46,6 +47,7 @@ export const BINNACLE_BINDINGS = {
   'binnacle.stepOut': { defaultKeys: 'escape', description: 'give the keyboard back to the composer' },
   'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'quit' },
   'binnacle.switchScreens': { defaultKeys: 'ctrl+t', description: 'switch screens' },
+  'binnacle.interrupt': { defaultKeys: 'escape', description: 'interrupt the running turn, while nothing has focus' },
 } as const satisfies KeybindingDefinitions
 
 /**
@@ -74,6 +76,7 @@ export type ResolvedKey =
   | { readonly kind: 'gesture', readonly binding: KeyBinding }
   | { readonly kind: 'quit' }
   | { readonly kind: 'switch-screens' }
+  | { readonly kind: 'interrupt' }
   | { readonly kind: 'screen', readonly name: string }
   | { readonly kind: 'screen-close' }
 
@@ -157,7 +160,7 @@ export function keyTable(): KeyTable {
         for (const kind of Object.keys(affordances) as AffordanceKind[]) {
           if (manager.matches(data, `binnacle.${kind}`)) return { kind: 'gesture', binding: kind }
         }
-      }
+      } else if (manager.matches(data, 'binnacle.interrupt')) return { kind: 'interrupt' }
       return undefined
     },
   }

@@ -146,7 +146,8 @@ function builtIn(entry: Entry, problem?: string): Node {
   switch (entry.kind) {
     case 'prompt':
       // The prompt heads its turn in a band: padded, and filled with the theme's background for what the person sent.
-      return noted({ kind: 'band', background: 'prompt', child: { kind: 'text', text: [{ mark: 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] } }, problem)
+      // A steer is drawn as what the person sent, marked as reaching a turn already running.
+      return noted({ kind: 'band', background: 'prompt', child: { kind: 'text', text: [{ mark: entry.steer === true ? 'steer' : 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] } }, problem)
     case 'context':
       return noted(folded('context', [{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'text', text: textOf(entry.fact.blocks) }), problem)
     case 'answer':
