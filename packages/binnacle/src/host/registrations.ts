@@ -13,6 +13,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AuthorAdapter, PlacedScreen, Registrations, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
+import { parseThemeChanges } from '../ui/theme-changes.ts'
 import type { Theme } from '../ui/theme.ts'
 
 /** What changed in the registrations, for a listener: the adapters, the views, the placed screens, or the theme. */
@@ -66,9 +67,12 @@ export class RegistrationService extends Service implements Registrations {
     return this.drawnIn
   }
 
-  /** @inheritDoc */
+  /**
+   * @inheritDoc
+   * @throws when the changes name what binnacle cannot draw, saying what to change.
+   */
   theme(changes: ThemeChanges): () => void {
-    return this.register(this.themeTable, 'theme', changes, 'binnacle.theme', 'theme')
+    return this.register(this.themeTable, 'theme', parseThemeChanges(changes), 'binnacle.theme', 'theme')
   }
 
   /** @inheritDoc */

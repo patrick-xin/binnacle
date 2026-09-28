@@ -91,6 +91,7 @@ export interface Registrations {
    * entry is drawn again in the theme that is left.
    * @param changes - what to change.
    * @returns a disposer, for taking it back before the plugin is disposed.
+   * @throws when the changes name what binnacle cannot draw — a colour not the terminal's, a mark with no glyph — saying by its path what to change.
    */
   theme(changes: ThemeChanges): () => void
 }

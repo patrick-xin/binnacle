@@ -84,6 +84,13 @@ test('a view may name a tone its author\'s theme adds, drawn in the colour the t
   assert.deepEqual(screen(facts, initial, 10, registrations.views, registrations.currentTheme).lines, ['\x1b[35masked\x1b[39m     '])
 })
 
+test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), { message: 'binnacle.theme: tones.accent.color is "purple", not one of the terminal\'s sixteen colours: black, red, green, yellow, blue, magenta, cyan, white, bright-black, bright-red, bright-green, bright-yellow, bright-blue, bright-magenta, bright-cyan, bright-white' })
+  assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★' } } }), { message: 'binnacle.theme: marks.pinned is a mark binnacle has none of, so it needs a glyph and a tone' })
+  assert.throws(() => registrations.theme({ words: { cut: 3 } } as never), { message: 'binnacle.theme: words.cut is 3, not a string' })
+})
+
 /**
  * A pane on the registrations as they stand, holding two prompts an author's view folds alike, and its lines.
  * @param registrations - the surface's registrations.
