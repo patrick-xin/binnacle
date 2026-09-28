@@ -377,3 +377,32 @@ test('the newest plugin to place a name places it, and disposing it gives the na
   await fiber.dispose()
   assert.equal(registrations.screens.get('trajectory')?.description, 'second', 'disposing one of two alike gives the other back')
 })
+
+/** Lines naming the model, as a status line draws them. */
+const modelLine = (): Node => ({ kind: 'text', text: 'deepseek/deepseek-v4' })
+
+test('a plugin places lines below the composer, and disposing its plugin takes them back', async () => {
+  const { registrations, author } = surface()
+  const changes: string[] = []
+  registrations.onChange((changed) => { changes.push(changed) })
+  const fiber = await author((ctx) => { ctx.binnacle.place('below-composer', { kind: 'lines', draw: modelLine }) })
+  assert.deepEqual(changes, ['placements'])
+  assert.deepEqual(registrations.placed('below-composer'), [{ kind: 'lines', draw: modelLine }])
+  await fiber.dispose()
+  assert.deepEqual(registrations.placed('below-composer'), [])
+})
+
+test('a transcript or composer placed outside its own slot, or lines in the transcript\'s place, is refused, saying what to change', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.place('below-composer', { kind: 'composer' }), { message: 'binnacle.place(below-composer): the composer goes only in the composer slot' })
+  assert.throws(() => registrations.place('composer', { kind: 'transcript' }), { message: 'binnacle.place(composer): the transcript goes only in the transcript slot' })
+  assert.throws(() => registrations.place('transcript', { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(transcript): lines cannot take the transcript\'s place; place a screen there with binnacle.screen' })
+  assert.deepEqual([registrations.placed('below-composer'), registrations.placed('composer'), registrations.placed('transcript')], [[], [], []])
+})
+
+test('a slot or a placement binnacle has not is refused, naming what it has', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.place('footer' as never, { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(footer): no such slot; the slots are transcript, above-composer, composer and below-composer' })
+  assert.throws(() => registrations.place('below-composer', { kind: 'status' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function' })
+  assert.throws(() => registrations.place('below-composer', { kind: 'lines' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function' })
+})

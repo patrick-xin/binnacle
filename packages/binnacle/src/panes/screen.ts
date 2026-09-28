@@ -17,14 +17,13 @@
  */
 
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
-import { describe } from '../contract/index.ts'
 import type { Fact } from '../facts/adapt.ts'
 import type { Gesture } from '../contract/index.ts'
 import { answer } from '../ui/answer.ts'
 import { layout, under } from '../ui/layout.ts'
 import type { Frame } from '../ui/layout.ts'
-import type { Node, Span } from '../ui/node.ts'
-import { parseNode } from '../ui/node.ts'
+import type { Node } from '../ui/node.ts'
+import { drawPlaced } from './placed.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
@@ -148,6 +147,18 @@ export class ScreenPane implements Component {
     return true
   }
 
+  /**
+   * What the placed screen draws, fenced.
+   * @param theme - the theme it is parsed against.
+   * @returns what its drawing returned, or what went wrong, naming its registration.
+   */
+  #drawn(theme: Theme): Node {
+    const draw = this.#draw
+    const name = this.#name
+    if (draw === undefined || name === undefined) return { kind: 'blank' }
+    return drawPlaced(`binnacle.screen(${name})`, draw, this.#facts(), theme)
+  }
+
   /** Draw the screen again, as pi-tui asks when the theme changes, or its registration is placed again. */
   invalidate(): void {
     this.#stale = true
@@ -163,39 +174,10 @@ export class ScreenPane implements Component {
     const laid = this.#laid
     const theme = this.#theme()
     if (!this.#stale && laid !== undefined && laid.width === width && laid.state === state && laid.theme === theme) return laid
-    const frame = layout(this.#drawn(), width, state, theme)
+    const frame = layout(this.#drawn(theme), width, state, theme)
     const next: Laid = { width, state, theme, frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
     this.#laid = next
     this.#stale = false
     return next
-  }
-
-  /**
-   * What the placed screen draws, fenced: what its drawing returned as a node, or what went wrong, naming its registration, in error.
-   */
-  #drawn(): Node {
-    const draw = this.#draw
-    const name = this.#name
-    if (draw === undefined || name === undefined) return { kind: 'blank' }
-    let returned: unknown
-    try {
-      returned = draw(this.#facts())
-    } catch (error) {
-      return this.#refused(`binnacle.screen(${name}) threw: ${describe(error)}`)
-    }
-    try {
-      return parseNode(returned, this.#theme())
-    } catch (error) {
-      return this.#refused(`binnacle.screen(${name}) returned no drawable node: ${describe(error)}`)
-    }
-  }
-
-  /**
-   * What went wrong, as a screen draws it: the problem mark and what did it, in error.
-   * @param what - the registration and why it failed.
-   */
-  #refused(what: string): Node {
-    const spans: readonly Span[] = [{ mark: 'problem' }, ` ${what}`]
-    return { kind: 'text', text: spans, tone: 'error' }
   }
 }
