@@ -1,6 +1,7 @@
 /**
  * The screen pane: a placed screen as a pi-tui component, in the
- * transcript's place on the alternate screen.
+ * transcript's place on the alternate screen; and placed lines, around the
+ * composer or in its seat, which answer a person the same way.
  *
  * It draws what the screen's registration returns, with nodes as a view
  * draws, laid out at the width pi-tui gives it — every line, unwindowed,
@@ -18,7 +19,7 @@
 
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
 import type { Fact } from '../facts/adapt.ts'
-import type { Gesture } from '../contract/index.ts'
+import type { AffordanceKind, Gesture } from '../contract/index.ts'
 import { answer } from '../ui/answer.ts'
 import { layout, under } from '../ui/layout.ts'
 import type { Frame } from '../ui/layout.ts'
@@ -36,6 +37,8 @@ export interface ScreenReports {
   readonly changed?: () => void
   /** Something to bring into view: the rows a focused thing covers, on the screen as now drawn. */
   readonly inView?: (top: number, height: number) => void
+  /** An offer a person invoked that UI state does not answer — any but `expand` — for the registration to act on. */
+  readonly invoked?: (region: string, affordance: AffordanceKind) => void
 }
 
 /** What one layout of the screen drew, and all that decides whether it stands. */
@@ -58,7 +61,8 @@ export class ScreenPane implements Component {
   readonly #theme: () => Theme
   readonly #changed: () => void
   readonly #inView: (top: number, height: number) => void
-  #name: string | undefined
+  readonly #invoked: (region: string, affordance: AffordanceKind) => void
+  #registration: string | undefined
   #draw: ((facts: readonly Fact[]) => Node) | undefined
   #state: UiState = initial
   #laid: Laid | undefined
@@ -74,15 +78,17 @@ export class ScreenPane implements Component {
     this.#theme = theme
     this.#changed = reports.changed ?? (() => {})
     this.#inView = reports.inView ?? (() => {})
+    this.#invoked = reports.invoked ?? (() => {})
   }
 
   /**
-   * Draw a placed screen in this pane.
+   * Draw a placed screen in this pane, or placed lines.
    * @param name - its registration's name.
    * @param screen - how it draws.
+   * @param registration - the registration as an author wrote it, to name it by in what went wrong; a placed screen's by default.
    */
-  place(name: string, screen: { readonly draw: (facts: readonly Fact[]) => Node }): void {
-    this.#name = name
+  place(name: string, screen: { readonly draw: (facts: readonly Fact[]) => Node }, registration = `binnacle.screen(${name})`): void {
+    this.#registration = registration
     this.#draw = screen.draw
     this.#stale = true
   }
@@ -90,6 +96,11 @@ export class ScreenPane implements Component {
   /** The session's facts have arrived, or been read again: the screen draws again at the next frame. */
   factsChanged(): void {
     this.#stale = true
+  }
+
+  /** Whether what it last drew offers something, so it can take focus. */
+  get offering(): boolean {
+    return (this.#laid?.focusable.length ?? 0) > 0
   }
 
   /** Whether something on the screen has focus. */
@@ -116,6 +127,10 @@ export class ScreenPane implements Component {
     if (gesture === undefined) return undefined
     const laid = this.laidAt(event.width, this.#state)
     const next = answer(this.#state, gesture, under(laid.frame.regions, event.y, event.x), laid)
+    if (next?.invoked !== undefined) {
+      this.#invoked(next.invoked.region, next.invoked.affordance)
+      return { handled: true }
+    }
     if (next === undefined || next.state === this.#state) return undefined
     this.#state = next.state
     this.#changed()
@@ -135,6 +150,7 @@ export class ScreenPane implements Component {
     const focused = focus === undefined ? undefined : drawn.frame.regions.find(placed => placed.region.id === focus)
     const next = answer(this.#state, gesture, focused === undefined ? [] : [focused.region], drawn)
     if (next === undefined) return false
+    if (next.invoked !== undefined) this.#invoked(next.invoked.region, next.invoked.affordance)
     if (next.state !== this.#state) {
       this.#state = next.state
       if (next.focus !== undefined) {
@@ -154,9 +170,9 @@ export class ScreenPane implements Component {
    */
   #drawn(theme: Theme): Node {
     const draw = this.#draw
-    const name = this.#name
-    if (draw === undefined || name === undefined) return { kind: 'blank' }
-    return drawPlaced(`binnacle.screen(${name})`, draw, this.#facts(), theme)
+    const registration = this.#registration
+    if (draw === undefined || registration === undefined) return { kind: 'blank' }
+    return drawPlaced(registration, draw, this.#facts(), theme)
   }
 
   /** Draw the screen again, as pi-tui asks when the theme changes, or its registration is placed again. */

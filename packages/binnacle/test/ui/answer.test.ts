@@ -34,3 +34,12 @@ test('a gesture that means nothing where it lands is not answered', () => {
   assert.equal(answer(initial, { kind: 'key', binding: 'primary' }, [prose], { focusable: ['prose'] }), undefined)
   assert.equal(answer(initial, { kind: 'click' }, [], { focusable: [] }), undefined)
 })
+
+test('an offer other than expand invoked on a region is reported, for whoever drew it to act on, and changes no state', () => {
+  const allow: Region = { id: 'allow', affordances: [{ kind: 'grant', label: 'allow once' }], overflows: false }
+  const state = { toggled: new Set<string>(), focus: 'allow' }
+  assert.deepEqual(answer(state, { kind: 'key', binding: 'primary' }, [allow], { focusable: ['allow'] }), {
+    state,
+    invoked: { region: 'allow', affordance: 'grant' },
+  })
+})

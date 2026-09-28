@@ -1096,3 +1096,32 @@ test('escape interrupts a running turn while nothing has focus, and while nothin
   assert.equal(session.interrupted, 1)
   assert.deepEqual(session.sent, ['hi'])
 })
+
+test('lines in the composer\'s seat that offer something take the keyboard: enter invokes the first offer, which reaches their invoke, and nothing is sent', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const invoked: string[] = []
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('composer', {
+        kind: 'lines',
+        draw: () => ({ kind: 'stack', children: [
+          { kind: 'offer', id: 'allow', affordances: [{ kind: 'grant', label: 'allow once' }], child: { kind: 'text', text: 'allow once' } },
+          { kind: 'offer', id: 'reject', affordances: [{ kind: 'dismiss', label: 'reject' }], child: { kind: 'text', text: 'reject' } },
+        ] }),
+        invoke: (region, affordance) => { invoked.push(`${region} ${affordance}`) },
+      })
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  terminal.type('\r')
+  assert.deepEqual(invoked, ['allow grant'])
+  terminal.type('\t')
+  terminal.type('\r')
+  assert.deepEqual(invoked, ['allow grant', 'reject dismiss'])
+  assert.deepEqual(session.sent, [])
+})
