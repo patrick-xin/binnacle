@@ -586,7 +586,7 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
   })
   const after = await terminal.mainScreen()
   assert.deepEqual(after.slice(0, 9), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line'])
-  assert.deepEqual(after.slice(9, 18), ['', '● stat {}', '  running…', '', '⋯ added by system-prompt', 'a', 'b', '[tool-addition]', '▸ fold it away'])
+  assert.deepEqual(after.slice(9, 18), ['', '● stat {}', '  running…', '', '⋯ added by system-prompt · show less', 'a', 'b', '[tool-addition]', '▸ fold it away'])
 })
 
 test('the key a plugin offers opens its screen in the transcript\'s place, the composer below it, and the same key returns the transcript as it was', async () => {
