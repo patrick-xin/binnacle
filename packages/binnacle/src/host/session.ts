@@ -55,6 +55,42 @@ export interface OpenedSession {
 }
 
 /**
+ * A count, when a projection holds one.
+ * @param value - what the projection holds.
+ * @returns the count, or undefined when it is none.
+ */
+const count = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+
+/**
+ * The tokens used, from the token meter's `tokenUsage` projection (`dsh:packages/llm/token-meter/src/projection.ts#TokenUsageProjection`).
+ * @param value - the projection's value, unknown until parsed.
+ * @returns the usage, or nothing when the projection holds none.
+ */
+function usageOf(value: unknown): Pick<SessionStands, 'usage'> {
+  if (typeof value !== 'object' || value === null) return {}
+  const totals = value as Record<string, unknown>
+  const input = count(totals.uncachedInputTokens)
+  const output = count(totals.outputTokens)
+  const cacheRead = count(totals.cacheReadTokens)
+  return input === undefined || output === undefined || cacheRead === undefined ? {} : { usage: { input, output, cacheRead } }
+}
+
+/**
+ * The context the session fills, from the token meter's `contextPressure` projection
+ * (`dsh:packages/llm/token-meter/src/projection.ts#ContextPressureProjection`): what the next request would cost, or
+ * the last one's size, out of the window the latest request context named.
+ * @param value - the projection's value, unknown until parsed.
+ * @returns the context, or nothing until both are known.
+ */
+function contextOf(value: unknown): Pick<SessionStands, 'context'> {
+  if (typeof value !== 'object' || value === null) return {}
+  const pressure = value as Record<string, unknown>
+  const used = count(pressure.projectedTokens) ?? count(pressure.pressureTokens)
+  const window = count(pressure.contextWindow)
+  return used === undefined || window === undefined || window === 0 ? {} : { context: { used, window } }
+}
+
+/**
  * Open a session on the default model.
  * @param ctx - the row's context, carrying dsh's `agents` and `agentDefaultModel`.
  * @returns the open session.
@@ -82,7 +118,15 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
     },
-    standing: () => ({ model: `${selection.provider}/${selection.model}`, running: handle.agent.status === 'running' }),
+    standing: () => {
+      // The model the session last asked for, from its latest request header; before its first request, the one it
+      // opened on (the reading on #42: the agent's options are fixed at creation).
+      const asked = session.requestHeader()?.config
+      const model = asked === undefined ? `${selection.provider}/${selection.model}` : `${asked.provider}/${asked.model}`
+      // The token meter's projections, where dsh-base mounts them, read as one cut of the log and parsed here.
+      const values = ctx.get('sessionProjections')?.snapshot(session, ['tokenUsage', 'contextPressure']).values
+      return { model, running: handle.agent.status === 'running', ...usageOf(values?.tokenUsage), ...contextOf(values?.contextPressure) }
+    },
     onStanding: listener => ctx.on('session/event', (from) => { if (from === session) listener() }),
     get running() { return handle.agent.status === 'running' },
     interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
