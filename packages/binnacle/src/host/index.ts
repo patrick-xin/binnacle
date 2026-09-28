@@ -22,7 +22,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
-import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
+import type { Component, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
@@ -31,6 +31,10 @@ import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
+import { LinesPane } from '../panes/placed.ts'
+import type { Placement, Slot } from '../api.ts'
+import { composer as composerFeature } from '../plugins/composer/index.ts'
+import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
 import { toolCards } from '../plugins/tool-cards/index.ts'
 import { trajectory } from '../plugins/trajectory/index.ts'
 import { RegistrationService } from './registrations.ts'
@@ -59,6 +63,21 @@ export const internals: {
   stderr: process.stderr,
   open: openSession,
 }
+
+/** The page as placed, read from the placements as they stand. */
+interface Page {
+  /** Whether binnacle's transcript is in the transcript's place. */
+  readonly transcript: boolean
+  /** The lines placed above the composer, oldest first. */
+  readonly above: readonly Component[]
+  /** What is in the composer's place: binnacle's composer, lines, or nothing. */
+  readonly composer: Component | undefined
+  /** The lines placed below the composer, oldest first. */
+  readonly below: readonly Component[]
+}
+
+/** What the alternate screen's reading place holds when neither the transcript nor a screen is placed there: nothing, growing. */
+const nothing: Component = { render: () => [], invalidate: () => {} }
 
 /** What this invocation asked for: a check, or the terminal on a screen, in pi's words for them. */
 type Mode = 'check' | TuiMode
@@ -161,20 +180,66 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     }
     return followed
   }
-  /** The alternate screen's layout: what the person is reading in the primary scroll view, the composer below it. */
-  const readBelowComposer = (reading: ScrollView): VStack => new VStack([
-    { component: reading, basis: 0, grow: 1, shrink: 1, minSize: 1 },
-    { component: composer, basis: 'auto', grow: 0, shrink: 1, minSize: 3 },
+  /**
+   * The alternate screen's layout: what the person is reading in the primary scroll view, growing to fill what the
+   * rest leave, then what is placed above the composer, the composer, and what is placed below it, each at its height.
+   */
+  const readBelowComposer = (reading: ScrollView | undefined): VStack => new VStack([
+    { component: reading ?? nothing, basis: 0, grow: 1, shrink: 1, minSize: reading === undefined ? 0 : 1 },
+    ...around().map((component): StackChild => ({ component, basis: 'auto', grow: 0, shrink: 1, minSize: component === composer ? 3 : 0 })),
   ])
-  /** Lay out the alternate screen: a placed screen that is open in the transcript's place, or the transcript. */
+  /** Lay out the alternate screen: a placed screen that is open in the transcript's place, or the transcript if it is placed. */
   function readOn(alternate: TuiAltScreen): void {
     const reading = open === undefined
-      ? transcriptView()
+      ? (page.transcript ? transcriptView() : undefined)
       : screenViews.get(open.name) ?? new ScrollView(open.pane, { primary: true })
-    if (open !== undefined) screenViews.set(open.name, reading)
+    if (open !== undefined && reading !== undefined) screenViews.set(open.name, reading)
     // What is being read is what focus is brought into view on: the transcript, or the placed screen that is open.
     scroll = reading
     alternate.setLayoutRoot(readBelowComposer(reading))
+  }
+  // The page as placed: whether binnacle's transcript is in its place, and what sits around the composer and in its
+  // place — binnacle's composer, lines, or nothing. Each lines placement is drawn by a pane of its own, kept while it stands.
+  const linesPanes = new Map<Placement, LinesPane>()
+  /**
+   * The pane that draws a lines placement, kept for as long as the placement stands.
+   * @param slot - where it is placed, to name it by.
+   * @param placement - the lines.
+   */
+  const linesPane = (slot: Slot, placement: Extract<Placement, { readonly kind: 'lines' }>): LinesPane => {
+    const kept = linesPanes.get(placement)
+    if (kept !== undefined) return kept
+    const pane = new LinesPane(`binnacle.place(${slot})`, placement.draw, () => facts, () => registrations.currentTheme)
+    linesPanes.set(placement, pane)
+    return pane
+  }
+  /** Read the page from the placements as they stand, forgetting the panes of lines no longer placed. */
+  function arrange(): Page {
+    const lines = (slot: Slot): readonly LinesPane[] => registrations.placed(slot).flatMap(placement => placement.kind === 'lines' ? [linesPane(slot, placement)] : [])
+    const inComposer = registrations.placed('composer').at(-1)
+    const arranged: Page = {
+      transcript: registrations.placed('transcript').at(-1)?.kind === 'transcript',
+      above: lines('above-composer'),
+      composer: inComposer === undefined ? undefined : inComposer.kind === 'lines' ? linesPane('composer', inComposer) : composer,
+      below: lines('below-composer'),
+    }
+    const standing = new Set<Component | undefined>([...arranged.above, arranged.composer, ...arranged.below])
+    for (const [placement, pane] of linesPanes) if (!standing.has(pane)) linesPanes.delete(placement)
+    return arranged
+  }
+  /** What sits under the transcript's place, top to bottom: the lines above the composer, the composer's place, the lines below it. */
+  const around = (): readonly Component[] => [...page.above, ...(page.composer === undefined ? [] : [page.composer]), ...page.below]
+  /**
+   * Stack the page on a screen: on the main screen, the order it is printed in; on the alternate one, what its layout reads.
+   * @param on - the screen.
+   */
+  function stack(on: TuiMainScreen | TuiAltScreen): void {
+    on.clear()
+    if (page.transcript) on.addChild(transcript)
+    for (const component of around()) on.addChild(component)
+    if (on instanceof TuiAltScreen) readOn(on)
+    // Typing reaches binnacle's composer where it is placed, and nothing where it is not.
+    on.setFocus(page.composer === composer ? composer : null)
   }
   /** Close the placed screen that is open: the transcript returns to its place, and one opened from the main screen returns there. */
   function closeScreen(): void {
@@ -201,8 +266,11 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (tui instanceof TuiAltScreen) readOn(tui)
     else show('fullscreen')
   }
-  // A change of adapters changes the facts, so the log is read again; a change of views or of the theme only needs a frame, which draws again what they drew.
+  // A change of adapters changes the facts, so the log is read again; a change of views or of the theme only needs a
+  // frame, which draws again what they drew; a change of placements lays the page out again. Placed lines are drawn
+  // again at any change.
   const unregister = registrations.onChange((changed) => {
+    for (const pane of linesPanes.values()) pane.invalidate()
     if (changed === 'facts') {
       // The whole log is read again, into the same array the placed screens are handed, so they see it as it now stands.
       facts.length = 0
@@ -210,9 +278,14 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       transcript.reset(facts)
       for (const pane of screenPanes.values()) pane.factsChanged()
     } else if (changed === 'screens') offerScreens()
-    else tui.requestRender()
+    else if (changed === 'placements') {
+      page = arrange()
+      stack(tui)
+      tui.requestRender()
+    } else tui.requestRender()
   })
   const composer = new Editor(reaching(() => tui), editorTheme)
+  let page = arrange()
   composer.onSubmit = (text) => {
     if (text.trim() === '') return
     composer.setText('')
@@ -247,8 +320,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // lost. While a placed screen is open, Esc returns to the transcript and no gesture moves on it;
   // scrolling, search and selection are the alternate screen's own, and the composer below stays live.
   const keys = (data: string): TuiInputListenerResult => {
-    const reading = open === undefined ? transcript : open.pane
-    const resolved = table.resolve(data, reading.focused, open !== undefined)
+    const reading = open === undefined ? (page.transcript ? transcript : undefined) : open.pane
+    const resolved = table.resolve(data, reading?.focused ?? false, open !== undefined)
     if (resolved?.kind === 'quit') {
       quit()
       return { consume: true }
@@ -268,9 +341,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       closeScreen()
       return { consume: true }
     }
-    if (resolved !== undefined && reading.handleKey({ kind: 'key', binding: resolved.binding })) return { consume: true }
+    if (resolved !== undefined && reading?.handleKey({ kind: 'key', binding: resolved.binding }) === true) return { consume: true }
     // Stepping out drops focus, and where the main screen parked it, so what was typed is sent, not answered by focus.
-    reading.handleKey({ kind: 'key', binding: 'focus.out' })
+    reading?.handleKey({ kind: 'key', binding: 'focus.out' })
     return undefined
   }
   // While the fullscreen's scroll view is scrolled away from the end it follows, pi-tui's indicator says so on the
@@ -285,11 +358,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     transcript.drawOn(mode)
     const next = mode === 'regular' ? new TuiMainScreen(terminal) : new TuiAltScreen(terminal, undefined, undefined, { scrollToEndIndicator: jumpToLatest })
     if (next instanceof TuiMainScreen && left !== undefined) next.restoreRenderState(left)
-    next.addChild(transcript)
-    next.addChild(composer)
-    if (next instanceof TuiAltScreen) readOn(next)
-    else scroll = undefined
-    next.setFocus(composer)
+    if (next instanceof TuiMainScreen) scroll = undefined
+    stack(next)
     next.addInputListener(keys)
     return next
   }
@@ -314,6 +384,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     facts.push(fact)
     transcript.push(fact)
     for (const pane of screenPanes.values()) pane.factsChanged()
+    for (const pane of linesPanes.values()) pane.invalidate()
   })
   let held = true
   let started = false
@@ -349,6 +420,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
 export function apply(ctx: Context): void {
   const registrations = new RegistrationService(ctx)
   // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
+  ctx.plugin(transcriptFeature)
+  ctx.plugin(composerFeature)
   ctx.plugin(toolCards)
   ctx.plugin(trajectory)
   let parsed: Mode | undefined

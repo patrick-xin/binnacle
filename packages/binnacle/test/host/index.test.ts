@@ -857,3 +857,110 @@ test('ctrl+o opens the trajectory, one line per event with the machinery in it, 
     return rows.some(row => row.includes('fix the build')) && rows.every(row => row.includes('turn 1 begins') === false)
   })
 })
+
+/** A plugin that places lines in a slot, drawing what it is told. */
+const placesLines = (ctx: Context, slot: 'above-composer' | 'below-composer', text: string) =>
+  ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place(slot, { kind: 'lines', draw: () => ({ kind: 'text', text }) }) } })
+
+test('a line placed below the composer is drawn under it on the alternate screen, and disposing its plugin takes it back', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const author = placesLines(ctx, 'below-composer', 'the status')
+  await author
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  assert.deepEqual((await terminal.altScreen()).slice(-4), ['─'.repeat(40), '', '─'.repeat(40), 'the status'])
+  await author.dispose()
+  await until(async () => (await terminal.altScreen()).every(row => row !== 'the status'))
+  assert.deepEqual((await terminal.altScreen()).slice(-3), ['─'.repeat(40), '', '─'.repeat(40)])
+})
+
+test('on the main screen, a line placed below the composer is printed under it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  terminal.write('$ dsh --profile binnacle\r\n')
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  await placesLines(ctx, 'below-composer', 'the status')
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('the status')))
+  assert.deepEqual(await terminal.mainScreen(), ['$ dsh --profile binnacle', '', ' › fix the build', '', '─'.repeat(40), '', '─'.repeat(40), 'the status'])
+})
+
+test('a line placed above the composer is drawn between the transcript and the composer', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesLines(ctx, 'above-composer', 'a hint')
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('a hint')))
+  assert.deepEqual((await terminal.altScreen()).slice(-4), ['a hint', '─'.repeat(40), '', '─'.repeat(40)])
+})
+
+test('two lines placed in one slot are drawn oldest first', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesLines(ctx, 'below-composer', 'placed first')
+  await placesLines(ctx, 'below-composer', 'placed second')
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('placed second')))
+  assert.deepEqual((await terminal.altScreen()).slice(-2), ['placed first', 'placed second'])
+})
+
+test('a line placed below the composer is drawn again as facts arrive', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('below-composer', { kind: 'lines', draw: facts => ({ kind: 'text', text: `${facts.length} facts` }) }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === '1 facts')
+  session.log(prompt(2, 'and the tests'))
+  await until(async () => (await terminal.altScreen()).at(-1) === '2 facts')
+})
+
+test('with lines in the composer\'s place, what is typed is sent nowhere, and ctrl+c still quits', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('composer', { kind: 'lines', draw: () => ({ kind: 'text', text: 'read only' }) }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'read only')
+  assert.equal((await terminal.altScreen()).some(row => row === '─'.repeat(40)), false)
+  terminal.type('hello')
+  terminal.type('\r')
+  await settle()
+  assert.deepEqual(session.sent, [])
+  terminal.type('\x03')
+  await until(() => exits.length > 0)
+  assert.deepEqual(exits, [0])
+})
+
+test('lines placed in the composer\'s place after it is drawn take it, and disposing them gives the composer back, typing and all', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === '─'.repeat(40))
+  const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.place('composer', { kind: 'lines', draw: () => ({ kind: 'text', text: 'read only' }) }) } })
+  await author
+  await until(async () => (await terminal.altScreen()).at(-1) === 'read only')
+  await author.dispose()
+  await until(async () => (await terminal.altScreen()).at(-1) === '─'.repeat(40))
+  terminal.type('hello')
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['hello'])
+})
+
+test('lines whose drawing throws draw what went wrong, naming their registration, and the surface stays up', async () => {
+  const terminal = new XtermTerminal(60, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('below-composer', { kind: 'lines', draw: () => { throw new Error('no model') } }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  await until(async () => (await terminal.altScreen()).at(-1) === '✗ binnacle.place(below-composer) threw: no model')
+  terminal.type('hello')
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['hello'])
+})
