@@ -202,18 +202,21 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     alternate.setLayoutRoot(readBelowComposer(reading))
   }
   // The page as placed: whether binnacle's transcript is in its place, and what sits around the composer and in its
-  // place — binnacle's composer, lines, or nothing. Each lines placement is drawn by a pane of its own, kept while it stands.
-  const linesPanes = new Map<Placement, LinesPane>()
+  // place — binnacle's composer, lines, or nothing. Each lines placement in a slot is drawn by a pane of its own, kept
+  // while it stands there, so one placement in two slots is named by each slot when it goes wrong.
+  const linesPanes = new Map<Slot, Map<Placement, LinesPane>>()
   /**
-   * The pane that draws a lines placement, kept for as long as the placement stands.
+   * The pane that draws a lines placement in its slot, kept for as long as the placement stands there.
    * @param slot - where it is placed, to name it by.
    * @param placement - the lines.
    */
   const linesPane = (slot: Slot, placement: Extract<Placement, { readonly kind: 'lines' }>): LinesPane => {
-    const kept = linesPanes.get(placement)
+    const inSlot = linesPanes.get(slot) ?? new Map<Placement, LinesPane>()
+    linesPanes.set(slot, inSlot)
+    const kept = inSlot.get(placement)
     if (kept !== undefined) return kept
     const pane = new LinesPane(`binnacle.place(${slot})`, placement.draw, () => facts, () => registrations.currentTheme)
-    linesPanes.set(placement, pane)
+    inSlot.set(placement, pane)
     return pane
   }
   /** Read the page from the placements as they stand, forgetting the panes of lines no longer placed. */
@@ -227,7 +230,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       below: lines('below-composer'),
     }
     const standing = new Set<Component | undefined>([...arranged.above, arranged.composer, ...arranged.below])
-    for (const [placement, pane] of linesPanes) if (!standing.has(pane)) linesPanes.delete(placement)
+    for (const [slot, panes] of linesPanes) {
+      for (const [placement, pane] of panes) if (!standing.has(pane)) panes.delete(placement)
+      if (panes.size === 0) linesPanes.delete(slot)
+    }
     return arranged
   }
   /** What sits under the transcript's place, top to bottom: the lines above the composer, the composer's place, the lines below it. */
@@ -273,7 +279,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // frame, which draws again what they drew; a change of placements lays the page out again. Placed lines are drawn
   // again at any change.
   const unregister = registrations.onChange((changed) => {
-    for (const pane of linesPanes.values()) pane.invalidate()
+    for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
     if (changed === 'facts') {
       // The whole log is read again, into the same array the placed screens are handed, so they see it as it now stands.
       facts.length = 0
@@ -395,7 +401,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     facts.push(fact)
     transcript.push(fact)
     for (const pane of screenPanes.values()) pane.factsChanged()
-    for (const pane of linesPanes.values()) pane.invalidate()
+    for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
   })
   let held = true
   let started = false

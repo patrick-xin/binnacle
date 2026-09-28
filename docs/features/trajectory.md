@@ -28,4 +28,4 @@ A frame costs what changed, as the transcript's does: the screen is laid out aga
 
 ## Open
 
-- [#17](https://github.com/[REDACTED:pii]/binnacle/issues/17): the turn's own rhythm, drawn on the transcript, may change what a turn is called here.
+- [#17](https://github.com/patrick-xin/binnacle/issues/17): the turn's own rhythm, drawn on the transcript, may change what a turn is called here.
