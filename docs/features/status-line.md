@@ -14,4 +14,4 @@ The status line is a built-in plugin (`binnacle:packages/binnacle/src/plugins/st
 
 ## Open
 
-- [#32](https://github.com/[REDACTED:pii]/binnacle/issues/32): the line names the default model the session opened on, not the live session; a change of model mid-session, usage and cost join when it moves onto the live session.
+- [#32](https://github.com/patrick-xin/binnacle/issues/32): the line names the default model the session opened on, not the live session; a change of model mid-session, usage and cost join when it moves onto the live session.
