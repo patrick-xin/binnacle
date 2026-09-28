@@ -983,3 +983,28 @@ test('the line names whatever dsh\'s default model selects, not a model of binna
   commit()
   await until(async () => (await terminal.altScreen()).at(-1) === 'moonshot/kimi-k2')
 })
+
+test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const selection = { provider: 'first', model: 'old' }
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, selection)
+  selection.provider = 'next'
+  selection.model = 'new'
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'next/new')
+})
+
+test('a change of the default after the session opened does not move the line, for the session still runs what it opened on', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const selection = { provider: 'deepseek', model: 'deepseek-v4' }
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, selection)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  selection.provider = 'moonshot'
+  selection.model = 'kimi-k2'
+  session.log(prompt(2, 'and the tests'))
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('and the tests')))
+  assert.equal((await terminal.altScreen()).at(-1), 'deepseek/deepseek-v4')
+})
