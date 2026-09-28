@@ -5,12 +5,12 @@ description: How a change to binnacle is reviewed before its pull request merges
 
 # Reviewing a change to binnacle
 
-What binds is `AGENTS.md`; this skill is how to check a change against it. A review judges the change against its issue — the durable intent — never against a brief, a commit message or the author's own account of what they did.
+What binds is `AGENTS.md`; this skill is how to check a change against it. A review judges the change against its issue — the durable intent, or the maintainer's words as given to the reviewer where there is no issue — never against a brief, a commit message or the author's own account of what they did.
 
 ## Before reading the diff
 
 1. **Read the issue at the change's base**: what a person can do, the maintainer's decisions, the agreed seams, the behaviours, the records to change, what is out of scope.
-2. **Run it.** From the checkout under review: `pnpm install --frozen-lockfile && pnpm refs && pnpm test && pnpm build`. A red run is the first finding, with its output.
+2. **Run it.** From the checkout under review: `pnpm install --frozen-lockfile && pnpm refs && pnpm test && pnpm build`. A red run is the first finding, with its output. Booting under the real `dsh` is not the reviewer's: a linked worktree cannot make a dsh profile, and `check:boot` runs when the maintainer builds the branch in their own checkout to try it.
 3. **Look at it.** What a person sees is lines: draw the screens the issue's behaviours describe — through the tests' `drawText`, or a probe test you write and throw away — and compare them with the issue, not with the tests the change brought.
 
 ## Reading the diff
@@ -47,7 +47,7 @@ The Sheepdog runs a second reviewer from another model family beside its own rev
 ```sh
 git worktree add --detach /tmp/review-<charge> <tip>
 codex exec --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>.md \
-  "Load the review skill and review this checkout against issue #<n>, from its base <base>. Push nothing; write nothing outside this checkout."
+  "Load the review skill and review this checkout against issue #<n>, from its base <base>. Push nothing; write nothing outside this checkout, where probes and caches are yours."
 git worktree remove --force /tmp/review-<charge>
 ```
 
