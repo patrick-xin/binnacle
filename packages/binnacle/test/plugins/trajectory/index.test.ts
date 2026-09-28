@@ -152,10 +152,10 @@ test('each event is one line, its record folded on it: the line says how much it
   const facts = session()
   const { placed } = await trajectoryOver(facts)
   assert.ok(placed !== undefined)
-  const closed = drawText(componentOf(placed.draw(facts), { expanded: new Set() }), 60)
+  const closed = drawText(componentOf(placed.draw(facts), { toggled: new Set() }), 60)
   assert.deepEqual([closed[1], closed[4], closed[11]], ['0 permission/preset · 8 lines', '1 turn 1 begins · 7 lines', '8 turn 1 ended · completed · 8 lines'])
   assert.equal(closed[6], '3 › fix the build · 11 lines')
-  const opened = drawText(componentOf(placed.draw(facts), { expanded: new Set(['3']) }), 60)
+  const opened = drawText(componentOf(placed.draw(facts), { toggled: new Set(['3']) }), 60)
   assert.deepEqual(opened.slice(6, 10), ['3 › fix the build · show less', '{', '  "kind": "prompt",', '  "seq": 3,'])
 })
 
@@ -164,7 +164,7 @@ test('each line folds its record: a read fact\'s opens to the fact binnacle read
   const { placed } = await trajectoryOver(facts)
   assert.ok(placed !== undefined)
   const opened = (id: string): readonly string[] => {
-    const lines = layout(placed.draw(facts), 60, { expanded: new Set([id]) }).lines.map(line => stripTerminalSequences(line).trimEnd())
+    const lines = layout(placed.draw(facts), 60, { toggled: new Set([id]) }).lines.map(line => stripTerminalSequences(line).trimEnd())
     return lines.slice(lines.findIndex(line => line.startsWith(`${id} `)))
   }
   assert.deepEqual(opened('3').slice(0, 12), [

@@ -6,8 +6,8 @@ const BOUNDS = { focusable: ['tool:c1', 'reasoning:8:0', 'unknown:2'] }
 
 test('expand opens a region, and again folds it', () => {
   const opened = act(initial, { kind: 'invoke', region: 'tool:c1', affordance: 'expand' }, BOUNDS)
-  assert.deepEqual([...opened.expanded], ['tool:c1'])
-  assert.deepEqual([...act(opened, { kind: 'invoke', region: 'tool:c1', affordance: 'expand' }, BOUNDS).expanded], [])
+  assert.deepEqual([...opened.toggled], ['tool:c1'])
+  assert.deepEqual([...act(opened, { kind: 'invoke', region: 'tool:c1', affordance: 'expand' }, BOUNDS).toggled], [])
 })
 
 test('focus moves through what offers something, in screen order, wrapping', () => {
@@ -22,7 +22,7 @@ test('dropping focus keeps what was opened, and leaves a screen with nothing foc
   const focused = act(opened, { kind: 'focus', step: 1 }, BOUNDS)
   const dropped = act(focused, { kind: 'unfocus' }, BOUNDS)
   assert.equal(dropped.focus, undefined)
-  assert.deepEqual([...dropped.expanded], ['tool:c1'])
+  assert.deepEqual([...dropped.toggled], ['tool:c1'])
   assert.equal(act(initial, { kind: 'unfocus' }, BOUNDS), initial)
 })
 

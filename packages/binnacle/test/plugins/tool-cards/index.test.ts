@@ -62,7 +62,7 @@ const returned = (text: string): Extract<Fact, { readonly kind: 'result' }> => r
  * @returns its lines.
  */
 const lines = (node: Node): string[] =>
-  layout(node, 40, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  layout(node, 40, { toggled: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
 
 /** What a call returned, having failed, as it lands in the log. */
 const failed = (callId: string): Extract<Fact, { readonly kind: 'result' }> => ({

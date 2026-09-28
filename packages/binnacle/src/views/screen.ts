@@ -140,9 +140,9 @@ export function screens(): DrawScreen {
     const laid = drawing.laid
     // The layout is kept against all of the state layout reads: the width, which folds are open, and focus, which draws its own row.
     const focus = state.focus !== undefined && drawing.regions.includes(state.focus) ? state.focus : undefined
-    if (laid?.width === width && laid.theme === theme && drawing.folds.every((id, index) => state.expanded.has(id) === laid.open[index]) && laid.focus === focus) return laid.frame
+    if (laid?.width === width && laid.theme === theme && drawing.folds.every((id, index) => state.toggled.has(id) === laid.open[index]) && laid.focus === focus) return laid.frame
     const frame = layout(drawing.node, width, state, theme)
-    drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.expanded.has(id)), focus, frame } })
+    drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.toggled.has(id)), focus, frame } })
     return frame
   }
   return (model, state, width, views = new Map(), theme = binnacleTheme) => {

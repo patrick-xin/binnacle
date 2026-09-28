@@ -11,8 +11,8 @@ import type { Mark, Theme, Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
-  /** The ids of the regions a person expanded, each scoped to the entry that drew it. */
-  readonly expanded: ReadonlySet<string>
+  /** The ids of the folds a person toggled from how they start — open where they start folded, folded where they start open — each scoped to the entry that drew it. */
+  readonly toggled: ReadonlySet<string>
   /** The id of the focused region, if any. */
   readonly focus?: string
 }
@@ -201,7 +201,7 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
       if (cut <= 0) return { lines: [...title, ...frame.lines], regions: below }
       const label = theme.words.show(cut)
       const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
-      if (state.expanded.has(node.id)) {
+      if (state.toggled.has(node.id)) {
         const away = node.rows === 0 ? theme.words.away : theme.words.to(node.rows)
         const open = { id: node.id, affordances: [{ kind: 'expand' as const, label: away }], overflows: false }
         // The heading a fold of no rows answers on: its title saying it can be folded — or, focused, the accent

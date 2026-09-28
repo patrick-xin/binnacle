@@ -9,8 +9,8 @@ import type { Action } from '../contract/index.ts'
 
 /** What a person has changed about the screen. */
 export interface UiState {
-  /** The ids of the regions they expanded, each scoped to the entry that drew it. */
-  readonly expanded: ReadonlySet<string>
+  /** The ids of the folds they toggled from how they start — open where they start folded, folded where they start open — each scoped to the entry that drew it. */
+  readonly toggled: ReadonlySet<string>
   /** The region the keys act on; absent until a person moves focus. */
   readonly focus?: string
 }
@@ -22,7 +22,7 @@ export interface Bounds {
 }
 
 /** The screen before a person has changed anything: everything folded, nothing focused. */
-export const initial: UiState = { expanded: new Set() }
+export const initial: UiState = { toggled: new Set() }
 
 /**
  * What an action does to the screen.
@@ -35,9 +35,9 @@ export function act(state: UiState, action: Action, bounds: Bounds): UiState {
   switch (action.kind) {
     case 'invoke': {
       if (action.affordance !== 'expand') return state
-      const expanded = new Set(state.expanded)
-      if (!expanded.delete(action.region)) expanded.add(action.region)
-      return { ...state, expanded }
+      const toggled = new Set(state.toggled)
+      if (!toggled.delete(action.region)) toggled.add(action.region)
+      return { ...state, toggled }
     }
     case 'focus': {
       const count = bounds.focusable.length
