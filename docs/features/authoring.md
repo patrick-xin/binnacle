@@ -51,6 +51,6 @@ A plugin can place a screen of its own in the transcript's place, opened with a 
 
 - The bindings are data, an effect of the plugin that registered them. Registrations layer by id, the newest over the older, and disposing one gives its ids back to what bound them before. What they leave becomes the table's user bindings in pi-tui's own manager (`pi:packages/tui/src/keybindings.ts#KeybindingsManager`) — never a table of binnacle's — and a registration coming or going rebinds the table and installs it again wherever keys are read.
 - Each affordance kind has a binding, unbound until a person binds one (`binnacle:packages/binnacle/src/ui/keys.ts#AFFORDANCE_BINDINGS`), held to the contract's kinds by a type: a kind added without a binding does not compile (`binnacle:packages/binnacle/src/contract/index.ts#affordances`).
-- A registration that cannot stand — an id no binding has, a key that is no string, two ids brought to one key — is refused where it is registered, saying what to change; what stands, and what a disposal can leave, is [Keys](keys.md)'s.
+- A registration that cannot stand — what is no record of binding ids, an id no binding has, a key that is no string, two ids brought to one key — is refused where it is registered, saying what to change; what stands, and what a disposal can leave, is [Keys](keys.md)'s.
 
 What a person asks for, and what they see, is [Keys](keys.md)'s.

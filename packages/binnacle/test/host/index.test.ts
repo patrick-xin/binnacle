@@ -67,7 +67,9 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
 async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, selection: { readonly provider: string, readonly model: string } = { provider: 'deepseek', model: 'deepseek-v4' }) {
   const exits: number[] = []
   const out: string[] = []
-  let ready: (() => void) | undefined
+  // The launcher's readiness: every listener runs once, in one go, at the commit — as the real one does (`dsh:apps/cli/src/profile-boot.ts#createAppReady`).
+  const listeners = new Set<() => void>()
+  let committed = false
   cmdline.stdout = { write: (chunk: string) => { out.push(chunk); return true } }
   cmdline.stderr = { write: (chunk: string) => { out.push(chunk); return true } }
   host.internals.terminal = () => terminal
@@ -79,14 +81,23 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   provideCmdline(ctx, {
     args,
     exit: code => { exits.push(code) },
-    ready: { onReady: listener => { ready = listener; return () => { ready = undefined } } },
+    ready: {
+      onReady: listener => {
+        if (committed) {
+          listener()
+          return () => {}
+        }
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      },
+    },
   })
   ctx.provide('agents', {} as never)
   // The default model the status line names, as dsh's own selection reads it; a test varies it to prove the line follows the service.
   ctx.provide('agentDefaultModel', { currentSelection: () => selection } as never)
   const fiber = ctx.plugin(host)
   await fiber
-  return { ctx, fiber, exits, out, terminal, session, commit: () => ready?.() }
+  return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
 test('the row is named binnacle and needs the command line, the agents and the default model', () => {
@@ -968,6 +979,19 @@ test('lines whose drawing throws draw what went wrong, naming their registration
   assert.deepEqual(session.sent, ['hello'])
 })
 
+test('one placement in two slots is named by each slot when it goes wrong, not by the first alone', async () => {
+  const terminal = new XtermTerminal(60, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const placement = { kind: 'lines' as const, draw: (): Node => { throw new Error('no model') } }
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('above-composer', placement); author.binnacle.place('below-composer', placement) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const rows = await terminal.altScreen()
+  assert.ok(rows.some(row => row.trim() === '✗ binnacle.place(above-composer) threw: no model'), 'the line above names its own registration')
+  assert.ok(rows.some(row => row.trim() === '✗ binnacle.place(below-composer) threw: no model'), 'the line below names its own registration')
+})
+
 test('out of the box, the line under the composer names the model the session runs, muted', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
@@ -1188,4 +1212,46 @@ test('an approval withdrawn by its signal takes its card back, settled cancelled
   withdraw.abort()
   assert.equal(await outcome, 'cancelled')
   await until(async () => (await terminal.altScreen()).every(row => !row.includes('allow once')))
+})
+
+test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const selection = { provider: 'first', model: 'old' }
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, selection)
+  selection.provider = 'next'
+  selection.model = 'new'
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'next/new')
+})
+
+test('a change of the default after the session opened does not move the line, for the session still runs what it opened on', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const selection = { provider: 'deepseek', model: 'deepseek-v4' }
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, selection)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  selection.provider = 'moonshot'
+  selection.model = 'kimi-k2'
+  session.log(prompt(2, 'and the tests'))
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('and the tests')))
+  assert.equal((await terminal.altScreen()).at(-1), 'deepseek/deepseek-v4')
+})
+
+test('a change of the default while the session is opening does not move the line, for the session runs what it opened on', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const selection = { provider: 'first', model: 'old' }
+  let opened: (() => void) | undefined
+  // The opening stands for openSession: it begins at the commit of startup, reading the selection on that tick, and holds while the agent is created.
+  const opening = new Promise<OpenedSession>(resolve => { opened = () => resolve(session) })
+  const { commit } = await mount([], session, () => opening, terminal, async () => {}, selection)
+  commit()
+  await settle()
+  selection.provider = 'next'
+  selection.model = 'new'
+  opened?.()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  assert.equal((await terminal.altScreen()).at(-1), 'first/old')
 })

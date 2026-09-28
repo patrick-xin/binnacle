@@ -13,6 +13,7 @@
     "typecheck": "tsc -p packages/binnacle/tsconfig.json --noEmit",
     "lint": "oxlint",
     "check:paths": "node scripts/check-paths.mjs",
+    "check:placeholders": "node scripts/check-placeholders.mjs",
     "check:citations": "node scripts/check-citations.mjs",
     "check:links": "node scripts/check-links.mjs",
     "check:pins": "node scripts/check-pins.mjs",
@@ -20,7 +21,7 @@
     "check:layers": "node scripts/check-layers.mjs",
     "check:jsdoc": "node scripts/check-jsdoc.mjs",
     "check:boot": "node scripts/check-boot.mjs",
-    "check": "pnpm run check:paths && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:layers && pnpm run check:jsdoc && pnpm run lint && pnpm run typecheck",
+    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:layers && pnpm run check:jsdoc && pnpm run lint && pnpm run typecheck",
     "test": "pnpm run check && node --test \"scripts/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {
