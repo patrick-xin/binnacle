@@ -49,6 +49,10 @@ export type Node =
     readonly kind: 'card'
     /** One line on its top edge, left off whole where the edge is too narrow for it. */
     readonly title?: string
+    /** The theme's background every line of it is filled with, border included; the terminal's own when absent. */
+    readonly background?: Background
+    /** The theme's tone its border is drawn in; dim when absent. */
+    readonly edge?: Tone
     /** What it holds, inside a rounded border; drawn without one where the width leaves no room inside it. */
     readonly child: Node
   }
@@ -116,8 +120,18 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
       const title = field('title')
       if (title !== undefined && typeof title !== 'string') throw new Error(`a card's title is ${describe(title)}`)
       if (typeof title === 'string' && /[\r\n]/.test(title)) throw new Error('a card\'s title is one line')
+      const background = field('background')
+      const edge = field('edge')
+      if (background !== undefined && (typeof background !== 'string' || !Object.hasOwn(theme.backgrounds, background))) throw new Error(`${describe(background)} is no background`)
+      if (edge !== undefined && (typeof edge !== 'string' || !Object.hasOwn(theme.tones, edge))) throw new Error(`${describe(edge)} is no tone`)
       const child = parseNode(field('child'), theme)
-      return title === undefined ? { kind: 'card', child } : { kind: 'card', title, child }
+      return {
+        kind: 'card',
+        ...title === undefined ? {} : { title },
+        ...background === undefined ? {} : { background: background as Background },
+        ...edge === undefined ? {} : { edge: edge as Tone },
+        child,
+      }
     }
     case 'band': {
       const background = field('background')

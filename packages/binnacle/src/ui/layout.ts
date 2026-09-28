@@ -242,14 +242,15 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
 }
 
 /**
- * Lay a card out: what it holds, inside a rounded border drawn in the theme's dim tone.
+ * Lay a card out: what it holds, inside a rounded border drawn in its edge's tone, dim by default, every line filled with its background when it names one.
  * @returns its lines, and what it holds's regions moved inside the border; what it holds alone where the width leaves no column inside.
  */
 function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const inner = width - 2 * CARD_SIDE
   if (inner < 1) return drawn(node.child, width, state, theme)
   const frame = drawn(node.child, inner, state, theme)
-  const edge = theme.tones.dim
+  const edge = (text: string): string => inTone(text, node.edge ?? 'dim', theme)
+  const fill = node.background === undefined ? undefined : theme.backgrounds[node.background]
   const border = theme.chrome.border
   // A title is left off whole, never cut, where it would leave no rule beside it: a cut title reads as another one.
   const title = node.title !== undefined && visibleWidth(node.title) <= width - 6 ? node.title : undefined
@@ -257,8 +258,9 @@ function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, sta
     ? edge(`${border.topLeft}${border.horizontal.repeat(width - 2)}${border.topRight}`)
     : `${edge(`${border.topLeft}${border.horizontal} `)}${title}${edge(` ${border.horizontal.repeat(width - 5 - visibleWidth(title))}${border.topRight}`)}`
   const body = frame.lines.map(row => `${edge(border.side)} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge(border.side)}`)
+  const lines = [top, ...body, edge(`${border.bottomLeft}${border.horizontal.repeat(width - 2)}${border.bottomRight}`)]
   return {
-    lines: [top, ...body, edge(`${border.bottomLeft}${border.horizontal.repeat(width - 2)}${border.bottomRight}`)],
+    lines: fill === undefined ? lines : lines.map(fill),
     regions: frame.regions.map(placed => ({ ...placed, top: placed.top + 1, left: placed.left + CARD_SIDE })),
   }
 }

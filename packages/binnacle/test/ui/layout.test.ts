@@ -305,3 +305,12 @@ test('a cut fold says what an author\'s theme gives the chrome and the words: it
   const fold = { kind: 'fold', id: 'f', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } } as const
   assert.deepEqual(layout(fold, 20, { expanded: new Set() }, theme).lines.map(line => line.trimEnd()), ['a', '+ 2 hidden lines'])
 })
+
+test('a card may be filled with a background and edged in a tone, both the theme\'s, every line of it filled', () => {
+  const card = { kind: 'card', background: 'prompt', edge: 'accent', child: { kind: 'text', text: 'x' } } as const
+  assert.deepEqual(layout(card, 6, { expanded: new Set() }).lines, [
+    '\x1b[100m\x1b[36m╭────╮\x1b[39m\x1b[49m',
+    '\x1b[100m\x1b[36m│\x1b[39m x  \x1b[36m│\x1b[39m\x1b[49m',
+    '\x1b[100m\x1b[36m╰────╯\x1b[39m\x1b[49m',
+  ])
+})
