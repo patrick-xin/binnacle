@@ -25,7 +25,7 @@ import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiM
 import type { Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
-import { chrome, editorTheme, tones } from '../ui/theme.ts'
+import { editorTheme } from '../ui/theme.ts'
 import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import type { BinnacleKeybindings } from '../ui/keys.ts'
 import { describe } from '../contract/index.ts'
@@ -278,7 +278,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // pi-tui's `tui.altScreen.bottom`, which pi-tui itself — or a click on the label — answers by bringing the end back.
   const jumpToLatest = (): string => {
     const bound = table.manager.getKeys('tui.altScreen.bottom').join(', ')
-    return tones.accent(` ${chrome.jump} Jump to latest · ${bound} `)
+    const theme = registrations.currentTheme
+    return theme.tones.accent(` ${theme.chrome.jump} Jump to latest · ${bound} `)
   }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)
