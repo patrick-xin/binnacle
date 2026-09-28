@@ -406,3 +406,26 @@ test('a slot or a placement binnacle has not is refused, naming what it has', ()
   assert.throws(() => registrations.place('below-composer', { kind: 'status' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function' })
   assert.throws(() => registrations.place('below-composer', { kind: 'lines' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function' })
 })
+
+test('a plugin rebinds a key, the newest registration of a binding wins, and disposing each gives back what was beneath it', async () => {
+  const { registrations, author } = surface()
+  const changes: string[] = []
+  registrations.onChange((changed) => { changes.push(changed) })
+  const first = await author((ctx) => { ctx.binnacle.keys({ 'binnacle.quit': 'ctrl+q', 'binnacle.copy': 'ctrl+y' }) })
+  const second = await author((ctx) => { ctx.binnacle.keys({ 'binnacle.quit': ['ctrl+w', 'f10'] }) })
+  assert.deepEqual(changes, ['keys', 'keys'])
+  assert.deepEqual(registrations.bindings, { 'binnacle.quit': ['ctrl+w', 'f10'], 'binnacle.copy': 'ctrl+y' })
+  await second.dispose()
+  assert.deepEqual(registrations.bindings, { 'binnacle.quit': 'ctrl+q', 'binnacle.copy': 'ctrl+y' })
+  await first.dispose()
+  assert.deepEqual(registrations.bindings, {})
+})
+
+test('a binding binnacle has not, a key that is no key\'s name, or two bindings sharing one key is refused where it is registered, saying what to change', async () => {
+  const { registrations, author } = surface()
+  assert.throws(() => registrations.keys({ 'binnacle.nope': 'ctrl+q' }), { message: 'binnacle.keys: binnacle.nope is no binding; bind one pi-tui or binnacle has, a placed screen\'s binnacle.screen.<name>, or an affordance\'s binnacle.<kind>' })
+  assert.throws(() => registrations.keys({ 'binnacle.quit': 3 } as never), { message: 'binnacle.keys: binnacle.quit is bound to 3; bind it to a key as pi-tui names one, such as ctrl+q, or a list of them' })
+  await author((ctx) => { ctx.binnacle.keys({ 'binnacle.quit': 'ctrl+q' }) })
+  assert.throws(() => registrations.keys({ 'binnacle.screen.trajectory': 'ctrl+q' }), { message: 'binnacle.keys: ctrl+q is bound to both binnacle.quit and binnacle.screen.trajectory; bind one of them to another key' })
+  assert.deepEqual(registrations.bindings, { 'binnacle.quit': 'ctrl+q' })
+})

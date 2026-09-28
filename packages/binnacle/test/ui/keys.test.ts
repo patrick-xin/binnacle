@@ -74,3 +74,17 @@ test('while a placed screen is open it takes the transcript\'s keys: shift+tab s
   assert.deepEqual(table.resolve('\x1b[A', true, true), { kind: 'gesture', binding: 'focus.previous' })
   assert.deepEqual(table.resolve('\r', true, true), { kind: 'gesture', binding: 'primary' })
 })
+
+test('a key a person rebinds resolves as they bound it, and the key it had resolves to nothing', () => {
+  const table = keyTable()
+  table.bind({ 'binnacle.quit': 'ctrl+q' })
+  assert.deepEqual(table.resolve('\x11', false), { kind: 'quit' })
+  assert.deepEqual(table.resolve('\x03', false), undefined)
+})
+
+test('a key bound to what content offers resolves to that affordance while something has focus, and reaches the composer while nothing has', () => {
+  const table = keyTable()
+  table.bind({ 'binnacle.copy': 'ctrl+y' })
+  assert.deepEqual(table.resolve('\x19', true), { kind: 'gesture', binding: 'copy' })
+  assert.deepEqual(table.resolve('\x19', false), undefined)
+})

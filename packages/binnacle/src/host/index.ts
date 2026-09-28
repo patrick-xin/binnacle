@@ -22,13 +22,12 @@ import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
-import type { Component, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
+import type { Component, Keybinding, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
-import { BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
-import type { BinnacleKeybindings } from '../ui/keys.ts'
-import { describe } from '../contract/index.ts'
+import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
+import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
 import { LinesPane } from '../panes/placed.ts'
@@ -84,14 +83,17 @@ const nothing: Component = { render: () => [], invalidate: () => {} }
 type Mode = 'check' | TuiMode
 
 /**
- * The keys as `--help` names them: each binding's keys and what it does, read from the one table, never restated.
+ * The keys as `--help` names them: each of binnacle's bindings and each affordance's, with its keys and what it does,
+ * read from the one table, never restated. dsh parses the command line as the row applies
+ * (`dsh:packages/boot/cmdline/src/index.ts#parseCmdline`), before any plugin has registered, so what plugins offer or
+ * rebind is not here.
  * @returns the help text under its heading.
  */
 function keysHelp(): string {
   const { manager } = keyTable()
-  const named = Object.entries(BINNACLE_BINDINGS).map(([id, definition]) => {
-    const keys = manager.getKeys(id as keyof BinnacleKeybindings).join(', ')
-    return `  ${keys === '' ? '(unbound)' : keys}  ${definition.description ?? ''}`
+  const named = [...Object.keys(BINNACLE_BINDINGS), ...Object.keys(AFFORDANCE_BINDINGS)].map((id) => {
+    const keys = manager.getKeys(id as Keybinding).join(', ')
+    return `  ${keys === '' ? '(unbound)' : keys}  ${manager.getDefinition(id as Keybinding)?.description ?? ''}`
   })
   return `Keys:\n${named.join('\n')}`
 }
@@ -279,7 +281,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       transcript.reset(facts)
       for (const pane of screenPanes.values()) pane.factsChanged()
     } else if (changed === 'screens') offerScreens()
-    else if (changed === 'placements') {
+    else if (changed === 'keys') {
+      table.bind(registrations.bindings)
+      setKeybindings(table.manager)
+    } else if (changed === 'placements') {
       page = arrange()
       stack(tui)
       tui.requestRender()
@@ -295,6 +300,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
   // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()
+  // What a person bound through the registrations, over the defaults, installed wherever keys are read.
+  table.bind(registrations.bindings)
   setKeybindings(table.manager)
   const offered = new Map<string, () => void>()
   /** Take back every key the placed screens offer and offer what they offer now, forgetting panes whose registration went, closing one such, and installing the manager the offers rebuilt. */
@@ -343,6 +350,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       return { consume: true }
     }
     if (resolved !== undefined && reading?.handleKey({ kind: 'key', binding: resolved.binding }) === true) return { consume: true }
+    // A key a person bound to an affordance is answered even where focus offers no such thing: it does nothing there,
+    // and focus stays.
+    if (resolved !== undefined && resolved.binding in affordances) return { consume: true }
     // Stepping out drops focus, and where the main screen parked it, so what was typed is sent, not answered by focus.
     reading?.handleKey({ kind: 'key', binding: 'focus.out' })
     return undefined

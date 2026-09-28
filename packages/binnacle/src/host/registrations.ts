@@ -11,13 +11,15 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
 import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Slot, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
+import { refusedBindings } from '../ui/keys.ts'
 import type { Theme } from '../ui/theme.ts'
 
 /** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, or the theme. */
-export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme'
+export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys'
 
 /** The slots of the page, top to bottom. */
 const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer'] satisfies readonly Slot[]
@@ -48,6 +50,8 @@ export class RegistrationService extends Service implements Registrations {
   private readonly screenTable = new Map<string, readonly PlacedScreen[]>()
   private readonly newestScreens = new Map<string, PlacedScreen>()
   private readonly placementTable = new Map<string, readonly Placement[]>()
+  private readonly bindingTable = new Map<string, readonly Readonly<Record<string, KeyId | readonly KeyId[]>>[]>()
+  private bound: KeybindingsConfig = {}
   private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
   private drawnIn: Theme = binnacleTheme
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
@@ -100,6 +104,19 @@ export class RegistrationService extends Service implements Registrations {
   /** @inheritDoc */
   screen(name: string, screen: PlacedScreen): () => void {
     return this.register(this.screenTable, name, screen, `binnacle.screen(${name})`, 'screens')
+  }
+
+  /** @inheritDoc */
+  keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void {
+    // What the registrations would bind together with this one, checked before it joins them.
+    const refused = refusedBindings(Object.assign({}, this.bound, bindings) as KeybindingsConfig)
+    if (refused !== undefined) throw new Error(`binnacle.keys: ${refused}`)
+    return this.register(this.bindingTable, 'keys', bindings, 'binnacle.keys', 'keys')
+  }
+
+  /** What the registrations bind, by binding id: each id's newest. */
+  get bindings(): KeybindingsConfig {
+    return this.bound
   }
 
   /** @inheritDoc */
@@ -175,6 +192,8 @@ export class RegistrationService extends Service implements Registrations {
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
     // A new theme object each change, so what was kept against the old one is known stale.
+    // Each id bound by the newest registration that binds it, as one config for pi-tui's manager.
+    if (table === 'keys') this.bound = Object.assign({}, ...this.bindingTable.get('keys') ?? []) as KeybindingsConfig
     if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
     for (const listener of this.listeners) listener(table)
   }

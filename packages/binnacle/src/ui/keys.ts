@@ -12,14 +12,18 @@
  */
 
 import { isKeyRepeat, isKeyRelease, KeybindingsManager, TUI_KEYBINDINGS } from '@earendil-works/pi-tui'
-import type { Keybinding, KeybindingDefinition, KeybindingDefinitions } from '@earendil-works/pi-tui'
-import type { KeyBinding } from '../contract/index.ts'
+import type { Keybinding, KeybindingDefinition, KeybindingDefinitions, KeybindingsConfig } from '@earendil-works/pi-tui'
+import { affordances } from '../contract/index.ts'
+import type { AffordanceKind, KeyBinding } from '../contract/index.ts'
 
 /** A key as pi-tui names it, re-exported for the author API: what a plugin offers to open a screen with. */
 export type { KeyId } from '@earendil-works/pi-tui'
 
+/** A binding for each affordance kind, by the kind's name: what a key bound to it invokes on the focused region. */
+type AffordanceKeybindings = { readonly [Kind in AffordanceKind as `binnacle.${Kind}`]: true }
+
 /** binnacle's bindings, merged into pi-tui's table so one manager holds them all. */
-export interface BinnacleKeybindings {
+export interface BinnacleKeybindings extends AffordanceKeybindings {
   'binnacle.quit': true
   'binnacle.switchScreens': true
   'binnacle.stepIn': true
@@ -44,10 +48,25 @@ export const BINNACLE_BINDINGS = {
   'binnacle.switchScreens': { defaultKeys: 'ctrl+t', description: 'switch screens' },
 } as const satisfies KeybindingDefinitions
 
-/** Every binding the table holds: pi-tui's own, then binnacle's. */
+/**
+ * A binding for each affordance kind, unbound until a person binds it: a key bound to one invokes that affordance on
+ * the focused region where it is offered (ADR 1). Every kind the contract has must be here, or this does not compile.
+ */
+export const AFFORDANCE_BINDINGS: { readonly [Kind in AffordanceKind as `binnacle.${Kind}`]: KeybindingDefinition } = {
+  'binnacle.expand': { defaultKeys: [], description: 'open or fold the focused thing' },
+  'binnacle.choose': { defaultKeys: [], description: 'choose the focused option' },
+  'binnacle.open': { defaultKeys: [], description: 'open the focused thing where it leads' },
+  'binnacle.copy': { defaultKeys: [], description: 'copy the focused thing' },
+  'binnacle.answer': { defaultKeys: [], description: 'answer the focused question' },
+  'binnacle.grant': { defaultKeys: [], description: 'grant what the focused thing asks' },
+  'binnacle.dismiss': { defaultKeys: [], description: 'dismiss the focused thing' },
+}
+
+/** Every binding the table holds: pi-tui's own, then binnacle's, then one for each affordance kind. */
 export const KEYBINDINGS = {
   ...TUI_KEYBINDINGS,
   ...BINNACLE_BINDINGS,
+  ...AFFORDANCE_BINDINGS,
 } as const satisfies KeybindingDefinitions
 
 /** What the table resolves a key to: a key gesture's binding, one of the host's own, or a placed screen's. */
@@ -81,6 +100,12 @@ export interface KeyTable {
    * @returns a function that withdraws the offer.
    */
   readonly offer: (name: string, definition: KeybindingDefinition) => () => void
+  /**
+   * Bind keys as a person asked, over the defaults, by binding id; what an earlier call bound and this one leaves out
+   * returns to its default. The manager is rebuilt with them; installing it is the host's.
+   * @param bindings - each binding id, and the key or keys it answers to now.
+   */
+  readonly bind: (bindings: KeybindingsConfig) => void
 }
 
 /**
@@ -90,14 +115,18 @@ export interface KeyTable {
 export function keyTable(): KeyTable {
   const offered = new Map<string, KeybindingDefinition>()
   let manager = new KeybindingsManager(KEYBINDINGS)
-  const rebuild = (): void => {
-    // A new manager is the only way a binding joins the table; what the person rebound is carried to it.
-    manager = new KeybindingsManager({ ...KEYBINDINGS, ...Object.fromEntries(offered) }, manager.getUserBindings())
+  /**
+   * Build the manager again: a new manager is the only way a binding joins the table.
+   * @param bindings - what the person bound, over the defaults.
+   */
+  const rebuild = (bindings: KeybindingsConfig = manager.getUserBindings()): void => {
+    manager = new KeybindingsManager({ ...KEYBINDINGS, ...Object.fromEntries(offered) }, bindings)
   }
   return {
     get manager(): KeybindingsManager {
       return manager
     },
+    bind: (bindings: KeybindingsConfig): void => { rebuild(bindings) },
     offer: (name: string, definition: KeybindingDefinition): () => void => {
       const id = offeredBinding(name)
       offered.set(id, definition)
@@ -125,8 +154,33 @@ export function keyTable(): KeyTable {
         if (manager.matches(data, 'binnacle.focusPrevious')) return { kind: 'gesture', binding: 'focus.previous' }
         if (manager.matches(data, 'binnacle.primary')) return { kind: 'gesture', binding: 'primary' }
         if (manager.matches(data, 'binnacle.stepOut')) return { kind: 'gesture', binding: 'focus.out' }
+        for (const kind of Object.keys(affordances) as AffordanceKind[]) {
+          if (manager.matches(data, `binnacle.${kind}`)) return { kind: 'gesture', binding: kind }
+        }
       }
       return undefined
     },
   }
+}
+
+/**
+ * Why a person's bindings cannot stand, as what to change: an id no binding has, a key that is not a key's name, or
+ * two ids come to share one key. A placed screen's id stands whether or not its screen is placed yet. Two ids sharing
+ * a key is what pi-tui's manager reports as a conflict among a person's bindings, taken from it rather than found again;
+ * whether a string names a key is pi-tui's to say, and it exports nothing that says it, so only a key that is no string
+ * is refused here.
+ * @param bindings - everything a person bound, together.
+ * @returns the reason, or undefined when they stand.
+ */
+export function refusedBindings(bindings: KeybindingsConfig): string | undefined {
+  const screens: Record<string, KeybindingDefinition> = {}
+  for (const [id, keys] of Object.entries(bindings)) {
+    if (id.startsWith(offeredBinding(''))) screens[id] = { defaultKeys: [] }
+    else if (!(id in KEYBINDINGS)) return `${id} is no binding; bind one pi-tui or binnacle has, a placed screen's ${offeredBinding('<name>')}, or an affordance's binnacle.<kind>`
+    const named = Array.isArray(keys) ? keys : [keys]
+    if (named.some(key => typeof key !== 'string')) return `${id} is bound to ${String(keys)}; bind it to a key as pi-tui names one, such as ctrl+q, or a list of them`
+  }
+  const conflict = new KeybindingsManager({ ...KEYBINDINGS, ...screens }, bindings).getConflicts()[0]
+  if (conflict === undefined) return undefined
+  return `${conflict.key} is bound to both ${conflict.keybindings.join(' and ')}; bind one of them to another key`
 }

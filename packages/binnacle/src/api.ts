@@ -137,6 +137,20 @@ export interface Registrations {
    * @throws when the changes name what binnacle cannot draw — a colour not the terminal's, a mark with no glyph — saying by its path what to change.
    */
   theme(changes: ThemeChanges): () => void
+  /**
+   * Bind keys as a person asks, over the defaults, by binding id, in the one
+   * key table everything reads — the composer, the alternate screen and
+   * binnacle's own keys alike. An id is pi-tui's own (`tui.input.submit`),
+   * binnacle's (`binnacle.quit`), a placed screen's (`binnacle.screen.<name>`)
+   * or an affordance kind's (`binnacle.copy`), which is unbound until bound
+   * and invokes that affordance on the focused thing that offers it. What
+   * the registrations bind is laid over the defaults, the newest over the
+   * ones before it, by id; disposing one gives back what it bound.
+   * @param bindings - each binding id, and the key or keys it answers to, as pi-tui names keys.
+   * @returns a disposer, for taking it back before the plugin is disposed.
+   * @throws when an id is none binnacle has, a key is none pi-tui can name, or two ids come to share one key, saying what to change.
+   */
+  keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void
 }
 
 declare module '@deepseek-ai/cordis' {
