@@ -91,6 +91,30 @@ function titleLine(spans: readonly Span[], tone: Tone | undefined): string {
 }
 
 /**
+ * A fold's title as one plain string: each span's text, a mark's glyph, none
+ * of their tones — the title as the accent row a focused fold draws keeps it.
+ * @param spans - the title's spans.
+ * @returns their text, joined.
+ */
+function plainTitle(spans: readonly Span[]): string {
+  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? marks[span.mark].glyph : span.text).join('')
+}
+
+/**
+ * The row a fold's line becomes while it is focused: the chrome's focus
+ * pointer, the fold's title kept on it, and what Enter will do, in accent —
+ * so a person tabbing onto the fold reads what it is and what Enter does,
+ * and focusing it moves nothing.
+ * @param title - the fold's title, as plain text.
+ * @param label - what Enter will do.
+ * @param width - the columns it is given.
+ * @returns the row, wrapped as text is.
+ */
+function focusWithTitle(title: string, label: string, width: number): string[] {
+  return new Text(tones.accent(`${chrome.focus} ${title} ${chrome.separator} ${label}`), 0, 0).render(width)
+}
+
+/**
  * Lay a node out: every string it carries is treated first, so none of it
  * reaches the terminal as a control.
  * @param node - what to draw.
@@ -156,18 +180,27 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
       if (state.expanded.has(node.id)) {
         const away = node.rows === 0 ? words.away : words.to(node.rows)
         const open = { id: node.id, affordances: [{ kind: 'expand' as const, label: away }], overflows: false }
-        const heading = foldsUnder === undefined ? title : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.less}`], node.tone), 0, 0).render(width)
+        // The heading a fold of no rows answers on: its title saying it can be folded — or, focused, the accent
+        // row saying what Enter will do, the title kept on it, so the row a person reads never sits below content
+        // that may run long.
+        const heading = foldsUnder === undefined
+          ? title
+          : state.focus === node.id
+            ? focusWithTitle(plainTitle(foldsUnder), away, width)
+            : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.less}`], node.tone), 0, 0).render(width)
+        // What it holds sits beneath the heading as drawn, which wraps to more rows than the title alone.
+        const underHeading = frame.regions.map(placed => ({ ...placed, top: placed.top + heading.length }))
         const lines = [...heading, ...frame.lines]
         const placed = { region: open, top: 0, height: foldsUnder === undefined ? lines.length : heading.length, left: 0, width }
-        if (state.focus !== node.id) return { lines, regions: [placed, ...below] }
+        if (state.focus !== node.id || foldsUnder !== undefined) return { lines, regions: [placed, ...underHeading] }
         const row = focusRow(away, width)
-        return { lines: [...lines, ...row], regions: [{ ...placed, height: foldsUnder === undefined ? lines.length + row.length : heading.length }, ...below] }
+        return { lines: [...lines, ...row], regions: [{ ...placed, height: lines.length + row.length }, ...underHeading] }
       }
       if (foldsUnder !== undefined) {
         // Folded to nothing under its title, the marker rides the title's line, so the fold costs one line; focused,
-        // that line is the accent row saying what Enter will do, so focusing it moves nothing.
+        // that line is the accent row saying what Enter will do, the title kept on it, so focusing it moves nothing.
         const marker = state.focus === node.id
-          ? focusRow(label, width)
+          ? focusWithTitle(plainTitle(foldsUnder), label, width)
           : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.holds(cut)}`], node.tone), 0, 0).render(width)
         return { lines: marker, regions: [{ region, top: 0, height: marker.length, left: 0, width }] }
       }

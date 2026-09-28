@@ -46,10 +46,10 @@ test('a closed fold of no rows under its title draws one line: its title and wha
   })
 })
 
-test('a focused one says what Enter will do, on that line: the accent row replaces it, so focusing it moves nothing', () => {
+test('a focused one says what Enter will do on that line, its title kept on it in accent, so focusing it moves nothing', () => {
   const frame = layout(quiet, 40, { expanded: new Set(), focus: 'answer:1/reasoning-0' })
-  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['▸ show 5 more lines'])
-  assert.equal(frame.lines[0]?.trimEnd(), '\x1b[36m▸ show 5 more lines\x1b[39m')
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['▸ ∴ thinking · show 5 more lines'])
+  assert.equal(frame.lines[0]?.trimEnd(), '\x1b[36m▸ ∴ thinking · show 5 more lines\x1b[39m')
   assert.deepEqual(frame.regions.map(({ region, top, height }) => [region.id, top, height]), [['answer:1/reasoning-0', 0, 1]])
 })
 
@@ -64,10 +64,24 @@ test('an opened one draws its content under its title, the title saying it can b
   assert.deepEqual(under(regions, 2, 0), [])
 })
 
-test('a focused open fold of no rows draws the accent row beneath its content, saying what Enter will do, and still answers on its title alone', () => {
+test('an open fold whose heading wraps places what it holds beneath the rows it drew, however many', () => {
+  const node = {
+    kind: 'fold',
+    id: 'f',
+    rows: 0,
+    title: [{ text: 'a title long enough to wrap', tone: 'muted' }],
+    child: { kind: 'offer', id: 'held', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'held' } },
+  } as const
+  const frame = layout(node, 12, { expanded: new Set(['f']) })
+  // pi-tui wraps `a title long enough to wrap · show less` at 12 columns onto four rows, the title alone onto three.
+  assert.deepEqual(plain(frame).lines, ['a title long', 'enough to', 'wrap · show', 'less', 'held'])
+  assert.deepEqual(frame.regions.map(({ region, top, height }) => [region.id, top, height]), [['f', 0, 4], ['held', 4, 1]])
+})
+
+test('a focused open fold of no rows says what Enter will do on its title line, titled and in accent, and its content follows', () => {
   const frame = layout(quiet, 40, { expanded: new Set(['answer:1/reasoning-0']), focus: 'answer:1/reasoning-0' })
-  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['∴ thinking · show less', 'one', 'two', 'three', 'four', 'five', '▸ fold it away'])
-  assert.equal(frame.lines[6]?.trimEnd(), '\x1b[36m▸ fold it away\x1b[39m')
+  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['▸ ∴ thinking · fold it away', 'one', 'two', 'three', 'four', 'five'])
+  assert.equal(frame.lines[0]?.trimEnd(), '\x1b[36m▸ ∴ thinking · fold it away\x1b[39m')
   assert.deepEqual(frame.regions.map(({ region, top, height }) => [region.id, top, height]), [['answer:1/reasoning-0', 0, 1]])
 })
 
