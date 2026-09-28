@@ -102,7 +102,7 @@ test('a fold whose content was cut shows its first rows, says what it cut, and o
   })
 })
 
-test('an toggled fold shows everything, and expand folds it back', () => {
+test('an opened fold shows everything, and expand folds it back', () => {
   assert.deepEqual(plain(layout(long, 20, { toggled: new Set(['tool:c1']) })), {
     lines: ['l1', 'l2', 'l3', 'l4'],
     regions: [{ region: { id: 'tool:c1', affordances: [{ kind: 'expand', label: 'fold to 2 lines' }], overflows: false }, top: 0, height: 4, left: 0, width: 20 }],

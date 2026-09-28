@@ -114,7 +114,7 @@ test('the screen over a real session\'s log is the conversation: a prompt band h
     "profile bundle and drawn with pi-tui.",
     "",
     "What is on screen says what can be done with it. A long",
-    "command that was cut can be toggled; one that fits offers",
+    "command that was cut can be expanded; one that fits offers",
     "nothing, and no key or click reaches it. One table gives",
     "every gesture its meaning, so every screen answers the same",
     "way. A dsh preset can run a different tool loop, and an",
