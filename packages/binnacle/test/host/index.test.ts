@@ -65,7 +65,9 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
 async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, selection: { readonly provider: string, readonly model: string } = { provider: 'deepseek', model: 'deepseek-v4' }) {
   const exits: number[] = []
   const out: string[] = []
-  let ready: (() => void) | undefined
+  // The launcher's readiness: every listener runs once, in one go, at the commit — as the real one does (`dsh:apps/cli/src/profile-boot.ts#createAppReady`).
+  const listeners = new Set<() => void>()
+  let committed = false
   cmdline.stdout = { write: (chunk: string) => { out.push(chunk); return true } }
   cmdline.stderr = { write: (chunk: string) => { out.push(chunk); return true } }
   host.internals.terminal = () => terminal
@@ -77,14 +79,23 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   provideCmdline(ctx, {
     args,
     exit: code => { exits.push(code) },
-    ready: { onReady: listener => { ready = listener; return () => { ready = undefined } } },
+    ready: {
+      onReady: listener => {
+        if (committed) {
+          listener()
+          return () => {}
+        }
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      },
+    },
   })
   ctx.provide('agents', {} as never)
   // The default model the status line names, as dsh's own selection reads it; a test varies it to prove the line follows the service.
   ctx.provide('agentDefaultModel', { currentSelection: () => selection } as never)
   const fiber = ctx.plugin(host)
   await fiber
-  return { ctx, fiber, exits, out, terminal, session, commit: () => ready?.() }
+  return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
 test('the row is named binnacle and needs the command line, the agents and the default model', () => {
@@ -1020,4 +1031,21 @@ test('a change of the default after the session opened does not move the line, f
   session.log(prompt(2, 'and the tests'))
   await until(async () => (await terminal.altScreen()).some(row => row.includes('and the tests')))
   assert.equal((await terminal.altScreen()).at(-1), 'deepseek/deepseek-v4')
+})
+
+test('a change of the default while the session is opening does not move the line, for the session runs what it opened on', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const selection = { provider: 'first', model: 'old' }
+  let opened: (() => void) | undefined
+  // The opening stands for openSession: it begins at the commit of startup, reading the selection on that tick, and holds while the agent is created.
+  const opening = new Promise<OpenedSession>(resolve => { opened = () => resolve(session) })
+  const { commit } = await mount([], session, () => opening, terminal, async () => {}, selection)
+  commit()
+  await settle()
+  selection.provider = 'next'
+  selection.model = 'new'
+  opened?.()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  assert.equal((await terminal.altScreen()).at(-1), 'first/old')
 })
