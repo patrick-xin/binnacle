@@ -966,6 +966,19 @@ test('lines whose drawing throws draw what went wrong, naming their registration
   assert.deepEqual(session.sent, ['hello'])
 })
 
+test('one placement in two slots is named by each slot when it goes wrong, not by the first alone', async () => {
+  const terminal = new XtermTerminal(60, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const placement = { kind: 'lines' as const, draw: (): Node => { throw new Error('no model') } }
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('above-composer', placement); author.binnacle.place('below-composer', placement) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const rows = await terminal.altScreen()
+  assert.ok(rows.some(row => row.trim() === '✗ binnacle.place(above-composer) threw: no model'), 'the line above names its own registration')
+  assert.ok(rows.some(row => row.trim() === '✗ binnacle.place(below-composer) threw: no model'), 'the line below names its own registration')
+})
+
 test('out of the box, the line under the composer names the model the session runs, muted', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
