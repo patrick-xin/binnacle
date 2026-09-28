@@ -31,6 +31,7 @@ import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
 import type { Placement, Slot } from '../api.ts'
+import { approvals } from '../plugins/approvals/index.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
 import { statusLine } from '../plugins/status-line/index.ts'
 import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
@@ -452,6 +453,7 @@ export function apply(ctx: Context): void {
   // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
   ctx.plugin(transcriptFeature)
   ctx.plugin(composerFeature)
+  ctx.plugin(approvals)
   ctx.plugin(statusLine)
   ctx.plugin(toolCards)
   ctx.plugin(trajectory)

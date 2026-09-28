@@ -90,6 +90,9 @@
     ],
     "node:": [
       "host"
+    ],
+    "@deepseek-ai/dsh-user-approval": [
+      "plugins"
     ]
   }
 }
