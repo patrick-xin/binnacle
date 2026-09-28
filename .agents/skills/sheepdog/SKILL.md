@@ -33,11 +33,11 @@ You are the Sheepdog: you talk with the maintainer, write the intent, write the 
    ```
 
    Two Charges that touch one file run one after the other.
-4. **Watch**, in the background: `HANDLED="" .agents/skills/sheepdog/scripts/watch.sh`. It exits when a Charge settles or asks; answer a question with `shepherd answer`.
+4. **Watch**, in the background: `HANDLED="" .agents/skills/sheepdog/scripts/watch.sh`. It exits when a Charge settles or asks; answer a question with `shepherd answer`, then run it again with `HANDLED` empty, or a Sheep's next question waits unseen. A question always wakes it, but a Charge you already read and left settled is named in `HANDLED` so it does not.
 5. **Review** when it settles: read the diff against the issue yourself, and start codex's rounds with the Sheep, as the `review` skill's *Running it with codex* says, in the background. Findings you raise yourself go through `shepherd review --charge <name> --finding "…"` and a `herdr agent prompt binnacle-<name> "…"`, all in one round: shepherd holds a reviewer's findings to what it raised first, refusing a new one later (exit 8), so raise everything at once, and re-flag what stands unfixed with `--reflag`. codex's rounds go to the Sheep through herdr alone, never through your ledger. **A usage or rate limit is the maintainer's.** When codex's log warns of one, or codex stops on one, tell the maintainer at once — the round it was on and any finding it had not sent, read from its log, since it writes no report when it stops early — and wait for their word. Never retry it, move it to another model, or finish its round yourself. Decisions codex reports come to you: take them yourself where the issue already decides, or to the maintainer.
 6. **Verify** apart from the Fold: `.agents/skills/sheepdog/scripts/checkout.sh --borrow verify-<name> charge-<name>`, then `pnpm test` there, and draw what the issue's behaviours describe.
 7. **The maintainer tries it.** The dsh profile `binnacle` links the main checkout's built bundle, so build and boot the branch there: `git switch --detach charge-<name> && pnpm build && pnpm check:boot`, and tell them it is ready for `dsh --profile binnacle`. Switch back once they have tried it.
-8. **Open a pull request** from the Sheep's branch, in the template's shape, once both reviews are clean: `shepherd review --charge <name> --clean`, then `git push -u origin charge-<name>` and `gh pr create --head charge-<name> --base main`: name the branch, since yours is not the Sheep's. The maintainer merges, with a merge commit.
+8. **Open a pull request** from the Sheep's branch, in the template's shape, once both reviews are clean — the template's *Reviewed* line carries each review's findings and what answered them, since the reviews live in shepherd's ledger and codex's log, where GitHub cannot see them: `shepherd review --charge <name> --clean`, then `git push -u origin charge-<name>` and `gh pr create --head charge-<name> --base main`: name the branch, since yours is not the Sheep's. The maintainer merges, with a merge commit.
 9. **Retire**: `shepherd retire --charge <name> --delete-branch`, `git pull`, `pnpm build`, remove your checkouts under `/tmp`.
 10. **Book it**: from `main` at the merge, `shepherd book --range <base>..<merge> --charge book-<name> --verify 'pnpm install --frozen-lockfile && pnpm refs'` sends a Booker after what the merge changed, your own work's included. Read its diff against the merged change, and open what it fixed as a pull request of its own.
 11. **Carry the lessons**: each Sheep's and reviewer's closing line goes on the lessons issue as a comment, naming the Charge. A lesson that recurs, or that cost a review round, moves into a skill or `AGENTS.md` in a pull request, and its comment links it.
@@ -46,9 +46,13 @@ You are the Sheepdog: you talk with the maintainer, write the intent, write the 
 
 A question whose answer is in a reference — what dsh's web shows, what pi-tui offers, what an upstream release changed — or why something broke, is a diagnosis Charge, read-only: `shepherd dispatch --as diagnose --charge <name> --brief "<the question, or the symptom and the commit — never your theory>"`. Its `REPORT` goes on the issue it informs as a reading, naming the references. You read the report, not the references: that keeps your context for deciding.
 
+A diagnosis Sheep has no shell: it cannot run `gh` or `pnpm refs`. Dispatch it with `--verify 'pnpm refs'`, so its Fold has the references, and put in the brief what it needs from an issue, since it cannot read one.
+
+A profile names a model that may not be ready under its runtime today, and `dispatch` then refuses, saying the model "does not verify reasoning level". `shepherd capabilities` lists what each runtime has ready; name `--model` and `--thinking` from there.
+
 ## Your own commits
 
-On a branch, never on `main`; red before green; a pull request like any other, reviewed by codex. They end with the attribution trailer your harness gives. A Sheep's carry none.
+On a branch, never on `main`; red before green; a pull request like any other, reviewed by codex. They end with the attribution trailer your harness gives. A Sheep's carry none. Where a privacy tool shows the trailer's address as a placeholder, copy the whole line from an earlier commit (`git log --all --format=%B | grep -m1 '^Co-Authored-By: Claude'`) into the message file, rather than typing it.
 
 ## Keep
 
