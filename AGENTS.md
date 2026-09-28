@@ -10,7 +10,7 @@ Standing orders — the one page here that binds. A record is evidence, never a 
 
 | Command | Does |
 |---|---|
-| `pnpm install && pnpm refs` | install, and fetch every reference into `.refs/` |
+| `pnpm install && pnpm refs` | install, point git at [`.githooks`](.githooks) (a push runs `pnpm test` first), and fetch every reference into `.refs/` |
 | `pnpm test` | every gate, then every test — what CI runs |
 | `pnpm build` | build the bundle into `packages/binnacle/dist/` |
 | `pnpm dsh:profile` | create the `binnacle` dsh profile linking this checkout |
@@ -18,6 +18,8 @@ Standing orders — the one page here that binds. A record is evidence, never a 
 | `dsh --profile binnacle` | run it |
 | `pnpm upstream` | list each release upstream has published past a pin |
 | `pnpm pin <name> <tag>` | move a pin, and every package that follows it |
+
+Agents here work in roles, each with a skill in [`.agents/skills`](.agents/skills): the Sheepdog coordinates (`sheepdog`), a Sheep builds one issue (`sheep`), a reviewer checks a change (`review`), and every change's tests follow `tdd`. Load yours first.
 
 Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.ts`; what each may import is [`layers.json`](packages/binnacle/layers.json), and a gate's error says what to change. What each layer is for, how they connect, and where a change goes is [the package map](packages/binnacle/README.md).
 

@@ -11,7 +11,7 @@ What binds is `AGENTS.md`; this skill is how to check a change against it. A rev
 
 1. **Read the issue at the change's base**: what a person can do, the maintainer's decisions, the agreed seams, the behaviours, the records to change, what is out of scope.
 2. **Run it.** From the checkout under review: `pnpm install --frozen-lockfile && pnpm refs && pnpm test && pnpm build`. A red run is the first finding, with its output. Booting under the real `dsh` is not the reviewer's: a linked worktree cannot make a dsh profile, and `check:boot` runs when the maintainer builds the branch in their own checkout to try it.
-3. **Look at it.** What a person sees is lines: draw the screens the issue's behaviours describe — through the tests' `drawText`, or a probe test you write and throw away — and compare them with the issue, not with the tests the change brought.
+3. **Look at it.** What a person sees is lines: draw the screens the issue's behaviours describe — through the tests' `drawText`, or a probe test you write and throw away — and compare them with the issue, not with the tests the change brought. Draw a changed layout at a width where its lines wrap as well: a region's rows are where a wrapped line goes wrong.
 
 ## Reading the diff
 
@@ -42,16 +42,31 @@ Then a verdict: `clean`, or `findings`. A finding you could not make fail is sai
 
 ## Running it with codex
 
-The Sheepdog runs a second reviewer from another model family beside its own review, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold:
+The Sheepdog runs a second reviewer from another model family, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It reviews a Charge in rounds with the Sheep directly, and reports to the Sheepdog once, at the end. It runs as `gpt-5.6-sol` at high effort, named on every run: codex's own default model may be a heavier one, and a review does not need it.
 
 ```sh
-git worktree add --detach /tmp/review-<charge> <tip>
-codex exec --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>.md \
-  "Load the review skill and review this checkout against issue #<n>, from its base <base>. Push nothing; write nothing outside this checkout, where probes and caches are yours."
+git worktree add --detach /tmp/review-<charge> charge-<charge>
+codex exec -m gpt-5.6-sol -c model_reasoning_effort=high --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>.md \
+  "Load the review skill and review Charge <charge> against issue #<n>, from its base <base>, in rounds with its Sheep. Push nothing; write nothing outside this checkout, where probes and caches are yours."
 git worktree remove --force /tmp/review-<charge>
 ```
 
-Its findings go to the Sheep with the Sheepdog's own, and the pull request says what each reviewer found.
+A temporary directory set inside the checkout (`TMPDIR`) needs `GIT_CEILING_DIRECTORIES` set to the checkout too, or git in a test's own repository finds the checkout around it.
+
+## Rounds with the Sheep
+
+When asked to review a Charge in rounds with its Sheep:
+
+1. **Review** the checkout, as above.
+2. **Send the Sheep its defects**, directly: `herdr agent prompt binnacle-<charge> "<findings>"`, each with where, what, and how it fails, ending "fix each red-first, add commits, and settle DONE again".
+3. **Wait** for it to settle: `herdr agent wait binnacle-<charge> --until done --until idle --until blocked --timeout 3600000`. Blocked means it asked the Sheepdog a question: stop, and report.
+4. **Move to what it committed**, `git checkout --detach charge-<charge>`, and review again: the fixes, and what they touched.
+
+Stop after three rounds, or when a round finds nothing.
+
+**What goes to the Sheep is only a defect against the issue as written**: a bug, a missing or wrong test, a gate, a record left behind. **What is a decision goes to the Sheepdog instead, and never to the Sheep**: work outside the issue's scope, the issue contradicting itself or the code, a choice the issue leaves open, anything that changes the author API beyond what the issue says. You never write in the Sheep's Fold, and never tell it to widen or narrow its scope.
+
+The report to the Sheepdog is the last message: each round's findings and the commit that answered each; what is still open; the decisions it needs, each with a recommendation; a verdict, `clean` or `findings`; and what this skill or the docs lacked.
 
 ## After the review
 
