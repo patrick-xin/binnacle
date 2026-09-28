@@ -172,6 +172,20 @@ test('a theme may start the thinking fold open, and a person\'s toggle folds it 
   assert.deepEqual(lines(new Set(['2/reasoning-0'])), ['∴ thinking · 3 lines'])
 })
 
+test('a theme registration draws and lays out every entry again, so an author changes no view of their own for it', async () => {
+  const { registrations, author } = surface()
+  let calls = 0
+  await author((ctx) => { ctx.binnacle.view('prompt', () => { calls++; return { kind: 'text', text: 'one' } }) })
+  const pane = new TranscriptPane(() => {}, () => registrations.views, {}, () => registrations.currentTheme)
+  pane.push(prompt)
+  const lines = () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['one'])
+  assert.equal(calls, 1)
+  await author((ctx) => { ctx.binnacle.theme({ tones: { accent: { color: 'cyan' } } }) })
+  assert.deepEqual(lines(), ['one'])
+  assert.equal(calls, 2)
+})
+
 test('a kind whose folds the theme starts open draws them open, and a person\'s toggle folds one', async () => {
   const { registrations, author } = surface()
   await author((ctx) => {
