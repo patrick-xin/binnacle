@@ -62,7 +62,7 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
 }
 
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
-async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}) {
+async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, selection: { readonly provider: string, readonly model: string } = { provider: 'deepseek', model: 'deepseek-v4' }) {
   const exits: number[] = []
   const out: string[] = []
   let ready: (() => void) | undefined
@@ -80,7 +80,8 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
     ready: { onReady: listener => { ready = listener; return () => { ready = undefined } } },
   })
   ctx.provide('agents', {} as never)
-  ctx.provide('agentDefaultModel', {} as never)
+  // The default model the status line names, as dsh's own selection reads it; a test varies it to prove the line follows the service.
+  ctx.provide('agentDefaultModel', { currentSelection: () => selection } as never)
   const fiber = ctx.plugin(host)
   await fiber
   return { ctx, fiber, exits, out, terminal, session, commit: () => ready?.() }
@@ -435,7 +436,7 @@ test('shift+tab steps in from the composer, enter opens the focused fold, and a 
 })
 
 test('on the alternate screen, focus brings what it is on into view as it moves up the session', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const logged: SessionEvent[] = []
   for (let entry = 1; entry <= 6; entry++) {
     const seq = entry * 2
@@ -463,7 +464,7 @@ const folded = Array.from({ length: 6 }, (_, index) => {
 }).flat()
 
 test('on the fullscreen, focus scrolled away from the end is said on the last row, naming the key that jumps back, and only then', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession(folded)
   const { commit } = await mount([], session, async () => session, terminal)
   commit()
@@ -476,7 +477,7 @@ test('on the fullscreen, focus scrolled away from the end is said on the last ro
 })
 
 test('the jump label is drawn in the chrome an author\'s theme gives it', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession(folded)
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.theme({ chrome: { jump: 'v' } }) } })
@@ -488,7 +489,7 @@ test('the jump label is drawn in the chrome an author\'s theme gives it', async 
 })
 
 test('the key the label names brings the transcript\'s last line back, following again, and the label goes', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession(folded)
   const { commit } = await mount([], session, async () => session, terminal)
   commit()
@@ -505,7 +506,7 @@ test('the key the label names brings the transcript\'s last line back, following
 })
 
 test('the label names whatever the one key table binds to jump to the end, so a rebinding is named', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession(folded)
   const { commit } = await mount([], session, async () => session, terminal)
   commit()
@@ -542,7 +543,7 @@ test('from the main screen, a fold in a printed entry opens on the fullscreen by
 })
 
 test('focus the main screen could not draw comes back with the fullscreen, drawn', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([prompt(1, 'fix the build'), called(2, 'read'), returned(3, 2, 'w\nx\ny\nz')])
   const { commit } = await mount([], session, async () => session, terminal)
   commit()
@@ -559,7 +560,7 @@ test('focus the main screen could not draw comes back with the fullscreen, drawn
 })
 
 test('focus the fullscreen gives back is brought into view, however far up the session it sits', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const logged: SessionEvent[] = []
   for (let entry = 1; entry <= 6; entry++) logged.push(called(entry * 2, `read${entry}`), returned(entry * 2 + 1, entry * 2, 'w\nx\ny\nz'))
   const session = new FakeSession(logged)
@@ -615,7 +616,7 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
 })
 
 test('the key a plugin offers opens its screen in the transcript\'s place, the composer below it, and the same key returns the transcript as it was', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await placesAScreen(ctx, namedRows(12))
@@ -633,7 +634,7 @@ test('the key a plugin offers opens its screen in the transcript\'s place, the c
 })
 
 test('escape returns to the transcript as it was, its scroll and what it drew unchanged', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession(folded)
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await placesAScreen(ctx, namedRows(12))
@@ -655,7 +656,7 @@ test('escape returns to the transcript as it was, its scroll and what it drew un
 })
 
 test('from the main screen, the offered key opens its screen on the alternate screen, and closing returns to the main screen as it was', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   terminal.write('$ dsh --profile binnacle\r\n')
   const session = new FakeSession([prompt(1, 'one'), prompt(2, 'two'), prompt(3, 'three')])
   const { ctx, commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
@@ -671,7 +672,7 @@ test('from the main screen, the offered key opens its screen on the alternate sc
 })
 
 test('quitting answers on a placed screen, and the session is left printed plain, without it', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([prompt(1, 'one'), prompt(2, 'two'), prompt(3, 'three')])
   const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
   await placesAScreen(ctx, namedRows(12))
@@ -688,7 +689,7 @@ test('quitting answers on a placed screen, and the session is left printed plain
 })
 
 test('disposing the plugin closes its screen if it is open, and takes back its key, which reaches the composer typed', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   const fiber = await placesAScreen(ctx, namedRows(12))
@@ -724,7 +725,7 @@ test('a screen whose drawing throws draws what went wrong, naming its registrati
 })
 
 test('an open placed screen scrolls with the keys the alternate screen answers, from its top', async () => {
-  const terminal = new XtermTerminal(40, 14)
+  const terminal = new XtermTerminal(40, 15)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await placesAScreen(ctx, namedRows(30))
@@ -740,7 +741,7 @@ test('an open placed screen scrolls with the keys the alternate screen answers, 
 })
 
 test('the composer below an open placed screen stays live: a line typed and entered is sent', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await placesAScreen(ctx, namedRows(12))
@@ -755,7 +756,7 @@ test('the composer below an open placed screen stays live: a line typed and ente
 })
 
 test('leaving the alternate screen closes a placed screen open on it, and the transcript returns', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await placesAScreen(ctx, namedRows(12))
@@ -870,10 +871,10 @@ test('a line placed below the composer is drawn under it on the alternate screen
   await author
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  assert.deepEqual((await terminal.altScreen()).slice(-4), ['─'.repeat(40), '', '─'.repeat(40), 'the status'])
+  assert.deepEqual((await terminal.altScreen()).slice(-5), ['─'.repeat(40), '', '─'.repeat(40), 'deepseek/deepseek-v4', 'the status'])
   await author.dispose()
   await until(async () => (await terminal.altScreen()).every(row => row !== 'the status'))
-  assert.deepEqual((await terminal.altScreen()).slice(-3), ['─'.repeat(40), '', '─'.repeat(40)])
+  assert.deepEqual((await terminal.altScreen()).slice(-4), ['─'.repeat(40), '', '─'.repeat(40), 'deepseek/deepseek-v4'])
 })
 
 test('on the main screen, a line placed below the composer is printed under it', async () => {
@@ -884,7 +885,7 @@ test('on the main screen, a line placed below the composer is printed under it',
   await placesLines(ctx, 'below-composer', 'the status')
   commit()
   await until(async () => (await terminal.mainScreen()).some(row => row.includes('the status')))
-  assert.deepEqual(await terminal.mainScreen(), ['$ dsh --profile binnacle', '', ' › fix the build', '', '─'.repeat(40), '', '─'.repeat(40), 'the status'])
+  assert.deepEqual(await terminal.mainScreen(), ['$ dsh --profile binnacle', '', ' › fix the build', '', '─'.repeat(40), '', '─'.repeat(40), 'deepseek/deepseek-v4', 'the status'])
 })
 
 test('a line placed above the composer is drawn between the transcript and the composer', async () => {
@@ -894,7 +895,7 @@ test('a line placed above the composer is drawn between the transcript and the c
   await placesLines(ctx, 'above-composer', 'a hint')
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('a hint')))
-  assert.deepEqual((await terminal.altScreen()).slice(-4), ['a hint', '─'.repeat(40), '', '─'.repeat(40)])
+  assert.deepEqual((await terminal.altScreen()).slice(-5), ['a hint', '─'.repeat(40), '', '─'.repeat(40), 'deepseek/deepseek-v4'])
 })
 
 test('two lines placed in one slot are drawn oldest first', async () => {
@@ -925,7 +926,7 @@ test('with lines in the composer\'s place, what is typed is sent nowhere, and ct
   const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
   await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('composer', { kind: 'lines', draw: () => ({ kind: 'text', text: 'read only' }) }) } })
   commit()
-  await until(async () => (await terminal.altScreen()).at(-1) === 'read only')
+  await until(async () => (await terminal.altScreen()).at(-2) === 'read only')
   assert.equal((await terminal.altScreen()).some(row => row === '─'.repeat(40)), false)
   terminal.type('hello')
   terminal.type('\r')
@@ -941,12 +942,12 @@ test('lines placed in the composer\'s place after it is drawn take it, and dispo
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   commit()
-  await until(async () => (await terminal.altScreen()).at(-1) === '─'.repeat(40))
+  await until(async () => (await terminal.altScreen()).at(-2) === '─'.repeat(40))
   const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.place('composer', { kind: 'lines', draw: () => ({ kind: 'text', text: 'read only' }) }) } })
   await author
-  await until(async () => (await terminal.altScreen()).at(-1) === 'read only')
+  await until(async () => (await terminal.altScreen()).at(-2) === 'read only')
   await author.dispose()
-  await until(async () => (await terminal.altScreen()).at(-1) === '─'.repeat(40))
+  await until(async () => (await terminal.altScreen()).at(-2) === '─'.repeat(40))
   terminal.type('hello')
   terminal.type('\r')
   assert.deepEqual(session.sent, ['hello'])
@@ -963,4 +964,22 @@ test('lines whose drawing throws draw what went wrong, naming their registration
   terminal.type('hello')
   terminal.type('\r')
   assert.deepEqual(session.sent, ['hello'])
+})
+
+test('out of the box, the line under the composer names the model the session runs, muted', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  assert.equal((await terminal.altScreen()).at(-1), 'deepseek/deepseek-v4')
+  assert.ok(terminal.written.includes('\x1b[90mdeepseek/deepseek-v4\x1b[39m'), 'the model is drawn in the muted tone')
+})
+
+test('the line names whatever dsh\'s default model selects, not a model of binnacle\'s own', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, { provider: 'moonshot', model: 'kimi-k2' })
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'moonshot/kimi-k2')
 })

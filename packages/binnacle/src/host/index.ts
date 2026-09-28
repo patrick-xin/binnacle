@@ -34,6 +34,7 @@ import { ScreenPane } from '../panes/screen.ts'
 import { LinesPane } from '../panes/placed.ts'
 import type { Placement, Slot } from '../api.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
+import { statusLine } from '../plugins/status-line/index.ts'
 import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
 import { toolCards } from '../plugins/tool-cards/index.ts'
 import { trajectory } from '../plugins/trajectory/index.ts'
@@ -422,6 +423,7 @@ export function apply(ctx: Context): void {
   // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
   ctx.plugin(transcriptFeature)
   ctx.plugin(composerFeature)
+  ctx.plugin(statusLine)
   ctx.plugin(toolCards)
   ctx.plugin(trajectory)
   let parsed: Mode | undefined

@@ -5,6 +5,7 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 ## Arrive: where am I, and what can I do?
 
 - [Session](features/session.md): open a session with an agent, check one opens, and quit.
+- [Status line](features/status-line.md): the line under the composer, naming the model the session runs.
 
 ## Ask: how do I say it?
 
