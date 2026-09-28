@@ -14,6 +14,7 @@ import { ScreenPane } from '../../../src/panes/screen.ts'
 import { trajectory } from '../../../src/plugins/trajectory/index.ts'
 import { drawText } from '../../../src/ui/draw.ts'
 import { layout } from '../../../src/ui/layout.ts'
+import { componentOf } from '../../support/drawn.ts'
 import { call as callFact, prompt as promptFact, returned as returnedFact } from '../../support/facts.ts'
 import { logged } from '../../support/log.ts'
 
@@ -151,10 +152,10 @@ test('each event is one line, its record folded on it: the line says how much it
   const facts = session()
   const { placed } = await trajectoryOver(facts)
   assert.ok(placed !== undefined)
-  const closed = layout(placed.draw(facts), 60, { expanded: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  const closed = drawText(componentOf(placed.draw(facts), { expanded: new Set() }), 60)
   assert.deepEqual([closed[1], closed[4], closed[11]], ['0 permission/preset · 8 lines', '1 turn 1 begins · 7 lines', '8 turn 1 ended · completed · 8 lines'])
   assert.equal(closed[6], '3 › fix the build · 11 lines')
-  const opened = layout(placed.draw(facts), 60, { expanded: new Set(['3']) }).lines.map(line => stripTerminalSequences(line).trimEnd())
+  const opened = drawText(componentOf(placed.draw(facts), { expanded: new Set(['3']) }), 60)
   assert.deepEqual(opened.slice(6, 10), ['3 › fix the build · show less', '{', '  "kind": "prompt",', '  "seq": 3,'])
 })
 

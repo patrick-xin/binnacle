@@ -6,6 +6,8 @@ import { layout } from '../../src/ui/layout.ts'
 import { drawEntry } from '../../src/views/entries.ts'
 import type { View, Views } from '../../src/views/entries.ts'
 import type { Node } from '../../src/ui/node.ts'
+import { drawText } from '../../src/ui/draw.ts'
+import { componentOf } from '../support/drawn.ts'
 import { prompt as promptFact, call as callFact } from '../support/facts.ts'
 
 /**
@@ -16,6 +18,18 @@ import { prompt as promptFact, call as callFact } from '../support/facts.ts'
  */
 const lines = (entry: Entry, expanded: string[] = []): string[] =>
   layout(drawEntry(entry), 40, { expanded: new Set(expanded) }).lines.map(line => stripTerminalSequences(line).trimEnd())
+
+/**
+ * What an entry draws at a width, as the terminal reads it back: drawn by
+ * `drawText` through the real layout, so a line past the width fails the test.
+ * @param entry - the entry.
+ * @param expanded - the regions a person opened.
+ * @param views - authors' views, as `drawEntry` takes them.
+ * @param width - the columns it is drawn at.
+ * @returns its lines.
+ */
+const seen = (entry: Entry, expanded: string[] = [], views: Views = new Map(), width = 40): string[] =>
+  drawText(componentOf(drawEntry(entry, views), { expanded: new Set(expanded) }), width)
 
 /**
  * What an entry draws at a width, styling and all, each line as it was drawn.
@@ -55,11 +69,11 @@ const answer: Entry = {
 }
 
 test('an answer shows its text, folds its reasoning to one line, and says when it was cut short', () => {
-  assert.deepEqual(lines(answer), ['∴ thinking · 1 line', 'The build', '(interrupted)'])
+  assert.deepEqual(seen(answer), ['∴ thinking · 1 line', 'The build', '(interrupted)'])
 })
 
 test('expanding the reasoning shows it, the line saying it can be folded', () => {
-  assert.deepEqual(lines(answer, ['reasoning-0']), ['∴ thinking · show less', 'the build fails in tsc', 'The build', '(interrupted)'])
+  assert.deepEqual(seen(answer, ['reasoning-0']), ['∴ thinking · show less', 'the build fails in tsc', 'The build', '(interrupted)'])
 })
 
 test('an answer\'s text is drawn as the markdown document it is, in the theme\'s styles', () => {
@@ -181,7 +195,7 @@ test('an answer\'s markdown carrying an escape is drawn without it, in the theme
 
 test('context the person did not type names who added it, one line saying what it holds', () => {
   const entry: Entry = { kind: 'context', fact: { kind: 'context', seq: 0, time: 1, source: 'agent-instructions', blocks: [{ kind: 'text', text: 'AGENTS.md\nsays' }] } }
-  assert.deepEqual(lines(entry), ['⋯ added by agent-instructions · 2 lines'])
+  assert.deepEqual(seen(entry), ['⋯ added by agent-instructions · 2 lines'])
 })
 
 test('a fold\'s title line is muted, marker and all, whoever wrote the content', () => {
@@ -227,25 +241,26 @@ test('a result with no call on screen names the call it answers', () => {
 
 test('an author\'s fold that names the line it folds under draws one line, its marker riding it', () => {
   const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'fold', id: 'mine', rows: 0, title: [{ text: '›', tone: 'accent' }, ' asked'], tone: 'muted', child: { kind: 'text', text: 'one\ntwo' } }) as unknown as Node]]])
+  assert.deepEqual(seen(prompt, [], views, 80), ['› asked · 2 lines'])
   assert.deepEqual(drawnWide(prompt, views), ['\x1b[36m›\x1b[39m\x1b[90m asked · 2 lines\x1b[39m'])
 })
 
 test('a fold\'s title carrying a control sequence is drawn as its text, in its tone', () => {
   const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'fold', id: 'mine', rows: 0, title: [{ text: 'wiped\x1b[2Jclean', tone: 'error' }], child: { kind: 'text', text: 'one' } }) as unknown as Node]]])
+  assert.deepEqual(seen(prompt, [], views, 80), ['wipedclean · 1 line'])
   assert.deepEqual(drawnWide(prompt, views), ['\x1b[31mwipedclean\x1b[39m · 1 line'])
 })
 
 test('a result with no call keeps its title a line of its own above the fold, outside it', () => {
   const entry: Entry = { kind: 'result', fact: { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c9', failed: false, blocks: [{ kind: 'text', text: 'a\nb\nc\nd\ne' }], meta: undefined } }
-  const { lines: drawn, regions } = layout(drawEntry(entry), 40, { expanded: new Set() })
-  assert.deepEqual(drawn.map(line => stripTerminalSequences(line).trimEnd()), ['● result of call c9', 'a', 'b', 'c', '… 2 more lines'])
-  assert.deepEqual(regions.map(({ region, top, height }) => [region.id, top, height]), [['output', 1, 4]])
+  assert.deepEqual(seen(entry), ['● result of call c9', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(layout(drawEntry(entry), 40, { expanded: new Set() }).regions.map(({ region, top, height }) => [region.id, top, height]), [['output', 1, 4]])
 })
 
 test('a kind nothing draws is its type in one line, what it holds beside it, and expand shows the raw record', () => {
   const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'goal/change', record: { type: 'goal/change', data: {} } } }
-  assert.deepEqual(lines(entry), ['? goal/change · 4 lines'])
-  assert.deepEqual(lines(entry, ['record']), ['? goal/change · show less', '{', '  "type": "goal/change",', '  "data": {}', '}'])
+  assert.deepEqual(seen(entry), ['? goal/change · 4 lines'])
+  assert.deepEqual(seen(entry, ['record']), ['? goal/change · show less', '{', '  "type": "goal/change",', '  "data": {}', '}'])
 })
 
 const prompt: Entry = { kind: 'prompt', fact: promptFact(2, 10, 'fix the build') }
@@ -260,12 +275,12 @@ test('an author\'s view that throws is drawn over by the built-in one, which say
 test('an authored fact named as a kind binnacle draws is drawn by the fallback, never by that kind\'s view', () => {
   const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'tool', data: {} } }
   const views = new Map<string, View[]>([['tool', [() => ({ kind: 'text', text: 'a tool card' })]]])
-  assert.deepEqual(drawn(entry, views), ['? tool · 1 line', '✗ tool is a kind binnacle draws; the adapter must give its fact another name'])
+  assert.deepEqual(seen(entry, [], views, 80), ['? tool · 1 line', '✗ tool is a kind binnacle draws; the adapter must give its fact another name'])
 })
 
 test('an unknown fact carrying a problem says it under its one line', () => {
   const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: {}, problem: 'binnacle.facts(test/marker) threw: no fork recorded' } }
-  assert.deepEqual(drawn(entry, new Map()), ['? test/marker · 1 line', '✗ binnacle.facts(test/marker) threw: no fork recorded'])
+  assert.deepEqual(seen(entry, [], new Map(), 80), ['? test/marker · 1 line', '✗ binnacle.facts(test/marker) threw: no fork recorded'])
 })
 
 /** An array of one slot with nothing in it, as a careless view might return. */
@@ -347,5 +362,5 @@ test('data with no JSON and no string form is still drawn, as what it is', () =>
   const cycle: Record<string, unknown> = Object.create(null)
   cycle.self = cycle
   const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'seeded', data: cycle } }
-  assert.deepEqual(layout(drawEntry(entry), 80, { expanded: new Set(['data']) }).lines.map(line => stripTerminalSequences(line).trimEnd()), ['? seeded · show less', 'a value binnacle cannot show'])
+  assert.deepEqual(seen(entry, ['data'], new Map(), 80), ['? seeded · show less', 'a value binnacle cannot show'])
 })

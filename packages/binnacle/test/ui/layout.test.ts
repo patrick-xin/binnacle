@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import { layout, under } from '../../src/ui/layout.ts'
 import type { Frame } from '../../src/ui/layout.ts'
+import { drawText } from '../../src/ui/draw.ts'
+import { componentOf } from '../support/drawn.ts'
 
 const OPEN = { expanded: new Set<string>() }
 
@@ -40,26 +42,26 @@ const quiet = {
 } as const
 
 test('a closed fold of no rows under its title draws one line: its title and what it holds, and offers expand there', () => {
-  assert.deepEqual(plain(layout(quiet, 40, OPEN)), {
-    lines: ['∴ thinking · 5 lines'],
-    regions: [{ region: { id: 'answer:1/reasoning-0', affordances: [{ kind: 'expand', label: 'show 5 more lines' }], overflows: false }, top: 0, height: 1, left: 0, width: 40 }],
-  })
+  assert.deepEqual(drawText(componentOf(quiet, OPEN), 40), ['∴ thinking · 5 lines'])
+  assert.deepEqual(layout(quiet, 40, OPEN).regions, [{ region: { id: 'answer:1/reasoning-0', affordances: [{ kind: 'expand', label: 'show 5 more lines' }], overflows: false }, top: 0, height: 1, left: 0, width: 40 }])
 })
 
-test('a focused one says what Enter will do on that line, its title kept on it in accent, so focusing it moves nothing', () => {
-  const frame = layout(quiet, 40, { expanded: new Set(), focus: 'answer:1/reasoning-0' })
-  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['▸ ∴ thinking · show 5 more lines'])
+test('a focused one says what Enter will do on its own line, its title kept on it in accent', () => {
+  const state = { expanded: new Set<string>(), focus: 'answer:1/reasoning-0' }
+  assert.deepEqual(drawText(componentOf(quiet, state), 40), ['▸ ∴ thinking · show 5 more lines'])
+  const frame = layout(quiet, 40, state)
   assert.equal(frame.lines[0]?.trimEnd(), '\x1b[36m▸ ∴ thinking · show 5 more lines\x1b[39m')
   assert.deepEqual(frame.regions.map(({ region, top, height }) => [region.id, top, height]), [['answer:1/reasoning-0', 0, 1]])
+  // The row is the fold's own line in its place; at a narrow width it wraps to more rows, as any line does.
+  assert.deepEqual(drawText(componentOf(quiet, state), 20), ['▸ ∴ thinking · show', '5 more lines'])
 })
 
 test('an opened one draws its content under its title, the title saying it can be folded, and answers on that line alone', () => {
-  assert.deepEqual(plain(layout(quiet, 40, { expanded: new Set(['answer:1/reasoning-0']) })), {
-    lines: ['∴ thinking · show less', 'one', 'two', 'three', 'four', 'five'],
-    regions: [{ region: { id: 'answer:1/reasoning-0', affordances: [{ kind: 'expand', label: 'fold it away' }], overflows: false }, top: 0, height: 1, left: 0, width: 40 }],
-  })
+  const state = { expanded: new Set(['answer:1/reasoning-0']) }
+  assert.deepEqual(drawText(componentOf(quiet, state), 40), ['∴ thinking · show less', 'one', 'two', 'three', 'four', 'five'])
+  assert.deepEqual(layout(quiet, 40, state).regions, [{ region: { id: 'answer:1/reasoning-0', affordances: [{ kind: 'expand', label: 'fold it away' }], overflows: false }, top: 0, height: 1, left: 0, width: 40 }])
   // The region is the title's line alone: a click on the content reaches nothing, a click on the title the fold.
-  const { regions } = layout(quiet, 40, { expanded: new Set(['answer:1/reasoning-0']) })
+  const { regions } = layout(quiet, 40, state)
   assert.deepEqual(under(regions, 0, 0).map(region => region.id), ['answer:1/reasoning-0'])
   assert.deepEqual(under(regions, 2, 0), [])
 })
@@ -74,23 +76,22 @@ test('an open fold whose heading wraps places what it holds beneath the rows it 
   } as const
   const frame = layout(node, 12, { expanded: new Set(['f']) })
   // pi-tui wraps `a title long enough to wrap · show less` at 12 columns onto four rows, the title alone onto three.
-  assert.deepEqual(plain(frame).lines, ['a title long', 'enough to', 'wrap · show', 'less', 'held'])
+  assert.deepEqual(drawText(componentOf(node, { expanded: new Set(['f']) }), 12), ['a title long', 'enough to', 'wrap · show', 'less', 'held'])
   assert.deepEqual(frame.regions.map(({ region, top, height }) => [region.id, top, height]), [['f', 0, 4], ['held', 4, 1]])
 })
 
 test('a focused open fold of no rows says what Enter will do on its title line, titled and in accent, and its content follows', () => {
-  const frame = layout(quiet, 40, { expanded: new Set(['answer:1/reasoning-0']), focus: 'answer:1/reasoning-0' })
-  assert.deepEqual(frame.lines.map(line => stripTerminalSequences(line).trimEnd()), ['▸ ∴ thinking · fold it away', 'one', 'two', 'three', 'four', 'five'])
+  const state = { expanded: new Set(['answer:1/reasoning-0']), focus: 'answer:1/reasoning-0' }
+  assert.deepEqual(drawText(componentOf(quiet, state), 40), ['▸ ∴ thinking · fold it away', 'one', 'two', 'three', 'four', 'five'])
+  const frame = layout(quiet, 40, state)
   assert.equal(frame.lines[0]?.trimEnd(), '\x1b[36m▸ ∴ thinking · fold it away\x1b[39m')
   assert.deepEqual(frame.regions.map(({ region, top, height }) => [region.id, top, height]), [['answer:1/reasoning-0', 0, 1]])
 })
 
 test('a fold that shows rows keeps its marker beneath them, its title above, and is a region over all its rows', () => {
   const node = { ...quiet, rows: 2, child: { kind: 'text', text: 'l1\nl2\nl3\nl4' } } as const
-  assert.deepEqual(plain(layout(node, 40, OPEN)), {
-    lines: ['∴ thinking', 'l1', 'l2', '… 2 more lines'],
-    regions: [{ region: { id: 'answer:1/reasoning-0', affordances: [{ kind: 'expand', label: 'show 2 more lines' }], overflows: false }, top: 0, height: 4, left: 0, width: 40 }],
-  })
+  assert.deepEqual(drawText(componentOf(node, OPEN), 40), ['∴ thinking', 'l1', 'l2', '… 2 more lines'])
+  assert.deepEqual(layout(node, 40, OPEN).regions, [{ region: { id: 'answer:1/reasoning-0', affordances: [{ kind: 'expand', label: 'show 2 more lines' }], overflows: false }, top: 0, height: 4, left: 0, width: 40 }])
 })
 
 test('a fold whose content was cut shows its first rows, says what it cut, and offers expand', () => {
@@ -112,7 +113,8 @@ test('a fold whose content fits offers nothing, so no gesture reaches it', () =>
 })
 
 test('a titled fold whose content fits draws its title above it, and offers nothing', () => {
-  assert.deepEqual(plain(layout({ ...quiet, rows: 1, child: { kind: 'text', text: 'one' } }, 40, OPEN)), { lines: ['∴ thinking', 'one'], regions: [] })
+  assert.deepEqual(drawText(componentOf({ ...quiet, rows: 1, child: { kind: 'text', text: 'one' } }, OPEN), 40), ['∴ thinking', 'one'])
+  assert.deepEqual(layout({ ...quiet, rows: 1, child: { kind: 'text', text: 'one' } }, 40, OPEN).regions, [])
 })
 
 test('the row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing', () => {
