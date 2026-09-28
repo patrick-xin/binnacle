@@ -165,9 +165,9 @@ export interface Theme {
   /** Each mark: its glyph, and the tone it is drawn in. */
   readonly marks: { readonly [name in keyof typeof marks]: { readonly glyph: string, readonly tone: Tone } } & { readonly [name: string]: { readonly glyph: string, readonly tone: Tone } | undefined }
   /** The chrome's glyphs. */
-  readonly chrome: typeof chrome
-  /** What a fold says of itself. */
-  readonly words: typeof words
+  readonly chrome: { readonly [part in Exclude<keyof typeof chrome, 'border'>]: string } & { readonly border: { readonly [piece in keyof typeof chrome.border]: string } }
+  /** What a fold says of itself: what it says of a count of lines, or, for `less` and `away`, what it says. */
+  readonly words: { readonly [word in Exclude<keyof typeof words, 'less' | 'away'>]: (count: number) => string } & { readonly less: string, readonly away: string }
   /** The styles a markdown document is drawn in. */
   readonly markdown: MarkdownTheme
 }
@@ -181,6 +181,14 @@ export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, 
 export interface ThemeChanges {
   /** Tones, by name — binnacle's, or new ones a view may then name: the colour and attributes each is drawn in, replacing how the theme beneath drew it. */
   readonly tones?: { readonly [name: string]: Style }
+  /** Backgrounds, by name — binnacle's, or new ones a band or a card may then be filled with: one of the terminal's sixteen colours. */
+  readonly backgrounds?: { readonly [name: string]: Colour }
+  /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. */
+  readonly chrome?: { readonly focus?: string, readonly cut?: string, readonly separator?: string, readonly jump?: string, readonly border?: { readonly [piece in keyof typeof chrome.border]?: string } }
+  /**
+   * What a fold says of itself, each a template: `{n}` is the count of lines, and `{lines}` the word for that many (`line` or `lines`). `less` and `away` count nothing.
+   */
+  readonly words?: { readonly [word in keyof typeof words]?: string }
   /** Marks, by name: a glyph, a tone, or both. */
   readonly marks?: { readonly [name: string]: { readonly glyph?: string, readonly tone?: Tone } }
 }
@@ -226,6 +234,26 @@ function styled(style: Style): (text: string) => string {
 }
 
 /**
+ * A word's template as a function of a count, as every word of the theme's is, those that count nothing ignoring it.
+ * @param template - the template, `{n}` and `{lines}` in it.
+ * @returns what it says of a count.
+ */
+function counting(template: string): (count: number) => string {
+  return count => template.replaceAll('{n}', String(count)).replaceAll('{lines}', lineWord(count))
+}
+
+/**
+ * What a background fills with: the colour's background code, closed by the default background.
+ * @param colour - the colour.
+ * @returns text filled with it.
+ */
+function filling(colour: Colour): (text: string) => string {
+  const index = colours.indexOf(colour)
+  const code = index < 8 ? 40 + index : 100 + index - 8
+  return text => `\x1b[${code}m${text}\x1b[49m`
+}
+
+/**
  * A theme with changes laid over it, oldest first, each over what the ones before it left.
  * @param base - the theme beneath them.
  * @param changes - each registration's changes, oldest first.
@@ -236,13 +264,29 @@ export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
   for (const change of changes) {
     for (const [name, mark] of Object.entries(change.marks ?? {})) {
       const beneath = marked[name]
-      if (beneath !== undefined && mark !== undefined) marked[name] = { glyph: mark.glyph ?? beneath.glyph, tone: mark.tone ?? beneath.tone }
+      const glyph = mark.glyph ?? beneath?.glyph
+      const tone = mark.tone ?? beneath?.tone
+      if (glyph !== undefined && tone !== undefined) marked[name] = { glyph, tone }
     }
   }
   const toned: Record<string, ((text: string) => string) | undefined> = { ...base.tones }
   for (const change of changes) {
     for (const [name, style] of Object.entries(change.tones ?? {})) if (style !== undefined) toned[name] = styled(style)
   }
+  const filled: Record<string, ((text: string) => string) | undefined> = { ...base.backgrounds }
+  for (const change of changes) {
+    for (const [name, colour] of Object.entries(change.backgrounds ?? {})) filled[name] = filling(colour)
+  }
+  let glyphs: Theme['chrome'] = base.chrome
+  let said: Theme['words'] = base.words
+  for (const change of changes) {
+    const { border, ...rest } = change.chrome ?? {}
+    glyphs = { ...glyphs, ...rest, border: { ...glyphs.border, ...border } }
+    for (const [word, template] of Object.entries(change.words ?? {})) {
+      if (template === undefined) continue
+      said = word === 'less' || word === 'away' ? { ...said, [word]: template } : { ...said, [word]: counting(template) }
+    }
+  }
   const tonesNow = toned as Theme['tones']
-  return { ...base, tones: tonesNow, marks: marked as Theme['marks'], markdown: markdownIn(tonesNow) }
+  return { ...base, chrome: glyphs, words: said, tones: tonesNow, backgrounds: filled as Theme['backgrounds'], marks: marked as Theme['marks'], markdown: markdownIn(tonesNow) }
 }

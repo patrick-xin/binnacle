@@ -289,3 +289,19 @@ test('a tone an author\'s theme recolours draws in the colour it names, one of t
   assert.deepEqual(layout({ kind: 'text', text: 'hi', tone: 'accent' }, 10, { expanded: new Set() }, theme).lines, ['\x1b[31mhi\x1b[39m        '])
   assert.deepEqual(layout({ kind: 'text', text: 'hi', tone: 'muted' }, 10, { expanded: new Set() }, theme).lines, ['\x1b[94m\x1b[1mhi\x1b[22m\x1b[39m        '])
 })
+
+test('a band may be filled with a background an author\'s theme adds, one of the terminal\'s sixteen', () => {
+  const theme = themed(binnacleTheme, [{ backgrounds: { failed: 'red' } }])
+  assert.deepEqual(layout({ kind: 'band', background: 'failed', child: { kind: 'text', text: 'x' } }, 5, { expanded: new Set() }, theme).lines, ['\x1b[41m     \x1b[49m', '\x1b[41m x   \x1b[49m', '\x1b[41m     \x1b[49m'])
+})
+
+test('a span may name a mark an author\'s theme adds, drawn in its glyph and tone', () => {
+  const theme = themed(binnacleTheme, [{ marks: { pinned: { glyph: '★', tone: 'warning' } } }])
+  assert.deepEqual(layout({ kind: 'text', text: [{ mark: 'pinned' }, ' kept'] }, 8, { expanded: new Set() }, theme).lines, ['\x1b[33m★\x1b[39m kept  '])
+})
+
+test('a cut fold says what an author\'s theme gives the chrome and the words: its glyph, and a template counting the lines', () => {
+  const theme = themed(binnacleTheme, [{ chrome: { cut: '+' }, words: { cut: '{n} hidden {lines}' } }])
+  const fold = { kind: 'fold', id: 'f', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } } as const
+  assert.deepEqual(layout(fold, 20, { expanded: new Set() }, theme).lines.map(line => line.trimEnd()), ['a', '+ 2 hidden lines'])
+})
