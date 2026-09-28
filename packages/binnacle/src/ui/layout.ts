@@ -6,8 +6,8 @@ import { Box, Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node, Span } from './node.ts'
 import { readable } from './readable.ts'
-import { builtIn } from './theme.ts'
-import type { Theme, Tone } from './theme.ts'
+import { binnacleTheme } from './theme.ts'
+import type { Mark, Theme, Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
@@ -56,6 +56,28 @@ function focusRow(label: string, width: number, theme: Theme): string[] {
 }
 
 /**
+ * Text in a tone of the theme's; as it is, in none. A node is read against the theme it is laid out in, so a tone it names is there — or it is plain.
+ * @param text - the text.
+ * @param tone - the tone, if any.
+ * @param theme - the theme.
+ * @returns the text, styled for the terminal.
+ */
+function inTone(text: string, tone: Tone | undefined, theme: Theme): string {
+  const paint = tone === undefined ? undefined : theme.tones[tone]
+  return paint === undefined ? text : paint(text)
+}
+
+/**
+ * A mark of the theme's; the theme's `unknown` mark for a name it lacks, which a node read against the theme never names.
+ * @param name - the mark's name.
+ * @param theme - the theme.
+ * @returns its glyph and tone.
+ */
+function markIn(name: Mark, theme: Theme): { readonly glyph: string, readonly tone: Tone } {
+  return theme.marks[name] ?? theme.marks.unknown
+}
+
+/**
  * What a text node's spans draw: joined into one line, each span in its tone,
  * a bare span in the node's, a mark's glyph in the mark's tone or the span's
  * own — and adjacent runs in one tone drawn as one, so a line all in one tone
@@ -64,19 +86,19 @@ function focusRow(label: string, width: number, theme: Theme): string[] {
  * @returns its line, styled for the terminal.
  */
 function written(node: Extract<Node, { readonly kind: 'text' }>, theme: Theme): string {
-  if (typeof node.text === 'string') return node.tone === undefined ? node.text : theme.tones[node.tone](node.text)
+  if (typeof node.text === 'string') return inTone(node.text, node.tone, theme)
   const runs: { text: string, tone: Tone | undefined }[] = []
   for (const span of node.text) {
     const run = typeof span === 'string'
       ? { text: span, tone: node.tone }
       : 'mark' in span
-        ? { text: theme.marks[span.mark].glyph, tone: span.tone ?? theme.marks[span.mark].tone }
+        ? { text: markIn(span.mark, theme).glyph, tone: span.tone ?? markIn(span.mark, theme).tone }
         : { text: span.text, tone: span.tone }
     const last = runs.at(-1)
     if (last !== undefined && last.tone === run.tone) last.text += run.text
     else runs.push(run)
   }
-  return runs.map(run => run.tone === undefined ? run.text : theme.tones[run.tone](run.text)).join('')
+  return runs.map(run => inTone(run.text, run.tone, theme)).join('')
 }
 
 /**
@@ -97,7 +119,7 @@ function titleLine(spans: readonly Span[], tone: Tone | undefined, theme: Theme)
  * @returns their text, joined.
  */
 function plainTitle(spans: readonly Span[], theme: Theme): string {
-  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? theme.marks[span.mark].glyph : span.text).join('')
+  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? markIn(span.mark, theme).glyph : span.text).join('')
 }
 
 /**
@@ -124,7 +146,7 @@ function focusWithTitle(title: string, label: string, width: number, theme: Them
  * @param theme - the theme it is drawn in; binnacle's own unless registrations change it.
  * @returns its lines and regions.
  */
-export function layout(node: Node, width: number, state: LayoutState, theme: Theme = builtIn): Frame {
+export function layout(node: Node, width: number, state: LayoutState, theme: Theme = binnacleTheme): Frame {
   return drawn(readable(node), width, state, theme)
 }
 

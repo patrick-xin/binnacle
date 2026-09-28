@@ -28,7 +28,7 @@ import { parseNode } from '../ui/node.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
-import { builtIn } from '../ui/theme.ts'
+import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
 
 /** What the pane reports about the screen it drew, for the host to act on beyond drawing. */
@@ -70,7 +70,7 @@ export class ScreenPane implements Component {
    * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
    * @param theme - the theme as it stands, read at every frame; the screen is laid out again when it changes.
    */
-  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => builtIn) {
+  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme) {
     this.#facts = facts
     this.#theme = theme
     this.#changed = reports.changed ?? (() => {})
@@ -184,7 +184,7 @@ export class ScreenPane implements Component {
       return this.#refused(`binnacle.screen(${name}) threw: ${describe(error)}`)
     }
     try {
-      return parseNode(returned)
+      return parseNode(returned, this.#theme())
     } catch (error) {
       return this.#refused(`binnacle.screen(${name}) returned no drawable node: ${describe(error)}`)
     }

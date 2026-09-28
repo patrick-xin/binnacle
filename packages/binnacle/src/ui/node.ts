@@ -8,8 +8,8 @@
 
 import { affordances, describe } from '../contract/index.ts'
 import type { Affordance } from '../contract/index.ts'
-import { backgrounds, marks, tones } from './theme.ts'
-import type { Background, Mark, Tone } from './theme.ts'
+import { binnacleTheme } from './theme.ts'
+import type { Background, Mark, Theme, Tone } from './theme.ts'
 
 /** One run of a text node's line: its text drawn in the node's tone as a bare string, or in a tone of its own; or one of the theme's marks, whose glyph the theme draws in the mark's tone, or in a tone of the span's own. */
 export type Span = string | { readonly text: string, readonly tone: Tone } | { readonly mark: Mark, readonly tone?: Tone }
@@ -76,10 +76,11 @@ export type Node =
 /**
  * Read a node from code binnacle does not own, copying it into fresh data so nothing of it runs later.
  * @param value - what an author's view returned.
+ * @param theme - the theme it will be drawn in, whose tones, marks and backgrounds are the names it may use.
  * @returns the node, as data.
  * @throws an error saying what is wrong with it, or whatever reading it threw.
  */
-export function parseNode(value: unknown): Node {
+export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
   if (typeof value !== 'object' || value === null) throw new Error(`it is ${value === null ? 'null' : typeof value}`)
   const kind = 'kind' in value ? value.kind : undefined
   const field = (name: string): unknown => name in value ? (value as Record<string, unknown>)[name] : undefined
@@ -90,8 +91,8 @@ export function parseNode(value: unknown): Node {
       const text = field('text')
       const tone = field('tone')
       if (typeof text !== 'string' && !Array.isArray(text)) throw new Error('a text node needs its text')
-      if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(tones, tone))) throw new Error(`${describe(tone)} is no tone`)
-      const read = typeof text === 'string' ? text : Array.from(text, span => spanOf(span))
+      if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(theme.tones, tone))) throw new Error(`${describe(tone)} is no tone`)
+      const read = typeof text === 'string' ? text : Array.from(text, span => spanOf(span, theme))
       return tone === undefined ? { kind: 'text', text: read } : { kind: 'text', text: read, tone: tone as Tone }
     }
     case 'markdown': {
@@ -102,26 +103,26 @@ export function parseNode(value: unknown): Node {
     case 'stack': {
       const children = field('children')
       if (!Array.isArray(children)) throw new Error('a stack needs its children')
-      return { kind: 'stack', children: Array.from(children, child => parseNode(child)) }
+      return { kind: 'stack', children: Array.from(children, child => parseNode(child, theme)) }
     }
     case 'offer': {
       const id = field('id')
       const offered = field('affordances')
       if (typeof id !== 'string') throw new Error('an offer needs an id')
       if (!Array.isArray(offered)) throw new Error('an offer needs its affordances')
-      return { kind: 'offer', id, affordances: Array.from(offered, affordance => affordanceOf(affordance)), child: parseNode(field('child')) }
+      return { kind: 'offer', id, affordances: Array.from(offered, affordance => affordanceOf(affordance)), child: parseNode(field('child'), theme) }
     }
     case 'card': {
       const title = field('title')
       if (title !== undefined && typeof title !== 'string') throw new Error(`a card's title is ${describe(title)}`)
       if (typeof title === 'string' && /[\r\n]/.test(title)) throw new Error('a card\'s title is one line')
-      const child = parseNode(field('child'))
+      const child = parseNode(field('child'), theme)
       return title === undefined ? { kind: 'card', child } : { kind: 'card', title, child }
     }
     case 'band': {
       const background = field('background')
-      if (typeof background !== 'string' || !Object.hasOwn(backgrounds, background)) throw new Error(`${describe(background)} is no background`)
-      return { kind: 'band', background: background as Background, child: parseNode(field('child')) }
+      if (typeof background !== 'string' || !Object.hasOwn(theme.backgrounds, background)) throw new Error(`${describe(background)} is no background`)
+      return { kind: 'band', background: background as Background, child: parseNode(field('child'), theme) }
     }
     case 'fold': {
       const id = field('id')
@@ -130,10 +131,10 @@ export function parseNode(value: unknown): Node {
       const rows = field('rows')
       if (typeof id !== 'string') throw new Error('a fold needs an id')
       if (title !== undefined && !Array.isArray(title)) throw new Error(`a fold's title is ${describe(title)}`)
-      if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(tones, tone))) throw new Error(`${describe(tone)} is no tone`)
+      if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(theme.tones, tone))) throw new Error(`${describe(tone)} is no tone`)
       if (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 0) throw new Error(`a fold's rows are ${describe(rows)}`)
-      const fold: { kind: 'fold', id: string, title?: readonly Span[], tone?: Tone, rows: number, child: Node } = { kind: 'fold', id, rows, child: parseNode(field('child')) }
-      if (title !== undefined) fold.title = Array.from(title, span => spanOf(span))
+      const fold: { kind: 'fold', id: string, title?: readonly Span[], tone?: Tone, rows: number, child: Node } = { kind: 'fold', id, rows, child: parseNode(field('child'), theme) }
+      if (title !== undefined) fold.title = Array.from(title, span => spanOf(span, theme))
       if (tone !== undefined) fold.tone = tone as Tone
       return fold
     }
@@ -145,18 +146,19 @@ export function parseNode(value: unknown): Node {
 /**
  * Read one span of a text node's line.
  * @param value - the span, as returned.
+ * @param theme - the theme whose tones and marks it may name.
  * @returns it, as data.
  * @throws when it is neither a bare string, a text with a tone, nor a mark with a tone; when its mark is no mark or its tone is no tone; or when it names a mark and carries text anyway.
  */
-function spanOf(value: unknown): Span {
+function spanOf(value: unknown, theme: Theme): Span {
   if (typeof value === 'string') return value
   if (typeof value !== 'object' || value === null) throw new Error(`${describe(value)} is no span`)
   const record = value as Record<string, unknown>
   const tone = 'tone' in record ? record.tone : undefined
-  const toned = tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(tones, tone))
+  const toned = tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(theme.tones, tone))
   if ('mark' in record) {
     const mark = record.mark
-    if (typeof mark !== 'string' || !Object.hasOwn(marks, mark)) throw new Error(`${describe(mark)} is no mark`)
+    if (typeof mark !== 'string' || !Object.hasOwn(theme.marks, mark)) throw new Error(`${describe(mark)} is no mark`)
     if (toned) throw new Error(`${describe(tone)} is no tone`)
     if ('text' in record) throw new Error('a span that names a mark carries no text')
     return tone === undefined ? { mark: mark as Mark } : { mark: mark as Mark, tone: tone as Tone }

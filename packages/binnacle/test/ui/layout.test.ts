@@ -5,6 +5,7 @@ import { layout, under } from '../../src/ui/layout.ts'
 import type { Frame } from '../../src/ui/layout.ts'
 import { drawText } from '../../src/ui/draw.ts'
 import { componentOf } from '../support/drawn.ts'
+import { binnacleTheme, themed } from '../../src/ui/theme.ts'
 
 const OPEN = { expanded: new Set<string>() }
 
@@ -281,4 +282,10 @@ test('a document\'s parts are drawn in the theme\'s markdown styles', () => {
   assert.ok(lines[7]?.startsWith('\x1b[2m│ \x1b[22m'), JSON.stringify(lines[7]))
   assert.equal(lines[9], '\x1b[2m```\x1b[22m')
   assert.equal(lines[13], '\x1b[2m' + '─'.repeat(20) + '\x1b[22m')
+})
+
+test('a tone an author\'s theme recolours draws in the colour it names, one of the terminal\'s sixteen', () => {
+  const theme = themed(binnacleTheme, [{ tones: { accent: { color: 'red' }, muted: { color: 'bright-blue', bold: true } } }])
+  assert.deepEqual(layout({ kind: 'text', text: 'hi', tone: 'accent' }, 10, { expanded: new Set() }, theme).lines, ['\x1b[31mhi\x1b[39m        '])
+  assert.deepEqual(layout({ kind: 'text', text: 'hi', tone: 'muted' }, 10, { expanded: new Set() }, theme).lines, ['\x1b[94m\x1b[1mhi\x1b[22m\x1b[39m        '])
 })

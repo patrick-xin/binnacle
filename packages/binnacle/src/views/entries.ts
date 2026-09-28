@@ -11,6 +11,8 @@ import type { Block, Fact } from '../facts/adapt.ts'
 import type { Entry } from '../models/transcript.ts'
 import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
+import { binnacleTheme } from '../ui/theme.ts'
+import type { Theme } from '../ui/theme.ts'
 import type { Node, Span } from '../ui/node.ts'
 
 /**
@@ -91,15 +93,16 @@ const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context
 /**
  * Draw one entry.
  * @param views - authors' views; the newest for the entry's key draws it, and one for a built-in kind builds on or replaces binnacle's.
+ * @param theme - the theme it is drawn in, whose tones, marks and backgrounds are the names a view may use.
  * @returns what it draws, which for a quiet entry no view claims is no lines at all. When an author's view throws or returns no node binnacle can lay out, what the view beneath it draws, saying what went wrong; when an authored fact is named as a built-in kind, the built-in drawing, saying so.
  */
-export function drawEntry(entry: Entry, views: Views = new Map()): Node {
+export function drawEntry(entry: Entry, views: Views = new Map(), theme: Theme = binnacleTheme): Node {
   if (entry.kind === 'authored' && Object.hasOwn(drawnHere, entry.fact.name)) {
     return builtIn(entry, `${entry.fact.name} is a kind binnacle draws; the adapter must give its fact another name`)
   }
   const key = keyOf(entry)
   const stack = views.get(key) ?? []
-  return drawnBy(entry, key, stack, stack.length)
+  return drawnBy(entry, key, stack, stack.length, theme)
 }
 
 /**
@@ -115,20 +118,21 @@ export function keyOf(entry: Entry): string {
  * Draw one entry with the views of its key up to a height, the topmost drawing.
  * @param stack - the key's views, oldest first.
  * @param height - how many of them draw; none is binnacle's own drawing.
+ * @param theme - the theme a view's node is read against.
  * @returns what the topmost draws, or what the one beneath it draws, saying why, when it fails.
  */
-function drawnBy(entry: Entry, key: string, stack: readonly View[], height: number): Node {
+function drawnBy(entry: Entry, key: string, stack: readonly View[], height: number, theme: Theme): Node {
   const view = stack[height - 1]
   if (view === undefined) return builtIn(entry)
-  const beneath = (problem: string): Node => height === 1 ? builtIn(entry, problem) : noted(drawnBy(entry, key, stack, height - 1), problem)
+  const beneath = (problem: string): Node => height === 1 ? builtIn(entry, problem) : noted(drawnBy(entry, key, stack, height - 1, theme), problem)
   let returned: unknown
   try {
-    returned = view(entry, () => drawnBy(entry, key, stack, height - 1))
+    returned = view(entry, () => drawnBy(entry, key, stack, height - 1, theme))
   } catch (error) {
     return beneath(`binnacle.view(${key}) threw: ${describe(error)}`)
   }
   try {
-    return parseNode(returned)
+    return parseNode(returned, theme)
   } catch (error) {
     return beneath(`binnacle.view(${key}) returned no drawable node: ${describe(error)}`)
   }

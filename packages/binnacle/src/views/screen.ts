@@ -13,7 +13,7 @@ import type { Entry, Transcript } from '../models/transcript.ts'
 import { layout } from '../ui/layout.ts'
 import type { Frame, Placed } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
-import { builtIn } from '../ui/theme.ts'
+import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
 import type { UiState } from '../ui/state.ts'
 import { drawEntry, keyOf } from './entries.ts'
@@ -34,6 +34,8 @@ export type DrawScreen = (model: Transcript, state: UiState, width: number, view
 interface Drawing {
   /** The views of its key that drew it, as they stood; none when binnacle's own did. */
   readonly by: readonly View[] | undefined
+  /** The theme its views' nodes were read against: a name one theme gives, another may not. */
+  readonly theme: Theme
   /** What its views returned, its regions scoped to the entry. */
   readonly node: Node
   /** The id of every fold in it, in the order `layout` cuts them. */
@@ -131,9 +133,9 @@ export function screens(): DrawScreen {
   const frameOf = (entry: Entry, state: UiState, width: number, views: Views, theme: Theme): Frame => {
     const by = views.get(keyOf(entry))
     let drawing = drawings.get(entry)
-    if (drawing === undefined || drawing.by !== by) {
-      const node = scopedWithin(drawEntry(entry, views), scopeOf(entry))
-      drawing = { by, node, folds: foldsIn(node), regions: regionsIn(node) }
+    if (drawing === undefined || drawing.by !== by || drawing.theme !== theme) {
+      const node = scopedWithin(drawEntry(entry, views, theme), scopeOf(entry))
+      drawing = { by, theme, node, folds: foldsIn(node), regions: regionsIn(node) }
     }
     const laid = drawing.laid
     // The layout is kept against all of the state layout reads: the width, which folds are open, and focus, which draws its own row.
@@ -143,7 +145,7 @@ export function screens(): DrawScreen {
     drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.expanded.has(id)), focus, frame } })
     return frame
   }
-  return (model, state, width, views = new Map(), theme = builtIn) => {
+  return (model, state, width, views = new Map(), theme = binnacleTheme) => {
     const lines: string[] = []
     const regions: Placed[] = []
     const ends: number[] = []
@@ -175,6 +177,6 @@ export function screens(): DrawScreen {
  * @param theme - the theme it is drawn in.
  * @returns every line, every region on them, and what can take focus.
  */
-export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map(), theme: Theme = builtIn): Screen {
+export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map(), theme: Theme = binnacleTheme): Screen {
   return screens()(transcript(facts), state, width, views, theme)
 }

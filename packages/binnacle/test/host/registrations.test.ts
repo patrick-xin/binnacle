@@ -74,6 +74,16 @@ test('the transcript pane draws in the theme an author registers, and in binnacl
   assert.deepEqual(lines(), ['', ' › fix the build', ''])
 })
 
+test('a view may name a tone its author\'s theme adds, drawn in the colour the theme gives it', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { highlight: { color: 'magenta' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'asked', tone: 'highlight' }))
+  })
+  const facts = [prompt]
+  assert.deepEqual(screen(facts, initial, 10, registrations.views, registrations.currentTheme).lines, ['\x1b[35masked\x1b[39m     '])
+})
+
 /**
  * A pane on the registrations as they stand, holding two prompts an author's view folds alike, and its lines.
  * @param registrations - the surface's registrations.

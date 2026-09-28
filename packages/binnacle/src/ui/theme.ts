@@ -27,8 +27,8 @@ export const tones = {
   error: (text: string): string => `\x1b[31m${text}\x1b[39m`,
 } as const satisfies Record<string, (text: string) => string>
 
-/** A colour of the theme's, by what the content drawn in it means. */
-export type Tone = keyof typeof tones
+/** A colour of the theme's, by what the content drawn in it means: binnacle's own, or one an author's theme adds. */
+export type Tone = keyof typeof tones | (string & {})
 
 /**
  * The theme's backgrounds: what a band is filled with, named by what the
@@ -39,8 +39,8 @@ export const backgrounds = {
   prompt: (text: string): string => `\x1b[100m${text}\x1b[49m`, // what the person sent, headed in a band
 } as const satisfies Record<string, (text: string) => string>
 
-/** A background of the theme's, by what the content drawn on it means. */
-export type Background = keyof typeof backgrounds
+/** A background of the theme's, by what the content drawn on it means: binnacle's own, or one an author's theme adds. */
+export type Background = keyof typeof backgrounds | (string & {})
 
 /**
  * The theme's marks: the glyphs that stand for what a thing is — how a call
@@ -58,8 +58,8 @@ export const marks = {
   unknown: { glyph: '?', tone: 'muted' }, // a kind binnacle has no view for, an author's fact included
 } as const satisfies Record<string, { readonly glyph: string, readonly tone: Tone }>
 
-/** A mark of the theme's, named by what it stands for. */
-export type Mark = keyof typeof marks
+/** A mark of the theme's, named by what it stands for: binnacle's own, or one an author's theme adds. */
+export type Mark = keyof typeof marks | (string & {})
 
 /** The word for a count of lines. */
 const lineWord = (count: number): string => count === 1 ? 'line' : 'lines'
@@ -120,21 +120,30 @@ const attributes = {
  * warning, and a quotation, its border, a rule and a code block's border dim.
  * Nothing is highlighted, so a fenced block's lines are the terminal's own.
  */
-export const markdownTheme: MarkdownTheme = {
-  heading: attributes.bold,
-  link: tones.accent,
-  linkUrl: tones.dim,
-  code: tones.warning,
-  codeBlock: plain,
-  codeBlockBorder: tones.dim,
-  quote: tones.dim,
-  quoteBorder: tones.dim,
-  hr: tones.dim,
-  listBullet: tones.accent,
-  bold: attributes.bold,
-  italic: attributes.italic,
-  underline: attributes.underline,
-  strikethrough: attributes.strikethrough,
+export const markdownTheme: MarkdownTheme = markdownIn(tones)
+
+/**
+ * The markdown theme in a theme's tones, so a document follows a tone an author recolours.
+ * @param toned - the tones.
+ * @returns the markdown theme.
+ */
+function markdownIn(toned: Theme['tones']): MarkdownTheme {
+  return {
+    heading: attributes.bold,
+    link: toned.accent,
+    linkUrl: toned.dim,
+    code: toned.warning,
+    codeBlock: plain,
+    codeBlockBorder: toned.dim,
+    quote: toned.dim,
+    quoteBorder: toned.dim,
+    hr: toned.dim,
+    listBullet: toned.accent,
+    bold: attributes.bold,
+    italic: attributes.italic,
+    underline: attributes.underline,
+    strikethrough: attributes.strikethrough,
+  }
 }
 
 /**
@@ -150,11 +159,11 @@ export const editorTheme: EditorTheme = {
 /** A theme, as drawing reads it: each part of binnacle's own, or as registrations changed it. */
 export interface Theme {
   /** Each tone, drawing text in its colour. */
-  readonly tones: { readonly [name in Tone]: (text: string) => string }
+  readonly tones: { readonly [name in keyof typeof tones]: (text: string) => string } & { readonly [name: string]: ((text: string) => string) | undefined }
   /** Each background, filling a band's lines. */
-  readonly backgrounds: { readonly [name in Background]: (text: string) => string }
+  readonly backgrounds: { readonly [name in keyof typeof backgrounds]: (text: string) => string } & { readonly [name: string]: ((text: string) => string) | undefined }
   /** Each mark: its glyph, and the tone it is drawn in. */
-  readonly marks: { readonly [name in Mark]: { readonly glyph: string, readonly tone: Tone } }
+  readonly marks: { readonly [name in keyof typeof marks]: { readonly glyph: string, readonly tone: Tone } } & { readonly [name: string]: { readonly glyph: string, readonly tone: Tone } | undefined }
   /** The chrome's glyphs. */
   readonly chrome: typeof chrome
   /** What a fold says of itself. */
@@ -164,14 +173,56 @@ export interface Theme {
 }
 
 /** binnacle's own theme, which registrations change. */
-export const builtIn: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme }
+export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme }
 
 /**
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.
  */
 export interface ThemeChanges {
+  /** Tones, by name — binnacle's, or new ones a view may then name: the colour and attributes each is drawn in, replacing how the theme beneath drew it. */
+  readonly tones?: { readonly [name: string]: Style }
   /** Marks, by name: a glyph, a tone, or both. */
-  readonly marks?: { readonly [name in Mark]?: { readonly glyph?: string, readonly tone?: Tone } }
+  readonly marks?: { readonly [name: string]: { readonly glyph?: string, readonly tone?: Tone } }
+}
+
+/** The terminal's sixteen colours, by the names a theme registration gives them, in the order their codes run. */
+export const colours = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'] as const
+
+/** One of the terminal's sixteen colours, so a person's palette decides what it looks like. */
+export type Colour = typeof colours[number]
+
+/** How a tone draws, as data: a colour of the terminal's, and attributes, each drawn inside the colour. */
+export interface Style {
+  /** The colour; the terminal's own foreground when absent. */
+  readonly color?: Colour
+  /** Drawn bold. */
+  readonly bold?: boolean
+  /** Drawn dim. */
+  readonly dim?: boolean
+  /** Drawn in italics. */
+  readonly italic?: boolean
+  /** Drawn underlined. */
+  readonly underline?: boolean
+}
+
+/**
+ * What a style draws with: each attribute closed by the parameter that ends it alone, inside the colour, closed by the default foreground.
+ * @param style - the style.
+ * @returns text drawn in it.
+ */
+function styled(style: Style): (text: string) => string {
+  const wraps: ((text: string) => string)[] = []
+  if (style.bold === true) wraps.push(attributes.bold)
+  if (style.dim === true) wraps.push(text => `\x1b[2m${text}\x1b[22m`)
+  if (style.italic === true) wraps.push(attributes.italic)
+  if (style.underline === true) wraps.push(attributes.underline)
+  const colour = style.color
+  if (colour !== undefined) {
+    const index = colours.indexOf(colour)
+    const code = index < 8 ? 30 + index : 90 + index - 8
+    wraps.push(text => `\x1b[${code}m${text}\x1b[39m`)
+  }
+  return text => wraps.reduce((inner, wrap) => wrap(inner), text)
 }
 
 /**
@@ -181,12 +232,17 @@ export interface ThemeChanges {
  * @returns a new theme, even when nothing changed, so what was kept against the old one is stale.
  */
 export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
-  const marked: Record<string, { readonly glyph: string, readonly tone: Tone }> = { ...base.marks }
+  const marked: Record<string, { readonly glyph: string, readonly tone: Tone } | undefined> = { ...base.marks }
   for (const change of changes) {
     for (const [name, mark] of Object.entries(change.marks ?? {})) {
       const beneath = marked[name]
       if (beneath !== undefined && mark !== undefined) marked[name] = { glyph: mark.glyph ?? beneath.glyph, tone: mark.tone ?? beneath.tone }
     }
   }
-  return { ...base, marks: marked as Theme['marks'] }
+  const toned: Record<string, ((text: string) => string) | undefined> = { ...base.tones }
+  for (const change of changes) {
+    for (const [name, style] of Object.entries(change.tones ?? {})) if (style !== undefined) toned[name] = styled(style)
+  }
+  const tonesNow = toned as Theme['tones']
+  return { ...base, tones: tonesNow, marks: marked as Theme['marks'], markdown: markdownIn(tonesNow) }
 }

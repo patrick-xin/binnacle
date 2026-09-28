@@ -4,7 +4,7 @@ import type { Fact } from '../../src/facts/adapt.ts'
 import type { Node } from '../../src/api.ts'
 import { ScreenPane } from '../../src/panes/screen.ts'
 import { drawText } from '../../src/ui/draw.ts'
-import { builtIn, themed } from '../../src/ui/theme.ts'
+import { binnacleTheme, themed } from '../../src/ui/theme.ts'
 import { pointer } from '../support/pointer.ts'
 import { prompt } from '../support/facts.ts'
 
@@ -32,11 +32,11 @@ test('the screen is drawn and laid out again as its facts arrive, and not otherw
 })
 
 test('the screen is drawn in the theme as it stands, and laid out again when it changes', () => {
-  let theme = builtIn
+  let theme = binnacleTheme
   const pane = new ScreenPane(() => [], {}, () => theme)
   pane.place('trajectory', { draw: () => ({ kind: 'text', text: [{ mark: 'prompt' }, ' asked'] }) })
   assert.deepEqual(drawText(pane, 40), ['› asked'])
-  theme = themed(builtIn, [{ marks: { prompt: { glyph: '>' } } }])
+  theme = themed(binnacleTheme, [{ marks: { prompt: { glyph: '>' } } }])
   assert.deepEqual(drawText(pane, 40), ['> asked'])
 })
 

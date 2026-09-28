@@ -12,7 +12,7 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AuthorAdapter, PlacedScreen, Registrations, ThemeChanges, View, Views } from '../api.ts'
-import { builtIn, themed } from '../ui/theme.ts'
+import { binnacleTheme, themed } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
 
 /** What changed in the registrations, for a listener: the adapters, the views, the placed screens, or the theme. */
@@ -26,7 +26,7 @@ export class RegistrationService extends Service implements Registrations {
   private readonly screenTable = new Map<string, readonly PlacedScreen[]>()
   private readonly newestScreens = new Map<string, PlacedScreen>()
   private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
-  private drawnIn: Theme = builtIn
+  private drawnIn: Theme = binnacleTheme
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
 
   /**
@@ -133,7 +133,7 @@ export class RegistrationService extends Service implements Registrations {
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
     // A new theme object each change, so what was kept against the old one is known stale.
-    if (table === 'theme') this.drawnIn = themed(builtIn, this.themeTable.get('theme') ?? [])
+    if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
     for (const listener of this.listeners) listener(table)
   }
 }

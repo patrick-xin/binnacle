@@ -18,7 +18,7 @@ import { under } from '../ui/layout.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { act, initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
-import { builtIn } from '../ui/theme.ts'
+import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
 import type { Views } from '../views/entries.ts'
 import { screens } from '../views/screen.ts'
@@ -64,7 +64,7 @@ export class TranscriptPane implements Component {
    * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
    * @param theme - the theme as it stands, read at every frame; every entry is laid out again when it changes.
    */
-  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => builtIn) {
+  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => binnacleTheme) {
     this.#changed = changed
     this.#views = views
     this.#theme = theme
