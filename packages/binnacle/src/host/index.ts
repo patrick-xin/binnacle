@@ -30,7 +30,7 @@ import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
-import type { Placement, Slot } from '../api.ts'
+import type { Placement, Slot, Surface } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
 import { statusLine } from '../plugins/status-line/index.ts'
@@ -57,11 +57,20 @@ export const internals: {
   stderr: { write(chunk: string): unknown }
   /** Open the session the surface draws. */
   open: (ctx: Context) => Promise<OpenedSession>
+  /** The time, the one place binnacle reads it: now, in milliseconds, and a call back after some. */
+  clock: { now(): number, after(ms: number, then: () => void): () => void }
 } = {
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
   stderr: process.stderr,
   open: openSession,
+  clock: {
+    now: () => Date.now(),
+    after: (ms, then) => {
+      const timer = setTimeout(then, ms)
+      return () => { clearTimeout(timer) }
+    },
+  },
 }
 
 /** The page as placed, read from the placements as they stand. */
@@ -75,6 +84,12 @@ interface Page {
   /** The lines placed below the composer, oldest first. */
   readonly below: readonly Component[]
 }
+
+/** How long a first Ctrl+C waits for a second to quit, in milliseconds. */
+const quitWindow = 3_000
+
+/** How long a notice saying what went wrong stands, in milliseconds. */
+const problemWindow = 5_000
 
 /** What the alternate screen's reading place holds when neither the transcript nor a screen is placed there: nothing, growing. */
 const nothing: Component = { render: () => [], invalidate: () => {} }
@@ -221,7 +236,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       changed: () => { tui.requestRender() },
       invoked: (region, affordance) => { placement.invoke?.(region, affordance) },
     }, () => registrations.currentTheme)
-    pane.place(slot, placement, `binnacle.place(${slot})`)
+    pane.place(slot, { draw: drawn => placement.draw(drawn, surface()) }, `binnacle.place(${slot})`)
     inSlot.set(placement, pane)
     return pane
   }
@@ -302,6 +317,28 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       tui.requestRender()
     } else tui.requestRender()
   })
+  // Where the session stands, as the session reads it live, with the notice the host raises laid over it: what lines
+  // are handed, and drawn again as it changes.
+  let notice: string | undefined
+  const surface = (): Surface => ({ ...session.standing(), ...notice === undefined ? {} : { notice } })
+  const restand = (): void => {
+    for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
+    tui.requestRender()
+  }
+  const unstand = session.onStanding(restand)
+  // A notice stands for its time, and goes; a newer one takes its place.
+  let unraise: (() => void) | undefined
+  let arming: (() => void) | undefined
+  const raise = (text: string, ms: number): void => {
+    unraise?.()
+    notice = text
+    unraise = internals.clock.after(ms, () => {
+      notice = undefined
+      unraise = undefined
+      restand()
+    })
+    restand()
+  }
   const composer = new Editor(reaching(() => tui), editorTheme)
   let page = arrange()
   // A submitted line is the composer placement's to act on: the built-in Composer plugin sends it, through the grant
@@ -309,7 +346,13 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   composer.onSubmit = (text) => {
     composer.setText('')
     const placed = registrations.placed('composer').at(-1)
-    if (placed?.kind === 'composer') placed.submit(text)
+    if (placed?.kind !== 'composer') return
+    // An author's submit is fenced: what it throws is said in a notice, naming its registration, and the surface stays up.
+    try {
+      placed.submit(text)
+    } catch (error) {
+      raise(`binnacle.place(composer) submit threw: ${describe(error)}`, problemWindow)
+    }
   }
   const closeGrants = registrations.open({ send: (text) => { session.send(text) } })
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
@@ -350,7 +393,16 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const reading = seat ?? (open === undefined ? (page.transcript ? transcript : undefined) : open.pane)
     const resolved = table.resolve(data, reading?.focused ?? false, seat === undefined && open !== undefined)
     if (resolved?.kind === 'quit') {
-      quit()
+      // Cancel twice to quit: the first stops a running turn and says what a second does; a second while that is said
+      // quits, and after it the first press is a first again.
+      if (arming !== undefined) {
+        quit()
+        return { consume: true }
+      }
+      if (session.running) session.interrupt()
+      const quitKeys = table.manager.getKeys('binnacle.quit').join(', ')
+      raise(`${quitKeys} again to quit`, quitWindow)
+      arming = internals.clock.after(quitWindow, () => { arming = undefined })
       return { consume: true }
     }
     if (resolved?.kind === 'switch-screens') {
@@ -428,6 +480,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (!held) return
     held = false
     unfollow()
+    unstand()
+    unraise?.()
+    arming?.()
     closeGrants()
     unregister()
     // A placed screen open at the quit is closed first, so the session is left where the person can read it, plain.

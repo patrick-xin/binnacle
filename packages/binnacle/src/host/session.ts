@@ -17,6 +17,10 @@ import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-mod
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { Surface } from '../api.ts'
+
+/** Where the session stands, as the host reads it from the live session; the notice is the host's own. */
+export type SessionStands = Omit<Surface, 'notice'>
 
 /** An open session: what the surface reads from it and sends to it. */
 export interface OpenedSession {
@@ -34,6 +38,14 @@ export interface OpenedSession {
    * @param text - what they typed.
    */
   send(text: string): void
+  /** Where the session stands now: the model it runs, whether a turn runs, and what dsh has measured. */
+  standing(): SessionStands
+  /**
+   * Hear when where the session stands may have changed: as it logs anything.
+   * @param listener - called on each change.
+   * @returns a function that stops listening.
+   */
+  onStanding(listener: () => void): () => void
   /** Whether a turn is running now, as the agent says. */
   readonly running: boolean
   /** Interrupt the running turn, keeping what waits in the agent's inbox, as dsh's web does; with none running, nothing. */
@@ -70,6 +82,8 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
     },
+    standing: () => ({ model: `${selection.provider}/${selection.model}`, running: handle.agent.status === 'running' }),
+    onStanding: listener => ctx.on('session/event', (from) => { if (from === session) listener() }),
     get running() { return handle.agent.status === 'running' },
     interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
     close: () => handle.dispose(),
