@@ -1,0 +1,42 @@
+name: Feature
+description: Something a person or an author cannot do yet.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What a person can do
+      description: What they will be able to do once it lands, from their side of the screen.
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: How it works (the maintainer's decisions)
+      description: What the maintainer decided, each a bullet. Where a decision is widened, reconcile Out of scope in the same edit.
+    validations:
+      required: true
+  - type: textarea
+    id: seams
+    attributes:
+      label: Seams (agreed)
+      description: Where the change is observed from outside — a registration, what a view draws, layout, the gesture table, the host. Proposed until the maintainer agrees them; no test is written at a seam not agreed.
+    validations:
+      required: true
+  - type: textarea
+    id: behaviours
+    attributes:
+      label: Behaviours
+      description: One sentence each, as a person or a caller would say it; each is a test's name.
+    validations:
+      required: true
+  - type: textarea
+    id: records
+    attributes:
+      label: Records
+      description: The feature pages, glossary entries and package-map rows that change with it.
+  - type: textarea
+    id: out
+    attributes:
+      label: Out of scope
+      description: What this does not do, and the issue that does it, if any.
