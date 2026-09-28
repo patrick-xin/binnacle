@@ -41,7 +41,7 @@ function surface() {
  */
 const shown = (registrations: RegistrationService, ...events: SessionEvent[]): string[] => {
   const facts = [prompt, ...events.map(event => adapt(event, registrations.adapters))]
-  return screen(facts, initial, 40, registrations.views).lines.map(line => stripTerminalSequences(line).trimEnd())
+  return screen(facts, initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
 }
 
 test('an author\'s view replaces a built-in one, until the author\'s plugin is disposed', async () => {
@@ -50,6 +50,14 @@ test('an author\'s view replaces a built-in one, until the author\'s plugin is d
     ctx.binnacle.view('prompt', entry => ({ kind: 'text', text: `ME: ${entry.kind === 'prompt' ? entry.fact.blocks.length : 0} block` }))
   })
   assert.deepEqual(shown(registrations), ['ME: 1 block'])
+  await fiber.dispose()
+  assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
+})
+
+test('an author\'s theme draws a mark in its own glyph, until the author\'s plugin is disposed', async () => {
+  const { registrations, author } = surface()
+  const fiber = await author((ctx) => { ctx.binnacle.theme({ marks: { prompt: { glyph: '>' } } }) })
+  assert.deepEqual(shown(registrations), ['', ' > fix the build', ''])
   await fiber.dispose()
   assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
 })

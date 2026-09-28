@@ -13,6 +13,8 @@ import type { Entry, Transcript } from '../models/transcript.ts'
 import { layout } from '../ui/layout.ts'
 import type { Frame, Placed } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
+import { builtIn } from '../ui/theme.ts'
+import type { Theme } from '../ui/theme.ts'
 import type { UiState } from '../ui/state.ts'
 import { drawEntry, keyOf } from './entries.ts'
 import type { View, Views } from './entries.ts'
@@ -26,7 +28,7 @@ export interface Screen extends Frame {
 }
 
 /** Draws one screen after another from the same session. */
-export type DrawScreen = (model: Transcript, state: UiState, width: number, views?: Views) => Screen
+export type DrawScreen = (model: Transcript, state: UiState, width: number, views?: Views, theme?: Theme) => Screen
 
 /** What an entry drew, and how it was last laid out. */
 interface Drawing {
@@ -38,8 +40,8 @@ interface Drawing {
   readonly folds: readonly string[]
   /** The id of every region in it, cut or not. */
   readonly regions: readonly string[]
-  /** Its last layout: at what width, which of `folds` were open, which region in it had focus, and what it drew. */
-  readonly laid?: { readonly width: number, readonly open: readonly boolean[], readonly focus: string | undefined, readonly frame: Frame }
+  /** Its last layout: at what width, in which theme, which of `folds` were open, which region in it had focus, and what it drew. */
+  readonly laid?: { readonly width: number, readonly theme: Theme, readonly open: readonly boolean[], readonly focus: string | undefined, readonly frame: Frame }
 }
 
 /**
@@ -120,12 +122,13 @@ function regionsIn(node: Node): string[] {
  * the entry itself, and against the views of its key, which are replaced as
  * a whole when one is registered, disposed or invalidated; the layout is kept
  * against the width and against which of its folds are open, which is all of
- * the state layout reads.
+ * the state layout reads, and against the theme, which is replaced as a whole
+ * when a theme registration comes or goes.
  * @returns the drawer, holding nothing yet.
  */
 export function screens(): DrawScreen {
   const drawings = new WeakMap<Entry, Drawing>()
-  const frameOf = (entry: Entry, state: UiState, width: number, views: Views): Frame => {
+  const frameOf = (entry: Entry, state: UiState, width: number, views: Views, theme: Theme): Frame => {
     const by = views.get(keyOf(entry))
     let drawing = drawings.get(entry)
     if (drawing === undefined || drawing.by !== by) {
@@ -135,19 +138,19 @@ export function screens(): DrawScreen {
     const laid = drawing.laid
     // The layout is kept against all of the state layout reads: the width, which folds are open, and focus, which draws its own row.
     const focus = state.focus !== undefined && drawing.regions.includes(state.focus) ? state.focus : undefined
-    if (laid?.width === width && drawing.folds.every((id, index) => state.expanded.has(id) === laid.open[index]) && laid.focus === focus) return laid.frame
-    const frame = layout(drawing.node, width, state)
-    drawings.set(entry, { ...drawing, laid: { width, open: drawing.folds.map(id => state.expanded.has(id)), focus, frame } })
+    if (laid?.width === width && laid.theme === theme && drawing.folds.every((id, index) => state.expanded.has(id) === laid.open[index]) && laid.focus === focus) return laid.frame
+    const frame = layout(drawing.node, width, state, theme)
+    drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.expanded.has(id)), focus, frame } })
     return frame
   }
-  return (model, state, width, views = new Map()) => {
+  return (model, state, width, views = new Map(), theme = builtIn) => {
     const lines: string[] = []
     const regions: Placed[] = []
     const ends: number[] = []
     let drew = false
     for (const turn of model.turns) {
       for (const entry of turn.entries) {
-        const frame = frameOf(entry, state, width, views)
+        const frame = frameOf(entry, state, width, views, theme)
         // One blank line separates two entries that draw something, whichever turns they sit in — so a turn's gap falls before its prompt, the first entry it drew. An entry that draws nothing takes none, and a turn every entry of which drew nothing draws no line at all.
         const draws = frame.lines.length > 0
         if (draws && drew) lines.push('')
@@ -169,8 +172,9 @@ export function screens(): DrawScreen {
  * @param state - what the person has changed about the screen.
  * @param width - the columns it is given.
  * @param views - authors' views, as `drawEntry` takes them.
+ * @param theme - the theme it is drawn in.
  * @returns every line, every region on them, and what can take focus.
  */
-export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map()): Screen {
-  return screens()(transcript(facts), state, width, views)
+export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map(), theme: Theme = builtIn): Screen {
+  return screens()(transcript(facts), state, width, views, theme)
 }

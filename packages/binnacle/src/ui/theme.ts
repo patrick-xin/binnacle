@@ -146,3 +146,47 @@ export const editorTheme: EditorTheme = {
   borderColor: tones.dim,
   selectList: { selectedPrefix: tones.accent, selectedText: tones.accent, description: tones.muted, scrollInfo: tones.muted, noMatch: tones.muted },
 }
+
+/** A theme, as drawing reads it: each part of binnacle's own, or as registrations changed it. */
+export interface Theme {
+  /** Each tone, drawing text in its colour. */
+  readonly tones: { readonly [name in Tone]: (text: string) => string }
+  /** Each background, filling a band's lines. */
+  readonly backgrounds: { readonly [name in Background]: (text: string) => string }
+  /** Each mark: its glyph, and the tone it is drawn in. */
+  readonly marks: { readonly [name in Mark]: { readonly glyph: string, readonly tone: Tone } }
+  /** The chrome's glyphs. */
+  readonly chrome: typeof chrome
+  /** What a fold says of itself. */
+  readonly words: typeof words
+  /** The styles a markdown document is drawn in. */
+  readonly markdown: MarkdownTheme
+}
+
+/** binnacle's own theme, which registrations change. */
+export const builtIn: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme }
+
+/**
+ * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.
+ */
+export interface ThemeChanges {
+  /** Marks, by name: a glyph, a tone, or both. */
+  readonly marks?: { readonly [name in Mark]?: { readonly glyph?: string, readonly tone?: Tone } }
+}
+
+/**
+ * A theme with changes laid over it, oldest first, each over what the ones before it left.
+ * @param base - the theme beneath them.
+ * @param changes - each registration's changes, oldest first.
+ * @returns a new theme, even when nothing changed, so what was kept against the old one is stale.
+ */
+export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
+  const marked: Record<string, { readonly glyph: string, readonly tone: Tone }> = { ...base.marks }
+  for (const change of changes) {
+    for (const [name, mark] of Object.entries(change.marks ?? {})) {
+      const beneath = marked[name]
+      if (beneath !== undefined && mark !== undefined) marked[name] = { glyph: mark.glyph ?? beneath.glyph, tone: mark.tone ?? beneath.tone }
+    }
+  }
+  return { ...base, marks: marked as Theme['marks'] }
+}

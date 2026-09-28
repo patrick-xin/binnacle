@@ -8,13 +8,14 @@
 import type { AuthorAdapter, Fact } from './facts/adapt.ts'
 import type { KeyId } from './ui/keys.ts'
 import type { Node } from './ui/node.ts'
+import type { ThemeChanges } from './ui/theme.ts'
 import type { View } from './views/entries.ts'
 
 export type { AuthorAdapter, Fact } from './facts/adapt.ts'
 export type { Entry } from './models/transcript.ts'
 export type { KeyId } from './ui/keys.ts'
 export type { Mark } from './ui/theme.ts'
-export type { Background } from './ui/theme.ts'
+export type { Background, ThemeChanges } from './ui/theme.ts'
 export type { Node } from './ui/node.ts'
 export type { View, Views } from './views/entries.ts'
 
@@ -81,6 +82,17 @@ export interface Registrations {
    * @returns a disposer, for taking it back before the plugin is disposed.
    */
   screen(name: string, screen: PlacedScreen): () => void
+  /**
+   * Change the theme everything is drawn in — a mark's glyph or tone, and the
+   * rest of the theme as it joins — without drawing anything again yourself.
+   * The changes are data: what they name is laid over the theme beneath, the
+   * newest registration over the ones before it, and what they leave out
+   * stays as it was. Disposing one gives back what it changed, and every
+   * entry is drawn again in the theme that is left.
+   * @param changes - what to change.
+   * @returns a disposer, for taking it back before the plugin is disposed.
+   */
+  theme(changes: ThemeChanges): () => void
 }
 
 declare module '@deepseek-ai/cordis' {

@@ -6,8 +6,8 @@ import { Box, Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node, Span } from './node.ts'
 import { readable } from './readable.ts'
-import { backgrounds, chrome, markdownTheme, marks, tones, words } from './theme.ts'
-import type { Tone } from './theme.ts'
+import { builtIn } from './theme.ts'
+import type { Theme, Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
@@ -51,8 +51,8 @@ export interface Frame {
  * @param width - the columns it is given.
  * @returns the row, wrapped as text is.
  */
-function focusRow(label: string, width: number): string[] {
-  return new Text(tones.accent(`${chrome.focus} ${label}`), 0, 0).render(width)
+function focusRow(label: string, width: number, theme: Theme): string[] {
+  return new Text(theme.tones.accent(`${theme.chrome.focus} ${label}`), 0, 0).render(width)
 }
 
 /**
@@ -63,20 +63,20 @@ function focusRow(label: string, width: number): string[] {
  * @param node - the text node.
  * @returns its line, styled for the terminal.
  */
-function written(node: Extract<Node, { readonly kind: 'text' }>): string {
-  if (typeof node.text === 'string') return node.tone === undefined ? node.text : tones[node.tone](node.text)
+function written(node: Extract<Node, { readonly kind: 'text' }>, theme: Theme): string {
+  if (typeof node.text === 'string') return node.tone === undefined ? node.text : theme.tones[node.tone](node.text)
   const runs: { text: string, tone: Tone | undefined }[] = []
   for (const span of node.text) {
     const run = typeof span === 'string'
       ? { text: span, tone: node.tone }
       : 'mark' in span
-        ? { text: marks[span.mark].glyph, tone: span.tone ?? marks[span.mark].tone }
+        ? { text: theme.marks[span.mark].glyph, tone: span.tone ?? theme.marks[span.mark].tone }
         : { text: span.text, tone: span.tone }
     const last = runs.at(-1)
     if (last !== undefined && last.tone === run.tone) last.text += run.text
     else runs.push(run)
   }
-  return runs.map(run => run.tone === undefined ? run.text : tones[run.tone](run.text)).join('')
+  return runs.map(run => run.tone === undefined ? run.text : theme.tones[run.tone](run.text)).join('')
 }
 
 /**
@@ -86,8 +86,8 @@ function written(node: Extract<Node, { readonly kind: 'text' }>): string {
  * @param tone - the fold's tone, if it has one.
  * @returns the line, styled for the terminal.
  */
-function titleLine(spans: readonly Span[], tone: Tone | undefined): string {
-  return written(tone === undefined ? { kind: 'text', text: spans } : { kind: 'text', text: spans, tone })
+function titleLine(spans: readonly Span[], tone: Tone | undefined, theme: Theme): string {
+  return written(tone === undefined ? { kind: 'text', text: spans } : { kind: 'text', text: spans, tone }, theme)
 }
 
 /**
@@ -96,8 +96,8 @@ function titleLine(spans: readonly Span[], tone: Tone | undefined): string {
  * @param spans - the title's spans.
  * @returns their text, joined.
  */
-function plainTitle(spans: readonly Span[]): string {
-  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? marks[span.mark].glyph : span.text).join('')
+function plainTitle(spans: readonly Span[], theme: Theme): string {
+  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? theme.marks[span.mark].glyph : span.text).join('')
 }
 
 /**
@@ -111,8 +111,8 @@ function plainTitle(spans: readonly Span[]): string {
  * @param width - the columns it is given.
  * @returns the row, wrapped as text is.
  */
-function focusWithTitle(title: string, label: string, width: number): string[] {
-  return new Text(tones.accent(`${chrome.focus} ${title} ${chrome.separator} ${label}`), 0, 0).render(width)
+function focusWithTitle(title: string, label: string, width: number, theme: Theme): string[] {
+  return new Text(theme.tones.accent(`${theme.chrome.focus} ${title} ${theme.chrome.separator} ${label}`), 0, 0).render(width)
 }
 
 /**
@@ -121,10 +121,11 @@ function focusWithTitle(title: string, label: string, width: number): string[] {
  * @param node - what to draw.
  * @param width - the columns it is given.
  * @param state - the UI state it is drawn in.
+ * @param theme - the theme it is drawn in; binnacle's own unless registrations change it.
  * @returns its lines and regions.
  */
-export function layout(node: Node, width: number, state: LayoutState): Frame {
-  return drawn(readable(node), width, state)
+export function layout(node: Node, width: number, state: LayoutState, theme: Theme = builtIn): Frame {
+  return drawn(readable(node), width, state, theme)
 }
 
 /**
@@ -134,52 +135,52 @@ export function layout(node: Node, width: number, state: LayoutState): Frame {
  * @param state - the UI state it is drawn in.
  * @returns its lines and regions.
  */
-function drawn(node: Node, width: number, state: LayoutState): Frame {
+function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Frame {
   switch (node.kind) {
     case 'blank':
       return { lines: [''], regions: [] }
     case 'text':
       // pi-tui wraps styled text, opening each line it wraps to in the style the line before ended in.
-      return { lines: new Text(written(node), 0, 0).render(width), regions: [] }
+      return { lines: new Text(written(node, theme), 0, 0).render(width), regions: [] }
     case 'markdown':
       // pi-tui lays a document out, in the theme's markdown styles; it offers nothing.
-      return { lines: new Markdown(node.text, 0, 0, markdownTheme).render(width), regions: [] }
+      return { lines: new Markdown(node.text, 0, 0, theme.markdown).render(width), regions: [] }
     case 'stack': {
       const lines: string[] = []
       const regions: Placed[] = []
       for (const child of node.children) {
-        const frame = drawn(child, width, state)
+        const frame = drawn(child, width, state, theme)
         regions.push(...frame.regions.map(placed => ({ ...placed, top: placed.top + lines.length })))
         lines.push(...frame.lines)
       }
       return { lines, regions }
     }
     case 'offer': {
-      const frame = drawn(node.child, width, state)
+      const frame = drawn(node.child, width, state, theme)
       const region = { id: node.id, affordances: node.affordances, overflows: false }
       const placed = { region, top: 0, height: frame.lines.length, left: 0, width }
       const primary = node.affordances[0]
       if (state.focus !== node.id || primary === undefined) return { lines: frame.lines, regions: [placed, ...frame.regions] }
-      const row = focusRow(primary.label, width)
+      const row = focusRow(primary.label, width, theme)
       return { lines: [...frame.lines, ...row], regions: [{ ...placed, height: frame.lines.length + row.length }, ...frame.regions] }
     }
     case 'card':
-      return card(node, width, state)
+      return card(node, width, state, theme)
     case 'band':
-      return band(node, width, state)
+      return band(node, width, state, theme)
     case 'fold': {
-      const frame = drawn(node.child, width, state)
+      const frame = drawn(node.child, width, state, theme)
       const cut = frame.lines.length - node.rows
       // The line the fold names to fold under, laid out as a text node's line in the fold's tone; a fold of no
       // rows answers on it alone, and its marker rides it — what it holds while closed, that it can be folded open.
       const foldsUnder = node.rows === 0 ? node.title : undefined
-      const title = node.title === undefined ? [] : new Text(titleLine(node.title, node.tone), 0, 0).render(width)
+      const title = node.title === undefined ? [] : new Text(titleLine(node.title, node.tone, theme), 0, 0).render(width)
       const below = frame.regions.map(placed => ({ ...placed, top: placed.top + title.length }))
       if (cut <= 0) return { lines: [...title, ...frame.lines], regions: below }
-      const label = words.show(cut)
+      const label = theme.words.show(cut)
       const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
       if (state.expanded.has(node.id)) {
-        const away = node.rows === 0 ? words.away : words.to(node.rows)
+        const away = node.rows === 0 ? theme.words.away : theme.words.to(node.rows)
         const open = { id: node.id, affordances: [{ kind: 'expand' as const, label: away }], overflows: false }
         // The heading a fold of no rows answers on: its title saying it can be folded — or, focused, the accent
         // row saying what Enter will do, the title kept on it, so the row a person reads never sits below content
@@ -187,14 +188,14 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
         const heading = foldsUnder === undefined
           ? title
           : state.focus === node.id
-            ? focusWithTitle(plainTitle(foldsUnder), away, width)
-            : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.less}`], node.tone), 0, 0).render(width)
+            ? focusWithTitle(plainTitle(foldsUnder, theme), away, width, theme)
+            : new Text(titleLine([...foldsUnder, ` ${theme.chrome.separator} ${theme.words.less}`], node.tone, theme), 0, 0).render(width)
         // What it holds sits beneath the heading as drawn, which wraps to more rows than the title alone.
         const underHeading = frame.regions.map(placed => ({ ...placed, top: placed.top + heading.length }))
         const lines = [...heading, ...frame.lines]
         const placed = { region: open, top: 0, height: foldsUnder === undefined ? lines.length : heading.length, left: 0, width }
         if (state.focus !== node.id || foldsUnder !== undefined) return { lines, regions: [placed, ...underHeading] }
-        const row = focusRow(away, width)
+        const row = focusRow(away, width, theme)
         return { lines: [...lines, ...row], regions: [{ ...placed, height: lines.length + row.length }, ...underHeading] }
       }
       if (foldsUnder !== undefined) {
@@ -202,13 +203,13 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
         // that line is the accent row saying what Enter will do, the title kept on it — the same line replaced in its
         // place, wrapping to more rows at a narrow width as any line does.
         const marker = state.focus === node.id
-          ? focusWithTitle(plainTitle(foldsUnder), label, width)
-          : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.holds(cut)}`], node.tone), 0, 0).render(width)
+          ? focusWithTitle(plainTitle(foldsUnder, theme), label, width, theme)
+          : new Text(titleLine([...foldsUnder, ` ${theme.chrome.separator} ${theme.words.holds(cut)}`], node.tone, theme), 0, 0).render(width)
         return { lines: marker, regions: [{ region, top: 0, height: marker.length, left: 0, width }] }
       }
       const shown = frame.lines.slice(0, node.rows)
       // The marker row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing.
-      const marker = new Text(state.focus === node.id ? tones.accent(`${chrome.focus} ${label}`) : `${chrome.cut} ${words.cut(cut)}`, 0, 0).render(width)
+      const marker = new Text(state.focus === node.id ? theme.tones.accent(`${theme.chrome.focus} ${label}`) : `${theme.chrome.cut} ${theme.words.cut(cut)}`, 0, 0).render(width)
       const lines = [...title, ...shown, ...marker]
       const inside = frame.regions
         .filter(placed => placed.top < node.rows)
@@ -222,12 +223,12 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
  * Lay a card out: what it holds, inside a rounded border drawn in the theme's dim tone.
  * @returns its lines, and what it holds's regions moved inside the border; what it holds alone where the width leaves no column inside.
  */
-function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, state: LayoutState): Frame {
+function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const inner = width - 2 * CARD_SIDE
-  if (inner < 1) return drawn(node.child, width, state)
-  const frame = drawn(node.child, inner, state)
-  const edge = tones.dim
-  const border = chrome.border
+  if (inner < 1) return drawn(node.child, width, state, theme)
+  const frame = drawn(node.child, inner, state, theme)
+  const edge = theme.tones.dim
+  const border = theme.chrome.border
   // A title is left off whole, never cut, where it would leave no rule beside it: a cut title reads as another one.
   const title = node.title !== undefined && visibleWidth(node.title) <= width - 6 ? node.title : undefined
   const top = title === undefined
@@ -247,11 +248,11 @@ function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, sta
  * line; what it holds is laid out here, for its regions are binnacle's.
  * @returns the padded lines, and what it holds's regions moved inside the padding; what it holds alone where the width leaves no column inside it, and nothing at all — not empty padding — when it holds nothing.
  */
-function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, state: LayoutState): Frame {
+function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const inner = width - 2 * BAND_PAD
-  if (inner < 1) return drawn(node.child, width, state)
-  const frame = drawn(node.child, inner, state)
-  const box = new Box(BAND_PAD, BAND_PAD, backgrounds[node.background])
+  if (inner < 1) return drawn(node.child, width, state, theme)
+  const frame = drawn(node.child, inner, state, theme)
+  const box = new Box(BAND_PAD, BAND_PAD, theme.backgrounds[node.background])
   // What it holds is laid out already, at exactly the width Box asks of it, so its render hands the lines back as they are; nothing is cached, for a band is laid out anew whenever the node it holds is.
   box.addChild({ render: () => [...frame.lines], invalidate: () => {} })
   return {
