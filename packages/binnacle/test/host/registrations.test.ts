@@ -445,10 +445,11 @@ test('disposing a registration takes back its own layer: a bindings object hande
   assert.deepEqual(registrations.bindings, { 'binnacle.quit': 'ctrl+w' })
 })
 
-test('a binding binnacle has not — an inherited name among them — a key that is no string, or two bindings sharing one key is refused where it is registered, saying what to change', async () => {
+test('a binding binnacle has not — an inherited name, or an own __proto__ dropped by a prototype setter, among them — a key that is no string, or two bindings sharing one key is refused where it is registered, saying what to change', async () => {
   const { registrations, author } = surface()
   assert.throws(() => registrations.keys({ 'binnacle.nope': 'ctrl+q' }), { message: 'binnacle.keys: binnacle.nope is no binding; bind one pi-tui or binnacle has, a placed screen\'s binnacle.screen.<name>, or an affordance\'s binnacle.<kind>' })
   assert.throws(() => registrations.keys({ toString: 'ctrl+q' } as never), { message: 'binnacle.keys: toString is no binding; bind one pi-tui or binnacle has, a placed screen\'s binnacle.screen.<name>, or an affordance\'s binnacle.<kind>' })
+  assert.throws(() => registrations.keys(JSON.parse('{"__proto__":"ctrl+q"}') as never), { message: 'binnacle.keys: __proto__ is no binding; bind one pi-tui or binnacle has, a placed screen\'s binnacle.screen.<name>, or an affordance\'s binnacle.<kind>' })
   assert.throws(() => registrations.keys({ 'binnacle.quit': 3 } as never), { message: 'binnacle.keys: binnacle.quit is bound to 3; bind it to a key as pi-tui names one, such as ctrl+q, or a list of them' })
   await author((ctx) => { ctx.binnacle.keys({ 'binnacle.quit': 'ctrl+q' }) })
   assert.throws(() => registrations.keys({ 'binnacle.screen.trajectory': 'ctrl+q' }), { message: 'binnacle.keys: ctrl+q is bound to both binnacle.quit and binnacle.screen.trajectory; bind one of them to another key' })
