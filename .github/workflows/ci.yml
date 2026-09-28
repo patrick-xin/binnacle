@@ -1,9 +1,8 @@
 name: ci
 
+# Run by hand while the repository is private; a push to main and a pull request run it once it is public.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
