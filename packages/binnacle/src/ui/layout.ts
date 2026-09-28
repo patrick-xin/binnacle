@@ -103,8 +103,9 @@ function plainTitle(spans: readonly Span[]): string {
 /**
  * The row a fold's line becomes while it is focused: the chrome's focus
  * pointer, the fold's title kept on it, and what Enter will do, in accent —
- * so a person tabbing onto the fold reads what it is and what Enter does,
- * and focusing it moves nothing.
+ * so a person tabbing onto the fold reads what it is and what Enter does.
+ * The fold's own line is replaced in its place; the row wraps to more rows
+ * at a narrow width, as any line does.
  * @param title - the fold's title, as plain text.
  * @param label - what Enter will do.
  * @param width - the columns it is given.
@@ -198,7 +199,8 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
       }
       if (foldsUnder !== undefined) {
         // Folded to nothing under its title, the marker rides the title's line, so the fold costs one line; focused,
-        // that line is the accent row saying what Enter will do, the title kept on it, so focusing it moves nothing.
+        // that line is the accent row saying what Enter will do, the title kept on it — the same line replaced in its
+        // place, wrapping to more rows at a narrow width as any line does.
         const marker = state.focus === node.id
           ? focusWithTitle(plainTitle(foldsUnder), label, width)
           : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.holds(cut)}`], node.tone), 0, 0).render(width)
