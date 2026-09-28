@@ -26,7 +26,7 @@ import { pointer } from '../../support/pointer.ts'
  * The cards applied in a Cordis context, with the `binnacle` service and a
  * real dsh `tools` service holding the tools given.
  * @param tools - the tools the session's agent ran, made with dsh's own `defineTool`.
- * @returns the pane they draw through, and the plugin's fiber.
+ * @returns the registrations, the pane they draw through, and the plugin's fiber.
  */
 async function withCards(...tools: ToolDefinition[]) {
   const ctx = new Context()
@@ -35,8 +35,8 @@ async function withCards(...tools: ToolDefinition[]) {
   const runtime = new ToolRuntime(ctx)
   for (const tool of tools) runtime.register(tool)
   const fiber = await ctx.plugin(toolCards)
-  const pane = new TranscriptPane(() => {}, () => registrations.views)
-  return { fiber, pane }
+  const pane = new TranscriptPane(() => {}, () => registrations.views, {}, () => registrations.currentTheme)
+  return { registrations, fiber, pane }
 }
 
 /** A tool that presents its calls and its results, made with dsh's own `defineTool`. */
@@ -323,7 +323,7 @@ test('a row can draw a head of its own and a line under a completed head', () =>
     waiting: { kind: 'text', text: '  running…', tone: 'muted' },
     reason: undefined,
     resultText: '',
-    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'output', rows, child }),
+    fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
   }
   assert.deepEqual(drawn(running), ['$ pnpm test', '  running…'])
   const done: CardParts = {
@@ -344,7 +344,7 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
     waiting: undefined,
     reason: undefined,
     resultText: 'tsc: 1 error',
-    fold: (child: Node, rows = 3) => ({ kind: 'fold', id: 'output', rows, child }),
+    fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
   }
   const exit: CardRow = {
     draw: current => {
@@ -381,6 +381,15 @@ test('the object a presenter returned is not frozen after drawing', async () => 
   assert.deepEqual(drawText(pane, 60), ['● pnpm test', 'tsc: 1 error'])
   assert.equal(Object.isFrozen(call), false)
   assert.equal(Object.isFrozen(result), false)
+})
+
+test('a presented output fold shows the rows the theme gives the tool kind, not a literal', async () => {
+  const { registrations, pane } = await withCards(read)
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  pane.push(returned('a\nb\nc\nd\ne'))
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', '… 2 more lines'])
+  registrations.theme({ folds: { tool: { rows: 1 } } })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', '… 4 more lines'])
 })
 
 test('disposing the plugin gives every call back to binnacle\'s card', async () => {

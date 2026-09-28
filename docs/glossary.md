@@ -21,6 +21,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **card** | A node holding another inside a rounded border, its title on the top edge. |
 | **band** | A node holding content padded within a background the theme holds, filled with it line by line. Ours. |
 | **markdown** | A node that draws its text as a markdown document, laid out by pi-tui's component in the theme's tones. |
+| **fold** | A node that draws what it holds cut to rows, offering `expand`: its marker beneath them says what it cut, and rides the line it folds under when it shows none. How many rows it shows while folded, and whether it starts open, are the theme's, by the kind of entry it is drawn in, unless the fold names its own ([Theme](features/theme.md)). Ours. |
 | **span** | One run of a text node's line: its text in the node's tone as a bare string, in a tone of its own, or one of the theme's marks, whose glyph the theme draws in the mark's tone or the span's own. |
 | **fallback view** | How an entry no view claims is drawn: its type in one line, and `expand` to the raw record. It also says what went wrong when an author's adapter or view failed. |
 | **layer** | A folder of `src`, or the module `api.ts`, and what it may import: [`layers.json`](../packages/binnacle/layers.json) ([ADR 2](adr/0002-five-layers-and-the-registrations-an-author-shares.md)). |

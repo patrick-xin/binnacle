@@ -33,7 +33,7 @@ export interface CardParts {
   /**
    * Fold a child beneath the card, under this call's fold id.
    * @param child - what the fold holds.
-   * @param rows - how many rows it shows while folded; three by default.
+   * @param rows - how many rows it shows while folded, when the row names its own; left out, what the theme gives the tool kind, or three.
    * @returns the fold.
    */
   fold(child: Node, rows?: number): Node

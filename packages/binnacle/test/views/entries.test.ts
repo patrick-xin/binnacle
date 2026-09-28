@@ -288,7 +288,8 @@ test('an author\'s view that throws is drawn over by the built-in one, which say
 test('an authored fact named as a kind binnacle draws is drawn by the fallback, never by that kind\'s view', () => {
   const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'tool', data: {} } }
   const views = new Map<string, View[]>([['tool', [() => ({ kind: 'text', text: 'a tool card' })]]])
-  assert.deepEqual(seen(entry, [], views, 80), ['? tool · 1 line', '✗ tool is a kind binnacle draws; the adapter must give its fact another name'])
+  // Its name is its key, so the theme\'s start for `tool` reaches its fold; the refusal stops views, not fold starts.
+  assert.deepEqual(seen(entry, [], views, 80), ['? tool', '{}', '✗ tool is a kind binnacle draws; the adapter must give its fact another name'])
 })
 
 test('an unknown fact carrying a problem says it under its one line', () => {

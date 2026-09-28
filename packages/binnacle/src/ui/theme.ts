@@ -170,7 +170,7 @@ export interface Theme {
   readonly words: { readonly [word in Exclude<keyof typeof words, 'less' | 'away'>]: (count: number) => string } & { readonly less: string, readonly away: string }
   /** The styles a markdown document is drawn in. */
   readonly markdown: MarkdownTheme
-  /** How the folds of each kind of entry start, by the key its views are registered under, when a fold does not say. */
+  /** How the folds of each kind of entry start, by the key its views are registered under, falling back to its kind when no start is given for its key, when a fold does not say. */
   readonly folds: { readonly [key: string]: FoldStart | undefined }
 }
 
@@ -182,8 +182,8 @@ export interface FoldStart {
   readonly open?: boolean
 }
 
-/** binnacle's own theme, which registrations change. */
-export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: {} }
+/** binnacle's own theme, which registrations change. Its folds start as its views draw them: reasoning folded to nothing under the thinking line, context, the fallback and authored facts the same, a tool's and a result's output to three rows. */
+export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: { answer: { rows: 0 }, context: { rows: 0 }, unknown: { rows: 0 }, authored: { rows: 0 }, tool: { rows: 3 }, result: { rows: 3 } } }
 
 /**
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.
@@ -199,7 +199,7 @@ export interface ThemeChanges {
    * What a fold says of itself, each a template: `{n}` is the count of lines, and `{lines}` the word for that many (`line` or `lines`). `less` and `away` count nothing.
    */
   readonly words?: { readonly [word in keyof typeof words]?: string }
-  /** How each kind of entry's folds start, by the key its views are registered under — an entry kind, a quiet kind's dsh type, an authored fact's name — when a fold does not say. */
+  /** How each kind of entry's folds start, by the key its views are registered under — an entry kind, a quiet kind's dsh type, an authored fact's name — falling back to its kind when no start is given for its key, when a fold does not say. */
   readonly folds?: { readonly [key: string]: FoldStart }
   /** Marks, by name: a glyph, a tone, or both. */
   readonly marks?: { readonly [name: string]: { readonly glyph?: string, readonly tone?: Tone } }
