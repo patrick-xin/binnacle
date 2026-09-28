@@ -11,7 +11,7 @@
  * @module binnacle/scripts/check-paths
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -42,14 +42,16 @@ export function findLeaks(files) {
 /**
  * The text files git tracks or would add, at a repository root.
  * @param {string} root - the repository root.
- * @returns {{ path: string, text: string }[]} each file's path and text; binaries are left out.
+ * @returns {{ path: string, text: string }[]} each file's path and text; binaries are left out. A symlink's text is the
+ * link itself, which is what git stores, never what it points at, which may be absent or outside the repository.
  */
 export function repositoryFiles(root) {
   const listed = execFileSync('git', ['-C', root, 'ls-files', '-z', '-co', '--exclude-standard'], { encoding: 'utf8' })
   return listed.split('\0').filter(Boolean).flatMap(path => {
     let text
     try {
-      text = readFileSync(join(root, path), 'utf8')
+      const at = join(root, path)
+      text = lstatSync(at).isSymbolicLink() ? readlinkSync(at, 'utf8') : readFileSync(at, 'utf8')
     } catch {
       // Listed and since deleted from the worktree: nothing to read.
       return []

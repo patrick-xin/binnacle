@@ -153,10 +153,11 @@ export interface Registrations {
    * or an affordance kind's (`binnacle.copy`), which is unbound until bound
    * and invokes that affordance on the focused thing that offers it. What
    * the registrations bind is laid over the defaults, the newest over the
-   * ones before it, by id; disposing one gives back what it bound.
+   * ones before it, by id; disposing one gives back what it bound, and what
+   * was handed over cannot be changed by changing the object after.
    * @param bindings - each binding id, and the key or keys it answers to, as pi-tui names keys.
    * @returns a disposer, for taking it back before the plugin is disposed.
-   * @throws when an id is none binnacle has, a key is none pi-tui can name, or two ids come to share one key, saying what to change.
+   * @throws when the bindings are no record of ids to keys, an id is none binnacle has, a key is no string, or two ids come to share one key, saying what to change.
    */
   keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void
   /**
