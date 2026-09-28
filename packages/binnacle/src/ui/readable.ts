@@ -39,7 +39,9 @@ export function readable(node: Node): Node {
     case 'band':
       return { ...node, child: readable(node.child) }
     case 'fold':
-      return { ...node, child: readable(node.child) }
+      return node.title === undefined
+        ? { ...node, child: readable(node.child) }
+        : { ...node, title: node.title.map(readableSpan), child: readable(node.child) }
   }
 }
 

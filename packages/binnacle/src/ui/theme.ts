@@ -61,6 +61,29 @@ export const marks = {
 /** A mark of the theme's, named by what it stands for. */
 export type Mark = keyof typeof marks
 
+/** The word for a count of lines. */
+const lineWord = (count: number): string => count === 1 ? 'line' : 'lines'
+
+/**
+ * The theme's words: what a fold says of itself, named by what the words
+ * mean. The chrome draws them as it draws its glyphs, so a person's theme
+ * can say them otherwise, as it can reglyph a mark or recolour a tone.
+ */
+export const words = {
+  /** What a fold that shows no rows says it holds, on the line it folds under. */
+  holds: (count: number): string => `${count} ${lineWord(count)}`,
+  /** What a fold that shows rows says it cut, on the row beneath them. */
+  cut: (count: number): string => `${count} more ${lineWord(count)}`,
+  /** What an open fold of no rows says on the line it folds under: that it can be folded. */
+  less: 'show less',
+  /** What opening a fold is called, where a focused fold says what Enter will do. */
+  show: (count: number): string => `show ${count} more ${lineWord(count)}`,
+  /** What folding a fold of no rows back is called. */
+  away: 'fold it away',
+  /** What folding a fold of rows back is called. */
+  to: (count: number): string => `fold to ${count} ${lineWord(count)}`,
+} as const
+
 /**
  * The theme's chrome: the glyphs the chrome — the focus row, a cut fold, a
  * card's border, the jump label — draws with, named beside the marks. A view
@@ -72,6 +95,8 @@ export const chrome = {
   focus: '▸',
   /** What an unfocused cut fold's marker opens with, saying lines were cut. */
   cut: '…',
+  /** What a fold that shows no rows separates the line it folds under from what that line says it holds. */
+  separator: '·',
   /** A card's rounded border, in its pieces. */
   border: { topLeft: '╭', horizontal: '─', topRight: '╮', side: '│', bottomLeft: '╰', bottomRight: '╯' },
   /** What the jump label names, to come down to the end. */

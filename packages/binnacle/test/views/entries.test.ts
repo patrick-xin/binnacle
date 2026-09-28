@@ -225,6 +225,16 @@ test('a result with no call on screen names the call it answers', () => {
   assert.deepEqual(lines(entry), ['● result of call c9', 'ok'])
 })
 
+test('an author\'s fold that names the line it folds under draws one line, its marker riding it', () => {
+  const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'fold', id: 'mine', rows: 0, title: [{ text: '›', tone: 'accent' }, ' asked'], tone: 'muted', child: { kind: 'text', text: 'one\ntwo' } }) as unknown as Node]]])
+  assert.deepEqual(drawnWide(prompt, views), ['\x1b[36m›\x1b[39m\x1b[90m asked · 2 lines\x1b[39m'])
+})
+
+test('a fold\'s title carrying a control sequence is drawn as its text, in its tone', () => {
+  const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'fold', id: 'mine', rows: 0, title: [{ text: 'wiped\x1b[2Jclean', tone: 'error' }], child: { kind: 'text', text: 'one' } }) as unknown as Node]]])
+  assert.deepEqual(drawnWide(prompt, views), ['\x1b[31mwipedclean\x1b[39m · 1 line'])
+})
+
 test('a kind nothing draws is its type in one line, and expand shows the raw record', () => {
   const entry: Entry = { kind: 'unknown', fact: { kind: 'unknown', seq: 2, time: 900, type: 'goal/change', record: { type: 'goal/change', data: {} } } }
   assert.deepEqual(lines(entry), ['? goal/change', '… 4 more lines'])
@@ -266,6 +276,8 @@ test('an author\'s view that returns what binnacle cannot lay out is drawn over,
   assert.deepEqual(drawn(prompt, unlabelled), [...band, '✗ binnacle.view(prompt) returned no drawable node: undefined is no affordance'])
   const folded = new Map<string, View[]>([['prompt', [() => ({ kind: 'fold', id: 'f', rows: -1, child: { kind: 'blank' } })]]])
   assert.deepEqual(drawn(prompt, folded), [...band, '✗ binnacle.view(prompt) returned no drawable node: a fold\'s rows are -1'])
+  const untitled = new Map<string, View[]>([['prompt', [() => ({ kind: 'fold', id: 'f', rows: 0, title: 'one line', child: { kind: 'blank' } }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, untitled), [...band, '✗ binnacle.view(prompt) returned no drawable node: a fold\'s title is one line'])
   const loud = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: 'hi', tone: 'shouting' }) as unknown as Node]]])
   assert.deepEqual(drawn(prompt, loud), [...band, '✗ binnacle.view(prompt) returned no drawable node: shouting is no tone'])
   const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'card', title: 'two\nlines', child: { kind: 'blank' } })]]])

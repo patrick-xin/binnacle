@@ -4,9 +4,9 @@
 
 import { Box, Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
-import type { Node } from './node.ts'
+import type { Node, Span } from './node.ts'
 import { readable } from './readable.ts'
-import { backgrounds, chrome, markdownTheme, marks, tones } from './theme.ts'
+import { backgrounds, chrome, markdownTheme, marks, tones, words } from './theme.ts'
 import type { Tone } from './theme.ts'
 
 /** UI state layout reads: which collapsible regions are open, and which region has focus. */
@@ -46,15 +46,6 @@ export interface Frame {
 }
 
 /**
- * The word for a count of lines.
- * @param count - how many.
- * @returns `line` for one, `lines` otherwise.
- */
-function line(count: number): string {
-  return count === 1 ? 'line' : 'lines'
-}
-
-/**
  * The row a focused region draws under it: the chrome's focus pointer and what Enter will do, in accent.
  * @param label - the primary affordance's label, which says what Enter will do.
  * @param width - the columns it is given.
@@ -86,6 +77,17 @@ function written(node: Extract<Node, { readonly kind: 'text' }>): string {
     else runs.push(run)
   }
   return runs.map(run => run.tone === undefined ? run.text : tones[run.tone](run.text)).join('')
+}
+
+/**
+ * The line a fold's title draws: its spans joined as a text node's line is,
+ * a bare span and the fold's marker in the fold's tone.
+ * @param spans - the title's spans, and any marker riding them.
+ * @param tone - the fold's tone, if it has one.
+ * @returns the line, styled for the terminal.
+ */
+function titleLine(spans: readonly Span[], tone: Tone | undefined): string {
+  return written(tone === undefined ? { kind: 'text', text: spans } : { kind: 'text', text: spans, tone })
 }
 
 /**
@@ -143,23 +145,40 @@ function drawn(node: Node, width: number, state: LayoutState): Frame {
     case 'fold': {
       const frame = drawn(node.child, width, state)
       const cut = frame.lines.length - node.rows
-      if (cut <= 0) return frame
+      // The line the fold names to fold under, laid out as a text node's line in the fold's tone; a fold of no
+      // rows answers on it alone, and its marker rides it — what it holds while closed, that it can be folded open.
+      const foldsUnder = node.rows === 0 ? node.title : undefined
+      const title = node.title === undefined ? [] : new Text(titleLine(node.title, node.tone), 0, 0).render(width)
+      const below = frame.regions.map(placed => ({ ...placed, top: placed.top + title.length }))
+      if (cut <= 0) return { lines: [...title, ...frame.lines], regions: below }
+      const label = words.show(cut)
+      const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
       if (state.expanded.has(node.id)) {
-        const label = node.rows === 0 ? 'fold it away' : `fold to ${node.rows} ${line(node.rows)}`
-        const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
-        if (state.focus !== node.id) return { lines: frame.lines, regions: [{ region, top: 0, height: frame.lines.length, left: 0, width }, ...frame.regions] }
-        const row = focusRow(label, width)
-        return { lines: [...frame.lines, ...row], regions: [{ region, top: 0, height: frame.lines.length + row.length, left: 0, width }, ...frame.regions] }
+        const away = node.rows === 0 ? words.away : words.to(node.rows)
+        const open = { id: node.id, affordances: [{ kind: 'expand' as const, label: away }], overflows: false }
+        const heading = foldsUnder === undefined ? title : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.less}`], node.tone), 0, 0).render(width)
+        const lines = [...heading, ...frame.lines]
+        const placed = { region: open, top: 0, height: foldsUnder === undefined ? lines.length : heading.length, left: 0, width }
+        if (state.focus !== node.id) return { lines, regions: [placed, ...below] }
+        const row = focusRow(away, width)
+        return { lines: [...lines, ...row], regions: [{ ...placed, height: foldsUnder === undefined ? lines.length + row.length : heading.length }, ...below] }
+      }
+      if (foldsUnder !== undefined) {
+        // Folded to nothing under its title, the marker rides the title's line, so the fold costs one line; focused,
+        // that line is the accent row saying what Enter will do, so focusing it moves nothing.
+        const marker = state.focus === node.id
+          ? focusRow(label, width)
+          : new Text(titleLine([...foldsUnder, ` ${chrome.separator} ${words.holds(cut)}`], node.tone), 0, 0).render(width)
+        return { lines: marker, regions: [{ region, top: 0, height: marker.length, left: 0, width }] }
       }
       const shown = frame.lines.slice(0, node.rows)
-      const label = `show ${cut} more ${line(cut)}`
       // The marker row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing.
-      const marker = new Text(state.focus === node.id ? tones.accent(`${chrome.focus} ${label}`) : `${chrome.cut} ${cut} more ${line(cut)}`, 0, 0).render(width)
-      const region = { id: node.id, affordances: [{ kind: 'expand' as const, label }], overflows: false }
+      const marker = new Text(state.focus === node.id ? tones.accent(`${chrome.focus} ${label}`) : `${chrome.cut} ${words.cut(cut)}`, 0, 0).render(width)
+      const lines = [...title, ...shown, ...marker]
       const inside = frame.regions
         .filter(placed => placed.top < node.rows)
-        .map(placed => ({ ...placed, height: Math.min(placed.height, node.rows - placed.top) }))
-      return { lines: [...shown, ...marker], regions: [{ region, top: 0, height: node.rows + marker.length, left: 0, width }, ...inside] }
+        .map(placed => ({ ...placed, top: placed.top + title.length, height: Math.min(placed.height, node.rows - placed.top) }))
+      return { lines, regions: [{ region, top: 0, height: lines.length, left: 0, width }, ...inside] }
     }
   }
 }

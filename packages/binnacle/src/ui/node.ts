@@ -63,6 +63,10 @@ export type Node =
     readonly kind: 'fold'
     /** The region's name within the entry this view draws; binnacle scopes it to that entry, so what `expand` opens and folds is this fold's alone. */
     readonly id: string
+    /** The line it folds under, drawn above what it holds: while the fold shows no rows its marker rides this line — `title · N lines` — so the fold costs that one line alone. */
+    readonly title?: readonly Span[]
+    /** The theme's colour the title is drawn in; the terminal's own when it has none. */
+    readonly tone?: Tone
     /** How many rows it shows while folded. */
     readonly rows: number
     /** The content. */
@@ -121,10 +125,17 @@ export function parseNode(value: unknown): Node {
     }
     case 'fold': {
       const id = field('id')
+      const title = field('title')
+      const tone = field('tone')
       const rows = field('rows')
       if (typeof id !== 'string') throw new Error('a fold needs an id')
+      if (title !== undefined && !Array.isArray(title)) throw new Error(`a fold's title is ${describe(title)}`)
+      if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(tones, tone))) throw new Error(`${describe(tone)} is no tone`)
       if (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 0) throw new Error(`a fold's rows are ${describe(rows)}`)
-      return { kind: 'fold', id, rows, child: parseNode(field('child')) }
+      const fold: { kind: 'fold', id: string, title?: readonly Span[], tone?: Tone, rows: number, child: Node } = { kind: 'fold', id, rows, child: parseNode(field('child')) }
+      if (title !== undefined) fold.title = Array.from(title, span => spanOf(span))
+      if (tone !== undefined) fold.tone = tone as Tone
+      return fold
     }
     default:
       throw new Error(`${describe(kind)} is no kind of node`)
