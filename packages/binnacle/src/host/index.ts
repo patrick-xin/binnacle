@@ -144,7 +144,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
-  })
+  }, () => registrations.currentTheme)
   // The screens plugins placed, each in a pane of its own with a scroll view of its own, so what a person did to
   // one — where they scrolled it — is kept while its registration stands. One is open at a time: it takes the
   // transcript's place in the alternate screen's scroll view, so pi-tui's scrolling, search and selection read it
@@ -193,7 +193,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
-      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView })
+      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme)
       screenPanes.set(id, pane)
     }
     pane.place(id, placed)
@@ -201,7 +201,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (tui instanceof TuiAltScreen) readOn(tui)
     else show('fullscreen')
   }
-  // A change of adapters changes the facts, so the log is read again; a change of views only needs a frame, which draws again what they drew.
+  // A change of adapters changes the facts, so the log is read again; a change of views or of the theme only needs a frame, which draws again what they drew.
   const unregister = registrations.onChange((changed) => {
     if (changed === 'facts') {
       // The whole log is read again, into the same array the placed screens are handed, so they see it as it now stands.

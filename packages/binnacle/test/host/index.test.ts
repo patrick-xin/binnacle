@@ -188,6 +188,19 @@ test('a view registered after its entries were drawn draws them again, and dispo
   await until(() => /› fix the build/.test(shown()))
 })
 
+test('a theme an author registers after its entries were drawn draws them again, and disposing it gives them back', async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  const shown = (): string => stripTerminalSequences(terminal.written)
+  await until(() => /› fix the build/.test(shown()))
+  const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.theme({ marks: { prompt: { glyph: '>' } } }) } })
+  await author
+  await until(() => /> fix the build/.test(shown()))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => /› fix the build/.test(shown()))
+})
+
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
   commit()

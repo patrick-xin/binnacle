@@ -4,6 +4,7 @@ import type { Fact } from '../../src/facts/adapt.ts'
 import type { Node } from '../../src/api.ts'
 import { ScreenPane } from '../../src/panes/screen.ts'
 import { drawText } from '../../src/ui/draw.ts'
+import { builtIn, themed } from '../../src/ui/theme.ts'
 import { pointer } from '../support/pointer.ts'
 import { prompt } from '../support/facts.ts'
 
@@ -28,6 +29,15 @@ test('the screen is drawn and laid out again as its facts arrive, and not otherw
   pane.factsChanged()
   assert.deepEqual(drawText(pane, 40), ['lines 2'])
   assert.deepEqual(handed.at(-1), [prompt(1, 1, 'fix the build'), prompt(2, 2, 'and the tests')], 'told of its facts, the screen draws them as they now stand')
+})
+
+test('the screen is drawn in the theme as it stands, and laid out again when it changes', () => {
+  let theme = builtIn
+  const pane = new ScreenPane(() => [], {}, () => theme)
+  pane.place('trajectory', { draw: () => ({ kind: 'text', text: [{ mark: 'prompt' }, ' asked'] }) })
+  assert.deepEqual(drawText(pane, 40), ['› asked'])
+  theme = themed(builtIn, [{ marks: { prompt: { glyph: '>' } } }])
+  assert.deepEqual(drawText(pane, 40), ['> asked'])
 })
 
 test('a drawing that throws draws what went wrong, naming its registration, and the pane stays up', () => {

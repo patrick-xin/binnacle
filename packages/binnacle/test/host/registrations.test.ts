@@ -62,6 +62,18 @@ test('an author\'s theme draws a mark in its own glyph, until the author\'s plug
   assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
 })
 
+test('the transcript pane draws in the theme an author registers, and in binnacle\'s once it is disposed', async () => {
+  const { registrations, author } = surface()
+  const pane = new TranscriptPane(() => {}, () => registrations.views, {}, () => registrations.currentTheme)
+  pane.push(prompt)
+  const lines = () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
+  assert.deepEqual(lines(), ['', ' › fix the build', ''])
+  const fiber = await author((ctx) => { ctx.binnacle.theme({ marks: { prompt: { glyph: '>' } } }) })
+  assert.deepEqual(lines(), ['', ' > fix the build', ''])
+  await fiber.dispose()
+  assert.deepEqual(lines(), ['', ' › fix the build', ''])
+})
+
 /**
  * A pane on the registrations as they stand, holding two prompts an author's view folds alike, and its lines.
  * @param registrations - the surface's registrations.

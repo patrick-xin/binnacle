@@ -18,6 +18,8 @@ import { under } from '../ui/layout.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { act, initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
+import { builtIn } from '../ui/theme.ts'
+import type { Theme } from '../ui/theme.ts'
 import type { Views } from '../views/entries.ts'
 import { screens } from '../views/screen.ts'
 import type { DrawScreen, Screen } from '../views/screen.ts'
@@ -45,6 +47,7 @@ export class TranscriptPane implements Component {
   #transcript: Transcript = empty
   readonly #changed: () => void
   readonly #views: () => Views
+  readonly #theme: () => Theme
   readonly #inView: (top: number, height: number) => void
   readonly #fullscreen: (top: number, height: number) => void
   #state: UiState = initial
@@ -59,10 +62,12 @@ export class TranscriptPane implements Component {
    * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
    * @param views - authors' views as they stand, read at every frame; an entry is drawn again when the views of its key change.
    * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
+   * @param theme - the theme as it stands, read at every frame; every entry is laid out again when it changes.
    */
-  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}) {
+  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => builtIn) {
     this.#changed = changed
     this.#views = views
+    this.#theme = theme
     this.#inView = reports.inView ?? (() => {})
     this.#fullscreen = reports.fullscreen ?? (() => {})
   }
@@ -131,14 +136,14 @@ export class TranscriptPane implements Component {
    */
   render(width: number): string[] {
     const now = settled(this.#transcript)
-    let screen = this.#draw(this.#transcript, this.#state, width, this.#views())
+    let screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme())
     if (this.#on === 'regular' && this.#state.focus !== undefined) {
       // Focus never sits within the rows this render prints: its own row could not be drawn without changing a row already printed.
       const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
       const placed = screen.regions.find(candidate => candidate.region.id === this.#state.focus)
       if (placed !== undefined && placed.top < through(now)) {
         this.#park(screen)
-        screen = this.#draw(this.#transcript, this.#state, width, this.#views())
+        screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme())
       }
     }
     this.#drawn = { width, screen }
@@ -157,7 +162,7 @@ export class TranscriptPane implements Component {
     const drawn = this.#drawn
     const focus = this.#state.focus
     if (drawn === undefined || focus === undefined) return
-    const placed = this.#draw(this.#transcript, this.#state, drawn.width, this.#views()).regions.find(candidate => candidate.region.id === focus)
+    const placed = this.#draw(this.#transcript, this.#state, drawn.width, this.#views(), this.#theme()).regions.find(candidate => candidate.region.id === focus)
     if (placed !== undefined) this.#inView(placed.top, placed.height)
   }
 
@@ -174,7 +179,7 @@ export class TranscriptPane implements Component {
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
-    const drawn = this.#drawn?.width === event.width ? this.#drawn.screen : this.#draw(this.#transcript, this.#state, event.width, this.#views())
+    const drawn = this.#drawn?.width === event.width ? this.#drawn.screen : this.#draw(this.#transcript, this.#state, event.width, this.#views(), this.#theme())
     const next = answer(this.#state, gesture, under(drawn.regions, event.y, event.x), drawn)
     if (next === undefined || next.state === this.#state) return undefined
     this.#state = next.state
@@ -200,7 +205,7 @@ export class TranscriptPane implements Component {
     if (next.state !== this.#state) {
       this.#state = next.state
       if (next.focus !== undefined) {
-        const screen = this.#draw(this.#transcript, next.state, drawn.width, this.#views())
+        const screen = this.#draw(this.#transcript, next.state, drawn.width, this.#views(), this.#theme())
         const placed = screen.regions.find(candidate => candidate.region.id === next.focus)
         if (placed !== undefined) {
           // On the fullscreen the focused thing is brought into view; on the main screen, focus that reaches a printed entry asks for the fullscreen.
