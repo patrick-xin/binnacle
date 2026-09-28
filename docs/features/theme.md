@@ -2,7 +2,7 @@
 
 binnacle draws content in tones named by what it means, a glyph as a mark named by what it stands for, and a band in a background named by what the content it holds means; the theme gives each tone its colour, each mark its glyph and the tone it draws it in, and each background its colour. It says too how each kind of entry's folds start: how many rows each shows while folded, and whether it starts open. Markdown and the composer are drawn in the same tones.
 
-A person changes any of it by asking an author, who registers the changes in one registration ([Authoring](authoring.md)); nothing is redrawn to do it.
+A person changes any of it by asking an author, who registers the changes through the theme registration ([Authoring](authoring.md)); no view is redrawn for it.
 
 ## How it works
 
