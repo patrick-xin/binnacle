@@ -78,7 +78,7 @@ function viewOf(tools: ToolRuntime): View {
         : result.failed === true ? { mark: 'failed' } : { mark: 'done' },
       waiting: result === undefined
         ? (entry.left === undefined
-            ? { kind: 'text', text: '  running…', tone: 'muted' }
+            ? { kind: 'text', text: ['  running ', { since: entry.call.time }], tone: 'muted' }
             : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' })
         : undefined,
       reason: result?.failure?.reason,

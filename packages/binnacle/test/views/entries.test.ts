@@ -125,7 +125,7 @@ test('the reasoning\'s line is muted, marker and all, the reasoning under it dim
 const call = callFact(9, 21, 'c1', 'bash', '{"command":"pnpm build"}')
 
 test('a tool still running says so', () => {
-  assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running…'])
+  assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running 0s'])
 })
 
 test('a call its turn left without a result says so, and why', () => {
@@ -145,7 +145,7 @@ test('a tool\'s glyph says how the call stands: muted while it runs, success onc
 
 test('running is muted, and why a tool failed is error', () => {
   const failed = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: true, failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' }, blocks: [], meta: undefined } as const
-  assert.equal(styled({ kind: 'tool', call })[1], '\x1b[90m  running…\x1b[39m')
+  assert.equal(styled({ kind: 'tool', call })[1], '\x1b[90m  running 0s\x1b[39m')
   assert.equal(styled({ kind: 'tool', call, result: failed })[1], '\x1b[31m  the command exited 2\x1b[39m')
 })
 

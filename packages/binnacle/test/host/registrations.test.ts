@@ -327,7 +327,7 @@ test('two plugins can each draw one tool\'s card, and every other card stays bin
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'bash' ? { kind: 'text', text: '$ make' } : next()) })
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'read' ? { kind: 'text', text: 'read a file' } : next()) })
-  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['', ' › fix the build', '', '', '$ make', '', 'read a file', '', '● grep {}', '  running…'])
+  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['', ' › fix the build', '', '', '$ make', '', 'read a file', '', '● grep {}', '  running 0s'])
 })
 
 test('a view that read something besides its entry invalidates its key, and only that key\'s entries are drawn again', async () => {

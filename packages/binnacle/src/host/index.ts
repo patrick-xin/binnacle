@@ -181,7 +181,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
-  }, () => registrations.currentTheme)
+  }, () => registrations.currentTheme, () => internals.clock.now())
   // The screens plugins placed, each in a pane of its own with a scroll view of its own, so what a person did to
   // one — where they scrolled it — is kept while its registration stands. One is open at a time: it takes the
   // transcript's place in the alternate screen's scroll view, so pi-tui's scrolling, search and selection read it
@@ -326,6 +326,14 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     tui.requestRender()
   }
   const unstand = session.onStanding(restand)
+  // While what the transcript drew holds the time since a moment, a frame each second draws it at the time; an entry
+  // that holds none is laid out once for all times.
+  let untick: (() => void) | undefined
+  const tick = (): void => {
+    if (transcript.ticking) tui.requestRender()
+    untick = internals.clock.after(1_000, tick)
+  }
+  untick = internals.clock.after(1_000, tick)
   // A notice stands for its time, and goes; a newer one takes its place.
   let unraise: (() => void) | undefined
   let arming: (() => void) | undefined
@@ -483,6 +491,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     unstand()
     unraise?.()
     arming?.()
+    untick?.()
     closeGrants()
     unregister()
     // A placed screen open at the quit is closed first, so the session is left where the person can read it, plain.
