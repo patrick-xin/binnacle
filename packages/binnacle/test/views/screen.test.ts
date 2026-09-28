@@ -79,8 +79,7 @@ test('the screen over a real session\'s log is the conversation: a prompt band h
     " › read readme",
     "",
     "",
-    "∴ thinking",
-    "… 1 more line",
+    "∴ thinking · 1 line",
     "I'll read the README file.",
     "",
     "● glob {\"pattern\": \"README*\"}",
@@ -89,8 +88,7 @@ test('the screen over a real session\'s log is the conversation: a prompt band h
     "node_modules/.pnpm/@earendil-works+pi-tui@0.85.1/node_module",
     "… 298 more lines",
     "",
-    "∴ thinking",
-    "… 2 more lines",
+    "∴ thinking · 2 lines",
     "",
     "● bash {\"command\": \"ls -1 | head -50\", \"description\": \"List",
     "root files\"}",
@@ -99,8 +97,7 @@ test('the screen over a real session\'s log is the conversation: a prompt band h
     "docs",
     "… 13 more lines",
     "",
-    "∴ thinking",
-    "… 1 more line",
+    "∴ thinking · 1 line",
     "",
     "● read {\"file_path\": \"README.md\"}",
     "<path>/workspace/binnacle/README.md</path>",
@@ -108,8 +105,7 @@ test('the screen over a real session\'s log is the conversation: a prompt band h
     "<content>",
     "… 27 more lines",
     "",
-    "∴ thinking",
-    "… 1 more line",
+    "∴ thinking · 1 line",
     "Here's the README:",
     "",
     "binnacle",
@@ -153,7 +149,7 @@ test('a region sits on the rows of the whole transcript, and what offers somethi
   const context: Fact = { kind: 'context', seq: 5, time: 5, source: 'goal', blocks: [{ kind: 'text', text: 'a\nb' }] }
   const [start, ...rest] = session(2)
   const drawn = screen([start as Fact, context, ...rest], initial, 40)
-  assert.deepEqual(plain(drawn).lines.slice(0, 6), ['⋯ added by goal', '… 2 more lines', '', '', ' › question 1', ''])
-  assert.deepEqual(drawn.regions.map(({ region, top, height }) => [region.id, top, height]), [['5/context', 1, 1]])
+  assert.deepEqual(plain(drawn).lines.slice(0, 6), ['⋯ added by goal · 2 lines', '', '', ' › question 1', '', ''])
+  assert.deepEqual(drawn.regions.map(({ region, top, height }) => [region.id, top, height]), [['5/context', 0, 1]])
   assert.deepEqual(drawn.focusable, ['5/context'])
 })

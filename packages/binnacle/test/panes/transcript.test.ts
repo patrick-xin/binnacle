@@ -37,20 +37,20 @@ test('a click on a fold opens it, and the pane claims the click', () => {
   const pane = new TranscriptPane(() => {})
   pane.push(prompt)
   pane.push(context)
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', '… 2 more lines'])
-  assert.deepEqual(pane.handleMouse(pointer('click', 5)), { handled: true })
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', 'a', 'b'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 4)), { handled: true })
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal · show less', 'a', 'b'])
 })
 
 test('stepping in from the composer focuses the nearest thing that offers something, drawn as its accent row', () => {
   const pane = new TranscriptPane(() => {})
   pane.push(prompt)
   pane.push(context)
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal · 2 lines'])
   assert.equal(pane.focused, false)
   assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
   assert.equal(pane.focused, true)
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · show 2 more lines'])
 })
 
 test('while something has focus, tab moves to the next thing and shift+tab to the previous, wrapping', () => {
@@ -60,12 +60,12 @@ test('while something has focus, tab moves to the next thing and shift+tab to th
   pane.push({ ...context, seq: 3, time: 3 })
   shown(pane)
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(shown(pane).slice(3), ['', '⋯ added by goal', '… 2 more lines', '', '⋯ added by goal', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane).slice(3), ['', '⋯ added by goal · 2 lines', '', '▸ ⋯ added by goal · show 2 more lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(shown(pane).slice(3), ['', '⋯ added by goal', '▸ show 2 more lines', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane).slice(3), ['', '▸ ⋯ added by goal · show 2 more lines', '', '⋯ added by goal · 2 lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.next' })
   pane.handleKey({ kind: 'key', binding: 'focus.next' })
-  assert.deepEqual(shown(pane).slice(3), ['', '⋯ added by goal', '▸ show 2 more lines', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane).slice(3), ['', '▸ ⋯ added by goal · show 2 more lines', '', '⋯ added by goal · 2 lines'])
 })
 
 test('enter does what the focused thing offers first: it opens a cut fold, and folds an open one again', () => {
@@ -75,9 +75,9 @@ test('enter does what the focused thing offers first: it opens a cut fold, and f
   shown(pane)
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   pane.handleKey({ kind: 'key', binding: 'primary' })
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', 'a', 'b', '▸ fold it away'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · fold it away', 'a', 'b'])
   pane.handleKey({ kind: 'key', binding: 'primary' })
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · show 2 more lines'])
 })
 
 test('escape gives the keyboard back to the composer: focus is dropped, and its row with it', () => {
@@ -88,7 +88,7 @@ test('escape gives the keyboard back to the composer: focus is dropped, and its 
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.out' }), true)
   assert.equal(pane.focused, false)
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal · 2 lines'])
 })
 
 test('a key bound to an affordance the focused thing does not offer is not answered', () => {
@@ -99,7 +99,7 @@ test('a key bound to an affordance the focused thing does not offer is not answe
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.equal(pane.handleKey({ kind: 'key', binding: 'copy' }), false)
   assert.equal(pane.focused, true)
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '▸ ⋯ added by goal · show 2 more lines'])
 })
 
 test('a focus that lands on something reports the rows it covers, to be brought into view, and opening what is focused reports nothing', () => {
@@ -111,11 +111,11 @@ test('a focus that lands on something reports the rows it covers, to be brought 
   pane.push({ ...context, seq: 3, time: 3 })
   shown(pane)
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(inView, [[8, 1]])
+  assert.deepEqual(inView, [[6, 1]])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(inView, [[8, 1], [5, 1]])
+  assert.deepEqual(inView, [[6, 1], [4, 1]])
   pane.handleKey({ kind: 'key', binding: 'primary' })
-  assert.deepEqual(inView, [[8, 1], [5, 1]])
+  assert.deepEqual(inView, [[6, 1], [4, 1]])
 })
 
 test('on the main screen, focus below what was printed stays drawn there, and focus that reaches a printed entry asks for fullscreen', () => {
@@ -127,10 +127,10 @@ test('on the main screen, focus below what was printed stays drawn there, and fo
   pane.push(result)
   pane.push(waiting)
   pane.push(below)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running…', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running…', '', '⋯ added by goal · 2 lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(fullscreen, [])
-  assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '  running…', '', '⋯ added by goal', '▸ show 2 more lines'])
+  assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '  running…', '', '▸ ⋯ added by goal · show 2 more lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(fullscreen, [[5, 4]])
 })
@@ -150,7 +150,7 @@ test('switching to the main screen drops focus that sits on a printed entry, and
   assert.equal(pane.focused, true)
   pane.drawOn('regular')
   assert.equal(pane.focused, false)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running…', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running…', '', '⋯ added by goal · 2 lines'])
 })
 
 test('when what is focused settles into the printed rows, focus is dropped rather than a printed row changed', () => {
@@ -166,7 +166,7 @@ test('when what is focused settles into the printed rows, focus is dropped rathe
   const done: Fact = { kind: 'result', seq: 6, time: 6, turn: 1, step: 1, callId: 'c2', failed: false, blocks: [{ kind: 'text', text: 'done' }], meta: undefined }
   pane.push(done)
   assert.equal(pane.focused, true)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', 'done', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', 'done', '', '⋯ added by goal · 2 lines'])
   assert.equal(pane.focused, false)
 })
 
@@ -291,18 +291,18 @@ test('a click answers the screen last drawn, the one the person pointed at, thou
   const pane = new TranscriptPane(() => {})
   pane.push(call)
   pane.push(goal)
-  assert.deepEqual(shown(pane), ['● read {}', '  running…', '', '⋯ added by goal', '… 2 more lines'])
+  assert.deepEqual(shown(pane), ['● read {}', '  running…', '', '⋯ added by goal · 2 lines'])
   pane.push(result)
-  assert.deepEqual(pane.handleMouse(pointer('click', 4)), { handled: true })
-  assert.deepEqual(shown(pane), ['● read {}', 'w', 'x', 'y', '… 1 more line', '', '⋯ added by goal', 'a', 'b'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 3)), { handled: true })
+  assert.deepEqual(shown(pane), ['● read {}', 'w', 'x', 'y', '… 1 more line', '', '⋯ added by goal · show less', 'a', 'b'])
 })
 
 test('a click at a width nothing was drawn at is answered at that width', () => {
   const pane = new TranscriptPane(() => {})
   pane.push(prompt)
   pane.push(context)
-  assert.deepEqual(pane.handleMouse(pointer('click', 5)), { handled: true })
-  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal', 'a', 'b'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 4)), { handled: true })
+  assert.deepEqual(shown(pane), ['', ' › fix the build', '', '', '⋯ added by goal · show less', 'a', 'b'])
 })
 
 /** A tool call as dsh logs it. */
@@ -364,10 +364,11 @@ test('a click on a card\'s border is left to pi-tui, and one inside it reaches w
   const views: Views = new Map([['context', [carded]]])
   const pane = new TranscriptPane(() => {}, () => views)
   pane.push(context)
-  assert.deepEqual(shown(pane), ['╭─ yours ──────────────────────────────╮', '│ ⋯ added by goal                      │', '│ … 2 more lines                       │', '╰──────────────────────────────────────╯'])
+  assert.deepEqual(shown(pane), ["\u256d\u2500 yours \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e", "\u2502 \u22ef added by goal \u00b7 2 lines            \u2502", "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f"])
   assert.equal(pane.handleMouse(pointer('click', 2, 0)), undefined)
-  assert.deepEqual(pane.handleMouse(pointer('click', 2, 2)), { handled: true })
-  assert.deepEqual(shown(pane).slice(1, 4), ['│ ⋯ added by goal                      │', '│ a                                    │', '│ b                                    │'])
+  assert.equal(pane.handleMouse(pointer('click', 2, 2)), undefined, 'the border below, for the fold is one line in the card')
+  assert.deepEqual(pane.handleMouse(pointer('click', 1, 2)), { handled: true })
+  assert.deepEqual(shown(pane).slice(1, 4), ["\u2502 \u22ef added by goal \u00b7 show less          \u2502", "\u2502 a                                    \u2502", "\u2502 b                                    \u2502"])
 })
 
 /**

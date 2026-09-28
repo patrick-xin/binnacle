@@ -109,7 +109,7 @@ test('an author\'s adapter turns an event kind into a fact of their own, which t
 test('a fact of the author\'s own with no view is drawn by the fallback, by its name, never dropped', async () => {
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.facts('test/marker', () => ({ name: 'seeded', data: { from: 'fork' } })) })
-  assert.deepEqual(shown(registrations, seed), ['', ' › fix the build', '', '', '? seeded', '… 3 more lines'])
+  assert.deepEqual(shown(registrations, seed), ['', ' › fix the build', '', '', '? seeded · 3 lines'])
 })
 
 test('the newest plugin to draw a key draws it, on what the one before drew, and disposing either gives its place back', async () => {
@@ -188,11 +188,11 @@ test('a view that read something besides its entry invalidates its key, and only
   pane.push(prompt)
   pane.push({ kind: 'context', seq: 2, time: 2, source: 'goal', blocks: [{ kind: 'text', text: 'ship it' }] })
   const lines = () => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
-  assert.deepEqual(lines(), ['› 1', '', '⋯ added by goal', '… 1 more line'])
+  assert.deepEqual(lines(), ['› 1', '', '⋯ added by goal · 1 line'])
   marker = '»'
-  assert.deepEqual(lines(), ['› 1', '', '⋯ added by goal', '… 1 more line'])
+  assert.deepEqual(lines(), ['› 1', '', '⋯ added by goal · 1 line'])
   registrations.invalidate('prompt')
-  assert.deepEqual(lines(), ['» 1', '', '⋯ added by goal', '… 1 more line'])
+  assert.deepEqual(lines(), ['» 1', '', '⋯ added by goal · 1 line'])
   assert.equal(calls, 1)
 })
 

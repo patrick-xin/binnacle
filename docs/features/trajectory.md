@@ -4,12 +4,12 @@ A person reads everything the session logged — the conversation, and the machi
 
 - every event one line: its place in the log, dim, its kind — a mark where one stands for it — and what it says in a few words. A `prompt` line carries its first line after the `prompt` mark; a `call` names its tool; a `result` says what it answered, with the `done` or `failed` mark; the machinery — quiet kinds — names its dsh type; a kind no view reads carries the `unknown` mark;
 - the lines are grouped by turn, under a `turn N` heading in the accent tone, the machinery before the first turn under `before turn 1`;
-- each line folds its record ([Transcript](transcript.md)'s fallback shape): a quiet or unknown event's line opens to the event as logged, and a read one's to the fact binnacle read of it — an authored fact included, and an adapter's problem said above the event;
+- each line carries its record folded on it, saying how much it holds ([Transcript](transcript.md)'s fallback shape): a quiet or unknown event's line opens to the event as logged, and a read one's to the fact binnacle read of it — an authored fact included, and an adapter's problem said above the event;
 - the Trajectory follows a live session: an event logged while it is open draws its line.
 
 Ctrl+O opens it, Claude Code's key for its own detailed transcript; binnacle's Ctrl+T switches screens, so the two must differ. The same key, or Esc, returns to the transcript as it was. From the main screen, Ctrl+O switches to the fullscreen to open it, and closing returns to the main screen as it was.
 
-While it is open, it answers the transcript's gestures ([Keys](keys.md)): a click on a line's fold marker opens the line to its record, Shift+Tab focuses a line and Enter opens it, and the wheel, search and selection are the fullscreen's own. The composer below stays live. What a person opened — a line's record, where focus was — is kept while the Trajectory stands, across opening and closing it.
+While it is open, it answers the transcript's gestures ([Keys](keys.md)): a click on a line opens it to its record, Shift+Tab focuses a line and Enter opens it, and the wheel, search and selection are the fullscreen's own. The composer below stays live. What a person opened — a line's record, where focus was — is kept while the Trajectory stands, across opening and closing it.
 
 ## How it works
 
