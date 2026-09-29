@@ -15,7 +15,7 @@ import { trajectory } from '../../../src/plugins/trajectory/index.ts'
 import { drawText } from '../../../src/ui/draw.ts'
 import { layout } from '../../../src/ui/layout.ts'
 import { componentOf } from '../../support/drawn.ts'
-import { call as callFact, prompt as promptFact, returned as returnedFact, asked as askedFact, decided as decidedFact } from '../../support/facts.ts'
+import { call as callFact, prompt as promptFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact } from '../../support/facts.ts'
 import { logged } from '../../support/log.ts'
 
 /**
@@ -208,6 +208,27 @@ test('an approval asked and its decision are each one line, naming the tool and 
     '2 ⚑ bash asks',
     '3 ⚑ decision allowed-once',
     '4 turn 1 ended · completed',
+  ])
+})
+
+test('a command\'s run and its done are each one line, the run the line as the person typed it, the done the outcome in dsh\'s words', async () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' },
+    runFact(2, 2, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2'),
+    doneFact(3, 3, 'cmd-1a2b3c4d-1', 'success', 'compacted'),
+    runFact(4, 4, 'cmd-1a2b3c4d-2', 'skill'),
+    doneFact(5, 5, 'cmd-1a2b3c4d-2', 'error', 'no such skill'),
+    { kind: 'turn', seq: 6, time: 6, turn: 1, phase: 'end', ending: 'completed' },
+  ]
+  const { lines } = await trajectoryOver(facts)
+  assert.deepEqual(titles(lines()), [
+    'turn 1',
+    '1 turn 1 begins',
+    '2 /compact --keep 2',
+    '3 done success',
+    '4 /skill',
+    '5 done error',
+    '6 turn 1 ended · completed',
   ])
 })
 

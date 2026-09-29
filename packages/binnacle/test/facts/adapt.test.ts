@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { CommandId } from '@deepseek-ai/dsh-commands'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -32,9 +33,9 @@ test('a kind no adapter knows is an unknown fact, carrying its type and the raw 
 })
 
 test('a kind named unread is left to the fallback on purpose: an unknown fact, as a kind dsh does not know is', () => {
-  // `command/run`'s declaration lives in a dsh package binnacle does not name, so it is not on the union the adapter is typed against — though the run-time set of dsh's kinds counts it, which is what the table is held to.
-  const event = { type: 'command/run' as string, seq: SessionSeq(7), time: 1_500, data: { name: 'compact' } } as SessionEvent
-  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 7, time: 1_500, type: 'command/run', record: event })
+  // `compaction/end`'s declaration lives in a dsh package binnacle does not name, so it is not on the union the adapter is typed against — though the run-time set of dsh's kinds counts it, which is what the table is held to.
+  const event = { type: 'compaction/end' as string, seq: SessionSeq(7), time: 1_500, data: {} } as SessionEvent
+  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 7, time: 1_500, type: 'compaction/end', record: event })
 })
 
 test('an event of a quiet kind is a quiet fact, carrying its type and the event for a view an author registers for the kind', () => {
@@ -178,6 +179,39 @@ test('a developer message is context when it changes the tools, quiet when it do
     data: { ...tools.data, message: { ...tools.data.message, id: MessageId('m5'), content: [{ type: 'text', text: 'a word from the registry' }] } },
   }
   assert.deepEqual(adapt(said), { kind: 'quiet', seq: 7, time: 1_250, type: 'developer/message', record: said })
+})
+
+test('a command that ran is a fact carrying dsh\'s pairing id, the name, and the args as the person typed them', () => {
+  const event: SessionEvent<'command/run'> = {
+    type: 'command/run', seq: SessionSeq(7), time: 1_500,
+    data: { commandId: CommandId('cmd-1a2b3c4d-1'), name: 'compact', args: ' --keep 2', source: { kind: 'user' } },
+  }
+  assert.deepEqual(adapt(event), {
+    kind: 'run', seq: 7, time: 1_500, commandId: CommandId('cmd-1a2b3c4d-1'), name: 'compact', args: ' --keep 2', source: 'user',
+  })
+})
+
+test('a command\'s done is a fact carrying the id of its run, the outcome in dsh\'s words, and what it returned', () => {
+  const succeeded: SessionEvent<'command/done'> = {
+    type: 'command/done', seq: SessionSeq(8), time: 1_600,
+    data: { commandId: CommandId('cmd-1a2b3c4d-1'), kind: 'success', text: 'compacted: 12 messages folded to a summary', sourceEventSeq: SessionSeq(6) },
+  }
+  assert.deepEqual(adapt(succeeded), {
+    kind: 'done', seq: 8, time: 1_600, commandId: CommandId('cmd-1a2b3c4d-1'), outcome: 'success', text: 'compacted: 12 messages folded to a summary', sourceEventSeq: SessionSeq(6),
+  })
+  const failed: SessionEvent<'command/done'> = {
+    type: 'command/done', seq: SessionSeq(9), time: 1_700,
+    data: { commandId: CommandId('cmd-1a2b3c4d-2'), kind: 'error', text: 'no such skill' },
+  }
+  assert.deepEqual(adapt(failed), { kind: 'done', seq: 9, time: 1_700, commandId: CommandId('cmd-1a2b3c4d-2'), outcome: 'error', text: 'no such skill' })
+})
+
+test('a command whose own event owns the payload ran with no args read', () => {
+  const event: SessionEvent<'command/run'> = {
+    type: 'command/run', seq: SessionSeq(10), time: 1_800,
+    data: { commandId: CommandId('cmd-1a2b3c4d-3'), name: 'plan', source: { kind: 'user' } },
+  }
+  assert.deepEqual(adapt(event), { kind: 'run', seq: 10, time: 1_800, commandId: CommandId('cmd-1a2b3c4d-3'), name: 'plan', source: 'user' })
 })
 
 test('an approval the agent asked is a fact carrying dsh\'s request id, the tool, the call it is about, and why it asks', () => {
