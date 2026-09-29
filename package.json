@@ -22,9 +22,10 @@
     "check:layers": "node scripts/check-layers.mjs",
     "check:jsdoc": "node scripts/check-jsdoc.mjs",
     "check:notes": "node scripts/check-folder-notes.mjs",
+    "check:words": "node scripts/check-words.mjs",
     "map": "node scripts/map.mjs",
     "check:boot": "node scripts/check-boot.mjs",
-    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:peers && pnpm run check:layers && pnpm run check:jsdoc && pnpm run check:notes && pnpm run lint && pnpm run typecheck",
+    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:peers && pnpm run check:layers && pnpm run check:jsdoc && pnpm run check:notes && pnpm run check:words && pnpm run lint && pnpm run typecheck",
     "test": "pnpm run check && node --test \"scripts/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {

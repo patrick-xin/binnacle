@@ -57,6 +57,7 @@ Two more repositories are read and never depended on: `codex` and `eve`, for wha
 | `check:patch` | [`scripts/check-patch.mjs`](../scripts/check-patch.mjs) |
 | `check:layers` | [`scripts/check-layers.mjs`](../scripts/check-layers.mjs) |
 | `check:jsdoc` | [`scripts/check-jsdoc.mjs`](../scripts/check-jsdoc.mjs) |
+| `check:words` | [`scripts/check-words.mjs`](../scripts/check-words.mjs) |
 | `lint` | [`.oxlintrc.json`](../.oxlintrc.json) |
 | `typecheck` | [`packages/binnacle/tsconfig.json`](../packages/binnacle/tsconfig.json), the tests included |
 
