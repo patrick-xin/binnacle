@@ -33,3 +33,21 @@ test('bullets under a later heading are free text and are not checked', () => {
   const files = [note('ui', '# ui\n\n- `node.ts` — nodes.\n\n## Keep\n\n- `gone.ts` is not a file.\n'), ts('ui/node.ts'), note('', '# src\n\n- `ui/` — ui.\n')]
   assert.deepEqual(checkFolderNotes(files), [])
 })
+
+test('a bullet that says nothing is a problem', () => {
+  const files = [note('ui', '# ui\n\n- `a.ts`\n- `b.ts` — \n- `c.ts` — c.\n'), ts('ui/a.ts'), ts('ui/b.ts'), ts('ui/c.ts'), note('', '# src\n\n- `ui/` — ui.\n')]
+  assert.deepEqual(checkFolderNotes(files), [
+    'packages/binnacle/src/ui/AGENTS.md: says nothing of what a.ts is for — follow its name with " — " and a line saying it',
+    'packages/binnacle/src/ui/AGENTS.md: says nothing of what b.ts is for — follow its name with " — " and a line saying it',
+  ])
+})
+
+test('a file named by two bullets is a problem', () => {
+  const files = [note('ui', '# ui\n\n- `a.ts` — a.\n- `b.ts` — b.\n- `a.ts` — a again.\n'), ts('ui/a.ts'), ts('ui/b.ts'), note('', '# src\n\n- `ui/` — ui.\n')]
+  assert.deepEqual(checkFolderNotes(files), ['packages/binnacle/src/ui/AGENTS.md: names a.ts twice — keep one line for it'])
+})
+
+test('a name followed by text but no dash says nothing', () => {
+  const files = [note('ui', '# ui\n\n- `a.ts` draws.\n'), ts('ui/a.ts'), note('', '# src\n\n- `ui/` — ui.\n')]
+  assert.deepEqual(checkFolderNotes(files), ['packages/binnacle/src/ui/AGENTS.md: says nothing of what a.ts is for — follow its name with " — " and a line saying it'])
+})
