@@ -24,7 +24,7 @@ You are a Sheep: a coding agent given one Charge, in a Fold of your own (a git w
 
 - One step each, that passes `pnpm test`.
 - The message says what changed for a person or an author and why, then how each test it adds failed before the code made it pass, in the failure's own words; a guard, how it was broken and what it said. A change to what `src/api.ts` exports says so. It ends `Issue #<n>.`
-- The records the issue names — the feature page, the glossary, the package map, the authoring page — change in the same commit as what they describe.
+- The records the issue names — the feature page, the glossary, the folder notes, the authoring page — change in the same commit as what they describe.
 
 ## Reviews
 

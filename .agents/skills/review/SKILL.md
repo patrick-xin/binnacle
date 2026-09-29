@@ -26,7 +26,7 @@ Check each, in order; each was a real finding here once.
 - **Arrays the size of a session.** Spreading one into a call (`push(...lines)`) throws past about a hundred thousand elements. Anything that can hold a log's worth of lines is pushed one at a time or concatenated.
 - **Every dsh kind as dsh means it.** A kind drawn, quieted or left unread is checked against what dsh's own web shows in its chat and its trajectory, not guessed from the kind's name.
 - **The author API.** A change to what `src/api.ts` exports, `Node` included, says so in its commit, and the authoring page follows it.
-- **The records.** The feature's page, the glossary and the package map change in the same commit as what they describe, and cite rather than restate.
+- **The records.** The feature's page, the glossary and the folder notes change in the same commit as what they describe, and cite rather than restate.
 - **Out of scope stays out.**
 
 ## What to report

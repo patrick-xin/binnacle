@@ -32,7 +32,7 @@ Two more repositories are read and never depended on: `codex` and `eve`, for wha
 
 | Path                                                                | Holds                                                                    |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [`packages/binnacle/`](../packages/binnacle/)                       | the bundle: `src/<layer>/`, the author API, its tests, and the patch dsh stacks; [its map](../packages/binnacle/README.md) |
+| [`packages/binnacle/`](../packages/binnacle/)                       | the bundle: `src/<layer>/`, the author API, its tests, and the patch dsh stacks; [its README](../packages/binnacle/README.md) for a person, and a folder note in each folder of `src/` for an agent |
 | [`packages/binnacle/layers.json`](../packages/binnacle/layers.json) | what each layer may import                                               |
 | [`AGENTS.md`](../AGENTS.md)                                         | the standing orders                                                      |
 | [`docs/architecture.md`](architecture.md)                           | this page                                                                |
