@@ -1571,6 +1571,39 @@ test('while the composer holds the seat the question stays readable above it, as
   assert.deepEqual(session.sent, [], 'the line answered the question; nothing was sent')
 })
 
+test('a click on a question\'s option chooses it, and a click on cancel cancels nothing, for dismiss refuses the pointer', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  let settled: AskUserQuestionAnswer | undefined
+  void askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] }] }).then((answer) => { settled = answer })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  const rows = await terminal.altScreen()
+  const optionRow = rows.findIndex(line => line.includes('postgres'))
+  click(terminal, (rows[optionRow]?.indexOf('postgres') ?? 0) + 1, optionRow + 1)
+  await until(() => settled !== undefined)
+  assert.deepEqual(settled, { answers: [{ id: 'q1', selected: ['postgres'] }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+
+  let refused: unknown
+  void askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q2', question: 'which port?', options: [{ label: '5432' }] }] }).then(() => {}, (reason: unknown) => { refused = reason })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which port?')))
+  const asking = await terminal.altScreen()
+  const cancelRow = asking.findIndex(line => line.includes('cancel'))
+  click(terminal, (asking[cancelRow]?.indexOf('cancel') ?? 0) + 1, cancelRow + 1)
+  await settle()
+  assert.ok(refused === undefined, 'a click on cancel cancels nothing')
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(() => refused !== undefined)
+  const reason: unknown = refused
+  assert.equal(reason instanceof Error && reason.name === 'UserQuestionError' && (reason as { code?: string }).code === 'ASK_CANCELLED', true, 'tab and enter cancel the ask')
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
