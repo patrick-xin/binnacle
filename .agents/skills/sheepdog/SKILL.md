@@ -54,11 +54,11 @@ A profile names a model that may not be ready under its runtime today, and `disp
 
 ## When you wrote part of the change
 
-Where you wrote an issue's hard part and a Sheep the rest, the change is your commits and the Sheep's together, on the issue's branch. A Bellwether reads only its Charge's own diff, so it never sees yours. Review the whole with codex instead: a checkout of the branch at its tip, the base named, and each commit said to be yours or the Sheep's, so codex sends the Sheep only the defects in its own, and reports those in yours to you.
+Where you wrote an issue's hard part and a Sheep the rest, the Sheep's Charge branch, dispatched from your issue branch, holds both: your commits beneath, the Sheep's on top. A Bellwether reads only its Charge's own diff, so it never sees yours. Review the whole with codex instead: a checkout of the Charge branch at its tip, the base named, and each commit named as yours or the Sheep's, so codex sends the Sheep only the defects in its own, and reports those in yours to you.
 
-A branch that builds on another (`issue-40` on `issue-36`) merges the one beneath it in before it is reviewed or dispatched from, and its review names the commits past the one beneath as its own. It merges to `main` after the one beneath.
+A branch that builds on another (`issue-40` on `issue-36`) merges the one beneath it in, the Sheep's records included, before it is reviewed or dispatched from. So a range from the branch beneath is not its own work: its review names its own commits one by one, and whose each is. It merges to `main` after the one beneath.
 
-A checkout under `/tmp` runs `CI=true pnpm install --frozen-lockfile`: without `CI`, pnpm can stop at a prompt no one is there to answer, and hang.
+A checkout under `/tmp` installs with `CI=true`: without it, pnpm stops to confirm replacing a `node_modules` it did not make, and waits on an answer no one gives.
 
 ## Your own commits
 
