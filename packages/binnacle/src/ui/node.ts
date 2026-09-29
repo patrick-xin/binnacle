@@ -8,6 +8,9 @@
 
 import { affordances, describe } from '../contract/index.ts'
 import type { Affordance } from '../contract/index.ts'
+
+/** A kind of affordance, re-exported for the author API: what a person invoked on an offer. */
+export type { AffordanceKind } from '../contract/index.ts'
 import { binnacleTheme } from './theme.ts'
 import type { Background, Mark, Theme, Tone } from './theme.ts'
 

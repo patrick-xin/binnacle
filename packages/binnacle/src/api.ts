@@ -7,7 +7,7 @@
 
 import type { AuthorAdapter, Fact } from './facts/adapt.ts'
 import type { KeyId } from './ui/keys.ts'
-import type { Node } from './ui/node.ts'
+import type { AffordanceKind, Node } from './ui/node.ts'
 import type { ThemeChanges } from './ui/theme.ts'
 import type { View } from './views/entries.ts'
 
@@ -69,6 +69,14 @@ export type Placement =
      * last of those.
      */
     readonly draw: (facts: readonly Fact[]) => Node
+    /**
+     * What an offer the lines draw does once a person invokes it: handed the
+     * offer's id and the kind invoked. Any kind but `expand`, which opens a
+     * fold where the lines draw one, reaches it. Lines in the composer's slot
+     * that offer something take the keyboard while they stand; lines
+     * elsewhere take no focus, and answer only the pointer.
+     */
+    readonly invoke?: (region: string, affordance: AffordanceKind) => void
   }
 
 /** The `binnacle` service, `ctx.binnacle`: each registration is an effect of the plugin that made it, gone when that plugin is disposed. */
@@ -124,8 +132,11 @@ export interface Registrations {
    * back the one before; with none, the slot draws nothing — with no
    * composer, nothing takes typing, and what the host answers itself,
    * quitting included, still answers. The lines slots draw every placement,
-   * oldest first, top to bottom. Lines draw no focus and answer no gesture.
-   * A drawing that throws, or returns no node binnacle can lay out, draws
+   * oldest first, top to bottom. Lines in the composer's slot that offer
+   * something take the keyboard while they stand, and an offer a person
+   * invokes other than `expand` reaches their `invoke`; lines elsewhere take
+   * no focus and answer only the pointer, which a `grant` never invokes. A
+   * drawing that throws, or returns no node binnacle can lay out, draws
    * what went wrong, naming its registration.
    * @param slot - where it goes.
    * @param placement - what it draws there.

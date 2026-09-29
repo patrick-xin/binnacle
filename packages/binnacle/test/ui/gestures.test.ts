@@ -61,7 +61,14 @@ test('the primary key invokes the focused region\'s primary affordance, a grant 
   assert.equal(meaning({ kind: 'key', binding: 'primary' }, []), undefined)
 })
 
-test('an affordance\'s own key invokes it only where the focused region offers it', () => {
+test('an affordance\'s own key invokes it only where a region it lands on offers it', () => {
   assert.deepEqual(meaning({ kind: 'key', binding: 'dismiss' }, [approval]), { kind: 'invoke', region: 'approval', affordance: 'dismiss' })
   assert.equal(meaning({ kind: 'key', binding: 'copy' }, [card, transcript]), undefined)
+})
+
+test('an affordance\'s own key lands on the focused region first, then on those beyond it, and invokes the first offering its kind', () => {
+  const allow: Region = { id: 'allow', affordances: [{ kind: 'grant', label: 'allow once' }], overflows: false }
+  const reject: Region = { id: 'reject', affordances: [{ kind: 'dismiss', label: 'reject' }], overflows: false }
+  assert.deepEqual(meaning({ kind: 'key', binding: 'dismiss' }, [allow, reject]), { kind: 'invoke', region: 'reject', affordance: 'dismiss' })
+  assert.deepEqual(meaning({ kind: 'key', binding: 'primary' }, [reject, allow]), { kind: 'invoke', region: 'reject', affordance: 'dismiss' })
 })

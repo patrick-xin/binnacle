@@ -2,7 +2,8 @@
  * The gesture table: the one place a gesture is given a meaning.
  *
  * A pointer gesture lands on the regions under the pointer, innermost first;
- * a key lands on the focused region.
+ * a key lands on the focused region, then on the regions the pane that
+ * answers it reaches beyond focus, in the order it hands them.
  */
 
 import { affordances } from '../contract/index.ts'
@@ -11,7 +12,7 @@ import type { Action, Gesture, Region } from '../contract/index.ts'
 /**
  * What a gesture means where it lands.
  * @param gesture - what the person did.
- * @param under - the regions it lands on, innermost first.
+ * @param under - the regions it lands on, innermost first; for a key, the focused region first.
  * @returns the action, or undefined when the gesture means nothing there.
  */
 export function meaning(gesture: Gesture, under: readonly Region[]): Action | undefined {
@@ -34,11 +35,12 @@ export function meaning(gesture: Gesture, under: readonly Region[]): Action | un
       if (gesture.binding === 'focus.next') return { kind: 'focus', step: 1 }
       if (gesture.binding === 'focus.previous') return { kind: 'focus', step: -1 }
       if (gesture.binding === 'focus.out') return { kind: 'unfocus' }
-      const focused = under[0]
-      const offered = gesture.binding === 'primary'
-        ? focused?.affordances[0]
-        : focused?.affordances.find(candidate => candidate.kind === gesture.binding)
-      return focused === undefined || offered === undefined ? undefined : { kind: 'invoke', region: focused.id, affordance: offered.kind }
+      // The primary key is the focused region's alone; a key bound to a kind invokes the first region it lands on
+      // that offers the kind, so a decision's reject answers its key while its allow has focus.
+      const binding = gesture.binding
+      const region = binding === 'primary' ? under[0] : under.find(candidate => candidate.affordances.some(offer => offer.kind === binding))
+      const offered = binding === 'primary' ? region?.affordances[0] : region?.affordances.find(offer => offer.kind === binding)
+      return region === undefined || offered === undefined ? undefined : { kind: 'invoke', region: region.id, affordance: offered.kind }
     }
   }
 }

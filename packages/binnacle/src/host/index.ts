@@ -30,8 +30,8 @@ import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
-import { LinesPane } from '../panes/placed.ts'
 import type { Placement, Slot } from '../api.ts'
+import { approvals } from '../plugins/approvals/index.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
 import { statusLine } from '../plugins/status-line/index.ts'
 import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
@@ -204,24 +204,30 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // The page as placed: whether binnacle's transcript is in its place, and what sits around the composer and in its
   // place — binnacle's composer, lines, or nothing. Each lines placement in a slot is drawn by a pane of its own, kept
   // while it stands there, so one placement in two slots is named by each slot when it goes wrong.
-  const linesPanes = new Map<Slot, Map<Placement, LinesPane>>()
+  const linesPanes = new Map<Slot, Map<Placement, ScreenPane>>()
   /**
    * The pane that draws a lines placement in its slot, kept for as long as the placement stands there.
    * @param slot - where it is placed, to name it by.
    * @param placement - the lines.
    */
-  const linesPane = (slot: Slot, placement: Extract<Placement, { readonly kind: 'lines' }>): LinesPane => {
-    const inSlot = linesPanes.get(slot) ?? new Map<Placement, LinesPane>()
+  const linesPane = (slot: Slot, placement: Extract<Placement, { readonly kind: 'lines' }>): ScreenPane => {
+    const inSlot = linesPanes.get(slot) ?? new Map<Placement, ScreenPane>()
     linesPanes.set(slot, inSlot)
     const kept = inSlot.get(placement)
     if (kept !== undefined) return kept
-    const pane = new LinesPane(`binnacle.place(${slot})`, placement.draw, () => facts, () => registrations.currentTheme)
+    // Lines are drawn as a placed screen is, UI state and all, so what they offer answers a person through the one
+    // gesture table; an offer UI state does not answer reaches the placement's invoke.
+    const pane = new ScreenPane(() => facts, {
+      changed: () => { tui.requestRender() },
+      invoked: (region, affordance) => { placement.invoke?.(region, affordance) },
+    }, () => registrations.currentTheme)
+    pane.place(slot, placement, `binnacle.place(${slot})`)
     inSlot.set(placement, pane)
     return pane
   }
   /** Read the page from the placements as they stand, forgetting the panes of lines no longer placed. */
   function arrange(): Page {
-    const lines = (slot: Slot): readonly LinesPane[] => registrations.placed(slot).flatMap(placement => placement.kind === 'lines' ? [linesPane(slot, placement)] : [])
+    const lines = (slot: Slot): readonly ScreenPane[] => registrations.placed(slot).flatMap(placement => placement.kind === 'lines' ? [linesPane(slot, placement)] : [])
     const inComposer = registrations.placed('composer').at(-1)
     const arranged: Page = {
       transcript: registrations.placed('transcript').at(-1)?.kind === 'transcript',
@@ -348,8 +354,12 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // lost. While a placed screen is open, Esc returns to the transcript and no gesture moves on it;
   // scrolling, search and selection are the alternate screen's own, and the composer below stays live.
   const keys = (data: string): TuiInputListenerResult => {
-    const reading = open === undefined ? (page.transcript ? transcript : undefined) : open.pane
-    const resolved = table.resolve(data, reading?.focused ?? false, open !== undefined)
+    // Lines in the composer's seat that offer something take the keyboard while they stand, ahead of what is being
+    // read, their first offer focused as they take it: what they ask is the person's to answer next.
+    const seat = page.composer instanceof ScreenPane && page.composer.offering ? page.composer : undefined
+    if (seat !== undefined && !seat.focused) seat.handleKey({ kind: 'key', binding: 'focus.next' })
+    const reading = seat ?? (open === undefined ? (page.transcript ? transcript : undefined) : open.pane)
+    const resolved = table.resolve(data, reading?.focused ?? false, seat === undefined && open !== undefined)
     if (resolved?.kind === 'quit') {
       quit()
       return { consume: true }
@@ -375,7 +385,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       session.interrupt()
       return { consume: true }
     }
-    if (resolved?.kind === 'gesture' && reading?.handleKey({ kind: 'key', binding: resolved.binding }) === true) return { consume: true }
+    if (resolved?.kind === 'gesture' && (seat === undefined ? reading?.handleKey({ kind: 'key', binding: resolved.binding }) : seat.handleKey({ kind: 'key', binding: resolved.binding }, true)) === true) return { consume: true }
     // A key a person bound to an affordance is answered even where focus offers no such thing: it does nothing there,
     // and focus stays.
     if (resolved?.kind === 'gesture' && resolved.binding in affordances) return { consume: true }
@@ -461,6 +471,7 @@ export function apply(ctx: Context): void {
   // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
   ctx.plugin(transcriptFeature)
   ctx.plugin(composerFeature)
+  ctx.plugin(approvals)
   ctx.plugin(statusLine)
   ctx.plugin(toolCards)
   ctx.plugin(trajectory)

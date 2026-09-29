@@ -13,9 +13,11 @@
  */
 
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { describe } from '../contract/index.ts'
 import { kinds } from './kinds.ts'
 import type { SessionEvent, SessionEventType } from '@deepseek-ai/dsh-session'
+import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
 export type Block =
@@ -116,6 +118,24 @@ export type Fact =
     readonly data: unknown
   }
   | Logged & {
+    readonly kind: 'asked'
+    /** dsh's id of the request, which pairs the ask with the decision that answers it (`dsh:packages/interaction/user-approval/src/types.ts#ApprovalRequestId`). */
+    readonly id: ApprovalRequestId
+    /** The tool the question is about. */
+    readonly toolName: string
+    /** The exact tool call being decided, when the asker had one. */
+    readonly callId?: ToolCallId
+    /** Why the asker asks, as a person reads it; present only when the asker gave one. */
+    readonly reason?: string
+  }
+  | Logged & {
+    readonly kind: 'decided'
+    /** dsh's id of the ask this answers, the asked fact's `id`. */
+    readonly id: ApprovalRequestId
+    /** What was decided, in dsh's words (`allowed-once`, `rejected`, `cancelled`, `unavailable`; `dsh:packages/interaction/user-approval/src/types.ts#ApprovalOutcome`). */
+    readonly outcome: ApprovalOutcome
+  }
+  | Logged & {
     readonly kind: 'quiet'
     /** The event's dsh type, the key a view registered for the kind draws it under. */
     readonly type: string
@@ -191,6 +211,12 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
   'tool/call': ({ seq, time, data }) => ({
     kind: 'call', seq, time, turn: data.turn, step: data.step, callId: data.callId, name: data.name, arguments: data.arguments,
   }),
+  'approval/asked': ({ seq, time, data }) => ({
+    kind: 'asked', seq, time, id: data.id, toolName: data.toolName,
+    ...data.callId === undefined ? {} : { callId: data.callId },
+    ...data.reason === undefined ? {} : { reason: data.reason },
+  }),
+  'approval/decided': ({ seq, time, data }) => ({ kind: 'decided', seq, time, id: data.id, outcome: data.outcome }),
   'tool/result': ({ seq, time, data }) => ({
     kind: 'result',
     seq,

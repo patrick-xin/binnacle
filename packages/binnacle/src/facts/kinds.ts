@@ -7,7 +7,12 @@
  * shows no row for (`dsh:packages/client/ui-chat/src/client/contract/chat-visibility.ts#isVisibleChatNode`):
  * the session's machinery, whose home is a screen of its own. What is unread
  * has a row there that no binnacle feature draws yet, so it is left to the
- * fallback on purpose, until a feature draws it.
+ * fallback on purpose, until a feature draws it. A kind Chat shows no row
+ * for can still be read, when a feature draws what a person must see of it:
+ * `approval/asked` and `approval/decided` are dsh's audit pair
+ * (`dsh:packages/interaction/user-approval/src/index.ts#ApprovalService`),
+ * and the transcript draws what an approval asked and what was decided of
+ * it, paired as a call and its result are.
  */
 
 /**
@@ -28,8 +33,8 @@ export type Treatment = 'read' | 'quiet' | 'unread'
 export const kinds: Readonly<Record<string, Treatment>> = {
   'agent-preset/selected': 'quiet',
   'agent/inbox/spliced': 'quiet',
-  'approval/asked': 'quiet',
-  'approval/decided': 'quiet',
+  'approval/asked': 'read',
+  'approval/decided': 'read',
   'approval/policy': 'quiet',
   'assistant/attempt': 'quiet',
   'assistant/message': 'read',

@@ -96,6 +96,10 @@
     ],
     "@deepseek-ai/dsh-skill": [
       "host"
+    ],
+    "@deepseek-ai/dsh-user-approval": [
+      "facts",
+      "plugins"
     ]
   }
 }
