@@ -34,6 +34,7 @@ import { ScreenPane } from '../panes/screen.ts'
 import type { Placement, Slot, Surface } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
+import { questions } from '../plugins/questions/index.ts'
 import { statusLine } from '../plugins/status-line/index.ts'
 import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
 import { toolCards } from '../plugins/tool-cards/index.ts'
@@ -555,12 +556,12 @@ export function apply(ctx: Context): void {
   let disposed = false
   let session: OpenedSession | undefined
   let release: (() => void) | undefined
-  // Approvals answers for the session's agent alone: applied on a scope of that agent once the session opens, so another agent's ask never reaches it and fails closed elsewhere (`dsh:packages/core/scope/src/index.ts#createScope`).
-  let approvalScope: Scope | undefined
+  // Approvals and Questions answer for the session's agent alone: applied on a scope of that agent once the session opens, so another agent's ask never reaches them and fails closed elsewhere (`dsh:packages/core/scope/src/index.ts#createScope`).
+  let agentScope: Scope | undefined
   const close = async (): Promise<void> => {
     // The approvals scope goes first, so a request still standing is answered and its card unseated before the terminal is given back — the session is left printed without it.
-    const scope = approvalScope
-    approvalScope = undefined
+    const scope = agentScope
+    agentScope = undefined
     await scope?.dispose()
     release?.()
     release = undefined
@@ -591,8 +592,9 @@ export function apply(ctx: Context): void {
       quit()
       return
     }
-    approvalScope = createScope(ctx, opened.agent)
-    void approvalScope.ctx.plugin(approvals)
+    agentScope = createScope(ctx, opened.agent)
+    void agentScope.ctx.plugin(approvals)
+    void agentScope.ctx.plugin(questions)
     release = takeTerminal(opened, registrations, quit, mode)
   }
   const cancel = ready.onReady(() => {

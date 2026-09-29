@@ -18,10 +18,11 @@ The ask and its decision are logged by dsh as an audit pair, `approval/asked` an
 ## Choices
 
 - A decision sits in the composer's place, not a dialog over the page: the composer's slot is live on both screens, and answering there gives back what was typed. A dialog over the page waits until a feature needs one.
+- A question the agent asks a person is answered in the same seat the same way ([Questions](questions.md)).
 - Enter allows once, for the grant is the card's primary offer; reject is one Tab away, or one press of a key bound to `dismiss` — unbound until a person binds it ([Keys](keys.md)).
 - The card's title names the tool (`bash asks`), its body the reason as the asker gave it, and its offers read `allow once` and `reject` — dsh's outcome words.
 - In the transcript the entry stands after the `approval` mark, the outcome in the tone of the decision: `allowed once` in success, `rejected` in error, `cancelled` and `unavailable` muted ([Theme](theme.md)). An author's view for the `approval` kind draws it otherwise.
 
 ## Open
 
-- [#32](https://github.com/patrick-xin/binnacle/issues/32): questions and plan review reach the person the same way; an approval policy a person can set, and "allow always", are the rest of the ask.
+- [#32](https://github.com/patrick-xin/binnacle/issues/32): an approval policy a person can set, and "allow always", are the rest of the ask.
