@@ -21,6 +21,11 @@ test('the manifest points dsh at the patch it ships, and the patch inserts the r
   assert.match(patch, new RegExp(`name: '${manifest.name}'`))
 })
 
+test('the patch loads dsh\'s ask-user tool, whose questions the built-in Questions plugin answers', () => {
+  const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+  assert.match(patch, /name: '@deepseek-ai\/dsh-tool-ask-user'/)
+})
+
 test('plain node loads the built entry as a Cordis row, with no default export and no test hook', () => {
   const probe = `const m = await import('./dist/index.js'); console.log(JSON.stringify({ keys: Object.keys(m).sort(), name: m.name, inject: m.inject, apply: typeof m.apply }))`
   const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], { cwd: packageDir, encoding: 'utf8' })

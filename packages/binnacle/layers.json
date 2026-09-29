@@ -110,6 +110,9 @@
     "@deepseek-ai/dsh-user-approval": [
       "facts",
       "plugins"
+    ],
+    "@deepseek-ai/dsh-user-questions": [
+      "plugins"
     ]
   }
 }

@@ -16,9 +16,10 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 - [Transcript](features/transcript.md): the session log drawn as turns, with what was sent, answered, called and returned.
 - [Tool cards](features/tool-cards.md): each tool call read as its tool presents it — its title, and what it returned folded beneath.
 
-## Decide: may it do that?
+## Decide: what does the agent ask?
 
 - [Approvals](features/approvals.md): what the agent asks to do, in the composer's place — allow it once or reject it by a key, and what was decided drawn in the transcript.
+- [Questions](features/questions.md): what the agent asks a person, in the composer's place — pick an option, type an answer, or skip, one question at a time.
 
 ## Review: what happened?
 

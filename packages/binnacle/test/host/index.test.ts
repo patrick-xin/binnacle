@@ -11,6 +11,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
+import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import * as host from '../../src/host/index.ts'
@@ -1419,6 +1421,287 @@ test('the key a person binds to dismiss rejects an approval while allow once has
   terminal.type('\x1b[19~')
   await until(() => settled !== undefined)
   assert.equal(settled, 'rejected')
+})
+
+/**
+ * Ask a question as dsh's user-questions service does for the session's agent: down the `user-questions/request` waterfall, scope-filtered to the agent that asks (`dsh:packages/core/scope/src/index.ts#scopeTarget`), failing with `NO_PROVIDER` when nothing answers.
+ * @param ctx - the context the answerers are on.
+ * @param agent - the agent asking, whose scope the dispatch is tagged with.
+ * @param req - what is asked.
+ * @returns the answer an answerer settled, or the rejection it was refused with.
+ */
+const askQuestionsFor = (ctx: Context, agent: Agent, req: Omit<Parameters<Events['user-questions/request']>[0], 'agent'>): Promise<AskUserQuestionAnswer> =>
+  ctx.waterfall(scopeTarget(agent, agent), 'user-questions/request', { agent, ...req }, () => Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')))
+
+test('a question another agent asks is not binnacle\'s to answer: no card seats, and it fails as nothing answered', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const foreign = {} as Agent
+  const answer = askQuestionsFor(ctx, foreign, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  await settle()
+  assert.ok((await terminal.altScreen()).every(row => !row.includes('which database?')), 'another agent\'s question seats no card')
+assert.equal(refusal instanceof Error && refusal.name === 'UserQuestionError' && (refusal as { code?: string }).code === 'NO_PROVIDER', true, 'another agent\'s ask fails as nothing answered')
+  // The session\'s own agent is still answered, asked the same scoped way.
+  const mine = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q2', question: 'which port?', options: [{ label: '5432' }] }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which port?')))
+  terminal.type('\r')
+  assert.deepEqual(await mine, { answers: [{ id: 'q2', selected: ['5432'] }] })
+})
+
+test('a question asked sits in the composer\'s seat, naming the question, and enter chooses its first option, answering it', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
+    id: 'q1',
+    header: 'Set up',
+    question: 'which database?',
+    detail: 'The workspace has no database yet.',
+    options: [{ label: 'postgres' }, { label: 'sqlite' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  const card = await terminal.altScreen()
+  assert.ok(card.some(row => row.includes('Set up')), 'the card titles itself with the header')
+  assert.ok(card.some(row => row.includes('The workspace has no database yet.')), 'the card draws the detail')
+  assert.ok(card.some(row => row.includes('postgres')) && card.some(row => row.includes('sqlite')), 'the card offers both options')
+  assert.ok(card.some(row => row.includes('type an answer')) && card.some(row => row.includes('skip')) && card.some(row => row.includes('cancel')), 'the card offers typing, skipping and cancelling')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['postgres'] }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+})
+
+test('skip answers a question with nothing selected, and the next question takes the seat', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [
+    { id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] },
+    { id: 'q2', question: 'which port?', options: [{ label: '5432' }, { label: '8080' }] },
+  ] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which port?')))
+  assert.ok((await terminal.altScreen()).every(row => !row.includes('which database?')), 'the first question\'s card is gone')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [
+    { id: 'q1', selected: [] },
+    { id: 'q2', selected: ['5432'] },
+  ] })
+})
+
+test('a multi-select question answers with every option marked, once done is chosen', async () => {
+  const terminal = new XtermTerminal(50, 18)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
+    id: 'q1',
+    question: 'which checks should run?',
+    multiSelect: true,
+    options: [{ label: 'types' }, { label: 'lint' }, { label: 'tests' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which checks should run?')))
+  assert.ok((await terminal.altScreen()).some(row => row.includes('done')), 'a multi-select question offers done')
+  terminal.type('\r')
+  // The marked option's line draws the done mark beside its label.
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('● types')))
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('● tests')))
+  terminal.type('\t')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['types', 'tests'] }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which checks should run?')))
+})
+
+test('type an answer places a composer in the seat, whose submitted line is the custom answer; a blank line gives the card back', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  assert.ok((await terminal.altScreen()).some(row => row.includes('skip')), 'the card is back')
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  terminal.type('whatever runs')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('whatever runs')))
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: [], custom: 'whatever runs' }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+})
+
+test('cancel rejects the request as cancelled, and the composer returns with what was typed', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.dismiss': 'f8' }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('draft')
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\x1b[19~')
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  assert.equal(refusal instanceof Error && refusal.name === 'UserQuestionError', true, 'the refusal is a UserQuestionError')
+  assert.equal((refusal as { code?: string }).code, 'ASK_CANCELLED')
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['draft'])
+})
+
+test('a request withdrawn by its signal takes its card back, rejected as aborted', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const withdraw = new AbortController()
+  const answer = askQuestionsFor(ctx, session.agent, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  withdraw.abort()
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  assert.equal(refusal instanceof Error && refusal.name === 'UserQuestionError', true, 'the refusal is a UserQuestionError')
+  assert.equal((refusal as { code?: string }).code, 'ASK_ABORTED')
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+})
+
+test('a request already withdrawn when it arrives seats nothing and is rejected as aborted', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const withdraw = new AbortController()
+  withdraw.abort()
+  const answer = askQuestionsFor(ctx, session.agent, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  assert.equal((refusal as { code?: string }).code, 'ASK_ABORTED')
+  await settle()
+  assert.ok((await terminal.altScreen()).every(row => !row.includes('which database?')), 'no card was seated')
+})
+
+test('a plan-review question is drawn the same way, its plan as markdown and its approve option primary', async () => {
+  const terminal = new XtermTerminal(50, 18)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
+    id: 'q1',
+    header: 'Plan review',
+    question: 'does this plan do it?',
+    detail: '## The plan\n\n1. read the code\n2. write the test',
+    intent: { kind: 'plan-review', approve: 'ship it' },
+    options: [{ label: 'rethink it' }, { label: 'ship it' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('does this plan do it?')))
+  const card = await terminal.altScreen()
+  assert.ok(card.some(row => row.includes('The plan')), 'the card draws the plan')
+  assert.ok(card.some(row => row.includes('read the code')), 'the plan\'s steps are drawn')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['ship it'] }] })
+})
+
+test('while the composer holds the seat the question stays readable above it, asked once, offering nothing', async () => {
+  const terminal = new XtermTerminal(50, 20)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
+    id: 'q1',
+    header: 'Set up',
+    question: 'which database?',
+    detail: 'The workspace has no database yet.',
+    options: [{ label: 'postgres' }, { label: 'sqlite' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('which database?')) && rows.some(row => row.includes('The workspace has no database yet.')) && rows.every(row => !row.includes('skip'))
+  })
+  assert.equal((await terminal.altScreen()).filter(row => row.includes('which database?')).length, 1, 'the question is asked once')
+  terminal.type('whatever runs')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: [], custom: 'whatever runs' }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+  terminal.type('\r')
+  assert.deepEqual(session.sent, [], 'the line answered the question; nothing was sent')
+})
+
+test('a click on a question\'s option chooses it, and a click on cancel cancels nothing, for dismiss refuses the pointer', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  let settled: AskUserQuestionAnswer | undefined
+  void askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] }] }).then((answer) => { settled = answer })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  const rows = await terminal.altScreen()
+  const optionRow = rows.findIndex(line => line.includes('postgres'))
+  click(terminal, (rows[optionRow]?.indexOf('postgres') ?? 0) + 1, optionRow + 1)
+  await until(() => settled !== undefined)
+  assert.deepEqual(settled, { answers: [{ id: 'q1', selected: ['postgres'] }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+
+  let refused: unknown
+  void askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q2', question: 'which port?', options: [{ label: '5432' }] }] }).then(() => {}, (reason: unknown) => { refused = reason })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which port?')))
+  const asking = await terminal.altScreen()
+  const cancelRow = asking.findIndex(line => line.includes('cancel'))
+  click(terminal, (asking[cancelRow]?.indexOf('cancel') ?? 0) + 1, cancelRow + 1)
+  await settle()
+  assert.ok(refused === undefined, 'a click on cancel cancels nothing')
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(() => refused !== undefined)
+  const reason: unknown = refused
+  assert.equal(reason instanceof Error && reason.name === 'UserQuestionError' && (reason as { code?: string }).code === 'ASK_CANCELLED', true, 'tab and enter cancel the ask')
+})
+
+test('an ask still standing when the session closes goes to the next answerer, and its card is gone from what it left', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const refusal = answer.then(() => undefined, (reason: unknown) => reason)
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\x03')
+  terminal.type('\x03')
+  const reason = await refusal
+  assert.equal(reason instanceof Error && reason.name === 'UserQuestionError' && (reason as { code?: string }).code === 'NO_PROVIDER', true, 'the ask went to the next answerer, and none answered')
+  await settle()
+  assert.deepEqual(exits, [0])
+  assert.ok((await terminal.mainScreen()).every(row => !row.includes('which database?')), 'the card is gone from what the session left printed')
 })
 
 test('lines are handed where the session stands, and are drawn again as it changes', async () => {
