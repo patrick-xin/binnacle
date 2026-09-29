@@ -275,7 +275,7 @@ export const questions = {
   apply(ctx: Context): void {
     const standing = new Set<Ask>()
     ctx.effect(() => () => {
-      // Each finishes and no-ops therefrom; a Set's iteration goes on past what it deletes.
+      // Each finishes once and ignores what follows; a Set's iteration goes on past what it deletes.
       for (const ask of standing) ask.handOver()
     }, 'questions: what still stands, handed to the next answerer')
     ctx.on('user-questions/request', (req, next) => new Promise<AskUserQuestionAnswer>((resolve, reject) => {
