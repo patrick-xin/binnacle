@@ -48,7 +48,17 @@ A question whose answer is in a reference — what dsh's web shows, what pi-tui 
 
 A diagnosis Sheep has no shell: it cannot run `gh` or `pnpm refs`. Dispatch it with `--verify 'pnpm refs'`, so its Fold has the references, and with `--spec '#<n>'` for the issue it informs, which it reads through `read_intent`; never copy the issue into the brief.
 
+Keep a `REPORT` before you retire its Charge: retiring closes the Sheep's pane, and the report is not kept in the retired record. Save it from `shepherd report --charge <name>` to a file, and post it from there.
+
 A profile names a model that may not be ready under its runtime today, and `dispatch` then refuses, saying the model "does not verify reasoning level". `shepherd capabilities` lists what each runtime has ready; name `--model` and `--thinking` from there.
+
+## When you wrote part of the change
+
+Where you wrote an issue's hard part and a Sheep the rest, the change is your commits and the Sheep's together, on the issue's branch. A Bellwether reads only its Charge's own diff, so it never sees yours. Review the whole with codex instead: a checkout of the branch at its tip, the base named, and each commit said to be yours or the Sheep's, so codex sends the Sheep only the defects in its own, and reports those in yours to you.
+
+A branch that builds on another (`issue-40` on `issue-36`) merges the one beneath it in before it is reviewed or dispatched from, and its review names the commits past the one beneath as its own. It merges to `main` after the one beneath.
+
+A checkout under `/tmp` runs `CI=true pnpm install --frozen-lockfile`: without `CI`, pnpm can stop at a prompt no one is there to answer, and hang.
 
 ## Your own commits
 
