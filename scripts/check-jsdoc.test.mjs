@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { undocumented } from './check-jsdoc.mjs'
+import { undocumented, undocumentedSurface } from './check-jsdoc.mjs'
 
 test('a module whose exports are all documented passes', () => {
   const text = `/** A thing. */\nexport const a = 1\n\n/**\n * Another.\n */\nexport function b(): void {}\n`
@@ -22,4 +22,12 @@ test('an opening block set apart from the first export by a blank line documents
 
 test('a re-export is documented where it is declared', () => {
   assert.deepEqual(undocumented('a.ts', `export { a } from './b.ts'\nexport * from './c.ts'\n`), [])
+})
+
+test('what an author reads is held: every name the entry exports, and each name it re-exports where it is declared, and nothing else', () => {
+  const files = {
+    'src/api.ts': `export type { Kept } from './ui/node.ts'\n/** Doc. */\nexport interface Own {}\nexport type Bare = string\n`,
+    'src/ui/node.ts': `export type Kept = string\nexport type Unread = number\n`,
+  }
+  assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ['src/api.ts:4: Bare', 'src/ui/node.ts:1: Kept'])
 })

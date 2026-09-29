@@ -23,7 +23,7 @@ The rules are `AGENTS.md`'s, under *Tests*: they bind, and this skill does not r
 
    From the root, a script's test is `node --test scripts/<script>.test.mjs`. It is red only when it fails **at its assertion, for the reason its name gives**. A missing export, a type error or a `TypeError` thrown on the way is not red: add the least code that lets the assertion run — an export that returns nothing — run it again, and read the real failure.
 3. **Write the least code that passes it.** Nothing a later test will need: no option, branch or parameter a test has not asked for yet.
-4. **Run the file, then `pnpm test`.** Green is every gate too: lint, types, citations, JSDoc, layers.
+4. **Run the file, then `pnpm test`.** Green is every gate too: lint, types, citations, the author API's JSDoc, layers.
 5. **Take the next behaviour, and let this cycle change the list.** A surprise is a new behaviour; one that fell out for free gets no test of its own.
 
 Never write a second test while the first is red, and never write tests ahead in a batch: a test written before the code it tests asserts a shape that was imagined.
