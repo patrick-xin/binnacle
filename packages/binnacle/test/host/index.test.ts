@@ -147,6 +147,32 @@ test('a line typed and entered is sent to the session', async () => {
   assert.deepEqual(session.sent, ['hello'])
 })
 
+test('a line that is blank, or only spaces, is not sent; the line after it is', async () => {
+  const { terminal, session, commit } = await mount([])
+  commit()
+  await settle()
+  terminal.type('\r')
+  terminal.type('   ')
+  terminal.type('\r')
+  terminal.type('hello')
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['hello'])
+})
+
+test('a submitted line reaches the placement as the Editor hands it on, trimmed and a blank line included', async () => {
+  const { ctx, terminal, commit } = await mount([])
+  const seen: string[] = []
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('composer', { kind: 'composer', submit: (text) => { seen.push(text) } }) } })
+  commit()
+  await settle()
+  terminal.type('\r')
+  terminal.type('  ')
+  terminal.type('hello')
+  terminal.type('  ')
+  terminal.type('\r')
+  assert.deepEqual(seen, ['', 'hello'])
+})
+
 test('ctrl+c gives the terminal back, closes the session, and asks to exit 0', async () => {
   const { terminal, exits, session, commit } = await mount([])
   commit()
