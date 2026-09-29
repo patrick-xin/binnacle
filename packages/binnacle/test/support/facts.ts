@@ -7,6 +7,8 @@
  * @module binnacle/test/support/facts
  */
 import type { Fact } from '../../src/facts/adapt.ts'
+import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
+import { ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 
 /**
  * A prompt: a line a person sent, as one text block.
@@ -42,4 +44,29 @@ export const call = (seq: number, time: number, callId: string, name: string, ar
  */
 export const returned = (seq: number, time: number, callId: string, text: string): Extract<Fact, { readonly kind: 'result' }> => ({
   kind: 'result', seq, time, turn: 1, step: 1, callId, failed: false, blocks: [{ kind: 'text', text }], meta: undefined,
+})
+
+/**
+ * An approval the agent asked for, as dsh logged it.
+ * @param seq - its place in the log.
+ * @param time - when it was logged.
+ * @param id - dsh's id of the request, which its decision names.
+ * @param toolName - the tool the question is about.
+ * @param reason - why it asks; left out when the asker gave none.
+ * @returns the asked fact.
+ */
+export const asked = (seq: number, time: number, id: string, toolName: string, reason?: string): Extract<Fact, { readonly kind: 'asked' }> => ({
+  kind: 'asked', seq, time, id: ApprovalRequestId(id), toolName, ...reason === undefined ? {} : { reason },
+})
+
+/**
+ * The decision that answered an approval, in dsh's words.
+ * @param seq - its place in the log.
+ * @param time - when it was logged.
+ * @param id - dsh's id of the ask it answers.
+ * @param outcome - what was decided.
+ * @returns the decided fact.
+ */
+export const decided = (seq: number, time: number, id: string, outcome: ApprovalOutcome): Extract<Fact, { readonly kind: 'decided' }> => ({
+  kind: 'decided', seq, time, id: ApprovalRequestId(id), outcome,
 })

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
+import type { Events } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -8,6 +9,9 @@ import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
+import { scopeTarget } from '@deepseek-ai/dsh-scope'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import * as host from '../../src/host/index.ts'
 import type { OpenedSession } from '../../src/host/session.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
@@ -1145,6 +1149,160 @@ test('escape interrupts a running turn while nothing has focus, and while nothin
   terminal.type('\r')
   assert.equal(session.interrupted, 1)
   assert.deepEqual(session.sent, ['hi'])
+})
+
+test('lines in the composer\'s seat that offer something take the keyboard: enter invokes the first offer, which reaches their invoke, and nothing is sent', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const invoked: string[] = []
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('composer', {
+        kind: 'lines',
+        draw: () => ({ kind: 'stack', children: [
+          { kind: 'offer', id: 'allow', affordances: [{ kind: 'grant', label: 'allow once' }], child: { kind: 'text', text: 'allow once' } },
+          { kind: 'offer', id: 'reject', affordances: [{ kind: 'dismiss', label: 'reject' }], child: { kind: 'text', text: 'reject' } },
+        ] }),
+        invoke: (region, affordance) => { invoked.push(`${region} ${affordance}`) },
+      })
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  terminal.type('\r')
+  assert.deepEqual(invoked, ['allow grant'])
+  terminal.type('\t')
+  terminal.type('\r')
+  assert.deepEqual(invoked, ['allow grant', 'reject dismiss'])
+  assert.deepEqual(session.sent, [])
+})
+
+/**
+ * Ask for approval as dsh's approval service does: down the \`approval/request\` waterfall, failing closed to \`unavailable\` when nothing answers.
+ * @param ctx - the context the answerers are on.
+ * @param req - what is asked.
+ * @returns the outcome an answerer settled.
+ */
+const askApproval = (ctx: Context, req: Omit<Parameters<Events['approval/request']>[0], 'agent'>): Promise<ApprovalOutcome> =>
+  ctx.waterfall('approval/request', { agent: {} as never, ...req }, () => Promise.resolve<ApprovalOutcome>('unavailable'))
+
+/**
+ * Ask for approval as dsh's approval service does: down the `approval/request` waterfall, scope-filtered to the agent that asks (`dsh:packages/core/scope/src/index.ts#scopeTarget`), failing closed to `unavailable` when nothing answers.
+ * @param ctx - the context the answerers are on.
+ * @param agent - the agent asking, whose scope the dispatch is tagged with.
+ * @param req - what is asked.
+ * @returns the outcome an answerer settled.
+ */
+const askApprovalFor = (ctx: Context, agent: Agent, req: Omit<Parameters<Events['approval/request']>[0], 'agent'>): Promise<ApprovalOutcome> =>
+  ctx.waterfall(scopeTarget(agent, agent), 'approval/request', { agent: {} as never, ...req }, () => Promise.resolve<ApprovalOutcome>('unavailable'))
+
+test('an approval another agent asks is not binnacle\'s to answer: no card seats, and it settles as nothing answered', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const foreign = {} as Agent
+  const outcome = askApprovalFor(ctx, foreign, { toolName: 'bash', reason: 'another agent asks' })
+  await settle()
+  assert.ok((await terminal.altScreen()).every(row => !row.includes('another agent asks')), 'another agent\'s ask seats no card')
+  assert.equal(await Promise.race([outcome, settle().then(() => 'still standing' as const)]), 'unavailable', 'another agent\'s ask settles as nothing answered')
+  // The session\'s own agent is still answered, asked the same scoped way.
+  const mine = askApprovalFor(ctx, session.agent, { toolName: 'bash', reason: 'the session asks' })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('the session asks')))
+  terminal.type('\r')
+  assert.equal(await mine, 'allowed-once')
+})
+
+test('an approval asked sits in the composer\'s seat, naming the tool and why, and enter allows it once, giving the composer back', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('draft')
+  const outcome = askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace' })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('writes outside the workspace')))
+  const card = await terminal.altScreen()
+  assert.ok(card.some(row => row.includes('bash asks')), 'the card names the tool')
+  assert.ok(card.some(row => row.includes('allow once')) && card.some(row => row.includes('reject')), 'the card offers both')
+  terminal.type('\r')
+  assert.equal(await outcome, 'allowed-once')
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('writes outside the workspace')))
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['draft'])
+})
+
+test('a click on the card does nothing, allow once or reject: an approval is a key pressed on purpose; tab and enter reject', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  let settled: ApprovalOutcome | undefined
+  void askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace' }).then((outcome) => { settled = outcome })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  const rows = await terminal.altScreen()
+  // The pointer reports a cell 1-based, where the rows read back are 0-based.
+  for (const offer of ['allow once', 'reject']) {
+    const row = rows.findIndex(line => line.includes(offer))
+    click(terminal, (rows[row]?.indexOf(offer) ?? 0) + 1, row + 1)
+    await settle()
+    assert.equal(settled, undefined, `a click on ${offer} settled nothing`)
+  }
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(() => settled !== undefined)
+  assert.equal(settled, 'rejected')
+})
+
+test('an approval still standing when the session closes settles unavailable, and its card is gone from what it left', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  let settled: ApprovalOutcome | undefined
+  void askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace' }).then((outcome) => { settled = outcome })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  terminal.type('\x03')
+  await until(() => settled !== undefined)
+  assert.equal(settled, 'unavailable')
+  await settle()
+  assert.deepEqual(exits, [0])
+  assert.ok((await terminal.mainScreen()).every(row => !row.includes('allow once')), 'the card is gone from what the session left printed')
+})
+
+test('an approval withdrawn by its signal takes its card back, settled cancelled', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const withdraw = new AbortController()
+  const outcome = askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace', signal: withdraw.signal })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  withdraw.abort()
+  assert.equal(await outcome, 'cancelled')
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('allow once')))
+})
+
+test('the key a person binds to dismiss rejects an approval while allow once has focus', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.dismiss': 'f8' }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  let settled: ApprovalOutcome | undefined
+  void askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace' }).then((outcome) => { settled = outcome })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  terminal.type('\x1b[19~')
+  await until(() => settled !== undefined)
+  assert.equal(settled, 'rejected')
 })
 
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {

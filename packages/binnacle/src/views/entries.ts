@@ -64,6 +64,19 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
 }
 
 /**
+ * Draw an approval: the tool that asks and why, then the decision that
+ * answered it, in the tone of its outcome — or that it waits for one.
+ * @param decided - the decision, once it has one.
+ */
+function drawApproval(asked: Extract<Fact, { readonly kind: 'asked' }>, decided: Extract<Fact, { readonly kind: 'decided' }> | undefined): Node {
+  const head: Node = { kind: 'text', text: [{ mark: 'approval' } as const, ` ${asked.toolName} asks${asked.reason === undefined ? '' : `: ${asked.reason}`}`] }
+  if (decided === undefined) return { kind: 'stack', children: [head, { kind: 'text', text: '  waiting…', tone: 'muted' }] }
+  const tone = decided.outcome === 'allowed-once' ? 'success' : decided.outcome === 'rejected' ? 'error' : 'muted'
+  const outcome = decided.outcome === 'allowed-once' ? 'allowed once' : decided.outcome
+  return { kind: 'stack', children: [head, { kind: 'text', text: `  ${outcome}`, tone }] }
+}
+
+/**
  * Draw a tool call: what was asked, then whether it is running, failed, left
  * behind by its turn, or what it returned, folded. Its mark says how the
  * call stands.
@@ -87,7 +100,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
 }
 
 /** Every kind of entry binnacle draws — or, for a quiet one, does not; a view registered under one of these names draws that kind, so no authored fact may take one. */
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, result: true, authored: true, unknown: true, quiet: true }
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, result: true, authored: true, unknown: true, quiet: true }
 
 /**
  * Draw one entry.
@@ -154,6 +167,13 @@ function builtIn(entry: Entry, problem?: string): Node {
       return noted(drawAnswer(entry.fact), problem)
     case 'tool':
       return noted(drawTool(entry.call, entry.result, entry.left), problem)
+    case 'approval':
+      return noted(drawApproval(entry.asked, entry.decided), problem)
+    case 'decided': {
+      // A decision without its ask reaches the screen only from a log torn between the two; it names the approval it answered, as a result without its call names its call.
+      const title: Node = { kind: 'text', text: [{ mark: 'approval', tone: 'muted' } as const, ` decision of approval ${entry.fact.id}: ${entry.fact.outcome}`], tone: 'muted' }
+      return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
+    }
     case 'result': {
       // A fold that shows rows keeps its marker beneath them, and what shows rows is out of #18: its title stays a
       // line of its own above the fold, as it always was, a titled fold that shows rows left to #23.

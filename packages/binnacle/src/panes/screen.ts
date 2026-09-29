@@ -1,6 +1,7 @@
 /**
  * The screen pane: a placed screen as a pi-tui component, in the
- * transcript's place on the alternate screen.
+ * transcript's place on the alternate screen; and placed lines, around the
+ * composer or in its seat, which answer a person the same way.
  *
  * It draws what the screen's registration returns, with nodes as a view
  * draws, laid out at the width pi-tui gives it — every line, unwindowed,
@@ -13,17 +14,19 @@
  * again as its facts arrive, its width changes, a person opens something on
  * it or its registration changes, and not otherwise. A drawing that throws
  * or returns no node binnacle can lay out draws what went wrong, naming its
- * registration, and never takes the surface down.
+ * registration, and never takes the surface down; so does the report an
+ * invoked offer reaches, drawn the same way until a later one returns.
  */
 
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
 import type { Fact } from '../facts/adapt.ts'
-import type { Gesture } from '../contract/index.ts'
+import type { AffordanceKind, Gesture } from '../contract/index.ts'
 import { answer } from '../ui/answer.ts'
+import { describe } from '../contract/index.ts'
 import { layout, under } from '../ui/layout.ts'
 import type { Frame } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
-import { drawPlaced } from './placed.ts'
+import { drawPlaced, refused } from './placed.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
@@ -36,6 +39,8 @@ export interface ScreenReports {
   readonly changed?: () => void
   /** Something to bring into view: the rows a focused thing covers, on the screen as now drawn. */
   readonly inView?: (top: number, height: number) => void
+  /** An offer a person invoked that UI state does not answer — any but `expand` — for the registration to act on. */
+  readonly invoked?: (region: string, affordance: AffordanceKind) => void
 }
 
 /** What one layout of the screen drew, and all that decides whether it stands. */
@@ -58,11 +63,14 @@ export class ScreenPane implements Component {
   readonly #theme: () => Theme
   readonly #changed: () => void
   readonly #inView: (top: number, height: number) => void
-  #name: string | undefined
+  readonly #invoked: (region: string, affordance: AffordanceKind) => void
+  #registration: string | undefined
   #draw: ((facts: readonly Fact[]) => Node) | undefined
   #state: UiState = initial
   #laid: Laid | undefined
   #stale = true
+  /** What the last report an invoked offer reached did wrong, drawn beneath what the pane drew until one returns. */
+  #said: string | undefined
 
   /**
    * @param facts - the session's facts, as they stand, handed to the placed screen's drawing as they change.
@@ -74,22 +82,30 @@ export class ScreenPane implements Component {
     this.#theme = theme
     this.#changed = reports.changed ?? (() => {})
     this.#inView = reports.inView ?? (() => {})
+    this.#invoked = reports.invoked ?? (() => {})
   }
 
   /**
-   * Draw a placed screen in this pane.
+   * Draw a placed screen in this pane, or placed lines.
    * @param name - its registration's name.
    * @param screen - how it draws.
+   * @param registration - the registration as an author wrote it, to name it by in what went wrong; a placed screen's by default.
    */
-  place(name: string, screen: { readonly draw: (facts: readonly Fact[]) => Node }): void {
-    this.#name = name
+  place(name: string, screen: { readonly draw: (facts: readonly Fact[]) => Node }, registration = `binnacle.screen(${name})`): void {
+    this.#registration = registration
     this.#draw = screen.draw
+    this.#said = undefined
     this.#stale = true
   }
 
   /** The session's facts have arrived, or been read again: the screen draws again at the next frame. */
   factsChanged(): void {
     this.#stale = true
+  }
+
+  /** Whether what it last drew offers something, so it can take focus. */
+  get offering(): boolean {
+    return (this.#laid?.focusable.length ?? 0) > 0
   }
 
   /** Whether something on the screen has focus. */
@@ -116,6 +132,10 @@ export class ScreenPane implements Component {
     if (gesture === undefined) return undefined
     const laid = this.laidAt(event.width, this.#state)
     const next = answer(this.#state, gesture, under(laid.frame.regions, event.y, event.x), laid)
+    if (next?.invoked !== undefined) {
+      this.#report(next.invoked.region, next.invoked.affordance)
+      return { handled: true }
+    }
     if (next === undefined || next.state === this.#state) return undefined
     this.#state = next.state
     this.#changed()
@@ -124,17 +144,22 @@ export class ScreenPane implements Component {
 
   /**
    * Answer a key gesture through the gesture table, on the screen last drawn:
-   * a key lands on the focused region.
+   * a key lands on the focused region, and, for lines in the composer's seat,
+   * on every region beyond it that offers something, top to bottom — so a key
+   * bound to a kind answers what the seat offers, whichever offer has focus.
    * @param gesture - the gesture a resolved key became.
+   * @param seated - whether these are lines in the composer's seat; a placed screen that is open is read, not answered, so its keys land on focus alone.
    * @returns whether the pane answered it, so the key is consumed; false leaves it to the composer.
    */
-  handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>): boolean {
+  handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>, seated = false): boolean {
     const drawn = this.#laid
     if (drawn === undefined) return false
     const focus = this.#state.focus
-    const focused = focus === undefined ? undefined : drawn.frame.regions.find(placed => placed.region.id === focus)
-    const next = answer(this.#state, gesture, focused === undefined ? [] : [focused.region], drawn)
+    const focused = drawn.frame.regions.find(placed => placed.region.id === focus)?.region
+    const beyond = seated ? drawn.frame.regions.map(placed => placed.region).filter(region => region !== focused && region.affordances.length > 0) : []
+    const next = answer(this.#state, gesture, focused === undefined ? beyond : [focused, ...beyond], drawn)
     if (next === undefined) return false
+    if (next.invoked !== undefined) this.#report(next.invoked.region, next.invoked.affordance)
     if (next.state !== this.#state) {
       this.#state = next.state
       if (next.focus !== undefined) {
@@ -148,15 +173,36 @@ export class ScreenPane implements Component {
   }
 
   /**
+   * Report an invoked offer to the registration, fenced: what the report —
+   * author code — does wrong is drawn beneath what the pane drew, naming its
+   * registration, and never takes the surface down. A report that returns
+   * draws the lines clean again.
+   * @param region - the offer's id, as the registration named it.
+   * @param affordance - the kind invoked.
+   */
+  #report(region: string, affordance: AffordanceKind): void {
+    try {
+      this.#invoked(region, affordance)
+      if (this.#said === undefined) return
+      this.#said = undefined
+    } catch (error) {
+      this.#said = `${this.#registration ?? 'binnacle.place'} invoke threw: ${describe(error)}`
+    }
+    this.#stale = true
+    this.#changed()
+  }
+
+  /**
    * What the placed screen draws, fenced.
    * @param theme - the theme it is parsed against.
    * @returns what its drawing returned, or what went wrong, naming its registration.
    */
   #drawn(theme: Theme): Node {
     const draw = this.#draw
-    const name = this.#name
-    if (draw === undefined || name === undefined) return { kind: 'blank' }
-    return drawPlaced(`binnacle.screen(${name})`, draw, this.#facts(), theme)
+    const registration = this.#registration
+    if (draw === undefined || registration === undefined) return { kind: 'blank' }
+    const drawn = drawPlaced(registration, draw, this.#facts(), theme)
+    return this.#said === undefined ? drawn : { kind: 'stack', children: [drawn, refused(this.#said)] }
   }
 
   /** Draw the screen again, as pi-tui asks when the theme changes, or its registration is placed again. */

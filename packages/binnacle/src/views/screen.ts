@@ -67,12 +67,12 @@ function foldsIn(node: Node): string[] {
 }
 
 /**
- * What scopes the regions an entry draws: its first fact's place in the log, stable as the log is — across a redraw, a change of adapters that reads the log again, and a switch of screens. A tool entry's first fact is its call, which no result of its own replaces.
+ * What scopes the regions an entry draws: its first fact's place in the log, stable as the log is — across a redraw, a change of adapters that reads the log again, and a switch of screens. A tool entry's first fact is its call, which no result of its own replaces, and an approval entry's its ask, which no decision replaces.
  * @param entry - the entry.
  * @returns the scope every region it draws is named within.
  */
 function scopeOf(entry: Entry): string {
-  return String(entry.kind === 'tool' ? entry.call.seq : entry.fact.seq)
+  return String(entry.kind === 'tool' ? entry.call.seq : entry.kind === 'approval' ? entry.asked.seq : entry.fact.seq)
 }
 
 /**
