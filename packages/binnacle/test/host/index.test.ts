@@ -1342,16 +1342,7 @@ test('the key a person binds to dismiss rejects an approval while allow once has
 })
 
 /**
- * Ask a question as dsh's user-questions service does: down the `user-questions/request` waterfall, failing with `NO_PROVIDER` when nothing answers.
- * @param ctx - the context the answerers are on.
- * @param req - what is asked.
- * @returns the answer an answerer settled, or the rejection it was refused with.
- */
-const askQuestions = (ctx: Context, req: Omit<Parameters<Events['user-questions/request']>[0], 'agent'>): Promise<AskUserQuestionAnswer> =>
-  ctx.waterfall('user-questions/request', { agent: {} as never, ...req }, () => Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')))
-
-/**
- * Ask a question as dsh's user-questions service does, scope-filtered to the agent that asks (`dsh:packages/core/scope/src/index.ts#scopeTarget`), failing with `NO_PROVIDER` when nothing answers.
+ * Ask a question as dsh's user-questions service does for the session's agent: down the `user-questions/request` waterfall, scope-filtered to the agent that asks (`dsh:packages/core/scope/src/index.ts#scopeTarget`), failing with `NO_PROVIDER` when nothing answers.
  * @param ctx - the context the answerers are on.
  * @param agent - the agent asking, whose scope the dispatch is tagged with.
  * @param req - what is asked.
@@ -1385,7 +1376,7 @@ test('a question asked sits in the composer\'s seat, naming the question, and en
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  const answer = askQuestions(ctx, { questions: [{
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
     id: 'q1',
     header: 'Set up',
     question: 'which database?',
@@ -1409,7 +1400,7 @@ test('skip answers a question with nothing selected, and the next question takes
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  const answer = askQuestions(ctx, { questions: [
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [
     { id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] },
     { id: 'q2', question: 'which port?', options: [{ label: '5432' }, { label: '8080' }] },
   ] })
@@ -1433,7 +1424,7 @@ test('a multi-select question answers with every option marked, once done is cho
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  const answer = askQuestions(ctx, { questions: [{
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
     id: 'q1',
     question: 'which checks should run?',
     multiSelect: true,
@@ -1460,7 +1451,7 @@ test('type an answer places a composer in the seat, whose submitted line is the 
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  const answer = askQuestions(ctx, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] }] })
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] }] })
   await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
   terminal.type('\t')
   terminal.type('\t')
@@ -1486,7 +1477,7 @@ test('cancel rejects the request as cancelled, and the composer returns with wha
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
   terminal.type('draft')
-  const answer = askQuestions(ctx, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
   await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
   terminal.type('\x1b[19~')
   const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
@@ -1504,7 +1495,7 @@ test('a request withdrawn by its signal takes its card back, rejected as aborted
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
   const withdraw = new AbortController()
-  const answer = askQuestions(ctx, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const answer = askQuestionsFor(ctx, session.agent, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
   await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
   withdraw.abort()
   const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
@@ -1521,7 +1512,7 @@ test('a request already withdrawn when it arrives seats nothing and is rejected 
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
   const withdraw = new AbortController()
   withdraw.abort()
-  const answer = askQuestions(ctx, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const answer = askQuestionsFor(ctx, session.agent, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
   const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
   assert.equal((refusal as { code?: string }).code, 'ASK_ABORTED')
   await settle()
@@ -1534,7 +1525,7 @@ test('a plan-review question is drawn the same way, its plan as markdown and its
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  const answer = askQuestions(ctx, { questions: [{
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
     id: 'q1',
     header: 'Plan review',
     question: 'does this plan do it?',
