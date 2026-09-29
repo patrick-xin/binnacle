@@ -12,6 +12,7 @@ What a presenter returns is the tool's code, not binnacle's: it is read as data 
 
 ## Choices
 
+- The tool cards are a row of binnacle's patch, `binnacle-tool-cards`, so a person removes them by disabling that row in their profile's patch ([Authoring](authoring.md#removing-a-built-in-feature)).
 - What the head shows: the mark and the presented title — its first line beside the mark, and each later line indented two columns beneath it, so a command written on more than one line does not read as output; the tool's name and arguments stay on binnacle's own card, beneath.
 - The mark the head stands by is the transcript's (`running`, `done`, `failed`), so a presented card reads at a glance beside an unpresented one ([Theme](theme.md)).
 - What it returned folds as a tool's output does, its rows the theme's for the tool kind ([Theme](theme.md)); a presented `content` is folded when the tool gives one, the result's own text when not.

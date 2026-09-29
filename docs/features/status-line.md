@@ -10,6 +10,7 @@ What it says of the session it reads from dsh itself, never from a shape of binn
 
 ## Choices
 
+- The Status line is a row of binnacle's patch, `binnacle-status-line`, so a person removes it by disabling that row in their profile's patch ([Authoring](authoring.md#removing-a-built-in-feature)).
 - The model is named as `provider/model`, as the session asks for it.
 - The tokens used are all the meter counts — sent, received and read from the cache — as one count: `517`, `12.4k`, `1.2m`, dsh web's compact count (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`) restated lowercase.
 - The share of context is rounded as dsh web's occupancy meter rounds it (`dsh:packages/client/ui-conversation/src/client/context-occupancy.ts#contextOccupancy`), never past full: `38% of context`.

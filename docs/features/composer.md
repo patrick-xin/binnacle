@@ -12,6 +12,7 @@ The composer is placed in its slot by the built-in Composer plugin (`binnacle:pa
 
 ## Choices
 
+- The Composer is a row of binnacle's patch, `binnacle-composer`, so a person removes it by disabling that row in their profile's patch ([Authoring](authoring.md#removing-a-built-in-feature)).
 - pi-tui's `Editor` is taken as upstream ships it, not rebuilt.
 - A submitted line reaches the placement trimmed of the whitespace around it, a blank line included: the `Editor` trims a line before it submits it, and is taken as upstream ships it; the composer clears itself either way. That a blank line is not sent is the built-in plugin's choice, a person's to change by asking for a composer that does something else with one.
 - A line starting with `/` is tried as a command and sent to the agent only when no command has the name — the built-in plugin's choice, a person's to change by asking for a composer that sends every line to the model. A command that ran never reaches the model, and what it did is drawn from the session log as a sent line is ([Transcript](transcript.md)).

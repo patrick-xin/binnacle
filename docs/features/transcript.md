@@ -23,6 +23,7 @@ The transcript is placed in its slot through the same registration an author use
 
 ## Choices
 
+- The Transcript is a row of binnacle's patch, `binnacle-transcript`, so a person removes it by disabling that row in their profile's patch ([Authoring](authoring.md#removing-a-built-in-feature)).
 - How far each kind is folded is [Theme](theme.md)'s — how many rows each shows, and whether it starts open — a person's to change by asking; the starts binnacle ships are named there.
 - A prompt heads its turn in a band: one column each side, one line above and below, filled with the theme's background for what the person sent ([Theme](theme.md)); the padding is pi's, for its user message is padded the same way (`pi:packages/coding-agent/src/modes/interactive/components/user-message.ts#UserMessageComponent`). This is a default, an author's to change: a view registered for `prompt` draws it otherwise.
 - A prompt in a turn that already holds one is a steer, drawn in the band a prompt is, with the `steer` mark in place of the prompt's — a default an author changes the same way, with a view registered for `prompt`. A turn's first prompt is not its first entry — a quiet entry, the inbox taking the line, can precede it — so what marks a steer is the turn already holding a prompt, not a prompt that stands past the turn's head.

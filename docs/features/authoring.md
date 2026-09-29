@@ -16,6 +16,17 @@ The registrations are the author API (`binnacle:packages/binnacle/src/api.ts#Reg
 
 Why an author reaches what the built-in surface reaches is [ADR 0](../adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)'s.
 
+## Removing a built-in feature
+
+A built-in feature a person does not want they remove without an author, as they remove any dsh plugin: each is a row of binnacle's patch (`binnacle:packages/binnacle/cordis.patch.yml`), `binnacle-<feature>`, and their profile's own patch — `cordis.patch.yml` in the profile, applied after every bundle (`dsh:docs/architecture.md`) — disables it by its id:
+
+```yaml
+- id: binnacle-status-line
+  disabled: true
+```
+
+The next start draws without it, and nothing of it is registered; a plugin of their own, or one an author writes, can take its place. Each feature's page names its row. Approvals and Questions have none: they answer for the session's agent, so the host applies them on that agent's scope once the session opens, and a profile's patch cannot remove them ([ADR 5](../adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md), [#57](https://github.com/patrick-xin/binnacle/issues/57)).
+
 ## Changing the theme
 
 `ctx.binnacle.theme(changes)` changes what everything is drawn in — a tone's colour, a mark's glyph, a background's colour, the chrome's glyphs, a fold's words, or how a kind's folds start (`binnacle:packages/binnacle/src/ui/theme.ts#ThemeChanges`) — without drawing anything again yourself. The changes are data, never functions or escape codes; each part names only what it changes, so what it leaves out stays as the theme beneath it has it. The newest registration lays over the ones before it, and disposing one gives back what it changed; a theme coming or going draws and lays out every entry again, in the theme that is left. A theme may add names as well as change binnacle's — a tone the author's view then names, a background a card is filled with, a mark a span names. One that names what binnacle cannot draw — a colour not one of the terminal's sixteen, a mark with no glyph, a string holding a control character — is refused where it is registered, saying by its path what to change (`binnacle:packages/binnacle/src/ui/theme-changes.ts#parseThemeChanges`). What the theme holds, and binnacle's own choices among them, are [Theme](theme.md)'s.

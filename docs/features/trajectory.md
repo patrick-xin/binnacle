@@ -19,6 +19,7 @@ A frame costs what changed, as the transcript's does: the screen is laid out aga
 
 ## Choices
 
+- The Trajectory is a row of binnacle's patch, `binnacle-trajectory`, so a person removes it by disabling that row in their profile's patch ([Authoring](authoring.md#removing-a-built-in-feature)).
 - The key, Ctrl+O, and what it is called in help, a person's to change through the one key table ([Keys](keys.md)).
 - One line per event, and what each line says: the kind first, then a few words — what a person sent, the tool a call asked for, which model answered, how a turn ended. The record beneath each line holds the rest.
 - A read fact's line opens to the fact binnacle read of it — the adapter's own words — while a quiet or unknown one opens to the event as logged. The fact is the honest record of what binnacle knows; the event is the fallback's.

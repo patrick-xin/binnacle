@@ -35,7 +35,7 @@ Nor does registering through an author's doors let a person remove a feature. An
 
 ## Consequences
 
-- A person removes a built-in feature from their profile's patch, by its row's id, with no author code; a feature bound to the agent's scope is removed only by an author.
+- A person removes a built-in feature from their profile's patch, by its row's id, with no author code; one bound to the agent's scope the profile cannot remove.
 - The manifest exports each feature row's module, and `check:patch` holds each row to the tree it lands on.
 
 - `check:layers` proves the built-in surface has no private door, for everything that lives in a plugin.
