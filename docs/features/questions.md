@@ -4,7 +4,7 @@ When the agent needs a person's answer — which database, which checks to run, 
 
 - What the agent asks sits in the composer's place, one question at a time: a card titled with the question's header, the question, and its detail beneath as markdown. What they had typed waits under it.
 - **Pick an option by a key or a click.** Enter chooses the focused option, and a click invokes the option it lands on. On a question that allows several, choosing marks the option — the done mark beside its label — and a last offer, **done**, answers with what is marked.
-- **Type an answer of their own.** The offer places the composer in the seat; the line submitted is the answer, and a blank line gives the card back.
+- **Type an answer of their own.** The offer places the composer in the seat with the question still readable above it; the line submitted is the answer, and a blank line gives the card back.
 - **Skip** the question, answering it with nothing selected, or **cancel** the whole ask — the key bound to `dismiss` cancels, as it rejects an approval.
 - Answering the last question gives the composer back as it was, what was typed included. A request the agent withdraws takes its card back, and the person is told nothing more of it.
 
@@ -24,7 +24,7 @@ A question whose `intent` is a plan review is drawn the same way here: its detai
 - The card's title is the question's `header` as the asker gave it; a question without one is titled by nothing.
 - Enter chooses — the card's first offer is its first option, the approve option on a plan review — and Tab, ↓ and ↑ move among the offers ([Keys](keys.md)).
 - An option's description draws beside its label in the muted tone; a marked option draws the theme's `done` mark beside its label, and an unmarked one keeps its place aligned ([Theme](theme.md)).
-- The typed answer is typed where the person was typing: what they had typed is the answer's start, theirs to edit before submitting, and submitting it sends it as the `custom` answer and clears the composer.
+- The typed answer is typed where the person was typing: what they had typed is the answer's start, theirs to edit before submitting, and submitting it sends it as the `custom` answer and clears the composer. While the composer holds the seat the question stays readable above it — its header, question and detail, without its offers, for dsh's web keeps the question on screen too — and it goes when the composer does, so the question is never asked twice.
 - Esc is bound to nothing here: while the agent waits on its question a turn is running, and Esc interrupts it ([Keys](keys.md)).
 - Cancelling, not Esc, is how a person refuses an ask: it rejects every question of the request, answered or not, with dsh's `ASK_CANCELLED`.
 

@@ -1541,6 +1541,36 @@ test('a plan-review question is drawn the same way, its plan as markdown and its
   assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['ship it'] }] })
 })
 
+test('while the composer holds the seat the question stays readable above it, asked once, offering nothing', async () => {
+  const terminal = new XtermTerminal(50, 20)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{
+    id: 'q1',
+    header: 'Set up',
+    question: 'which database?',
+    detail: 'The workspace has no database yet.',
+    options: [{ label: 'postgres' }, { label: 'sqlite' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('which database?')) && rows.some(row => row.includes('The workspace has no database yet.')) && rows.every(row => !row.includes('skip'))
+  })
+  assert.equal((await terminal.altScreen()).filter(row => row.includes('which database?')).length, 1, 'the question is asked once')
+  terminal.type('whatever runs')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: [], custom: 'whatever runs' }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+  terminal.type('\r')
+  assert.deepEqual(session.sent, [], 'the line answered the question; nothing was sent')
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])

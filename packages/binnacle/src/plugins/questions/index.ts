@@ -76,6 +76,18 @@ function offered(question: AskUserQuestionItem): readonly AskUserQuestionOption[
 }
 
 /**
+ * The question's own lines: the question, and its `detail` beneath as markdown.
+ * @param question - the question.
+ * @returns what it draws of itself.
+ */
+function asked(question: AskUserQuestionItem): readonly Node[] {
+  return [
+    { kind: 'text', text: question.question },
+    ...question.detail === undefined ? [] : [{ kind: 'markdown' as const, text: question.detail }],
+  ]
+}
+
+/**
  * The card one question is asked with: its `header` as the title, the question, its `detail` beneath as markdown, each option offered `choose`, and after the options type an answer, skip and cancel.
  * @param question - the question.
  * @param marked - the labels marked on its options, in the order they were marked.
@@ -90,8 +102,7 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
     child: {
       kind: 'stack',
       children: [
-        { kind: 'text', text: question.question },
-        ...question.detail === undefined ? [] : [{ kind: 'markdown' as const, text: question.detail }],
+        ...asked(question),
         ...offered(question).map((option, index): Node => ({
           kind: 'offer',
           id: `option ${index + 1}`,
@@ -121,6 +132,7 @@ class Ask {
   private unseat: (() => void) | undefined
   private seated: Placement | undefined
   private unsit: (() => void) | undefined
+  private unshow: (() => void) | undefined
   private finished = false
 
   /**
@@ -196,7 +208,7 @@ class Ask {
   }
 
   /**
-   * Place a composer in the seat over the card: the newest placement in the composer's slot, so the person types where they were typing. A line they submit is the question's custom answer, on a multi-select question beside every option marked; a blank line takes the composer back and gives the card the seat again.
+   * Place a composer in the seat over the card — the newest placement in the composer's slot, so the person types where they were typing — and the question above it, its header, question and detail without its offers, so they are not typing blind. A line they submit is the question's custom answer, on a multi-select question beside every option marked; a blank line takes the composer and the question above back, and gives the card the seat again.
    */
   private typeAnswer(): void {
     this.unsit?.()
@@ -205,6 +217,8 @@ class Ask {
       submit: (text) => {
         this.unsit?.()
         this.unsit = undefined
+        this.unshow?.()
+        this.unshow = undefined
         if (text === '') return
         const question = this.question
         this.answerWith({
@@ -213,6 +227,17 @@ class Ask {
           custom: text,
         })
       },
+    })
+    const question = this.question
+    this.unshow?.()
+    this.unshow = this.ctx.binnacle.place('above-composer', {
+      kind: 'lines',
+      draw: () => ({
+        kind: 'card',
+        ...question.header === undefined ? {} : { title: question.header },
+        edge: 'accent',
+        child: { kind: 'stack', children: asked(question) },
+      }),
     })
   }
 
@@ -260,6 +285,8 @@ class Ask {
   /** Take back everything the ask seated, leaving the composer to the person. */
   private close(): void {
     this.req.signal?.removeEventListener('abort', this.withdrawn)
+    this.unshow?.()
+    this.unshow = undefined
     this.unsit?.()
     this.unsit = undefined
     this.unseat?.()
