@@ -100,3 +100,19 @@ test('what has settled is every entry, oldest first, up to a call still waiting 
   assert.equal(settled(transcript([...facts, { kind: 'turn', seq: 11, time: 11, turn: 2, phase: 'end', ending: 'aborted' }])), 6)
   assert.equal(settled(transcript([asked(1, 'c0')])), 0)
 })
+
+test('a prompt in a turn that already holds one steered it; the turn\'s first prompt, and one before any turn, did not', () => {
+  const steer = promptFact(8, 30, 'use pnpm')
+  const facts: Fact[] = [
+    promptFact(1, 1, 'before any turn'),
+    { kind: 'turn', seq: 2, time: 5, turn: 1, phase: 'start' },
+    { kind: 'quiet', seq: 3, time: 6, type: 'agent/inbox/spliced', record: {} } as Fact,
+    promptFact(4, 10, 'fix the build'),
+    call,
+    steer,
+  ]
+  assert.deepEqual(transcript(facts).turns.map(turn => turn.entries.filter(entry => entry.kind === 'prompt')), [
+    [{ kind: 'prompt', fact: promptFact(1, 1, 'before any turn') }],
+    [{ kind: 'prompt', fact: promptFact(4, 10, 'fix the build') }, { kind: 'prompt', fact: steer, steer: true }],
+  ])
+})

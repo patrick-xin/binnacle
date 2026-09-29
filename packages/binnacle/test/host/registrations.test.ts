@@ -395,7 +395,7 @@ test('a plugin places lines below the composer, and disposing its plugin takes t
 
 test('a transcript or composer placed outside its own slot, or lines in the transcript\'s place, is refused, saying what to change', () => {
   const { registrations } = surface()
-  assert.throws(() => registrations.place('below-composer', { kind: 'composer' }), { message: 'binnacle.place(below-composer): the composer goes only in the composer slot' })
+  assert.throws(() => registrations.place('below-composer', { kind: 'composer', submit: () => {} }), { message: 'binnacle.place(below-composer): the composer goes only in the composer slot' })
   assert.throws(() => registrations.place('composer', { kind: 'transcript' }), { message: 'binnacle.place(composer): the transcript goes only in the transcript slot' })
   assert.throws(() => registrations.place('transcript', { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(transcript): lines cannot take the transcript\'s place; place a screen there with binnacle.screen' })
   assert.deepEqual([registrations.placed('below-composer'), registrations.placed('composer'), registrations.placed('transcript')], [[], [], []])
@@ -404,8 +404,9 @@ test('a transcript or composer placed outside its own slot, or lines in the tran
 test('a slot or a placement binnacle has not is refused, naming what it has', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.place('footer' as never, { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(footer): no such slot; the slots are transcript, above-composer, composer and below-composer' })
-  assert.throws(() => registrations.place('below-composer', { kind: 'status' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function' })
-  assert.throws(() => registrations.place('below-composer', { kind: 'lines' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\' } or { kind: \'lines\', draw }, a function' })
+  assert.throws(() => registrations.place('below-composer', { kind: 'status' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
+  assert.throws(() => registrations.place('below-composer', { kind: 'lines' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
+  assert.throws(() => registrations.place('composer', { kind: 'composer' } as never), { message: 'binnacle.place(composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
 })
 
 test('a plugin rebinds a key, the newest registration of a binding wins, and disposing each gives back what was beneath it', async () => {
@@ -454,6 +455,17 @@ test('a binding binnacle has not — an inherited name, or an own __proto__ drop
   await author((ctx) => { ctx.binnacle.keys({ 'binnacle.quit': 'ctrl+q' }) })
   assert.throws(() => registrations.keys({ 'binnacle.screen.trajectory': 'ctrl+q' }), { message: 'binnacle.keys: ctrl+q is bound to both binnacle.quit and binnacle.screen.trajectory; bind one of them to another key' })
   assert.deepEqual(registrations.bindings, { 'binnacle.quit': 'ctrl+q' })
+})
+
+test('a line sent before the session opens, or after it closes, is refused, saying so; one sent while it is open reaches it', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.send('hello'), { message: 'binnacle.send: no session is open; a line can be sent once the session opens, and until it closes' })
+  const sent: string[] = []
+  const close = registrations.open({ send: (text) => { sent.push(text) } })
+  registrations.send('hello')
+  assert.deepEqual(sent, ['hello'])
+  close()
+  assert.throws(() => registrations.send('again'), { message: 'binnacle.send: no session is open; a line can be sent once the session opens, and until it closes' })
 })
 
 test('what is no record of binding ids is refused where it is registered, saying what to change', () => {

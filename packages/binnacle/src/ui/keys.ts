@@ -26,6 +26,7 @@ type AffordanceKeybindings = { readonly [Kind in AffordanceKind as `binnacle.${K
 export interface BinnacleKeybindings extends AffordanceKeybindings {
   'binnacle.quit': true
   'binnacle.switchScreens': true
+  'binnacle.interrupt': true
   'binnacle.stepIn': true
   'binnacle.focusNext': true
   'binnacle.focusPrevious': true
@@ -46,6 +47,7 @@ export const BINNACLE_BINDINGS = {
   'binnacle.stepOut': { defaultKeys: 'escape', description: 'give the keyboard back to the composer' },
   'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'quit' },
   'binnacle.switchScreens': { defaultKeys: 'ctrl+t', description: 'switch screens' },
+  'binnacle.interrupt': { defaultKeys: 'escape', description: 'interrupt the running turn, while nothing has focus' },
 } as const satisfies KeybindingDefinitions
 
 /**
@@ -74,6 +76,7 @@ export type ResolvedKey =
   | { readonly kind: 'gesture', readonly binding: KeyBinding }
   | { readonly kind: 'quit' }
   | { readonly kind: 'switch-screens' }
+  | { readonly kind: 'interrupt' }
   | { readonly kind: 'screen', readonly name: string }
   | { readonly kind: 'screen-close' }
 
@@ -144,7 +147,7 @@ export function keyTable(): KeyTable {
       if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
       // The bindings live in this context, in the order the table resolves them: the host's own everywhere, then a
       // placed screen's key, its closing while one is open, step in, and — while something has focus — moving focus,
-      // the primary and step out, then one binding per affordance kind. A placed screen takes the keys the transcript
+      // the primary and step out, then one binding per affordance kind; while nothing has focus, interrupting instead. A placed screen takes the keys the transcript
       // would answer, on itself rather than the transcript beneath; only Esc differs, returning to the transcript,
       // and it is resolved before the gestures both screens share, which the rest of the order gives. Scrolling,
       // search and selection are the alternate screen's own, over the scroll view the screen sits in; the composer
@@ -164,7 +167,7 @@ export function keyTable(): KeyTable {
           { id: 'binnacle.stepOut', to: { kind: 'gesture', binding: 'focus.out' } },
         )
         for (const kind of Object.keys(affordances) as AffordanceKind[]) live.push({ id: `binnacle.${kind}` as Keybinding, to: { kind: 'gesture', binding: kind } })
-      }
+      } else live.push({ id: 'binnacle.interrupt', to: { kind: 'interrupt' } })
       // What the person set resolves before what only defaults to the same key, within that order; two ids the
       // registrations leave on one key keep the order, whichever the person set.
       const explicit = live.filter(({ id }) => Object.hasOwn(set, id) && set[id] !== undefined)

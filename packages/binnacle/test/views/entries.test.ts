@@ -73,6 +73,12 @@ test('a prompt heads its turn in a band: padded, and filled with the theme\'s ba
   ])
 })
 
+test('a prompt that steered a running turn is drawn in the band a prompt is, with the steer mark in place of the prompt\'s', () => {
+  const entry: Entry = { kind: 'prompt', fact: { kind: 'prompt', seq: 9, time: 30, blocks: [{ kind: 'text', text: 'use pnpm' }] }, steer: true }
+  assert.deepEqual(lines(entry), ['', ' ↳ use pnpm', ''])
+  assert.equal(styled(entry)[1], `\x1b[100m \x1b[36m↳\x1b[39m use pnpm${' '.repeat(29)}\x1b[49m`)
+})
+
 const answer: Entry = {
   kind: 'answer',
   fact: {
