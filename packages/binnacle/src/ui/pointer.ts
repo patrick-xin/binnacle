@@ -1,10 +1,3 @@
-/**
- * The pointer: pi-tui's mouse events, as gestures.
- *
- * The one place pi-tui's mouse vocabulary is read; the gesture table knows
- * only gestures.
- */
-
 import type { TuiMouseEvent } from '@earendil-works/pi-tui'
 import type { Gesture } from '../contract/index.ts'
 

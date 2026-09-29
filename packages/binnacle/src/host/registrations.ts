@@ -1,14 +1,3 @@
-/**
- * The `binnacle` service: the registrations of the author API, kept for the
- * host to adapt and draw with.
- *
- * Each registration is an effect bound to the plugin that made it, through
- * the context Cordis traces to the caller, so disposing that plugin takes
- * back what it registered. Its state is in TypeScript-private members, not
- * `#private` ones: Cordis hands each caller a traced copy of the service,
- * which a `#private` field refuses as its receiver.
- */
-
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
@@ -69,8 +58,14 @@ function overlaid(...sources: readonly Readonly<Record<string, KeyId | readonly 
   return Object.fromEntries(sources.flatMap(source => Object.entries(source))) as KeybindingsConfig
 }
 
-/** The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change. */
+/**
+ * The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change.
+ * Each registration is an effect bound to the plugin that made it, through the context Cordis traces to the caller,
+ * so disposing that plugin takes back what it registered.
+ */
 export class RegistrationService extends Service implements Registrations {
+  // State is in TypeScript-private members, not `#private` ones: Cordis hands each caller a traced copy of the service,
+  // which a `#private` field refuses as its receiver.
   private readonly adapterTable = new Map<string, readonly AuthorAdapter[]>()
   private readonly newestAdapters = new Map<string, AuthorAdapter>()
   private readonly viewTable = new Map<string, readonly View[]>()

@@ -1,12 +1,3 @@
-/**
- * The screen: a session's transcript and the UI state, at a width, as every
- * line of the transcript and the regions on them.
- *
- * It draws the whole transcript, which pi-tui windows, scrolls and selects,
- * so a frame's cost is kept to what changed: each entry's view is called once
- * and its layout kept while its width and folds stay as they were.
- */
-
 import type { Fact } from '../facts/adapt.ts'
 import { transcript } from '../models/transcript.ts'
 import type { Entry, Transcript } from '../models/transcript.ts'
@@ -123,6 +114,10 @@ function regionsIn(node: Node): string[] {
 }
 
 /**
+ * It draws the whole transcript, which pi-tui windows, scrolls and selects,
+ * so a frame's cost is kept to what changed: each entry's view is called once
+ * and its layout kept while its width and folds stay as they were.
+ *
  * A way to draw screens that keeps what each entry drew, its regions scoped to it — one name in two entries is two regions, and a region's state is kept under its scoped id across redraws, adapter changes that read the log again, and switches of screens. An entry is a value
  * the transcript replaces when it changes, so what it drew is kept against
  * the entry itself, and against the views of its key, which are replaced as

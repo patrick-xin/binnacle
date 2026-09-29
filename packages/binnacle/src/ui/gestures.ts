@@ -1,18 +1,10 @@
-/**
- * The gesture table: the one place a gesture is given a meaning.
- *
- * A pointer gesture lands on the regions under the pointer, innermost first;
- * a key lands on the focused region, then on the regions the pane that
- * answers it reaches beyond focus, in the order it hands them.
- */
-
 import { affordances } from '../contract/index.ts'
 import type { Action, Gesture, Region } from '../contract/index.ts'
 
 /**
  * What a gesture means where it lands.
  * @param gesture - what the person did.
- * @param under - the regions it lands on, innermost first; for a key, the focused region first.
+ * @param under - the regions it lands on: for a pointer, those under it, innermost first; for a key, the focused region, then the regions the pane that answers it reaches beyond focus, in the order it hands them.
  * @returns the action, or undefined when the gesture means nothing there.
  */
 export function meaning(gesture: Gesture, under: readonly Region[]): Action | undefined {

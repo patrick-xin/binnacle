@@ -1,14 +1,3 @@
-/**
- * The theme binnacle draws in: content in tones, a glyph as a mark a view
- * names or as one the chrome draws with, a band in a background a view
- * names, a markdown document in the tones and the attributes, and the
- * composer framed in dim with its select list in accent and muted.
- *
- * A tone is drawn in one of the terminal's own sixteen colours, so a person's
- * palette decides what it looks like, as their terminal already does; so is
- * a background, in one of the sixteen the terminal fills with.
- */
-
 import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
 
 /** Leave text as it is. */

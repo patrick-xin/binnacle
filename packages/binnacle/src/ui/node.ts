@@ -1,11 +1,3 @@
-/**
- * The nodes a view draws with: data, never a render callback.
- *
- * A view returns a node; the ui lays it out with pi-tui at a width. So a view,
- * built-in or an author's, never holds a pi-tui component, and a change in
- * how pi-tui draws reaches every view at once.
- */
-
 import { affordances, describe } from '../contract/index.ts'
 import type { Affordance } from '../contract/index.ts'
 
@@ -20,7 +12,11 @@ export type Span =
   /** The time since a moment, in milliseconds since the epoch, as dsh logs a fact's time: `4s`, `1m 05s`, `1h 02m`, laid out at the time the host hands layout, so a view drawing it stays a function of its entry. */
   | { readonly since: number, readonly tone?: Tone }
 
-/** Something a view draws. */
+/**
+ * Something a view draws: data, never a render callback. The ui lays it out
+ * with pi-tui at a width, so a view, built-in or an author's, never holds a
+ * pi-tui component, and a change in how pi-tui draws reaches every view at once.
+ */
 export type Node =
   | {
     readonly kind: 'blank'

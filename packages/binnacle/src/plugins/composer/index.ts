@@ -1,12 +1,3 @@
-/**
- * The Composer: where a person types a line and sends it, under the
- * transcript. A built-in plugin, holding only what an author holds: the
- * `binnacle` service, to place binnacle's composer where an author could
- * place it, or place something newer over it, and to send what the person
- * submits, or run it as one of dsh's commands, through the grants an author
- * would.
- */
-
 import type { Context } from '@deepseek-ai/cordis'
 
 /** The Composer plugin, loaded by the host beside the surface it draws on. */
