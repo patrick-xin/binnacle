@@ -23,7 +23,6 @@ export interface Screen extends Frame {
 /** Draws one screen after another from the same session. */
 export type DrawScreen = (model: Transcript, state: UiState, width: number, views?: Views, theme?: Theme, now?: number) => Screen
 
-/** What an entry drew, and how it was last laid out. */
 interface Drawing {
   /** The views of its key that drew it, as they stood; none when binnacle's own did. */
   readonly by: readonly View[] | undefined
@@ -41,9 +40,6 @@ interface Drawing {
   readonly laid?: { readonly width: number, readonly theme: Theme, readonly open: readonly boolean[], readonly focus: string | undefined, readonly now: number | undefined, readonly frame: Frame }
 }
 
-/**
- * The id of every fold in a node, however deep.
- */
 function foldsIn(node: Node): string[] {
   switch (node.kind) {
     case 'blank':
@@ -64,8 +60,6 @@ function foldsIn(node: Node): string[] {
 
 /**
  * What scopes the regions an entry draws: its first fact's place in the log, stable as the log is — across a redraw, a change of adapters that reads the log again, and a switch of screens. A tool entry's first fact is its call, which no result of its own replaces, an approval entry's its ask, which no decision replaces, a command entry's its run, which no done replaces, and a compaction entry's its start, which no summary or end replaces.
- * @param entry - the entry.
- * @returns the scope every region it draws is named within.
  */
 function scopeOf(entry: Entry): string {
   return String(entry.kind === 'tool' ? entry.call.seq : entry.kind === 'approval' ? entry.asked.seq : entry.kind === 'command' ? entry.run.seq : entry.kind === 'compaction' ? entry.start.seq : entry.fact.seq)
@@ -73,9 +67,6 @@ function scopeOf(entry: Entry): string {
 
 /**
  * A node with every region id scoped to the entry that drew it, so one name in two entries is two regions, and two views of one entry that name a region alike share what a person did to it.
- * @param node - what the entry's views drew, its regions named within it.
- * @param scope - the entry's scope.
- * @returns the node, its regions named for the whole screen.
  */
 function scopedWithin(node: Node, scope: string): Node {
   switch (node.kind) {
@@ -95,9 +86,6 @@ function scopedWithin(node: Node, scope: string): Node {
   }
 }
 
-/**
- * The id of every region in a node, however deep, cut or not: any of them can take focus.
- */
 function regionsIn(node: Node): string[] {
   switch (node.kind) {
     case 'blank':
@@ -117,17 +105,11 @@ function regionsIn(node: Node): string[] {
 }
 
 /**
- * It draws the whole transcript, which pi-tui windows, scrolls and selects,
- * so a frame's cost is kept to what changed: each entry's view is called once
- * and its layout kept while its width and folds stay as they were.
- *
- * A way to draw screens that keeps what each entry drew, its regions scoped to it — one name in two entries is two regions, and a region's state is kept under its scoped id across redraws, adapter changes that read the log again, and switches of screens. An entry is a value
- * the transcript replaces when it changes, so what it drew is kept against
- * the entry itself, and against the views of its key, which are replaced as
- * a whole when one is registered, disposed or invalidated; the layout is kept
- * against the width and against which of its folds are open, which is all of
- * the state layout reads, and against the theme, which is replaced as a whole
- * when a theme registration comes or goes.
+ * A drawer that keeps what each entry drew, so a frame's cost is kept to what changed; pi-tui windows, scrolls and selects the whole transcript it draws.
+ * An entry is a value the transcript replaces when it changes, so what it drew is kept against the entry itself, and
+ * against the views of its key, which are replaced as a whole when one is registered, disposed or invalidated; the
+ * layout is kept against the width and against which of its folds are open, which is all of the state layout reads,
+ * and against the theme, which is replaced as a whole when a theme registration comes or goes.
  * @returns the drawer, holding nothing yet.
  */
 export function screens(): DrawScreen {
@@ -140,11 +122,10 @@ export function screens(): DrawScreen {
       drawing = { by, theme, node, folds: foldsIn(node), regions: regionsIn(node), timed: timedIn(node) }
     }
     const laid = drawing.laid
-    // The layout is kept against all of the state layout reads: the width, which folds are open, and focus, which draws its own row.
     const focus = state.focus !== undefined && drawing.regions.includes(state.focus) ? state.focus : undefined
     // An entry that draws the time since a moment is kept against the time too; every other one is laid out once for all times.
     if (laid?.width === width && laid.theme === theme && drawing.folds.every((id, index) => state.toggled.has(id) === laid.open[index]) && laid.focus === focus && (!drawing.timed || laid.now === now)) return laid.frame
-    // How its folds start is the theme's for its key, then for its kind; the theme is what the layout is kept against, so this needs no key of its own.
+    // The theme is what the layout is kept against, so how folds start needs no key of its own.
     const starts = theme.folds[keyOf(entry)] ?? theme.folds[entry.kind]
     const frame = layout(drawing.node, width, { ...state, ...starts === undefined ? {} : { folds: starts }, ...now === undefined ? {} : { now } }, theme)
     drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.toggled.has(id)), focus, now, frame } })
@@ -160,7 +141,6 @@ export function screens(): DrawScreen {
       for (const entry of turn.entries) {
         const frame = frameOf(entry, state, width, views, theme, now)
         timed = timed || drawings.get(entry)?.timed === true
-        // One blank line separates two entries that draw something, whichever turns they sit in — so a turn's gap falls before its prompt, the first entry it drew. An entry that draws nothing takes none, and a turn every entry of which drew nothing draws no line at all.
         const draws = frame.lines.length > 0
         if (draws && drew) lines.push('')
         drew = drew || draws
@@ -175,11 +155,6 @@ export function screens(): DrawScreen {
   }
 }
 
-/**
- * Whether a line's spans say the time since a moment.
- * @param text - a text node's text, or a fold's title.
- * @returns true when a span of it does.
- */
 function timedSpans(text: string | readonly Span[] | undefined): boolean {
   return typeof text === 'object' && text.some(span => typeof span === 'object' && 'since' in span)
 }
@@ -187,8 +162,6 @@ function timedSpans(text: string | readonly Span[] | undefined): boolean {
 /**
  * Whether a node draws the time since a moment anywhere in it: what a pane keeps a layout for against the time,
  * so a later one lays it out again.
- * @param node - the node.
- * @returns true when a span of it, or of anything it holds, says the time since a moment.
  */
 export function timedIn(node: Node): boolean {
   switch (node.kind) {
@@ -212,12 +185,6 @@ export function timedIn(node: Node): boolean {
 
 /**
  * Draw the whole transcript at a width, once, each entry's regions scoped to it so their ids name them across the whole screen.
- * @param facts - the session's facts, in log order.
- * @param state - what the person has changed about the screen.
- * @param width - the columns it is given.
- * @param views - authors' views, as `drawEntry` takes them.
- * @param theme - the theme it is drawn in.
- * @returns every line, every region on them, and what can take focus.
  */
 export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map(), theme: Theme = binnacleTheme): Screen {
   return screens()(transcript(facts), state, width, views, theme)

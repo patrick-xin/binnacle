@@ -1,12 +1,10 @@
 import type { Fact } from '../facts/adapt.ts'
 
-/** A fact of one kind. */
 type FactOf<K extends Fact['kind']> = Extract<Fact, { readonly kind: K }>
 
-/** An entry holding one fact, its kind the fact's: distributed so each kind narrows its fact. */
+// Distributed so each kind narrows its fact.
 type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, readonly fact: FactOf<K> } : never
 
-/** The kinds of fact that stand as an entry of their own, never paired with another. */
 type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'authored' | 'unknown' | 'quiet'
 
 /**
@@ -55,24 +53,17 @@ export interface Transcript {
 /** The transcript of a session with nothing logged yet. */
 export const empty: Transcript = { turns: [] }
 
-/**
- * The entry holding one fact.
- * @returns an entry of the fact's kind; TypeScript cannot correlate the two across the union, so the pairing is asserted here, once.
- */
+// TypeScript cannot correlate an entry's kind with its fact across the union, so the pairing is asserted here, once.
 function single<K extends Alone>(fact: FactOf<K>): Single<K> {
   return Object.freeze({ kind: (fact as Fact).kind, fact }) as Single<K>
 }
 
 /**
- * Fold one fact into a transcript.
- *
  * A pure fold, so the host can apply one fact as it arrives and a replay can
  * apply the whole log, and both reach the same transcript.
  *
  * Each entry it makes is frozen: an author's view is handed entries, never
  * turns, so it cannot change what later facts are folded into.
- * @param model - the transcript so far.
- * @param fact - the next fact in log order.
  * @returns the transcript with it folded in; `model` is left as it was.
  */
 export function fold(model: Transcript, fact: Fact): Transcript {
@@ -135,8 +126,6 @@ export function fold(model: Transcript, fact: Fact): Transcript {
  * (`dsh:packages/compaction/compaction/src/types.ts`), so either can wait in
  * a turn already ended. Only the last turn is ever folded into, so every
  * turn before it has settled whole.
- * @param model - the transcript so far.
- * @returns a count of entries, taken in log order.
  */
 export function settled(model: Transcript): number {
   const last = model.turns.at(-1)
@@ -150,11 +139,6 @@ export function settled(model: Transcript): number {
   return before + (waiting === -1 ? last.entries.length : waiting)
 }
 
-/**
- * Fold a whole log.
- * @param facts - every fact, in log order.
- * @returns the transcript they make.
- */
 export function transcript(facts: readonly Fact[]): Transcript {
   return facts.reduce(fold, empty)
 }
