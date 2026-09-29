@@ -45,7 +45,7 @@ export interface OpenedSession {
   /** Where the session stands now: the model it runs, whether a turn runs, and what dsh has measured. */
   standing(): SessionStands
   /**
-   * Hear when where the session stands may have changed: as it logs anything.
+   * Hear when where the session stands may have changed: as it logs anything, and as the agent's own status flips.
    * @param listener - called on each change.
    * @returns a function that stops listening.
    */
@@ -100,6 +100,12 @@ function contextOf(value: ContextPressureProjection | undefined): Pick<SessionSt
 export async function openSession(ctx: Context): Promise<OpenedSession> {
   const defaults: AgentDefaultModelConfig = ctx.agentDefaultModel
   const selection = defaults.currentSelection()
+  // Where the session stands is heard on two doors: the agent flips to idle after the last event of its turn is
+  // logged — kick's finally sets the phase only after `turn/end` is appended, and says so as `agent/status`
+  // (`dsh:packages/core/agent-loop/src/agent.ts`) — so a listener on session events alone would keep reading a
+  // running turn; and the projections and the model it last asked for ride the events themselves.
+  const standsChanged = new Set<() => void>()
+  const restand = (): void => { for (const listener of standsChanged) listener() }
   const handle: AgentHandle = await ctx.agents.create({
     sessionId: SessionId(`session-${randomUUID()}`),
     meta: { cwd: process.cwd() },
@@ -107,6 +113,8 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     setup: (agentCtx) => {
       const selected: ModelSelectionRef = { current: selection, assembled: undefined }
       installModelSelection(agentCtx, selected)
+      // Scoped to this agent, and gone with its world when the handle is disposed.
+      agentCtx.on('agent/status', restand)
     },
   })
   const { session } = handle.agent
@@ -130,7 +138,11 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       const values: ProjectionSnapshot['values'] = ctx.sessionProjections.snapshot(session, ['tokenUsage', 'contextPressure']).values
       return { model, running: handle.agent.status === 'running', ...usageOf(values.tokenUsage), ...contextOf(values.contextPressure) }
     },
-    onStanding: listener => ctx.on('session/event', (from) => { if (from === session) listener() }),
+    onStanding: (listener) => {
+      standsChanged.add(listener)
+      const off = ctx.on('session/event', (from) => { if (from === session) listener() })
+      return () => { standsChanged.delete(listener); off() }
+    },
     get running() { return handle.agent.status === 'running' },
     interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
     close: () => handle.dispose(),
