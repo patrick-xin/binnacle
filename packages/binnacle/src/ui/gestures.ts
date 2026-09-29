@@ -2,10 +2,10 @@ import { affordances } from '../contract/index.ts'
 import type { Action, Gesture, Region } from '../contract/index.ts'
 
 /**
- * What a gesture means where it lands.
- * @param gesture - what the person did.
- * @param under - the regions it lands on: for a pointer, those under it, innermost first; for a key, the focused region, then the regions the pane that answers it reaches beyond focus, in the order it hands them.
- * @returns the action, or undefined when the gesture means nothing there.
+ * What a gesture means where it lands, or undefined when nothing. `under` is
+ * the regions it lands on: for a pointer, those under it, innermost first; for
+ * a key, the focused region, then the regions the pane that answers it reaches
+ * beyond focus, in the order it hands them.
  */
 export function meaning(gesture: Gesture, under: readonly Region[]): Action | undefined {
   switch (gesture.kind) {

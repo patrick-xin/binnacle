@@ -21,13 +21,7 @@ export interface Bounds {
 /** The screen before a person has changed anything: everything folded, nothing focused. */
 export const initial: UiState = { toggled: new Set() }
 
-/**
- * What an action does to the screen.
- * @param state - the screen as it is.
- * @param action - what a gesture meant.
- * @param bounds - what bounds it on the screen as drawn now.
- * @returns the screen after it; `state` itself when the action is not the screen's to answer: `select` and scrolling are pi-tui's, `copy` and the rest the host's.
- */
+/** What an action does to the screen: `state` itself when the action is not the screen's to answer: `select` and scrolling are pi-tui's, `copy` and the rest the host's. */
 export function act(state: UiState, action: Action, bounds: Bounds): UiState {
   switch (action.kind) {
     case 'invoke': {

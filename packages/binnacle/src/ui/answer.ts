@@ -14,12 +14,10 @@ export interface Answer {
 }
 
 /**
- * Answer a gesture that has landed, through the gesture table.
- * @param state - the screen as it is.
- * @param gesture - what the person did.
- * @param landing - the regions it lands on, innermost first: those under the pointer, or for a key the focused one, then those beyond it the pane reaches.
- * @param bounds - what bounds an action on the screen as it is drawn.
- * @returns what the gesture did; `undefined` when the gesture means nothing where it landed, which no pane answers.
+ * Answer a gesture that has landed, through the gesture table. `landing` is
+ * the regions it lands on, innermost first: those under the pointer, or for a
+ * key the focused one, then those beyond it the pane reaches. Undefined when
+ * the gesture means nothing where it landed, which no pane answers.
  */
 export function answer(state: UiState, gesture: Gesture, landing: readonly Region[], bounds: Bounds): Answer | undefined {
   const action = meaning(gesture, landing)
