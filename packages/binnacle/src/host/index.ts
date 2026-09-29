@@ -48,7 +48,7 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 export const name = 'binnacle'
 
 /** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, and its commands. Each is a key dsh declares on `Context`. */
-export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'] satisfies (keyof Context)[]
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {
@@ -323,7 +323,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // Where the session stands, as the session reads it live, with the notice the host raises laid over it: what lines
   // are handed, and drawn again as it changes.
   let notice: string | undefined
-  const surface = (): Surface => ({ ...session.standing(), ...notice === undefined ? {} : { notice } })
+  const surface = (): Surface => notice === undefined ? {} : { notice }
   const restand = (): void => {
     for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
     tui.requestRender()
@@ -379,7 +379,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   offer()
   const unoffer = session.onOffers(offer)
-  const closeGrants = registrations.open({ send: (text) => { session.send(text) }, command: line => session.command(line) })
+  const closeGrants = registrations.open({ send: (text) => { session.send(text) }, command: line => session.command(line), agent: session.agent })
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
   // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()

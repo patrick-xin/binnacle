@@ -4,6 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { KeyId } from '@earendil-works/pi-tui'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { adapt } from '../../src/facts/adapt.ts'
 import type { AffordanceKind, Fact, Node, Placement } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
@@ -461,11 +462,22 @@ test('a line sent before the session opens, or after it closes, is refused, sayi
   const { registrations } = surface()
   assert.throws(() => registrations.send('hello'), { message: 'binnacle.send: no session is open; a line can be sent once the session opens, and until it closes' })
   const sent: string[] = []
-  const close = registrations.open({ send: (text) => { sent.push(text) }, command: async () => false })
+  const close = registrations.open({ send: (text) => { sent.push(text) }, command: async () => false, agent: {} as Agent })
   registrations.send('hello')
   assert.deepEqual(sent, ['hello'])
   close()
   assert.throws(() => registrations.send('again'), { message: 'binnacle.send: no session is open; a line can be sent once the session opens, and until it closes' })
+})
+
+test('the agent on screen is handed as dsh\'s own once the session opens, and refused before it opens and after it closes, saying so', () => {
+  const { registrations } = surface()
+  const refused = { message: 'binnacle.agent: no session is open; the agent on screen can be read once the session opens, and until it closes' }
+  assert.throws(() => registrations.agent(), refused)
+  const agent = { options: { provider: 'deepseek', model: 'deepseek-v4' } } as unknown as Agent
+  const close = registrations.open({ send: () => {}, command: async () => false, agent })
+  assert.equal(registrations.agent(), agent)
+  close()
+  assert.throws(() => registrations.agent(), refused)
 })
 
 test('what is no record of binding ids is refused where it is registered, saying what to change', () => {
@@ -479,7 +491,7 @@ test('a line run as a command before the session opens is refused, saying so; wh
   const { registrations } = surface()
   await assert.rejects(registrations.command('/compact'), { message: 'binnacle.command: no session is open; a command can be run once the session opens, and until it closes' })
   const run: string[] = []
-  const close = registrations.open({ send: () => {}, command: async (line) => { run.push(line); return line === '/compact' } })
+  const close = registrations.open({ send: () => {}, command: async (line) => { run.push(line); return line === '/compact' }, agent: {} as Agent })
   assert.equal(await registrations.command('/compact'), true)
   assert.equal(await registrations.command('/nothing'), false)
   assert.deepEqual(run, ['/compact', '/nothing'])

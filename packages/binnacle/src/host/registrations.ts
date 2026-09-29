@@ -11,6 +11,7 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
 import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Slot, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
@@ -34,6 +35,8 @@ export interface GrantedSession {
    * @returns whether a command ran.
    */
   command(line: string): Promise<boolean>
+  /** The agent whose session is on screen, as dsh holds it. */
+  readonly agent: Agent
 }
 
 /** The slots of the page, top to bottom. */
@@ -160,6 +163,12 @@ export class RegistrationService extends Service implements Registrations {
   }
 
   /** @inheritDoc */
+  agent(): Agent {
+    const session = this.granted
+    if (session === undefined) throw new Error('binnacle.agent: no session is open; the agent on screen can be read once the session opens, and until it closes')
+    return session.agent
+  }
+
   async command(line: string): Promise<boolean> {
     const session = this.granted
     if (session === undefined) throw new Error('binnacle.command: no session is open; a command can be run once the session opens, and until it closes')

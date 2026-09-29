@@ -1,6 +1,6 @@
 # 4. A fact is one event, and what dsh folds is taken from dsh
 
-- Status: accepted
+- Status: accepted; widened in place from the facts layer to every plugin
 - Date: 2026-09-26
 
 ## Context
@@ -13,7 +13,7 @@ dsh already folds some of it. `foldSurface` and a live `Session`'s `surface` say
 
 **A fact is one event, adapted: `adapt(event) → Fact`, pure.** A kind with no adapter is an `unknown` fact carrying its type and raw record. A block binnacle cannot read is kept as `unread`, named by its type.
 
-**What dsh already folds is taken from dsh, never derived again.** The model-visible surface and what a replacement shadowed come from the live `Session` the host holds, handed to the facts layer as facts.
+**What dsh already folds is taken from dsh, never derived again.** The model-visible surface and what a replacement shadowed come from the live `Session` the host holds, handed to the facts layer as facts. The same holds beyond the facts layer: what dsh knows of a session — its model, whether a turn runs, what its services project — a plugin reads from dsh, through the agent on screen the host grants and the dsh services the plugin names; binnacle never restates it in a shape of its own.
 
 **Models fold only what dsh does not**: pairing a call with its result, grouping a turn, the agents tree.
 

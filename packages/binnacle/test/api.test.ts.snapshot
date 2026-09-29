@@ -386,17 +386,6 @@ export interface PlacedScreen {
 }
 // api.d.ts
 export interface Surface {
-    readonly model: string;
-    readonly running: boolean;
-    readonly usage?: {
-        readonly input: number;
-        readonly output: number;
-        readonly cacheRead: number;
-    };
-    readonly context?: {
-        readonly used: number;
-        readonly window: number;
-    };
     readonly notice?: string;
 }
 // api.d.ts
@@ -423,6 +412,8 @@ export interface Registrations {
     keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void;
     send(text: string): void;
     command(line: string): Promise<boolean>;
+    agent(): Agent;
 }
+// Agent ← @deepseek-ai/dsh-agent
 
 `;

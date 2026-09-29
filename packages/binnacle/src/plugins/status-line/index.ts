@@ -2,40 +2,82 @@
  * The Status line: one line under the composer saying what the session runs
  * and where it stands — the model it runs, the tokens it has used and the
  * share of its context, muted — with a notice in its place while one stands. A built-in plugin, holding only what an
- * author holds: the `binnacle` service, to place its line where an author
- * could place one of their own. What it says arrives in the surface the host
- * hands every lines drawing, read live from the session, so it names no
- * service of dsh's and reads nothing at any tick of its own.
+ * author holds: it places its line through the `binnacle` service, and reads
+ * what dsh knows of the session from dsh itself — the agent on screen, which
+ * `binnacle.agent()` hands it, and the token meter's projections, through
+ * the `sessionProjections` service it names in `inject`.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Surface } from '../../api.ts'
+// Type-only: `ProjectionSnapshot` arrives with the `sessionProjections` Context declaration, and the token meter's
+// projections augment the keys a snapshot may ask for.
+import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
+import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter'
 
 /** The Status line plugin, loaded by the host beside the surface it draws on. */
 export const statusLine = {
   name: 'status-line',
-  inject: ['binnacle'] satisfies (keyof Context)[],
+  inject: ['binnacle', 'sessionProjections'] satisfies (keyof Context)[],
   apply(ctx: Context): void {
     ctx.binnacle.place('below-composer', {
       kind: 'lines',
-      draw: (_facts, surface) => ({ kind: 'text', text: lineOf(surface), tone: 'muted' }),
+      draw: (_facts, surface) => ({ kind: 'text', text: surface.notice ?? measured(ctx).join(' · '), tone: 'muted' }),
     })
   },
 }
 
 /**
- * What the status line says: the notice while one stands, in the line's
- * place; otherwise the model the session runs, the tokens it has used and
- * the share of its context, each measure as it is known, joined by ` · `.
- * @param surface - where the session stands.
- * @returns the line's text.
+ * What the line says of the session, each measure as dsh has it: the model
+ * its session last asked for, or before its first request the one it opened
+ * on; the tokens it has used; and the share of its context.
+ * @param ctx - the plugin's context, holding the agent on screen and dsh's projections.
+ * @returns the measures, in the line's order, each left out until it is known.
  */
-function lineOf(surface: Surface): string {
-  if (surface.notice !== undefined) return surface.notice
-  const parts = [surface.model]
-  if (surface.usage !== undefined) parts.push(`${compact(surface.usage.input + surface.usage.output + surface.usage.cacheRead)} tokens`)
-  if (surface.context !== undefined) parts.push(`${share(surface.context.used, surface.context.window)} of context`)
-  return parts.join(' · ')
+function measured(ctx: Context): readonly string[] {
+  const agent = ctx.binnacle.agent()
+  const { provider, model } = agent.session.requestHeader()?.config ?? agent.options
+  // One cut of the log, read as the line is drawn; parsed here, for a projection is data from code binnacle does not own.
+  const { values }: ProjectionSnapshot = ctx.sessionProjections.snapshot(agent.session, ['tokenUsage', 'contextPressure'])
+  const parts = [`${provider}/${model}`]
+  const tokens = tokensOf(values.tokenUsage)
+  if (tokens !== undefined) parts.push(`${compact(tokens)} tokens`)
+  const context = contextOf(values.contextPressure)
+  if (context !== undefined) parts.push(`${share(context.used, context.window)} of context`)
+  return parts
+}
+
+/**
+ * A count, when a projection holds one.
+ * @param value - what the projection holds.
+ * @returns the count, or undefined when it is none.
+ */
+const count = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+
+/**
+ * The tokens used, from the token meter's `tokenUsage` projection (`dsh:packages/llm/token-meter/src/projection.ts#TokenUsageProjection`): sent, received and read from the cache.
+ * @param value - the projection's value: a field that holds no count leaves the measure out, never guessed.
+ * @returns the tokens, or undefined until each is counted.
+ */
+function tokensOf(value: TokenUsageProjection | undefined): number | undefined {
+  if (value === undefined) return undefined
+  const input = count(value.uncachedInputTokens)
+  const output = count(value.outputTokens)
+  const cacheRead = count(value.cacheReadTokens)
+  return input === undefined || output === undefined || cacheRead === undefined ? undefined : input + output + cacheRead
+}
+
+/**
+ * The context the session fills, from the token meter's `contextPressure` projection
+ * (`dsh:packages/llm/token-meter/src/projection.ts#ContextPressureProjection`): what the next request would cost, or
+ * the last one's size, out of the window the latest request context named.
+ * @param value - the projection's value: a field that holds no count leaves the measure out, never guessed.
+ * @returns the context, or undefined until both are known.
+ */
+function contextOf(value: ContextPressureProjection | undefined): { readonly used: number, readonly window: number } | undefined {
+  if (value === undefined) return undefined
+  const used = count(value.projectedTokens) ?? count(value.pressureTokens)
+  const window = count(value.contextWindow)
+  return used === undefined || window === undefined || window === 0 ? undefined : { used, window }
 }
 
 /**
