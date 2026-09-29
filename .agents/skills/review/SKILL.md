@@ -40,33 +40,58 @@ Findings, most severe first, each with:
 
 Then a verdict: `clean`, or `findings`. A finding you could not make fail is said to be so. Style the gates already hold is no finding.
 
-## Running it with codex
+## Running a review
 
-The Sheepdog runs a second reviewer from another model family, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It reviews a Charge in rounds with the Sheep directly, and reports to the Sheepdog once, at the end. It runs as `gpt-5.6-sol` at high effort, named on every run: codex's own default model may be a heavier one, and a review does not need it.
+The Sheepdog runs a second reviewer, of another family than the change's author, with a shell in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It commits nothing, and reports once.
+
+**One run is one round.** A model is sent the whole conversation again on every call, so a review costs its calls times the size its context has grown to, and a round kept alive across the Sheep's fixes pays the first round again on every call of the second. On one change here, one reviewer ran 93 calls and 11M input tokens, and three reviews at once used up the account's usage window. So a round ends when its findings are sent, and the next is a new run that starts from them.
+
+**A Sheep's work** — glm's — is reviewed by a subagent from the Sheepdog's own harness, in a checkout under `/tmp`:
 
 ```sh
-git worktree add --detach /tmp/review-<charge> charge-<charge>
-codex exec -m gpt-5.6-sol -c model_reasoning_effort=high --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>.md \
-  "Load the review skill and review Charge <charge> against issue #<n>, from its base <base>, in rounds with its Sheep. Push nothing; write nothing outside this checkout, where probes and caches are yours."
-git worktree remove --force /tmp/review-<charge>
+git worktree add --detach /tmp/review-<name> <tip>
+cd /tmp/review-<name> && CI=true pnpm install --frozen-lockfile && pnpm refs
 ```
+
+then a subagent, told to load this skill, with the brief below and the checkout's path.
+
+**The Sheepdog's own commits** are reviewed by a GPT model on pi, as a shepherd Charge whose Fold is cut at the Pasture, the tip checked out there. GPT on pi, codex and opencode's `openai` models share one ChatGPT usage window, so these runs are kept for the Sheepdog's commits alone, lean, and a round that only checks fixes takes a lighter model (`gpt-5.6-luna`, `medium`):
+
+```sh
+git switch --detach <tip>
+shepherd dispatch --charge review-<name>-<round> --spec '#<n>' --issue <n> \
+  --model openai-codex/gpt-5.6-sol --thinking high --policy worktree_write \
+  --verify 'pnpm install --frozen-lockfile && pnpm refs' \
+  --brief "<the brief>"
+```
+
+**The brief**, either way: "Load the review skill. Round <round> of #<n>: its own commits are <shas>, <whose each is>; the Sheep is binnacle-<charge>. <From round 2: round <round-1>'s findings are in /tmp/review-<name>-<round-1>.md, answered by <shas>.> <What is already decided.> Commit nothing; report once." Save the report to `/tmp/review-<name>-<round>.md`.
 
 A temporary directory set inside the checkout (`TMPDIR`) needs `GIT_CEILING_DIRECTORIES` set to the checkout too, or git in a test's own repository finds the checkout around it.
 
+## Keeping a review small
+
+What each call returns stays in the context for every call after it.
+
+- **The issue without its comments**: `gh issue view <n>`. Read a comment only when the brief names it; the tracking issue's comments are readings, each many pages long.
+- **The named commits' diffs**, and a file around a hunk by range (`sed -n '<from>,<to>p'`), never whole files or a diff of every doc at once.
+- **The tests' summary**: `pnpm test 2>&1 | tail -15`, then a failing test alone with `--test-name-pattern`.
+- **A search bounded to what the change touches**, and a reference only at the package a commit cites. Never search `.refs` whole, `node_modules`, or a home directory.
+- **Only what the change claims.** A change to a skill or a record is checked against the lines it changed, not by reading the implementation of every tool it names.
+
 ## Rounds with the Sheep
 
-When asked to review a Charge in rounds with its Sheep:
+When asked to review round `<round>` of a Charge with its Sheep:
 
-1. **Review** the checkout, as above.
+1. **Review** the checkout, as above. From round 2, check each earlier finding is answered, then what the fixes touched.
 2. **Send the Sheep its defects**, directly: `herdr agent prompt binnacle-<charge> "<findings>"`, each with where, what, and how it fails, ending "fix each red-first, add commits, and settle DONE again".
-3. **Wait** for it to settle: `herdr agent wait binnacle-<charge> --until done --until idle --until blocked --timeout 3600000`. Blocked means it asked the Sheepdog a question: stop, and report.
-4. **Move to what it committed**, `git checkout --detach charge-<charge>`, and review again: the fixes, and what they touched.
+3. **Report and stop.** Never wait for the Sheep: the Sheepdog starts the next round, as a new Charge, when it settles.
 
-Stop after three rounds, or when a round finds nothing.
+The Sheepdog stops after three rounds, or when a round finds nothing.
 
 **What goes to the Sheep is only a defect against the issue as written**: a bug, a missing or wrong test, a gate, a record left behind. **What is a decision goes to the Sheepdog instead, and never to the Sheep**: work outside the issue's scope, the issue contradicting itself or the code, a choice the issue leaves open, anything that changes the author API beyond what the issue says. You never write in the Sheep's Fold, and never tell it to widen or narrow its scope.
 
-The report to the Sheepdog is the last message: each round's findings and the commit that answered each; what is still open; the decisions it needs, each with a recommendation; a verdict, `clean` or `findings`; and what this skill or the docs lacked.
+The report to the Sheepdog is the last message: this round's findings, and for an earlier round's, the commit that answered each; what is still open; the decisions it needs, each with a recommendation; a verdict, `clean` or `findings`; and what this skill or the docs lacked.
 
 ## After the review
 
