@@ -1,10 +1,3 @@
-/**
- * The author API: what an author, or a built-in feature, may depend on — the
- * `binnacle` service and the types its registrations take and return.
- *
- * Removing or renaming an export here breaks every author; its commit says so.
- */
-
 import type { AuthorAdapter, Fact } from './facts/adapt.ts'
 import type { KeyId } from './ui/keys.ts'
 import type { AffordanceKind, Node } from './ui/node.ts'
