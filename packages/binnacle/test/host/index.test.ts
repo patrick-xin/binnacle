@@ -1358,6 +1358,37 @@ test('cancel rejects the request as cancelled, and the composer returns with wha
   assert.deepEqual(session.sent, ['draft'])
 })
 
+test('a request withdrawn by its signal takes its card back, rejected as aborted', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const withdraw = new AbortController()
+  const answer = askQuestions(ctx, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  withdraw.abort()
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  assert.equal(refusal instanceof Error && refusal.name === 'UserQuestionError', true, 'the refusal is a UserQuestionError')
+  assert.equal((refusal as { code?: string }).code, 'ASK_ABORTED')
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+})
+
+test('a request already withdrawn when it arrives seats nothing and is rejected as aborted', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const withdraw = new AbortController()
+  withdraw.abort()
+  const answer = askQuestions(ctx, { signal: withdraw.signal, questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  assert.equal((refusal as { code?: string }).code, 'ASK_ABORTED')
+  await settle()
+  assert.ok((await terminal.altScreen()).every(row => !row.includes('which database?')), 'no card was seated')
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])

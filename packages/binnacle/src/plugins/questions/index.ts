@@ -24,6 +24,9 @@ import type { Node, Placement } from '../../api.ts'
 /** What the waterfall hands an answerer, as dsh declares it on its event map; the package does not export it by name. */
 type Asked = Parameters<Events['user-questions/request']>[0]
 
+/** The rest of the waterfall's chain, handed to an answerer to delegate to. */
+type AnswerNext = Parameters<Events['user-questions/request']>[1]
+
 /** The region ids the card offers, minted here and read back by the ask that seats it. */
 const TYPING = 'type an answer'
 const SKIP = 'skip'
@@ -97,6 +100,7 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
 class Ask {
   private readonly ctx: Context
   private readonly req: Asked
+  private readonly next: AnswerNext
   private readonly settle: (answer: AskUserQuestionAnswer) => void
   private readonly refuse: (reason: unknown) => void
   private readonly answers: AskUserQuestionAnswerItem[] = []
@@ -106,18 +110,32 @@ class Ask {
   private unseat: (() => void) | undefined
   private seated: Placement | undefined
   private unsit: (() => void) | undefined
+  private finished = false
 
   /**
    * @param ctx - the plugin's context, to seat the card with.
    * @param req - what the waterfall handed.
+   * @param next - the rest of the waterfall's chain, to hand the request to when the plugin is disposed with it standing.
    * @param settle - resolves the waterfall's promise, once every question is answered.
    * @param refuse - rejects the waterfall's promise, when the person cancels the ask or its signal withdraws it.
    */
-  constructor(ctx: Context, req: Asked, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void) {
+  constructor(ctx: Context, req: Asked, next: AnswerNext, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void) {
     this.ctx = ctx
     this.req = req
+    this.next = next
     this.settle = settle
     this.refuse = refuse
+    req.signal?.addEventListener('abort', this.withdrawn, { once: true })
+  }
+
+  /** The request was withdrawn by its signal: take the card back and reject, as dsh's web client does when the host aborts under it. */
+  private readonly withdrawn = (): void => {
+    this.finish(() => { this.refuse(refused('ASK_ABORTED', 'ask_user_question was aborted before the user answered')) })
+  }
+
+  /** Hand the request to the next answerer, its card taken back: what the plugin leaves standing when it is disposed. */
+  handOver(): void {
+    this.finish(() => { this.next().then(this.settle, this.refuse) })
   }
 
   /** The question the card is seated for. */
@@ -130,6 +148,11 @@ class Ask {
 
   /** Seat the card of the current question, taking the composer's place until it is answered. */
   seat(): void {
+    // A signal already aborted never fires the listener, so it is answered here, as dsh's own client answers it at construction.
+    if (this.req.signal?.aborted === true) {
+      this.withdrawn()
+      return
+    }
     const question = this.question
     this.marks.length = 0
     this.acts.clear()
@@ -138,8 +161,7 @@ class Ask {
     this.acts.set(TYPING, () => this.typeAnswer())
     this.acts.set(SKIP, () => this.answerWith({ id: question.id, selected: [] }))
     this.acts.set(CANCEL, () => {
-      this.close()
-      this.refuse(refused('ASK_CANCELLED', 'the user cancelled ask_user_question'))
+      this.finish(() => { this.refuse(refused('ASK_CANCELLED', 'the user cancelled ask_user_question')) })
     })
     this.unseat?.()
     const seated: Placement = {
@@ -207,15 +229,26 @@ class Ask {
     this.answers.push(item)
     this.index += 1
     if (this.index >= this.req.questions.length) {
-      this.close()
-      this.settle({ answers: this.answers })
+      this.finish(() => { this.settle({ answers: this.answers }) })
       return
     }
     this.seat()
   }
 
+  /**
+   * Take back everything the ask seated and finish it, once: settle it, refuse it, or hand it on.
+   * @param settled - how it finishes.
+   */
+  private finish(settled: () => void): void {
+    if (this.finished) return
+    this.finished = true
+    this.close()
+    settled()
+  }
+
   /** Take back everything the ask seated, leaving the composer to the person. */
   private close(): void {
+    this.req.signal?.removeEventListener('abort', this.withdrawn)
     this.unsit?.()
     this.unsit = undefined
     this.unseat?.()
@@ -229,8 +262,14 @@ export const questions = {
   name: 'questions',
   inject: ['binnacle'] satisfies (keyof Context)[],
   apply(ctx: Context): void {
-    ctx.on('user-questions/request', req => new Promise<AskUserQuestionAnswer>((resolve, reject) => {
-      const ask = new Ask(ctx, req, resolve, reject)
+    const standing = new Set<Ask>()
+    ctx.effect(() => () => {
+      // Each finishes and no-ops therefrom; a Set's iteration goes on past what it deletes.
+      for (const ask of standing) ask.handOver()
+    }, 'questions: what still stands, handed to the next answerer')
+    ctx.on('user-questions/request', (req, next) => new Promise<AskUserQuestionAnswer>((resolve, reject) => {
+      const ask = new Ask(ctx, req, next, resolve, reject)
+      standing.add(ask)
       ask.seat()
     }))
   },
