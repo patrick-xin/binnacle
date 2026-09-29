@@ -165,6 +165,39 @@ test('a command still running holds back settling in a turn that has ended, for 
   assert.equal(settled(transcript([...facts, doneFact(5, 50, 'cmd-1a2b3c4d-1', 'success', 'compacted')])), 2)
 })
 
+test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s is held by exactly one entry, paired or alone', () => {
+  const machinery: Fact[] = [
+    { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
+    { kind: 'step', seq: 3, time: 15, turn: 1, step: 1, phase: 'start' },
+    { kind: 'step', seq: 8, time: 25, turn: 1, step: 1, phase: 'end' },
+    { kind: 'turn', seq: 13, time: 30, turn: 1, phase: 'end', ending: 'completed' },
+  ]
+  const held: Fact[] = [
+    prompt,
+    { kind: 'context', seq: 5, time: 18, source: 'goal', blocks: [{ kind: 'text', text: 'ship it' }] },
+    answer,
+    call,
+    askedFact(9, 26, 'a1', 'bash', 'writes outside the workspace'),
+    decidedFact(10, 27, 'a1', 'allowed-once'),
+    // A decision whose ask is not in the log: kept on its own, never dropped.
+    decidedFact(11, 28, 'a9', 'rejected'),
+    { kind: 'authored', seq: 6, time: 19, name: 'seeded', data: { from: 'fork' } },
+    { kind: 'unknown', seq: 7, time: 20, type: 'test/marker', record: {} },
+    { kind: 'quiet', seq: 12, time: 29, type: 'session/title', record: {} },
+  ]
+  const drawn: Fact[] = []
+  for (const turn of transcript([...machinery, ...held]).turns) {
+    for (const entry of turn.entries) {
+      if (entry.kind === 'tool') drawn.push(entry.call, ...entry.result === undefined ? [] : [entry.result])
+      else if (entry.kind === 'approval') drawn.push(entry.asked, ...entry.decided === undefined ? [] : [entry.decided])
+      else if (entry.kind === 'command') drawn.push(entry.run, ...entry.done === undefined ? [] : [entry.done])
+      else drawn.push(entry.fact)
+    }
+  }
+  // Entries hold their facts in log order, so what they hold reads back as the log does, turn and step facts excepted: the model spends those naming the turns themselves.
+  assert.deepEqual(drawn, held)
+})
+
 test('a prompt in a turn that already holds one steered it; the turn\'s first prompt, and one before any turn, did not', () => {
   const steer = promptFact(8, 30, 'use pnpm')
   const facts: Fact[] = [

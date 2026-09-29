@@ -5,7 +5,7 @@ import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { KeyId } from '@earendil-works/pi-tui'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
-import type { Fact, Node } from '../../src/api.ts'
+import type { AffordanceKind, Fact, Node, Placement } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
 import { ScreenPane } from '../../src/panes/screen.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
@@ -484,4 +484,11 @@ test('a line run as a command before the session opens is refused, saying so; wh
   assert.equal(await registrations.command('/nothing'), false)
   assert.deepEqual(run, ['/compact', '/nothing'])
   close()
+})
+
+test('an author types what their lines are invoked with from the author API alone', () => {
+  const heard: AffordanceKind[] = []
+  const placement: Placement = { kind: 'lines', draw: () => ({ kind: 'blank' }), invoke: (_region, affordance) => { heard.push(affordance) } }
+  if (placement.kind === 'lines') placement.invoke?.('reject', 'dismiss')
+  assert.deepEqual(heard, ['dismiss'])
 })

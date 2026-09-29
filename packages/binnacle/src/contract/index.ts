@@ -8,7 +8,8 @@
 
 /**
  * Every affordance, and its policy. `pointer` says whether a click may invoke
- * it: a grant never, so an approval is always a key pressed on purpose.
+ * it: a grant and a dismiss never, so an approval is always answered by a key
+ * pressed on purpose — allowed or refused.
  */
 export const affordances = {
   expand: { pointer: true },
@@ -17,7 +18,7 @@ export const affordances = {
   copy: { pointer: true },
   answer: { pointer: true },
   grant: { pointer: false },
-  dismiss: { pointer: true },
+  dismiss: { pointer: false },
 } as const satisfies Record<string, { readonly pointer: boolean }>
 
 /** Something a person can do with a piece of content. */
