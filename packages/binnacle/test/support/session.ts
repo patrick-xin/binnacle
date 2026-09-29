@@ -6,11 +6,14 @@
  * @module binnacle/test/support/session
  */
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { OpenedSession, SessionStands } from '../../src/host/session.ts'
 
 /** A session that records what the host does with it; the harness behind it is dsh's, proven by `check:boot`. */
 export class FakeSession implements OpenedSession {
   readonly model = 'deepseek/deepseek-v4'
+  /** The agent whose session this stands in for: the scope its approvals are answered under. */
+  readonly agent = {} as Agent
   readonly sent: string[] = []
   closed = false
   running = false

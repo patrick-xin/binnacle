@@ -15,17 +15,19 @@
  * it, its registration changes, or — where its drawing says the time since a
  * moment — as that time passes, and not otherwise. A drawing that throws
  * or returns no node binnacle can lay out draws what went wrong, naming its
- * registration, and never takes the surface down.
+ * registration, and never takes the surface down; so does the report an
+ * invoked offer reaches, drawn the same way until a later one returns.
  */
 
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
 import type { Fact } from '../facts/adapt.ts'
 import type { AffordanceKind, Gesture } from '../contract/index.ts'
 import { answer } from '../ui/answer.ts'
+import { describe } from '../contract/index.ts'
 import { layout, under } from '../ui/layout.ts'
 import type { Frame } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
-import { drawPlaced } from './placed.ts'
+import { drawPlaced, refused } from './placed.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
@@ -73,6 +75,8 @@ export class ScreenPane implements Component {
   #laid: Laid | undefined
   #stale = true
   #timed = false
+  /** What the last report an invoked offer reached did wrong, drawn beneath what the pane drew until one returns. */
+  #said: string | undefined
 
   /**
    * @param facts - the session's facts, as they stand, handed to the placed screen's drawing as they change.
@@ -99,6 +103,7 @@ export class ScreenPane implements Component {
   place(name: string, screen: { readonly draw: (facts: readonly Fact[]) => Node }, registration = `binnacle.screen(${name})`): void {
     this.#registration = registration
     this.#draw = screen.draw
+    this.#said = undefined
     this.#stale = true
   }
 
@@ -142,7 +147,7 @@ export class ScreenPane implements Component {
     const laid = this.laidAt(event.width, this.#state)
     const next = answer(this.#state, gesture, under(laid.frame.regions, event.y, event.x), laid)
     if (next?.invoked !== undefined) {
-      this.#invoked(next.invoked.region, next.invoked.affordance)
+      this.#report(next.invoked.region, next.invoked.affordance)
       return { handled: true }
     }
     if (next === undefined || next.state === this.#state) return undefined
@@ -168,7 +173,7 @@ export class ScreenPane implements Component {
     const beyond = seated ? drawn.frame.regions.map(placed => placed.region).filter(region => region !== focused && region.affordances.length > 0) : []
     const next = answer(this.#state, gesture, focused === undefined ? beyond : [focused, ...beyond], drawn)
     if (next === undefined) return false
-    if (next.invoked !== undefined) this.#invoked(next.invoked.region, next.invoked.affordance)
+    if (next.invoked !== undefined) this.#report(next.invoked.region, next.invoked.affordance)
     if (next.state !== this.#state) {
       this.#state = next.state
       if (next.focus !== undefined) {
@@ -182,6 +187,26 @@ export class ScreenPane implements Component {
   }
 
   /**
+   * Report an invoked offer to the registration, fenced: what the report —
+   * author code — does wrong is drawn beneath what the pane drew, naming its
+   * registration, and never takes the surface down. A report that returns
+   * draws the lines clean again.
+   * @param region - the offer's id, as the registration named it.
+   * @param affordance - the kind invoked.
+   */
+  #report(region: string, affordance: AffordanceKind): void {
+    try {
+      this.#invoked(region, affordance)
+      if (this.#said === undefined) return
+      this.#said = undefined
+    } catch (error) {
+      this.#said = `${this.#registration ?? 'binnacle.place'} invoke threw: ${describe(error)}`
+    }
+    this.#stale = true
+    this.#changed()
+  }
+
+  /**
    * What the placed screen draws, fenced.
    * @param theme - the theme it is parsed against.
    * @returns what its drawing returned, or what went wrong, naming its registration.
@@ -190,7 +215,8 @@ export class ScreenPane implements Component {
     const draw = this.#draw
     const registration = this.#registration
     if (draw === undefined || registration === undefined) return { kind: 'blank' }
-    return drawPlaced(registration, draw, this.#facts(), theme)
+    const drawn = drawPlaced(registration, draw, this.#facts(), theme)
+    return this.#said === undefined ? drawn : { kind: 'stack', children: [drawn, refused(this.#said)] }
   }
 
   /** Draw the screen again, as pi-tui asks when the theme changes, or its registration is placed again. */

@@ -16,7 +16,7 @@ export type { Entry } from './models/transcript.ts'
 export type { KeyId } from './ui/keys.ts'
 export type { Mark } from './ui/theme.ts'
 export type { Background, ThemeChanges } from './ui/theme.ts'
-export type { Node } from './ui/node.ts'
+export type { AffordanceKind, Node } from './ui/node.ts'
 export type { View, Views } from './views/entries.ts'
 
 /** A screen a plugin places in the transcript's place: the key its plugin offers, and how it draws. */
@@ -71,8 +71,9 @@ export type Placement =
   | {
     readonly kind: 'composer'
     /**
-     * What a line does once the person submits it: handed the line as they
-     * wrote it, blank included. binnacle's composer clears itself either way.
+     * What a line does once the person submits it: handed the line as
+     * pi-tui's Editor submits it, trimmed of the whitespace around it, a
+     * blank line included. binnacle's composer clears itself either way.
      * The built-in Composer plugin sends a line that is not blank.
      */
     readonly submit: (text: string) => void
@@ -154,9 +155,10 @@ export interface Registrations {
    * oldest first, top to bottom. Lines in the composer's slot that offer
    * something take the keyboard while they stand, and an offer a person
    * invokes other than `expand` reaches their `invoke`; lines elsewhere take
-   * no focus and answer only the pointer, which a `grant` never invokes. A
-   * drawing that throws, or returns no node binnacle can lay out, draws
-   * what went wrong, naming its registration.
+   * no focus and answer only the pointer, which a `grant` or a `dismiss`
+   * never invokes. A drawing that throws, or returns no node binnacle can
+   * lay out, and an `invoke` that throws, draw what went wrong, naming the
+   * registration, and never take the surface down.
    * @param slot - where it goes.
    * @param placement - what it draws there.
    * @returns a disposer, for taking it back before the plugin is disposed.
@@ -194,7 +196,7 @@ export interface Registrations {
    * Send a line from the person to the session: a grant, an effect the host
    * performs, not a registration. It steers the agent, reaching a turn
    * already running at its next step, or starting a turn when none runs.
-   * @param text - the line, as the person wrote it.
+   * @param text - the line to send.
    * @throws when no session is open — before it opens, or after it closes — saying so.
    */
   send(text: string): void

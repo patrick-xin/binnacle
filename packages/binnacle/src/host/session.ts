@@ -12,7 +12,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
-import type { AgentHandle, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-model'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -30,6 +30,8 @@ export type SessionStands = Omit<Surface, 'notice'>
 export interface OpenedSession {
   /** The model it runs, as `provider/model`. */
   readonly model: string
+  /** The agent whose session this is: the scope its approvals are answered under, and the identity of everything it logs. */
+  readonly agent: Agent
   /**
    * Hear every event of the session: those logged so far, then each as it is logged, in order and once each.
    * @param listener - called with each event.
@@ -120,6 +122,7 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
   const { session } = handle.agent
   return {
     model: `${selection.provider}/${selection.model}`,
+    agent: handle.agent,
     follow: (listener) => {
       // Drained and subscribed in one synchronous run, so no event can fall between them.
       for (const event of session.snapshotEvents()) listener(event)

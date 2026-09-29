@@ -83,6 +83,9 @@
     "@deepseek-ai/dsh-token-meter": [
       "host"
     ],
+    "@deepseek-ai/dsh-scope": [
+      "host"
+    ],
     "@deepseek-ai/dsh-tools": [
       "plugins"
     ],
