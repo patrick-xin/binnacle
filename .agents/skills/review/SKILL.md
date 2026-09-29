@@ -40,18 +40,32 @@ Findings, most severe first, each with:
 
 Then a verdict: `clean`, or `findings`. A finding you could not make fail is said to be so. Style the gates already hold is no finding.
 
-## Running it with codex
+## Running a review
 
-The Sheepdog runs a second reviewer from another model family, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It runs as `gpt-5.6-sol` at high effort, named on every run: codex's own default model may be a heavier one, and a review does not need it.
+The Sheepdog runs a second reviewer, of another family than the change's author, with a shell in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It commits nothing, and reports once.
 
-**One `codex exec` is one round.** codex sends the whole conversation to the model again on every tool call, so a review costs its calls times the size its context has grown to. A second round in the same run pays the first round's whole context on every call. On one change here, that was 93 calls and 11M input tokens, and three reviews at once used up the usage window. So a round ends when its findings are sent, and the next round is a fresh run that starts from them:
+**One run is one round.** A model is sent the whole conversation again on every call, so a review costs its calls times the size its context has grown to, and a round kept alive across the Sheep's fixes pays the first round again on every call of the second. On one change here, one reviewer ran 93 calls and 11M input tokens, and three reviews at once used up the account's usage window. So a round ends when its findings are sent, and the next is a new run that starts from them.
+
+**A Sheep's work** — glm's — is reviewed by a subagent from the Sheepdog's own harness, in a checkout under `/tmp`:
 
 ```sh
-git worktree add --detach /tmp/review-<charge> charge-<charge>
-codex exec -m gpt-5.6-sol -c model_reasoning_effort=high --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>-<round>.md \
-  "Load the review skill. Round <round> of Charge <charge> against issue #<n>, from its base <base>; its own commits are <shas>, <whose each is>. <For round 2 on: round <round-1>'s findings are in /tmp/review-<charge>-<round-1>.md, answered by <shas>.> Push nothing; write nothing outside this checkout, where probes and caches are yours."
-git worktree remove --force /tmp/review-<charge>
+git worktree add --detach /tmp/review-<name> <tip>
+cd /tmp/review-<name> && CI=true pnpm install --frozen-lockfile && pnpm refs
 ```
+
+then a subagent, told to load this skill, with the brief below and the checkout's path.
+
+**The Sheepdog's own commits** are reviewed by a GPT model on pi, as a shepherd Charge whose Fold is cut at the Pasture, the tip checked out there. GPT on pi, codex and opencode's `openai` models share one ChatGPT usage window, so these runs are kept for the Sheepdog's commits alone, lean, and a round that only checks fixes takes a lighter model (`gpt-5.6-luna`, `medium`):
+
+```sh
+git switch --detach <tip>
+shepherd dispatch --charge review-<name>-<round> --spec '#<n>' --issue <n> \
+  --model openai-codex/gpt-5.6-sol --thinking high --policy worktree_write \
+  --verify 'pnpm install --frozen-lockfile && pnpm refs' \
+  --brief "<the brief>"
+```
+
+**The brief**, either way: "Load the review skill. Round <round> of #<n>: its own commits are <shas>, <whose each is>; the Sheep is binnacle-<charge>. <From round 2: round <round-1>'s findings are in /tmp/review-<name>-<round-1>.md, answered by <shas>.> <What is already decided.> Commit nothing; report once." Save the report to `/tmp/review-<name>-<round>.md`.
 
 A temporary directory set inside the checkout (`TMPDIR`) needs `GIT_CEILING_DIRECTORIES` set to the checkout too, or git in a test's own repository finds the checkout around it.
 
@@ -71,7 +85,7 @@ When asked to review round `<round>` of a Charge with its Sheep:
 
 1. **Review** the checkout, as above. From round 2, check each earlier finding is answered, then what the fixes touched.
 2. **Send the Sheep its defects**, directly: `herdr agent prompt binnacle-<charge> "<findings>"`, each with where, what, and how it fails, ending "fix each red-first, add commits, and settle DONE again".
-3. **Report and stop.** Never wait for the Sheep: the Sheepdog starts the next round when it settles.
+3. **Report and stop.** Never wait for the Sheep: the Sheepdog starts the next round, as a new Charge, when it settles.
 
 The Sheepdog stops after three rounds, or when a round finds nothing.
 
