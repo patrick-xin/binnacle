@@ -29,10 +29,15 @@ export interface OpenedSession {
    */
   follow(listener: (event: SessionEvent) => void): () => void
   /**
-   * Send a line from the person: it follows up the running turn, or starts one.
+   * Send a line from the person: it steers the agent, reaching a turn already running at its next step, or starting
+   * one when none runs (`dsh:packages/core/agent-loop/src/agent.ts`, where `steer` sends to the next step).
    * @param text - what they typed.
    */
   send(text: string): void
+  /** Whether a turn is running now, as the agent says. */
+  readonly running: boolean
+  /** Interrupt the running turn, keeping what waits in the agent's inbox, as dsh's web does; with none running, nothing. */
+  interrupt(): void
   /** Stop the agent and remove it; the session log stays where dsh stored it. */
   close(): Promise<void>
 }
@@ -63,8 +68,10 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       return ctx.on('session/event', (from, event) => { if (from === session) listener(event) })
     },
     send: (text) => {
-      handle.agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
+      handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
     },
+    get running() { return handle.agent.status === 'running' },
+    interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
     close: () => handle.dispose(),
   }
 }

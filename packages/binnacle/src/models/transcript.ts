@@ -18,10 +18,13 @@ type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, re
  * result once it has one. A `result` entry is a result whose call is not in
  * its turn, kept rather than dropped. A tool entry is `left` when its turn
  * ended without the call's result: how the turn ended, as dsh names it, and
- * gone again once a late result answers the call.
+ * gone again once a late result answers the call. A prompt is a `steer` when
+ * it reached a turn that already held one: a line the person sent while the
+ * agent worked, which dsh hands the running turn at its next step.
  */
 export type Entry =
-  | Single<'prompt' | 'context' | 'answer' | 'result' | 'authored' | 'unknown' | 'quiet'>
+  | Single<'context' | 'answer' | 'result' | 'authored' | 'unknown' | 'quiet'>
+  | { readonly kind: 'prompt', readonly fact: FactOf<'prompt'>, readonly steer?: true }
   | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'>, readonly left?: string }
 
 /** A turn: what a person sent and everything the agent did about it. */
@@ -80,6 +83,8 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     const at = last.entries.findLastIndex(entry => entry.kind === 'tool' && entry.call.callId === fact.callId)
     const pending = last.entries[at]
     entries = pending?.kind === 'tool' ? last.entries.with(at, Object.freeze({ kind: 'tool', call: pending.call, result: fact })) : [...last.entries, single(fact)]
+  } else if (fact.kind === 'prompt' && last.turn !== null && last.entries.some(entry => entry.kind === 'prompt')) {
+    entries = [...last.entries, Object.freeze({ kind: 'prompt', fact, steer: true })]
   } else {
     entries = [...last.entries, single(fact)]
   }
