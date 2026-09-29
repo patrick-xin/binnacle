@@ -6,6 +6,9 @@
  * it): its line from its folder's `AGENTS.md`, what it exports and re-exports,
  * which modules import it, and which of its names the author API takes. Only
  * relative specifiers link modules; a package re-export shows the package.
+ * A name is author API when `api.ts` re-exports it, or imports it and an
+ * exported declaration of `api.ts` (or a `declare module` block in it) mentions
+ * it as an identifier; an import used only in a non-exported helper is not.
  * @module binnacle/scripts/map
  */
 import { dirname, join, posix } from 'node:path'
@@ -29,12 +32,14 @@ function declared(declaration) {
  * What a module exports, in source order.
  * @param {string} path - the module's path, for the parser.
  * @param {string} text - the module's text.
- * @returns {string[]} the names it declares and exports.
+ * @returns {string[]} the names it declares and exports, and those a local export list (`export { a as b }`, no `from`) exports, by the name outside (`b`); a re-export is not here.
  */
 function exportsOf(path, text) {
   const names = []
   for (const node of parseSync(path, text).program.body) {
-    if (node.type === 'ExportNamedDeclaration' && node.declaration) names.push(...declared(node.declaration))
+    if (node.type !== 'ExportNamedDeclaration') continue
+    if (node.declaration) names.push(...declared(node.declaration))
+    else if (!node.source) names.push(...node.specifiers.map(specifier => nameOf(specifier.exported)))
   }
   return names
 }
@@ -67,26 +72,74 @@ function reExportsOf(path, text) {
 }
 
 /**
- * Every module a module imports or re-exports from by a relative specifier.
+ * Every identifier under a syntax node.
+ * @param {any} node - a parsed node, or any value inside one.
+ * @param {Set<string>} into - where the names are collected.
+ * @returns {Set<string>} `into`.
+ */
+function identifiersIn(node, into) {
+  if (Array.isArray(node)) for (const item of node) identifiersIn(item, into)
+  else if (node !== null && typeof node === 'object') {
+    if (node.type === 'Identifier' && typeof node.name === 'string') into.add(node.name)
+    for (const value of Object.values(node)) if (typeof value === 'object') identifiersIn(value, into)
+  }
+  return into
+}
+
+/**
+ * The identifiers `api.ts` exposes in what it exports.
+ * @param {string} path - the module's path, for the parser.
+ * @param {string} text - the module's text.
+ * @returns {Set<string>} every identifier inside an exported declaration, an export list, or a `declare module` block; a name only a non-exported helper mentions is not in it.
+ */
+function exposedIn(path, text) {
+  const names = new Set()
+  for (const node of parseSync(path, text).program.body) {
+    if (node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration' || node.type === 'TSModuleDeclaration') identifiersIn(node, names)
+  }
+  return names
+}
+
+/**
+ * The string-literal specifiers a module imports dynamically.
+ * @param {any} node - a parsed node, or any value inside one.
+ * @param {string[]} into - where the specifiers are collected.
+ * @returns {string[]} `into`; an `import()` of a computed specifier is not in it.
+ */
+function dynamicSpecifiers(node, into) {
+  if (Array.isArray(node)) for (const item of node) dynamicSpecifiers(item, into)
+  else if (node !== null && typeof node === 'object') {
+    if (node.type === 'ImportExpression' && node.source?.type === 'Literal' && typeof node.source.value === 'string') into.push(node.source.value)
+    for (const value of Object.values(node)) if (typeof value === 'object') dynamicSpecifiers(value, into)
+  }
+  return into
+}
+
+/**
+ * Every module a module imports, re-exports from or dynamically imports by a relative specifier.
  * @param {string} path - the module's path relative to `src/`.
  * @param {string} text - the module's text.
  * @param {Set<string>} known - the paths of every module, relative to `src/`.
- * @returns {{ target: string, names: string[] }[]} each relative specifier that resolves to a module (as `./x.ts`, `./x.js`, `./x` or a folder holding `index.ts`), with the names it takes from it: `*` for a namespace import or `export *`, `default` for a default import; a specifier that resolves to none is left out.
+ * @returns {{ target: string, names: string[], locals: (string | null)[] }[]} each relative specifier that resolves to a module (as `./x.ts`, `./x.js`, `./x` or a folder holding `index.ts`), with the names it takes from it: `*` for a namespace import or `export *`, `default` for a default import, and beside each the name it is bound to here (`null` for an export, which needs no other mention); a dynamic `import()` with a string-literal specifier takes no names; a specifier that resolves to none is left out.
  */
 function importsOf(path, text, known) {
   const found = []
-  for (const node of parseSync(path, text).program.body) {
-    if (!node.source || !['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)) continue
-    const spec = node.source.value
-    if (!spec.startsWith('.')) continue
+  const { program } = parseSync(path, text)
+  /** @param {string} spec @param {string[]} names @param {(string | null)[]} locals */
+  const add = (spec, names, locals) => {
+    if (!spec.startsWith('.')) return
     const base = posix.join(posix.dirname(path), spec)
     const target = [base, base.replace(/\.js$/, '.ts'), `${base}.ts`, `${base}/index.ts`].find(candidate => known.has(candidate))
-    if (target === undefined) continue
+    if (target !== undefined) found.push({ target, names, locals })
+  }
+  for (const node of program.body) {
+    if (!node.source || !['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)) continue
     const names = node.type === 'ImportDeclaration'
       ? node.specifiers.map(specifier => specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : '*')
       : node.type === 'ExportAllDeclaration' ? ['*'] : node.specifiers.map(specifier => nameOf(specifier.local))
-    found.push({ target, names })
+    add(node.source.value, names, node.type === 'ImportDeclaration' ? node.specifiers.map(specifier => specifier.local.name) : names.map(() => null))
   }
+  for (const spec of dynamicSpecifiers(program.body, [])) add(spec, [], [])
   return found
 }
 
@@ -123,7 +176,10 @@ export function mapOf(files, folder) {
   }
   const api = modules.find(module => module.path === 'api.ts')
   const taken = new Map()
-  for (const { target, names } of api ? importsOf(api.path, api.text, known) : []) taken.set(target, [...taken.get(target) ?? [], ...names])
+  const exposed = api ? exposedIn(api.path, api.text) : new Set()
+  for (const { target, names, locals } of api ? importsOf(api.path, api.text, known) : []) {
+    taken.set(target, [...taken.get(target) ?? [], ...names.filter((_name, index) => locals[index] === null || exposed.has(locals[index]))])
+  }
   const shown = folder === undefined ? modules : modules.filter(module => module.path.startsWith(`${folder.replace(/\/$/, '')}/`))
   return shown.toSorted((a, b) => (a.path < b.path ? -1 : 1)).map(module => {
     const exports = exportsOf(module.path, module.text)
