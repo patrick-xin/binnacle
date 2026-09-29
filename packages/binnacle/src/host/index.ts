@@ -33,6 +33,7 @@ import { ScreenPane } from '../panes/screen.ts'
 import type { Placement, Slot } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
+import { questions } from '../plugins/questions/index.ts'
 import { statusLine } from '../plugins/status-line/index.ts'
 import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
 import { toolCards } from '../plugins/tool-cards/index.ts'
@@ -460,6 +461,7 @@ export function apply(ctx: Context): void {
   ctx.plugin(transcriptFeature)
   ctx.plugin(composerFeature)
   ctx.plugin(approvals)
+  ctx.plugin(questions)
   ctx.plugin(statusLine)
   ctx.plugin(toolCards)
   ctx.plugin(trajectory)

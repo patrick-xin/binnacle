@@ -10,6 +10,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
+import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import * as host from '../../src/host/index.ts'
 import type { OpenedSession } from '../../src/host/session.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
@@ -1227,6 +1229,39 @@ test('the key a person binds to dismiss rejects an approval while allow once has
   terminal.type('\x1b[19~')
   await until(() => settled !== undefined)
   assert.equal(settled, 'rejected')
+})
+
+/**
+ * Ask a question as dsh's user-questions service does: down the `user-questions/request` waterfall, failing with `NO_PROVIDER` when nothing answers.
+ * @param ctx - the context the answerers are on.
+ * @param req - what is asked.
+ * @returns the answer an answerer settled, or the rejection it was refused with.
+ */
+const askQuestions = (ctx: Context, req: Omit<Parameters<Events['user-questions/request']>[0], 'agent'>): Promise<AskUserQuestionAnswer> =>
+  ctx.waterfall('user-questions/request', { agent: {} as never, ...req }, () => Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')))
+
+test('a question asked sits in the composer\'s seat, naming the question, and enter chooses its first option, answering it', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestions(ctx, { questions: [{
+    id: 'q1',
+    header: 'Set up',
+    question: 'which database?',
+    detail: 'The workspace has no database yet.',
+    options: [{ label: 'postgres' }, { label: 'sqlite' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  const card = await terminal.altScreen()
+  assert.ok(card.some(row => row.includes('Set up')), 'the card titles itself with the header')
+  assert.ok(card.some(row => row.includes('The workspace has no database yet.')), 'the card draws the detail')
+  assert.ok(card.some(row => row.includes('postgres')) && card.some(row => row.includes('sqlite')), 'the card offers both options')
+  assert.ok(card.some(row => row.includes('type an answer')) && card.some(row => row.includes('skip')) && card.some(row => row.includes('cancel')), 'the card offers typing, skipping and cancelling')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['postgres'] }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
 })
 
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
