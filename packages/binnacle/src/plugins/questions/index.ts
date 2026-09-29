@@ -125,6 +125,7 @@ class Ask {
   private readonly next: AnswerNext
   private readonly settle: (answer: AskUserQuestionAnswer) => void
   private readonly refuse: (reason: unknown) => void
+  private readonly leave: () => boolean
   private readonly answers: AskUserQuestionAnswerItem[] = []
   private readonly marks: string[] = []
   private readonly acts = new Map<string, () => void>()
@@ -133,7 +134,6 @@ class Ask {
   private seated: Placement | undefined
   private unsit: (() => void) | undefined
   private unshow: (() => void) | undefined
-  private finished = false
 
   /**
    * @param ctx - the plugin's context, to seat the card with.
@@ -141,13 +141,15 @@ class Ask {
    * @param next - the rest of the waterfall's chain, to hand the request to when the plugin is disposed with it standing.
    * @param settle - resolves the waterfall's promise, once every question is answered.
    * @param refuse - rejects the waterfall's promise, when the person cancels the ask or its signal withdraws it.
+   * @param leave - takes the ask out of what the plugin holds standing, reporting whether it stood; finishing is once, and this is what makes it so.
    */
-  constructor(ctx: Context, req: Asked, next: AnswerNext, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void) {
+  constructor(ctx: Context, req: Asked, next: AnswerNext, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void, leave: () => boolean) {
     this.ctx = ctx
     this.req = req
     this.next = next
     this.settle = settle
     this.refuse = refuse
+    this.leave = leave
     req.signal?.addEventListener('abort', this.withdrawn, { once: true })
   }
 
@@ -272,12 +274,11 @@ class Ask {
   }
 
   /**
-   * Take back everything the ask seated and finish it, once: settle it, refuse it, or hand it on.
+   * Take back everything the ask seated and finish it, once: settle it, refuse it, or hand it on. Leaving what stands is what makes it once — the first finish takes the ask out, and the rest find it gone — as Approvals' settle does.
    * @param settled - how it finishes.
    */
   private finish(settled: () => void): void {
-    if (this.finished) return
-    this.finished = true
+    if (!this.leave()) return
     this.close()
     settled()
   }
@@ -306,7 +307,8 @@ export const questions = {
       for (const ask of standing) ask.handOver()
     }, 'questions: what still stands, handed to the next answerer')
     ctx.on('user-questions/request', (req, next) => new Promise<AskUserQuestionAnswer>((resolve, reject) => {
-      const ask = new Ask(ctx, req, next, resolve, reject)
+      // Leaving what stands is the ask's own once-guard, read back through `leave` below.
+      const ask = new Ask(ctx, req, next, resolve, reject, () => standing.delete(ask))
       standing.add(ask)
       ask.seat()
     }))
