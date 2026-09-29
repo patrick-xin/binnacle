@@ -1,9 +1,3 @@
-/**
- * The Trajectory: every event of a session, on a screen of its own. A
- * built-in plugin, holding only what an author holds: the author API,
- * type-only; and the `binnacle` service, to place its screen.
- */
-
 import type { Context } from '@deepseek-ai/cordis'
 import { drawTrajectory } from './draw.ts'
 
