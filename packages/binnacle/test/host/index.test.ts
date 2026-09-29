@@ -1316,6 +1316,35 @@ test('the key a person binds to dismiss rejects an approval while allow once has
 const askQuestions = (ctx: Context, req: Omit<Parameters<Events['user-questions/request']>[0], 'agent'>): Promise<AskUserQuestionAnswer> =>
   ctx.waterfall('user-questions/request', { agent: {} as never, ...req }, () => Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')))
 
+/**
+ * Ask a question as dsh's user-questions service does, scope-filtered to the agent that asks (`dsh:packages/core/scope/src/index.ts#scopeTarget`), failing with `NO_PROVIDER` when nothing answers.
+ * @param ctx - the context the answerers are on.
+ * @param agent - the agent asking, whose scope the dispatch is tagged with.
+ * @param req - what is asked.
+ * @returns the answer an answerer settled, or the rejection it was refused with.
+ */
+const askQuestionsFor = (ctx: Context, agent: Agent, req: Omit<Parameters<Events['user-questions/request']>[0], 'agent'>): Promise<AskUserQuestionAnswer> =>
+  ctx.waterfall(scopeTarget(agent, agent), 'user-questions/request', { agent, ...req }, () => Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')))
+
+test('a question another agent asks is not binnacle\'s to answer: no card seats, and it fails as nothing answered', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const foreign = {} as Agent
+  const answer = askQuestionsFor(ctx, foreign, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  await settle()
+  assert.ok((await terminal.altScreen()).every(row => !row.includes('which database?')), 'another agent\'s question seats no card')
+assert.equal(refusal instanceof Error && refusal.name === 'UserQuestionError' && (refusal as { code?: string }).code === 'NO_PROVIDER', true, 'another agent\'s ask fails as nothing answered')
+  // The session\'s own agent is still answered, asked the same scoped way.
+  const mine = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q2', question: 'which port?', options: [{ label: '5432' }] }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which port?')))
+  terminal.type('\r')
+  assert.deepEqual(await mine, { answers: [{ id: 'q2', selected: ['5432'] }] })
+})
+
 test('a question asked sits in the composer\'s seat, naming the question, and enter chooses its first option, answering it', async () => {
   const terminal = new XtermTerminal(50, 16)
   const session = new FakeSession([prompt(1, 'fix the build')])
