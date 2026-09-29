@@ -16,5 +16,5 @@ What a view draws with and how a person's input changes what is shown: nodes lai
 ## Keep
 
 - The gesture table is the one place a gesture is given a meaning, and `answer.ts` the one place a landed gesture becomes a change of UI state.
-- `keys.ts` is the one place key bytes are matched to what they do; `pointer.ts` the one place pi-tui's mouse vocabulary is read.
+- `keys.ts` is the one place key bytes are matched to what they do; `pointer.ts` the one place pi-tui's mouse vocabulary is read; `readable.ts` the one place terminal sequences are stripped. The `owners` of `layers.json` hold each, naming the pi-tui symbols only these files, and the panes and the host that hand them on, may import.
 - A tone or a background is drawn in one of the terminal's own sixteen colours, so a person's palette decides what it looks like, as their terminal already does.
