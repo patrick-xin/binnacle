@@ -123,7 +123,7 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
-test('the row is named binnacle and needs the command line, the agents, the default model, the session projections and the commands', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model and the commands', () => {
   assert.equal(host.name, 'binnacle')
   assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'])
 })

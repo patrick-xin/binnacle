@@ -23,7 +23,7 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, and its commands. Each is a key dsh declares on `Context`. */
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, and its commands. Each is a key dsh declares on `Context`. */
 export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
