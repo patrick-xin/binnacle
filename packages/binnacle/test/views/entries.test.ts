@@ -7,7 +7,7 @@ import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../../src/ui/draw.ts'
 import { screens } from '../../src/views/screen.ts'
 import type { View, Views } from '../../src/views/entries.ts'
-import { prompt as promptFact, call as callFact } from '../support/facts.ts'
+import { prompt as promptFact, call as callFact, asked as askedFact, decided as decidedFact } from '../support/facts.ts'
 
 /** An entry alone in a turn of its own: what the screen draws it from. */
 const alone = (entry: Entry): Transcript => ({ turns: [{ turn: null, entries: [entry] }] })
@@ -160,6 +160,34 @@ test('a failed tool is marked, with the reason dsh gave a person', () => {
     failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' }, blocks: [{ kind: 'text', text: 'tsc: 1 error' }], meta: undefined,
   } as const
   assert.deepEqual(lines({ kind: 'tool', call, result }), ['✗ bash {"command":"pnpm build"}', '  the command exited 2', 'tsc: 1 error'])
+})
+
+const approval = askedFact(5, 22, 'a1', 'bash', 'writes outside the repo')
+
+/** The approval, decided as the outcome names. */
+const decidedAs = (outcome: 'allowed-once' | 'rejected' | 'cancelled'): Entry =>
+  ({ kind: 'approval', asked: approval, decided: decidedFact(6, 24, 'a1', outcome) })
+
+test('an approval decided draws what was asked, why, and the decision in the tone of its outcome', () => {
+  assert.deepEqual(lines(decidedAs('allowed-once')), ['⚑ bash asks: writes outside the repo', '  allowed once'])
+  assert.deepEqual(lines(decidedAs('rejected')), ['⚑ bash asks: writes outside the repo', '  rejected'])
+  assert.deepEqual(lines(decidedAs('cancelled')), ['⚑ bash asks: writes outside the repo', '  cancelled'])
+  assert.equal(styled(decidedAs('allowed-once'))[0], '\x1b[33m⚑\x1b[39m bash asks: writes outside the repo')
+  assert.equal(styled(decidedAs('allowed-once'))[1], '\x1b[32m  allowed once\x1b[39m')
+  assert.equal(styled(decidedAs('rejected'))[1], '\x1b[31m  rejected\x1b[39m')
+  assert.equal(styled(decidedAs('cancelled'))[1], '\x1b[90m  cancelled\x1b[39m')
+})
+
+test('an approval still waiting for its answer says so, and asks without a reason named', () => {
+  assert.deepEqual(lines({ kind: 'approval', asked: approval }), ['⚑ bash asks: writes outside the repo', '  waiting…'])
+  assert.deepEqual(lines({ kind: 'approval', asked: askedFact(7, 30, 'a2', 'bash') }), ['⚑ bash asks', '  waiting…'])
+  assert.equal(styled({ kind: 'approval', asked: approval })[1], '\x1b[90m  waiting…\x1b[39m')
+})
+
+test('a decision whose ask is not in its turn draws on its own, muted, naming the approval it answered', () => {
+  const orphan: Entry = { kind: 'decided', fact: decidedFact(9, 40, 'a9', 'rejected') }
+  assert.deepEqual(lines(orphan), ['⚑ decision of approval a9: rejected'])
+  assert.equal(styled(orphan)[0], '\x1b[90m⚑ decision of approval a9: rejected\x1b[39m')
 })
 
 /** A tool call with a result whose blocks are one text block, as an output a test reads. */

@@ -89,6 +89,10 @@ function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly wor
       return { words: [`answer by ${fact.provider}/${fact.model}${fact.interrupted ? ' · interrupted' : ''}`] }
     case 'call':
       return { words: [`call ${fact.name}`] }
+    case 'asked':
+      return { words: [` ${fact.toolName} asks`], mark: 'approval' }
+    case 'decided':
+      return { words: [` decision ${fact.outcome}`], mark: 'approval', tone: 'muted' }
     case 'result':
       return { words: [` result of ${tools.get(fact.callId) ?? fact.callId}`], mark: fact.failed ? 'failed' : 'done' }
     case 'authored':

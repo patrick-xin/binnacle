@@ -56,6 +56,7 @@ export const marks = {
   steer: { glyph: '↳', tone: 'accent' }, // what the person sent while a turn ran, reaching it at its next step
   thinking: { glyph: '∴', tone: 'muted' }, // reasoning
   context: { glyph: '⋯', tone: 'muted' }, // what something added to the context
+  approval: { glyph: '⚑', tone: 'warning' }, // an approval the agent asked a person to decide
   unknown: { glyph: '?', tone: 'muted' }, // a kind binnacle has no view for, an author's fact included
 } as const satisfies Record<string, { readonly glyph: string, readonly tone: Tone }>
 

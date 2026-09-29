@@ -1229,6 +1229,21 @@ test('an approval withdrawn by its signal takes its card back, settled cancelled
   await until(async () => (await terminal.altScreen()).every(row => !row.includes('allow once')))
 })
 
+test('the key a person binds to dismiss rejects an approval while allow once has focus', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.dismiss': 'f8' }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  let settled: ApprovalOutcome | undefined
+  void askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace' }).then((outcome) => { settled = outcome })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  terminal.type('\x1b[19~')
+  await until(() => settled !== undefined)
+  assert.equal(settled, 'rejected')
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])

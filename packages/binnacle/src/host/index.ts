@@ -434,7 +434,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       session.interrupt()
       return { consume: true }
     }
-    if (resolved?.kind === 'gesture' && reading?.handleKey({ kind: 'key', binding: resolved.binding }) === true) return { consume: true }
+    if (resolved?.kind === 'gesture' && (seat === undefined ? reading?.handleKey({ kind: 'key', binding: resolved.binding }) : seat.handleKey({ kind: 'key', binding: resolved.binding }, true)) === true) return { consume: true }
     // A key a person bound to an affordance is answered even where focus offers no such thing: it does nothing there,
     // and focus stays.
     if (resolved?.kind === 'gesture' && resolved.binding in affordances) return { consume: true }

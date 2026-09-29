@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Fact } from '../../src/facts/adapt.ts'
 import { settled, transcript } from '../../src/models/transcript.ts'
-import { prompt as promptFact, call as callFact, returned as returnedFact } from '../support/facts.ts'
+import { prompt as promptFact, call as callFact, returned as returnedFact, asked as askedFact, decided as decidedFact } from '../support/facts.ts'
 
 const prompt = promptFact(2, 10, 'fix the build')
 const answer: Fact = { kind: 'answer', seq: 4, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'text', text: 'Done.' }] }
@@ -40,9 +40,28 @@ test('a call and its result are one tool entry, where the call was asked', () =>
   ])
 })
 
+test('an approval asked and its decision are one entry, where it was asked, as a call and its result are', () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
+    prompt,
+    askedFact(5, 22, 'a1', 'bash', 'writes outside the workspace'),
+    decidedFact(6, 24, 'a1', 'allowed-once'),
+  ]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    { kind: 'approval', asked: askedFact(5, 22, 'a1', 'bash', 'writes outside the workspace'), decided: decidedFact(6, 24, 'a1', 'allowed-once') },
+  ])
+})
+
 test('a result whose call is not in its turn is kept on its own, never dropped', () => {
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, result]
   assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'result', fact: result }])
+})
+
+test('a decision whose ask is not in its turn is kept on its own, never dropped, as a result without its call is', () => {
+  const orphan = decidedFact(3, 30, 'a9', 'rejected')
+  const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, orphan]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'decided', fact: orphan }])
 })
 
 test('what the log holds before its first turn opens the transcript, in a turn numbered null', () => {
@@ -99,6 +118,13 @@ test('what has settled is every entry, oldest first, up to a call still waiting 
   assert.equal(settled(transcript([...facts, returned(11, 'c2')])), 6)
   assert.equal(settled(transcript([...facts, { kind: 'turn', seq: 11, time: 11, turn: 2, phase: 'end', ending: 'aborted' }])), 6)
   assert.equal(settled(transcript([asked(1, 'c0')])), 0)
+})
+
+test('an approval still waiting for its decision holds back settling, as a call still waiting for its result does', () => {
+  const facts: Fact[] = [start(1, 1), prompt, askedFact(3, 21, 'a1', 'bash', 'writes outside the workspace'), answer]
+  // The approval waits between the prompt and the answer: it and the answer after it have not settled, for the decision will change the entry.
+  assert.equal(settled(transcript(facts)), 1)
+  assert.equal(settled(transcript([...facts, decidedFact(5, 24, 'a1', 'allowed-once')])), 3)
 })
 
 test('a prompt in a turn that already holds one steered it; the turn\'s first prompt, and one before any turn, did not', () => {
