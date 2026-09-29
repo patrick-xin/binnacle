@@ -94,13 +94,15 @@ function scaled(over: number): string {
 /**
  * A count of tokens as a person reads it: `517`, `12.4k`, `517k`, `1.2m` — dsh web's compact count
  * (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`), restated lowercase and without its
- * locale seat, as #42's worked example writes it.
+ * locale seat, as #42's worked example writes it. Where a count rounds to a thousand thousands it is written in
+ * millions, where dsh web writes `1000K`.
  * @param value - the count.
  * @returns it, compact.
  */
 function compact(value: number): string {
   if (value < 1_000) return `${value}`
-  if (value < 1_000_000) return `${scaled(value / 1_000)}k`
+  const thousands = scaled(value / 1_000)
+  if (value < 1_000_000 && thousands !== '1000') return `${thousands}k`
   return `${scaled(value / 1_000_000)}m`
 }
 

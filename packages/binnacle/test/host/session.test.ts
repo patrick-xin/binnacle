@@ -111,3 +111,39 @@ test('a line sent steers the agent with the person\'s message; interrupt cancels
   assert.equal(typeof line.message.id, 'string')
   assert.deepEqual(cancels, [{ cause: { kind: 'user' }, options: { keepInbox: true } }])
 })
+
+test('where the session stands is heard again as the agent\'s status flips, which dsh says only after the turn\'s last event is logged', async () => {
+  const ctx = new Context()
+  const agentCtx = new Context()
+  const agent = { session: {} }
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('agents', {
+    create: async (options: { readonly setup: (agentCtx: Context) => void }) => {
+      options.setup(agentCtx)
+      return { agent, dispose: async () => {} }
+    },
+  } as never)
+  const session = await openSession(ctx)
+  let heard = 0
+  const stop = session.onStanding(() => { heard++ })
+  agentCtx.emit('agent/status', { agent: agent as never, status: 'idle' })
+  assert.equal(heard, 1)
+  stop()
+  agentCtx.emit('agent/status', { agent: agent as never, status: 'running' })
+  assert.equal(heard, 1)
+})
+
+test('following a session hears what it logged before, then what it logs after, each once and in order, and nothing of another session', async () => {
+  const ctx = new Context()
+  const earlier = { type: 'turn/start', seq: 1, time: 0, data: {} } as unknown as SessionEvent
+  const later = { type: 'turn/end', seq: 2, time: 0, data: {} } as unknown as SessionEvent
+  const log = { snapshotEvents: (): readonly SessionEvent[] => [earlier] }
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('agents', { create: async () => ({ agent: { session: log }, dispose: async () => {} }) } as never)
+  const session = await openSession(ctx)
+  const heard: SessionEvent[] = []
+  session.follow((event) => { heard.push(event) })
+  ctx.emit('session/event', log as never, later)
+  ctx.emit('session/event', {} as never, earlier)
+  assert.deepEqual(heard, [earlier, later])
+})
