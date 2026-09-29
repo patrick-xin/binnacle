@@ -358,7 +358,7 @@ test('a click on what offers nothing, a wheel, a drag and hovering are left to p
 })
 
 /** An author's view that draws binnacle's drawing of an entry in a card. */
-const carded: View = (_, next) => ({ kind: 'card', title: 'yours', child: next() })
+const carded: View = (_, next) => ({ kind: 'ask', title: 'yours', child: next() })
 
 test('a click on a card\'s border is left to pi-tui, and one inside it reaches what the card holds', () => {
   const views: Views = new Map([['context', [carded]]])

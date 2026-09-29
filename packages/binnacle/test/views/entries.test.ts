@@ -404,6 +404,13 @@ test('an unknown fact carrying a problem says it under its one line', () => {
   assert.deepEqual(seen(entry, [], new Map(), 80), ['? test/marker · 1 line', '✗ binnacle.facts(test/marker) threw: no fork recorded'])
 })
 
+test('an author\'s view may show what it did not write, its title read as spans and what it holds beneath it', () => {
+  const shown = new Map<string, View[]>([['prompt', [() => ({ kind: 'show', title: ['notes.md'], child: { kind: 'text', text: 'first line' } })]]])
+  assert.deepEqual(drawn(prompt, shown), ['notes.md', '│ first line'])
+  const untitled = new Map<string, View[]>([['prompt', [() => ({ kind: 'show', title: 'notes.md', child: { kind: 'blank' } }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, untitled).at(-1), '✗ binnacle.view(prompt) returned no drawable node: a show\'s title is notes.md')
+})
+
 /** An array of one slot with nothing in it, as a careless view might return. */
 const hole = <T>(): T[] => Object.assign<T[], { length: number }>([], { length: 1 })
 
@@ -423,8 +430,8 @@ test('an author\'s view that returns what binnacle cannot lay out is drawn over,
   assert.deepEqual(drawn(prompt, untitled), [...band, '✗ binnacle.view(prompt) returned no drawable node: a fold\'s title is one line'])
   const loud = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: 'hi', tone: 'shouting' }) as unknown as Node]]])
   assert.deepEqual(drawn(prompt, loud), [...band, '✗ binnacle.view(prompt) returned no drawable node: shouting is no tone'])
-  const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'card', title: 'two\nlines', child: { kind: 'blank' } })]]])
-  assert.deepEqual(drawn(prompt, titled), [...band, '✗ binnacle.view(prompt) returned no drawable node: a card\'s title is one line'])
+  const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'ask', title: 'two\nlines', child: { kind: 'blank' } })]]])
+  assert.deepEqual(drawn(prompt, titled), [...band, '✗ binnacle.view(prompt) returned no drawable node: an ask\'s title is one line'])
   const undocumented = new Map<string, View[]>([['prompt', [() => ({ kind: 'markdown' }) as unknown as Node]]])
   assert.deepEqual(drawn(prompt, undocumented), [...band, '✗ binnacle.view(prompt) returned no drawable node: a markdown block needs text'])
   const unspanned = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: ['fix', 3] }) as unknown as Node]]])
@@ -469,7 +476,7 @@ test('an author\'s card title and affordance label carrying a control sequence a
     kind: 'offer',
     id: 'theirs',
     affordances: [{ kind: 'open', label: 'open \x1b]0;owned\x07wide' }],
-    child: { kind: 'card', title: 'to\x1b[2Jdo', child: { kind: 'text', text: 'the body' } },
+    child: { kind: 'ask', title: 'to\x1b[2Jdo', child: { kind: 'text', text: 'the body' } },
   }) as unknown as Node]]])
   assert.deepEqual(rawWith(prompt, views, 20, '2/theirs'), [
     '\x1b[2m╭─ \x1b[22mtodo\x1b[2m ───────────╮\x1b[22m',

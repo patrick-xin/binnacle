@@ -48,7 +48,7 @@ export type Node =
     readonly child: Node
   }
   | {
-    readonly kind: 'card'
+    readonly kind: 'ask'
     /** One line on its top edge, left off whole where the edge is too narrow for it. */
     readonly title?: string
     /** The theme's background every line of it is filled with, border included; the terminal's own when absent. */
@@ -56,6 +56,15 @@ export type Node =
     /** The theme's tone its border is drawn in; dim when absent. */
     readonly edge?: Tone
     /** What it holds, inside a rounded border; drawn without one where the width leaves no room inside it. */
+    readonly child: Node
+  }
+  | {
+    readonly kind: 'show'
+    /** The line above what it holds, saying what is shown: a call's name and what it was asked, a document's title. */
+    readonly title: readonly Span[]
+    /** The theme's tone the title is drawn in; the terminal's own when it has none. */
+    readonly tone?: Tone
+    /** What is shown, drawn beneath the title along the theme's gutter, which marks it as what the surface shows and did not write. */
     readonly child: Node
   }
   | {
@@ -118,22 +127,31 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
       if (!Array.isArray(offered)) throw new Error('an offer needs its affordances')
       return { kind: 'offer', id, affordances: Array.from(offered, affordance => affordanceOf(affordance)), child: parseNode(field('child'), theme) }
     }
-    case 'card': {
+    case 'ask': {
       const title = field('title')
-      if (title !== undefined && typeof title !== 'string') throw new Error(`a card's title is ${describe(title)}`)
-      if (typeof title === 'string' && /[\r\n]/.test(title)) throw new Error('a card\'s title is one line')
+      if (title !== undefined && typeof title !== 'string') throw new Error(`an ask's title is ${describe(title)}`)
+      if (typeof title === 'string' && /[\r\n]/.test(title)) throw new Error('an ask\'s title is one line')
       const background = field('background')
       const edge = field('edge')
       if (background !== undefined && (typeof background !== 'string' || !Object.hasOwn(theme.backgrounds, background))) throw new Error(`${describe(background)} is no background`)
       if (edge !== undefined && (typeof edge !== 'string' || !Object.hasOwn(theme.tones, edge))) throw new Error(`${describe(edge)} is no tone`)
       const child = parseNode(field('child'), theme)
       return {
-        kind: 'card',
+        kind: 'ask',
         ...title === undefined ? {} : { title },
         ...background === undefined ? {} : { background: background as Background },
         ...edge === undefined ? {} : { edge: edge as Tone },
         child,
       }
+    }
+    case 'show': {
+      const title = field('title')
+      const tone = field('tone')
+      if (!Array.isArray(title)) throw new Error(`a show's title is ${describe(title)}`)
+      if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(theme.tones, tone))) throw new Error(`${describe(tone)} is no tone`)
+      const read = Array.from(title, span => spanOf(span, theme))
+      const child = parseNode(field('child'), theme)
+      return tone === undefined ? { kind: 'show', title: read, child } : { kind: 'show', title: read, tone: tone as Tone, child }
     }
     case 'band': {
       const background = field('background')

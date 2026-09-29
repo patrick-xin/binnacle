@@ -25,10 +25,12 @@ export function readable(node: Node): Node {
         affordances: node.affordances.map(affordance => ({ ...affordance, label: treated(affordance.label) })),
         child: readable(node.child),
       }
-    case 'card': {
+    case 'ask': {
       const child = readable(node.child)
       return node.title === undefined ? { ...node, child } : { ...node, title: treated(node.title), child }
     }
+    case 'show':
+      return { ...node, title: node.title.map(readableSpan), child: readable(node.child) }
     case 'band':
       return { ...node, child: readable(node.child) }
     case 'fold':

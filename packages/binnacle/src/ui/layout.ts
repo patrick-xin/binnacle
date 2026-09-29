@@ -1,5 +1,5 @@
 import { Box, Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
-import type { Region } from '../contract/index.ts'
+import type { KeyBinding, Region } from '../contract/index.ts'
 import type { Node, Span } from './node.ts'
 import { readable } from './readable.ts'
 import { binnacleTheme } from './theme.ts'
@@ -15,6 +15,8 @@ export interface LayoutState {
   readonly folds?: FoldStart
   /** The time a span saying the time since a moment is laid out at, in milliseconds since the epoch: the host's to hand, for nothing below it reads the clock. */
   readonly now?: number
+  /** The keys the one key table binds to a binding, as pi-tui names them: the host's to hand, so an ask names the keys that answer it; none are named without it. */
+  readonly keys?: (binding: KeyBinding) => readonly string[]
 }
 
 /** A region, and the rows and columns it covers. */
@@ -31,8 +33,11 @@ export interface Placed {
   readonly width: number
 }
 
-/** Columns a card spends on each side: its border, and a column of air inside it. */
-const CARD_SIDE = 2
+/** Columns a show's gutter spends: its glyph, and a column of air after it. */
+const SHOW_GUTTER = 2
+
+/** Columns an ask spends on each side: its border, and a column of air inside it. */
+const ASK_SIDE = 2
 
 /** What a band pads around what it holds, in columns each side and lines above and below: as pi pads a person's message (`pi:packages/coding-agent/src/modes/interactive/components/user-message.ts#UserMessageComponent`). */
 const BAND_PAD = 1
@@ -187,9 +192,11 @@ function at(node: Node, now: number | undefined): Node {
     case 'stack':
       return { ...node, children: node.children.map(child => at(child, now)) }
     case 'offer':
-    case 'card':
+    case 'ask':
     case 'band':
       return { ...node, child: at(node.child, now) }
+    case 'show':
+      return { ...node, title: node.title.map(span), child: at(node.child, now) }
     case 'fold':
       return node.title === undefined ? { ...node, child: at(node.child, now) } : { ...node, title: node.title.map(span), child: at(node.child, now) }
   }
@@ -231,8 +238,10 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
       const row = focusRow(primary.label, width, theme)
       return { lines: [...frame.lines, ...row], regions: [{ ...placed, height: frame.lines.length + row.length }, ...frame.regions] }
     }
-    case 'card':
-      return card(node, width, state, theme)
+    case 'ask':
+      return ask(node, width, state, theme)
+    case 'show':
+      return show(node, width, state, theme)
     case 'band':
       return band(node, width, state, theme)
     case 'fold': {
@@ -305,11 +314,11 @@ function refilled(line: string, fill: (text: string) => string): string {
 const DEFAULT_BACKGROUND = '\x1b[49m'
 
 /**
- * Lay a card out: what it holds, inside a rounded border drawn in its edge's tone, dim by default, every line filled with its background when it names one.
+ * Lay an ask out: what it holds, inside a rounded border drawn in its edge's tone, dim by default, every line filled with its background when it names one.
  * @returns its lines, and what it holds's regions moved inside the border; what it holds alone where the width leaves no column inside.
  */
-function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, state: LayoutState, theme: Theme): Frame {
-  const inner = width - 2 * CARD_SIDE
+function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state: LayoutState, theme: Theme): Frame {
+  const inner = width - 2 * ASK_SIDE
   if (inner < 1) return drawn(node.child, width, state, theme)
   const frame = drawn(node.child, inner, state, theme)
   const edge = (text: string): string => inTone(text, node.edge ?? 'dim', theme)
@@ -321,11 +330,53 @@ function card(node: Extract<Node, { readonly kind: 'card' }>, width: number, sta
     ? edge(`${border.topLeft}${border.horizontal.repeat(width - 2)}${border.topRight}`)
     : `${edge(`${border.topLeft}${border.horizontal} `)}${title}${edge(` ${border.horizontal.repeat(width - 5 - visibleWidth(title))}${border.topRight}`)}`
   const body = frame.lines.map(row => `${edge(border.side)} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge(border.side)}`)
-  const lines = [top, ...body, edge(`${border.bottomLeft}${border.horizontal.repeat(width - 2)}${border.bottomRight}`)]
+  // The keys that answer what it holds, named on the bottom edge as a title is on the top: left off whole where they would leave no rule beside them.
+  const hint = answeredBy(frame, state, theme)
+  const named = hint !== undefined && visibleWidth(hint) <= width - 6 ? hint : undefined
+  const bottom = named === undefined
+    ? edge(`${border.bottomLeft}${border.horizontal.repeat(width - 2)}${border.bottomRight}`)
+    : `${edge(`${border.bottomLeft}${border.horizontal} `)}${named}${edge(` ${border.horizontal.repeat(width - 5 - visibleWidth(named))}${border.bottomRight}`)}`
+  const lines = [top, ...body, bottom]
   return {
     lines: fill === undefined ? lines : lines.map(line => fill(refilled(line, fill))),
-    regions: frame.regions.map(placed => ({ ...placed, top: placed.top + 1, left: placed.left + CARD_SIDE })),
+    regions: frame.regions.map(placed => ({ ...placed, top: placed.top + 1, left: placed.left + ASK_SIDE })),
   }
+}
+
+/**
+ * Lay a show out: its title, then what it holds beneath it, each line along the
+ * theme's gutter in the dim tone, a column of air after it.
+ * @returns the title's lines and what it holds, its regions moved beside the gutter; what it holds without a gutter where the width leaves no column beside one.
+ */
+function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, state: LayoutState, theme: Theme): Frame {
+  const title = new Text(written({ kind: 'text', text: node.title, ...node.tone === undefined ? {} : { tone: node.tone } }, theme), 0, 0).render(width)
+  const inner = width - SHOW_GUTTER
+  const frame = drawn(node.child, inner < 1 ? width : inner, state, theme)
+  const gutter = inTone(theme.chrome.gutter, 'dim', theme)
+  return {
+    lines: [...title, ...inner < 1 ? frame.lines : frame.lines.map(row => `${gutter} ${row}`)],
+    regions: frame.regions.map(placed => ({ ...placed, top: placed.top + title.length, left: placed.left + (inner < 1 ? 0 : SHOW_GUTTER) })),
+  }
+}
+
+/**
+ * What answers an ask, as its bottom edge names it: the keys that invoke what
+ * has focus in it, and, where it holds more than one offer, the keys that move
+ * focus on, each followed by what it does in the theme's words.
+ * @param frame - what the ask holds, laid out.
+ * @param state - the state it is laid out in, holding the keys the table binds.
+ * @param theme - the theme, holding the words.
+ * @returns the keys and what they do, or undefined where nothing answers it or no keys are handed.
+ */
+function answeredBy(frame: Frame, state: LayoutState, theme: Theme): string | undefined {
+  const offers = frame.regions.filter(placed => placed.region.affordances.length > 0).length
+  if (state.keys === undefined || offers === 0) return undefined
+  const named = (binding: KeyBinding, word: string): readonly string[] => {
+    const bound = state.keys?.(binding) ?? []
+    return bound.length === 0 ? [] : [`${bound.join('/')} ${word}`]
+  }
+  const hints = [...named('primary', theme.words.select), ...offers > 1 ? named('focus.next', theme.words.next) : []]
+  return hints.length === 0 ? undefined : hints.join(` ${theme.chrome.separator} `)
 }
 
 /**

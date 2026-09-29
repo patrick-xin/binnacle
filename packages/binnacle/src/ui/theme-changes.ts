@@ -41,7 +41,7 @@ function isControl(character: string): boolean {
 }
 
 /**
- * A border's piece: a string, drawn one column wide, as a card's border is measured.
+ * A border's piece: a string, drawn one column wide, as an ask's border is measured.
  */
 function piece(value: unknown, at: string): string {
   const read = text(value, at)

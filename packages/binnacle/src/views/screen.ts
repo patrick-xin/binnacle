@@ -53,7 +53,8 @@ function foldsIn(node: Node): string[] {
     case 'stack':
       return node.children.flatMap(foldsIn)
     case 'offer':
-    case 'card':
+    case 'ask':
+    case 'show':
     case 'band':
       return foldsIn(node.child)
     case 'fold':
@@ -87,7 +88,8 @@ function scopedWithin(node: Node, scope: string): Node {
     case 'offer':
     case 'fold':
       return { ...node, id: `${scope}/${node.id}`, child: scopedWithin(node.child, scope) }
-    case 'card':
+    case 'ask':
+    case 'show':
     case 'band':
       return { ...node, child: scopedWithin(node.child, scope) }
   }
@@ -107,7 +109,8 @@ function regionsIn(node: Node): string[] {
     case 'offer':
     case 'fold':
       return [node.id, ...regionsIn(node.child)]
-    case 'card':
+    case 'ask':
+    case 'show':
     case 'band':
       return regionsIn(node.child)
   }
@@ -197,9 +200,11 @@ export function timedIn(node: Node): boolean {
     case 'stack':
       return node.children.some(timedIn)
     case 'offer':
-    case 'card':
+    case 'ask':
     case 'band':
       return timedIn(node.child)
+    case 'show':
+      return timedSpans(node.title) || timedIn(node.child)
     case 'fold':
       return timedSpans(node.title) || timedIn(node.child)
   }
