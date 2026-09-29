@@ -111,3 +111,57 @@ test('a line sent steers the agent with the person\'s message; interrupt cancels
   assert.equal(typeof line.message.id, 'string')
   assert.deepEqual(cancels, [{ cause: { kind: 'user' }, options: { keepInbox: true } }])
 })
+
+test('where the session stands names the agents it delegated to: each one\'s label and mode, whether it works, and when its open turn began', async () => {
+  const ctx = new Context()
+  const parent = { requestHeader: () => undefined }
+  const childSession = {}
+  // The projections dsh's registry answers, by the session asked about: the parent's catalog of its children, and a
+  // child's timing, whose open turn began at 1500.
+  const values = new Map<object, Record<string, unknown>>([
+    [parent, { subagentCatalog: [{ id: 'child-1', createdAt: 10, mode: 'continuable', label: 'tests' }, { id: 'child-2', createdAt: 20, mode: 'one-shot' }] }],
+    [childSession, { subagentTiming: { settledMs: 0, active: { since: 1500, through: 1600 } } }],
+  ])
+  ctx.provide('sessionProjections', {
+    snapshot: (session: object, keys: readonly string[]) => ({ values: Object.fromEntries(keys.flatMap(key => { const value = values.get(session)?.[key]; return value === undefined ? [] : [[key, value]] })) }),
+  } as never)
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('commands', {} as never)
+  // Only the first child is live, and working; the second, a one-shot child, has finished and left the registry.
+  const live = new Map<string, object>([['child-1', { status: 'running', session: childSession }]])
+  ctx.provide('agents', {
+    create: async () => ({ agent: { session: parent, status: 'idle' }, dispose: async () => {} }),
+    get: (id: string) => live.get(id),
+  } as never)
+  const session = await openSession(ctx)
+  assert.deepEqual(session.standing().agents, [
+    { id: 'child-1', label: 'tests', mode: 'continuable', working: true, since: 1500 },
+    { id: 'child-2', mode: 'one-shot', working: false },
+  ])
+})
+
+test('where the session stands is heard again as an agent it delegated to flips, or logs, and not as another session logs', async () => {
+  const ctx = new Context()
+  const parent = { id: 'parent' }
+  const child = { id: 'child-1' }
+  const stranger = { id: 'elsewhere' }
+  ctx.provide('sessionProjections', { snapshot: () => ({ values: {} }) } as never)
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('commands', {} as never)
+  ctx.provide('agents', {
+    create: async () => ({ agent: { session: parent, status: 'idle' }, dispose: async () => {} }),
+    get: () => undefined,
+    isOwnedBy: (id: string) => id === 'child-1',
+  } as never)
+  const session = await openSession(ctx)
+  let heard = 0
+  session.onStanding(() => { heard++ })
+  // dsh emits these on the agent's scope carrier; the root hears them as it hears every agent's, so the root emits here.
+  const emit = ctx.emit.bind(ctx) as (name: string, ...args: unknown[]) => void
+  emit('agent/status', { agent: { session: child }, status: 'running' })
+  assert.equal(heard, 1, 'a child\'s status flipping is heard')
+  emit('session/event', child, { type: 'turn/start' })
+  assert.equal(heard, 2, 'a child logging is heard')
+  emit('session/event', stranger, { type: 'turn/start' })
+  assert.equal(heard, 2, 'another session logging is not')
+})

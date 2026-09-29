@@ -23,7 +23,9 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 // projections augment the keys a snapshot may ask for.
 import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter'
-import type { Surface } from '../api.ts'
+// Type-only: the subagent catalog and timing projections augment the keys a snapshot may ask for.
+import type { SubagentTimingProjection } from '@deepseek-ai/dsh-subagent'
+import type { Delegated, Surface } from '../api.ts'
 
 /** Where the session stands, as the host reads it from the live session; the notice is the host's own. */
 export type SessionStands = Omit<Surface, 'notice'>
@@ -49,7 +51,8 @@ export interface OpenedSession {
   /** Where the session stands now: the model it runs, whether a turn runs, and what dsh has measured. */
   standing(): SessionStands
   /**
-   * Hear when where the session stands may have changed: as it logs anything, and as the agent's own status flips.
+   * Hear when where the session stands may have changed: as it logs anything, as the agent's own status flips, and as
+   * an agent it delegated to flips or logs.
    * @param listener - called on each change.
    * @returns a function that stops listening.
    */
@@ -118,6 +121,40 @@ function contextOf(value: ContextPressureProjection | undefined): Pick<SessionSt
 }
 
 /**
+ * The agents a session delegated to, from its `subagentCatalog` projection
+ * (`dsh:packages/subagent/subagent/src/projection-types.ts#SubagentCatalogEntry`), each read live where dsh's
+ * registry still holds it: working while its status is `running`, and its open turn's start from its own
+ * `subagentTiming` projection. A child the registry no longer holds — a one-shot child that finished — is named, not
+ * working.
+ * @param catalog - the parent's catalog, parsed where it enters: a row with no id is left out, a mode dsh did not name is `unknown`.
+ * @param live - the registry's agent for a child, if it holds one.
+ * @param timing - a live child's timing projection.
+ * @returns the agents, or nothing while there are none.
+ */
+function delegatedOf(
+  catalog: unknown,
+  live: (id: string) => { readonly status: string, readonly session: object } | undefined,
+  timing: (session: object) => SubagentTimingProjection | undefined,
+): Pick<SessionStands, 'agents'> {
+  if (!Array.isArray(catalog)) return {}
+  const agents = catalog.flatMap((row: unknown): Delegated[] => {
+    if (typeof row !== 'object' || row === null) return []
+    const { id, label, mode } = row as { readonly id?: unknown, readonly label?: unknown, readonly mode?: unknown }
+    if (typeof id !== 'string') return []
+    const agent = live(id)
+    const since = agent === undefined ? undefined : count(timing(agent.session)?.active?.since)
+    return [{
+      id,
+      ...typeof label === 'string' ? { label } : {},
+      mode: mode === 'one-shot' || mode === 'continuable' ? mode : 'unknown',
+      working: agent?.status === 'running',
+      ...since === undefined ? {} : { since },
+    }]
+  })
+  return agents.length === 0 ? {} : { agents }
+}
+
+/**
  * Open a session on the default model.
  * @param ctx - the row's context, carrying dsh's `agents`, `agentDefaultModel` and `sessionProjections`.
  * @returns the open session.
@@ -162,13 +199,24 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       const model = asked === undefined ? `${selection.provider}/${selection.model}` : `${asked.provider}/${asked.model}`
       // The token meter's projections, where dsh-base mounts them, read as one cut of the log and parsed here: a
       // registry without them refuses the row, for the service is one the row names in inject, not one it may miss.
-      const values: ProjectionSnapshot['values'] = ctx.sessionProjections.snapshot(session, ['tokenUsage', 'contextPressure']).values
-      return { model, running: handle.agent.status === 'running', ...usageOf(values.tokenUsage), ...contextOf(values.contextPressure) }
+      const values: ProjectionSnapshot['values'] = ctx.sessionProjections.snapshot(session, ['tokenUsage', 'contextPressure', 'subagentCatalog']).values
+      const agents = delegatedOf(
+        values.subagentCatalog,
+        id => ctx.agents.get(SessionId(id)),
+        child => ctx.sessionProjections.snapshot(child as typeof session, ['subagentTiming']).values.subagentTiming,
+      )
+      return { model, running: handle.agent.status === 'running', ...usageOf(values.tokenUsage), ...contextOf(values.contextPressure), ...agents }
     },
     onStanding: (listener) => {
       standsChanged.add(listener)
-      const off = ctx.on('session/event', (from) => { if (from === session) listener() })
-      return () => { standsChanged.delete(listener); off() }
+      // An agent the session delegated to stands in the surface too: its status flips on dsh's root, which hears every
+      // agent's (`dsh:packages/core/agent/src/invariant.ts`), and its timing rides its own session's events. Another
+      // session's events are not this surface's.
+      const stops = [
+        ctx.on('session/event', (from) => { if (from === session || ctx.agents.isOwnedBy(from.id, handle.agent)) listener() }),
+        ctx.on('agent/status', ({ agent }) => { if (agent !== handle.agent) listener() }),
+      ]
+      return () => { standsChanged.delete(listener); for (const stop of stops) stop() }
     },
     offers: async () => {
       const named = commands.list(handle.agent).map(({ name, description }) => ({ name, description }))

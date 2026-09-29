@@ -55,6 +55,22 @@ export interface Surface {
   readonly context?: { readonly used: number, readonly window: number }
   /** A notice for the person while one stands: what a second Ctrl+C does, or what went wrong. */
   readonly notice?: string
+  /** The agents the session delegated to, in the order it delegated to them; absent while it has delegated to none. */
+  readonly agents?: readonly Delegated[]
+}
+
+/** An agent the session delegated to, as dsh's subagent catalog names it and its registry holds it now. */
+export interface Delegated {
+  /** Its session's id: what `follow` takes to read its log. */
+  readonly id: string
+  /** What its creator named it for; a one-shot child may have none. */
+  readonly label?: string
+  /** Whether it can be sent to again (`continuable`), ran once (`one-shot`), or is of a mode dsh did not name. */
+  readonly mode: 'one-shot' | 'continuable' | 'unknown'
+  /** Whether a turn of its own is running. */
+  readonly working: boolean
+  /** When its open turn began, in milliseconds since the epoch; absent while it has none open. */
+  readonly since?: number
 }
 
 /**

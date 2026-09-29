@@ -113,6 +113,9 @@
     ],
     "@deepseek-ai/dsh-user-questions": [
       "plugins"
+    ],
+    "@deepseek-ai/dsh-subagent": [
+      "host"
     ]
   }
 }
