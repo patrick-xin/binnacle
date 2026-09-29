@@ -1,16 +1,3 @@
-/**
- * The key table: the one place key bytes are matched to what they do.
- *
- * binnacle's bindings are declared on pi-tui's `Keybindings` by declaration
- * merging and held in one `KeybindingsManager` together with pi-tui's own,
- * so the composer and the alternate screen read the same table; the keys
- * plugins offer for screens they placed join it as bindings of their own,
- * and the manager is rebuilt as offers come and go. Installing the manager
- * is the host's, again whenever an offer changes it. The table answers a
- * press only, once: a repeat or a release, which a kitty-protocol terminal
- * also reports, is answered by nothing binnacle binds.
- */
-
 import { isKeyRepeat, isKeyRelease, KeybindingsManager, TUI_KEYBINDINGS } from '@earendil-works/pi-tui'
 import type { Keybinding, KeybindingDefinition, KeybindingDefinitions, KeybindingsConfig } from '@earendil-works/pi-tui'
 import { affordances } from '../contract/index.ts'
@@ -83,14 +70,19 @@ export type ResolvedKey =
 /** The binding id a placed screen's key is offered under: the one table's, named for the screen. */
 const offeredBinding = (name: string): string => `binnacle.screen.${name}`
 
-/** The one key table. */
+/**
+ * The one key table: binnacle's bindings held in one `KeybindingsManager`
+ * together with pi-tui's own, so the composer and the alternate screen read
+ * the same table.
+ */
 export interface KeyTable {
   /** The manager holding every binding, for the host to install with pi-tui's `setKeybindings`. */
   readonly manager: KeybindingsManager
   /**
    * What a key resolves to. The bindings live in the context in a fixed order, and within it a binding the person
    * set resolves before one that only defaults to the same key, so an explicit binding is never defeated by a
-   * default that shares its key.
+   * default that shares its key. It answers a press only, once: a repeat or a release, which a kitty-protocol
+   * terminal also reports, is answered by nothing binnacle binds.
    * @param data - the key's bytes, as the terminal reported them.
    * @param focused - whether something on the screen being read — the transcript, or a placed screen that is open — has focus, which decides which bindings are live.
    * @param open - whether a placed screen is open, which takes the keys the transcript would answer.

@@ -1,13 +1,3 @@
-/**
- * A gesture answered: the one place a gesture that has landed becomes a
- * change of UI state, shared by the panes that hold the state a person
- * changes — the transcript's and a placed screen's.
- *
- * A pane hands it the gesture, the regions it lands on — those under the
- * pointer, or the focused one and those beyond it a key reaches — and what bounds an action on the
- * screen as it is drawn; it says what the gesture did.
- */
-
 import type { AffordanceKind, Gesture, Region } from '../contract/index.ts'
 import { meaning } from './gestures.ts'
 import { act } from './state.ts'
