@@ -1,6 +1,6 @@
 # Authoring
 
-A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry — a built-in kind, or a quiet kind by its dsh event type ([Transcript](transcript.md)) — building on binnacle's drawing or replacing it. A screen a plugin places takes the transcript's place, opened with the key its plugin offers. A placement draws around the composer: lines above or below it, or the composer's place itself, deciding what a line submitted there does and what an offer it draws does when a person invokes it. A line is sent to the session with `send`, a grant the host performs. A theme registration changes what everything is drawn in, from colours to how a kind's folds start. Disposing the plugin gives back everything it registered.
+A plugin in a person's profile, written by them or by an author agent they ask, changes what binnacle draws through `ctx.binnacle`. An adapter reads one kind of session event as a fact of the author's own. A view draws one kind of entry — a built-in kind, or a quiet kind by its dsh event type ([Transcript](transcript.md)) — building on binnacle's drawing or replacing it. A screen a plugin places takes the transcript's place, opened with the key its plugin offers. A placement draws around the composer: lines above or below it, or the composer's place itself, deciding what a line submitted there does and what an offer it draws does when a person invokes it. A line is sent to the session with `send`, and run as one of dsh's commands with `command`, grants the host performs. A theme registration changes what everything is drawn in, from colours to how a kind's folds start. Disposing the plugin gives back everything it registered.
 
 ## How it works
 
@@ -49,6 +49,10 @@ A plugin can place a screen of its own in the transcript's place, opened with a 
 ## Sending a line
 
 `ctx.binnacle.send(text)` sends a line from the person to the session: a grant, an effect the host performs on the open session, not a registration, so nothing of it is disposed with the plugin (`binnacle:packages/binnacle/src/api.ts#Registrations`). It steers the agent, reaching a turn already running at its next step, or starting a turn when none runs; in the transcript, a line that steered a running turn is drawn as one ([Transcript](transcript.md)). It throws when no session is open — before it opens, or after it closes — saying so. The built-in Composer plugin sends each line that is not blank through it ([Composer](composer.md)).
+
+## Running a command
+
+`ctx.binnacle.command(line)` runs a line as one of dsh's commands, `/compact` among them: a grant like `send`, an effect the host performs on the open session, not a registration (`binnacle:packages/binnacle/src/api.ts#Registrations`). It resolves `true` when a command ran, whatever it returned, and `false` when no command has the name, leaving the line to its caller; it throws when no session is open — before it opens, or after it closes — saying so. What the command did reaches the screen from the pair dsh logs, never as a return value ([Transcript](transcript.md)). Commands are dsh's, not binnacle's: a plugin registers one with `ctx.commands` (`dsh:packages/interaction/commands/src/index.ts#CommandRuntime`), never through the author API. The built-in Composer plugin runs each line starting with `/` through the grant, sending it when no command has the name ([Composer](composer.md)).
 
 ## Binding keys
 
