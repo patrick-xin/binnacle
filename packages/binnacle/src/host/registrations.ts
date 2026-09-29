@@ -8,8 +8,8 @@ import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
 import type { Theme } from '../ui/theme.ts'
 
-/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, or the theme. */
-export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys'
+/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, the theme, the keys, or what a plugin's drawings read, which it asked to draw again. */
+export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys' | 'drawn'
 
 /** What the host performs the grants with, on the session it opened. */
 export interface GrantedSession {
@@ -200,6 +200,10 @@ export class RegistrationService extends Service implements Registrations {
    * @inheritDoc
    * The key's views are put back as a new stack, which is how a drawing knows it is stale.
    */
+  redraw(): void {
+    this.changed('drawn')
+  }
+
   invalidate(key: string): void {
     const stack = this.viewTable.get(key)
     if (stack === undefined) return

@@ -45,6 +45,18 @@ export class FakeSession implements OpenedSession {
     this.#standsChanged = listener
     return () => { this.#standsChanged = undefined }
   }
+  readonly #projectionListeners = new Set<() => void>()
+  /**
+   * Hear dsh's session projections change, as their change feed says it.
+   * @param listener - called at each change.
+   * @returns a function that stops listening.
+   */
+  onProjections(listener: () => void): () => void {
+    this.#projectionListeners.add(listener)
+    return () => { this.#projectionListeners.delete(listener) }
+  }
+  /** Say that the projections changed, as dsh's change feed does after an event is committed. */
+  projectionsChanged(): void { for (const listener of this.#projectionListeners) listener() }
   /** Say that where the session stands changed, as dsh does when a turn starts or tokens are counted. */
   standsChanged(): void { this.#standsChanged?.() }
   async offers(): Promise<readonly { readonly name: string, readonly description: string }[]> {

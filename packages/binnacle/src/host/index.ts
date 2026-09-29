@@ -290,6 +290,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     else if (changed === 'keys') {
       table.bind(registrations.bindings)
       setKeybindings(table.manager)
+    } else if (changed === 'drawn') {
+      // What a plugin's drawings read changed where no session event says so; its lines are drawn again above, its placed screens here.
+      for (const pane of screenPanes.values()) pane.invalidate()
+      tui.requestRender()
     } else if (changed === 'placements') {
       page = arrange()
       stack(tui)
