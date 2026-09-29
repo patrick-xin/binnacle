@@ -58,6 +58,7 @@ export const marks = {
   context: { glyph: '⋯', tone: 'muted' }, // what something added to the context
   approval: { glyph: '⚑', tone: 'warning' }, // an approval the agent asked a person to decide
   unknown: { glyph: '?', tone: 'muted' }, // a kind binnacle has no view for, an author's fact included
+  compaction: { glyph: '≡', tone: 'muted' }, // where the model stopped seeing earlier history: one compaction's marker
 } as const satisfies Record<string, { readonly glyph: string, readonly tone: Tone }>
 
 /** A mark of the theme's, named by what it stands for: binnacle's own, or one an author's theme adds. */
@@ -184,8 +185,8 @@ export interface FoldStart {
   readonly open?: boolean
 }
 
-/** binnacle's own theme, which registrations change. Its folds start as its views draw them: reasoning folded to nothing under the thinking line, context, the fallback and authored facts the same, a tool's and a result's output to three rows. */
-export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: { answer: { rows: 0 }, context: { rows: 0 }, unknown: { rows: 0 }, authored: { rows: 0 }, tool: { rows: 3 }, result: { rows: 3 } } }
+/** binnacle's own theme, which registrations change. Its folds start as its views draw them: reasoning folded to nothing under the thinking line, context, the fallback, authored facts and a compaction's summary the same, a tool's and a result's output to three rows. */
+export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: { answer: { rows: 0 }, context: { rows: 0 }, unknown: { rows: 0 }, authored: { rows: 0 }, compaction: { rows: 0 }, tool: { rows: 3 }, result: { rows: 3 } } }
 
 /**
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.

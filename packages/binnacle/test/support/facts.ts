@@ -7,6 +7,7 @@
  * @module binnacle/test/support/facts
  */
 import type { Fact } from '../../src/facts/adapt.ts'
+import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import { CommandId } from '@deepseek-ai/dsh-commands'
 import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
 import { ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
@@ -96,4 +97,41 @@ export const run = (seq: number, time: number, commandId: string, name: string, 
  */
 export const done = (seq: number, time: number, commandId: string, outcome: 'success' | 'error', text?: string): Extract<Fact, { readonly kind: 'done' }> => ({
   kind: 'done', seq, time, commandId: CommandId(commandId), outcome, ...text === undefined ? {} : { text },
+})
+
+/**
+ * A compaction's start, as dsh logged it.
+ * @param seq - its place in the log.
+ * @param time - when it was logged.
+ * @param compactionId - dsh's id of the compaction, which its summary and its end name.
+ * @returns the start fact.
+ */
+export const started = (seq: number, time: number, compactionId: string): Extract<Fact, { readonly kind: 'start' }> => ({
+  kind: 'start', seq, time, compactionId: CompactionId(compactionId),
+})
+
+/**
+ * A compaction's summary: one text block.
+ * @param seq - its place in the log.
+ * @param time - when it was logged.
+ * @param compactionId - dsh's id of the compaction it summarizes.
+ * @param items - how many items it shadowed.
+ * @param tokens - about how many tokens they held.
+ * @param text - the summary itself.
+ * @returns the summary fact.
+ */
+export const summarized = (seq: number, time: number, compactionId: string, items: number, tokens: number, text: string): Extract<Fact, { readonly kind: 'summary' }> => ({
+  kind: 'summary', seq, time, compactionId: CompactionId(compactionId), items, tokens, blocks: [{ kind: 'text', text }],
+})
+
+/**
+ * The end of a compaction, in dsh's words.
+ * @param seq - its place in the log.
+ * @param time - when it was logged.
+ * @param compactionId - dsh's id of the compaction it ends.
+ * @param error - why it failed; left out when it compacted.
+ * @returns the end fact.
+ */
+export const ended = (seq: number, time: number, compactionId: string, error?: string): Extract<Fact, { readonly kind: 'end' }> => ({
+  kind: 'end', seq, time, compactionId: CompactionId(compactionId), ...error === undefined ? {} : { error },
 })

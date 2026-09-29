@@ -9,15 +9,20 @@
  * not know at all, is an `unknown` fact carrying its raw record, so the
  * fallback view can show it — dsh has already refused any log whose unknown
  * events are not marked ignorable, so what arrives here unadapted is a kind
- * binnacle has not learned yet, never one it may silently drop.
+ * binnacle has not learned yet, never one it may silently drop. A surface
+ * event dsh logged as a replacement is never read as a row: the append-origin
+ * events alone are the transcript's source material, as dsh's own
+ * `isAppendSurfaceEvent` has it, so a replacement becomes a `quiet` fact.
  */
 
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { describe } from '../contract/index.ts'
 import { kinds } from './kinds.ts'
+import type { CompactionId } from '@deepseek-ai/dsh-compaction'
 import type { CommandId } from '@deepseek-ai/dsh-commands'
 import type { SessionEvent, SessionEventType, SessionSeq } from '@deepseek-ai/dsh-session'
+import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
@@ -159,6 +164,29 @@ export type Fact =
     readonly outcome: ApprovalOutcome
   }
   | Logged & {
+    readonly kind: 'start'
+    /** dsh's id of the compaction, which joins its summary and its end as one entry (`dsh:packages/compaction/compaction/src/brand.ts#CompactionId`). */
+    readonly compactionId: CompactionId
+  }
+  | Logged & {
+    readonly kind: 'summary'
+    /** dsh's id of the compaction whose summary it is, the start fact's `compactionId`. */
+    readonly compactionId: CompactionId
+    /** How many items the compaction shadowed: dsh's `shadowedSeqs` counted (`dsh:packages/compaction/compaction/src/types.ts`, the `compaction/summary` member). */
+    readonly items: number
+    /** About how many tokens they held: dsh's `shadowedTokenCount`, an estimate, read as dsh writes it. */
+    readonly tokens: number
+    /** The summary the model now sees in their place. */
+    readonly blocks: readonly Block[]
+  }
+  | Logged & {
+    readonly kind: 'end'
+    /** dsh's id of the compaction it ends, the start fact's `compactionId`. */
+    readonly compactionId: CompactionId
+    /** Why the compaction failed, in dsh's words; absent when it compacted (`dsh:packages/compaction/compaction/src/types.ts`, the `compaction/end` member). */
+    readonly error?: string
+  }
+  | Logged & {
     readonly kind: 'quiet'
     /** The event's dsh type, the key a view registered for the kind draws it under. */
     readonly type: string
@@ -180,6 +208,17 @@ type Adapter<K extends SessionEventType> = (event: SessionEvent<K>) => Fact
 
 /** An author's adapter for one kind of event: it names the fact and says what it holds. The name must not be an entry kind binnacle draws, such as `prompt` or `tool`. */
 export type AuthorAdapter = (event: SessionEvent) => { readonly name: string, readonly data: unknown }
+
+/**
+ * A replacement as a quiet fact: a surface event that shadowed a range instead of appending to the tail, whose copy
+ * stays model-only (`dsh:packages/core/session/src/surface.ts#isAppendSurfaceEvent`), so it draws as nothing and its
+ * record is kept for a view an author registers for its kind.
+ * @param event - the replacement, as dsh logged it.
+ * @returns the quiet fact of it.
+ */
+function replaced(event: SessionEvent): Fact {
+  return { kind: 'quiet', seq: event.seq, time: event.time, type: event.type, record: event }
+}
 
 /**
  * Read one of dsh's content blocks as binnacle's.
@@ -206,31 +245,37 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
   'step/start': ({ seq, time, data }) => ({ kind: 'step', seq, time, turn: data.turn, step: data.step, phase: 'start' }),
   'step/end': ({ seq, time, data }) => ({ kind: 'step', seq, time, turn: data.turn, step: data.step, phase: 'end' }),
   'user/message': (event) => {
+    if (!isAppendSurfaceEvent(event)) return replaced(event)
     const blocks = event.data.content.map(blockOf)
     const source = event.data.source.kind
     return source === 'user'
       ? { kind: 'prompt', seq: event.seq, time: event.time, blocks }
       : changesTools(event.data.content)
         ? { kind: 'context', seq: event.seq, time: event.time, source, blocks }
-        : { kind: 'quiet', seq: event.seq, time: event.time, type: 'user/message', record: event }
+        : replaced(event)
   },
   'developer/message': (event) => {
+    if (!isAppendSurfaceEvent(event)) return replaced(event)
     const message = event.data.message
     return changesTools(message.content)
       ? { kind: 'context', seq: event.seq, time: event.time, source: message.source.kind, blocks: message.content.map(blockOf) }
-      : { kind: 'quiet', seq: event.seq, time: event.time, type: 'developer/message', record: event }
+      : replaced(event)
   },
-  'assistant/message': ({ seq, time, data }) => ({
-    kind: 'answer',
-    seq,
-    time,
-    turn: data.turn,
-    step: data.step,
-    provider: data.message.source.provider,
-    model: data.message.source.model,
-    interrupted: data.interrupted === true,
-    blocks: data.message.content.map(blockOf),
-  }),
+  'assistant/message': (event) => {
+    if (!isAppendSurfaceEvent(event)) return replaced(event)
+    const { seq, time, data } = event
+    return {
+      kind: 'answer',
+      seq,
+      time,
+      turn: data.turn,
+      step: data.step,
+      provider: data.message.source.provider,
+      model: data.message.source.model,
+      interrupted: data.interrupted === true,
+      blocks: data.message.content.map(blockOf),
+    }
+  },
   'tool/call': ({ seq, time, data }) => ({
     kind: 'call', seq, time, turn: data.turn, step: data.step, callId: data.callId, name: data.name, arguments: data.arguments,
   }),
@@ -249,18 +294,31 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
     ...data.text === undefined ? {} : { text: data.text },
     ...data.sourceEventSeq === undefined ? {} : { sourceEventSeq: data.sourceEventSeq },
   }),
-  'tool/result': ({ seq, time, data }) => ({
-    kind: 'result',
-    seq,
-    time,
-    turn: data.turn,
-    step: data.step,
-    callId: data.message.toolCallId,
-    failed: data.message.isError === true,
-    ...data.error === undefined ? {} : { failure: { name: data.error.name, code: data.error.code, ...data.error.reason === undefined ? {} : { reason: data.error.reason } } },
-    blocks: data.message.content.map(blockOf),
-    meta: data.meta,
+  'compaction/start': ({ seq, time, data }) => ({ kind: 'start', seq, time, compactionId: data.compactionId }),
+  'compaction/summary': ({ seq, time, data }) => ({
+    kind: 'summary', seq, time, compactionId: data.compactionId,
+    items: data.shadowedSeqs.length, tokens: data.shadowedTokenCount, blocks: data.summary.map(blockOf),
   }),
+  'compaction/end': ({ seq, time, data }) => ({
+    kind: 'end', seq, time, compactionId: data.compactionId,
+    ...data.error === undefined ? {} : { error: data.error },
+  }),
+  'tool/result': (event) => {
+    if (!isAppendSurfaceEvent(event)) return replaced(event)
+    const { seq, time, data } = event
+    return {
+      kind: 'result',
+      seq,
+      time,
+      turn: data.turn,
+      step: data.step,
+      callId: data.message.toolCallId,
+      failed: data.message.isError === true,
+      ...data.error === undefined ? {} : { failure: { name: data.error.name, code: data.error.code, ...data.error.reason === undefined ? {} : { reason: data.error.reason } } },
+      blocks: data.message.content.map(blockOf),
+      meta: data.meta,
+    }
+  },
 }
 
 /**

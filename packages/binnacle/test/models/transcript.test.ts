@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Fact } from '../../src/facts/adapt.ts'
 import { settled, transcript } from '../../src/models/transcript.ts'
-import { prompt as promptFact, call as callFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact } from '../support/facts.ts'
+import { prompt as promptFact, call as callFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact, started as startedFact, summarized as summarizedFact, ended as endedFact } from '../support/facts.ts'
 
 const prompt = promptFact(2, 10, 'fix the build')
 const answer: Fact = { kind: 'answer', seq: 4, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'text', text: 'Done.' }] }
@@ -63,6 +63,25 @@ test('a command run and its done are one entry, where it ran, as a call and its 
   assert.deepEqual(transcript(facts).turns[0]?.entries, [
     { kind: 'prompt', fact: prompt },
     { kind: 'command', run: runFact(5, 22, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2'), done: doneFact(6, 24, 'cmd-1a2b3c4d-1', 'success', 'compacted: 12 messages folded to a summary') },
+  ])
+})
+
+test('a compaction\'s start, summary and end are one entry, where it started, as a call and its result are paired', () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
+    prompt,
+    startedFact(20, 100, 'cmp-1'),
+    summarizedFact(21, 110, 'cmp-1', 3, 18_300, 'The person asked to fix the build, and it did.'),
+    endedFact(22, 120, 'cmp-1'),
+  ]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    {
+      kind: 'compaction',
+      start: startedFact(20, 100, 'cmp-1'),
+      summary: summarizedFact(21, 110, 'cmp-1', 3, 18_300, 'The person asked to fix the build, and it did.'),
+      end: endedFact(22, 120, 'cmp-1'),
+    },
   ])
 })
 
@@ -165,6 +184,56 @@ test('a command still running holds back settling in a turn that has ended, for 
   assert.equal(settled(transcript([...facts, doneFact(5, 50, 'cmd-1a2b3c4d-1', 'success', 'compacted')])), 2)
 })
 
+test('a compaction still running holds back settling, wherever dsh logged it, for dsh logs one between turns', () => {
+  const facts: Fact[] = [
+    start(1, 1),
+    prompt,
+    { kind: 'turn', seq: 3, time: 3, turn: 1, phase: 'end', ending: 'completed' },
+    startedFact(4, 40, 'cmp-1'),
+  ]
+  // The compaction ran while the session idled, past its last turn's end, as a manual /compact does: it has not settled,
+  // for its end — the summary it lands or the error it names — is still to come and will change the entry.
+  assert.equal(settled(transcript(facts)), 1)
+  assert.equal(settled(transcript([...facts, summarizedFact(5, 50, 'cmp-1', 3, 300, 'summarized')])), 1)
+  assert.equal(settled(transcript([...facts, endedFact(6, 60, 'cmp-1')])), 2)
+})
+
+test('a summary or end whose compaction is not in its turn is kept on its own, never dropped, as a done whose run is not is', () => {
+  const half = summarizedFact(3, 30, 'cmp-9', 3, 300, 'half a log')
+  const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, half]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'summary', fact: half }])
+  const failed = endedFact(4, 40, 'cmp-8', 'summary: the provider refused the call')
+  assert.deepEqual(transcript([{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, failed]).turns[0]?.entries, [{ kind: 'end', fact: failed }])
+})
+
+test('a replacement leaves what it shadowed standing: the entries before a compaction keep their places, and a call keeps the result it had', () => {
+  const pruned: Fact = { kind: 'quiet', seq: 8, time: 45, type: 'tool/result', record: {} }
+  const checkpoint: Fact = { kind: 'quiet', seq: 12, time: 65, type: 'user/message', record: {} }
+  const facts: Fact[] = [
+    start(1, 1),
+    prompt,
+    call,
+    result,
+    pruned,
+    startedFact(9, 50, 'cmp-1'),
+    summarizedFact(10, 60, 'cmp-1', 3, 300, 'The person asked to fix the build, and it did.'),
+    checkpoint,
+    endedFact(13, 70, 'cmp-1'),
+  ]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    { kind: 'tool', call, result },
+    { kind: 'quiet', fact: pruned },
+    {
+      kind: 'compaction',
+      start: startedFact(9, 50, 'cmp-1'),
+      summary: summarizedFact(10, 60, 'cmp-1', 3, 300, 'The person asked to fix the build, and it did.'),
+      end: endedFact(13, 70, 'cmp-1'),
+    },
+    { kind: 'quiet', fact: checkpoint },
+  ])
+})
+
 test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s is held by exactly one entry, paired or alone', () => {
   const machinery: Fact[] = [
     { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
@@ -181,6 +250,11 @@ test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s i
     decidedFact(10, 27, 'a1', 'allowed-once'),
     // A decision whose ask is not in the log: kept on its own, never dropped.
     decidedFact(11, 28, 'a9', 'rejected'),
+    startedFact(14, 31, 'cmp-1'),
+    summarizedFact(15, 32, 'cmp-1', 3, 300, 'The person asked to fix the build, and it did.'),
+    endedFact(16, 33, 'cmp-1'),
+    // An end whose compaction is not in the log: kept on its own, never dropped.
+    endedFact(17, 34, 'cmp-9'),
     { kind: 'authored', seq: 6, time: 19, name: 'seeded', data: { from: 'fork' } },
     { kind: 'unknown', seq: 7, time: 20, type: 'test/marker', record: {} },
     { kind: 'quiet', seq: 12, time: 29, type: 'session/title', record: {} },
@@ -191,6 +265,7 @@ test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s i
       if (entry.kind === 'tool') drawn.push(entry.call, ...entry.result === undefined ? [] : [entry.result])
       else if (entry.kind === 'approval') drawn.push(entry.asked, ...entry.decided === undefined ? [] : [entry.decided])
       else if (entry.kind === 'command') drawn.push(entry.run, ...entry.done === undefined ? [] : [entry.done])
+      else if (entry.kind === 'compaction') drawn.push(entry.start, ...entry.summary === undefined ? [] : [entry.summary], ...entry.end === undefined ? [] : [entry.end])
       else drawn.push(entry.fact)
     }
   }
