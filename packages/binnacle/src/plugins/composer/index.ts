@@ -25,7 +25,8 @@ export const composer = {
         }
         // A line naming one of dsh's commands runs it; one naming none is prose, sent as any other line.
         ctx.binnacle.command(text).then((ran) => { if (!ran) ctx.binnacle.send(text) }, () => {
-          // The command grant rejects only once the session has closed under the line: there is nothing to run it on.
+          // The grant resolves whatever the command returned — a failure is logged as its done and drawn from the log;
+          // it rejects only once the session has closed under the line, with nothing to run it on.
         })
       },
     })

@@ -38,7 +38,9 @@ export interface OpenedSession {
   send(text: string): void
   /**
    * Run a line as one of dsh's commands for the agent, without sending it to the model
-   * (`dsh:packages/interaction/commands/src/index.ts`).
+   * (`dsh:packages/interaction/commands/src/index.ts`). A command that failed still
+   * ran — dsh logs its failure as the command's `done` before rethrowing, and the
+   * failure is drawn from the log — so it is contained here.
    * @param line - the line, as the person wrote it.
    * @returns whether a command ran, whatever it returned; false when no command has the name.
    */
@@ -101,7 +103,16 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       const stops = [ctx.on('commands/change', listener), ctx.on('skills/change', listener)]
       return () => { for (const stop of stops) stop() }
     },
-    command: async (line) => await commands.execute(handle.agent, line, [], new AbortController().signal) !== undefined,
+    command: async (line) => {
+      try {
+        return await commands.execute(handle.agent, line, [], new AbortController().signal) !== undefined
+      } catch {
+        // dsh's executor rethrows a failed command's own failure after logging it as the command's `done`
+        // (`dsh:packages/interaction/commands/src/index.ts`): the command ran, and what it did is on the log, so the
+        // grant keeps its contract — it resolves, and throws only where the session is gone.
+        return true
+      }
+    },
     get running() { return handle.agent.status === 'running' },
     interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
     close: () => handle.dispose(),
