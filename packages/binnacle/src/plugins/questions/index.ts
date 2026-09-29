@@ -11,7 +11,8 @@
  * as the title, the question, its `detail` beneath as markdown, each option
  * offered `choose`, and after the options type an answer (`answer`), skip
  * (`choose`) and cancel (`dismiss`). The answer collects every question's
- * answer, in order. A request withdrawn by its signal takes its card back,
+ * answer, in order. Cancelling rejects the whole request with dsh's
+ * `ASK_CANCELLED`; a request withdrawn by its signal takes its card back,
  * rejected `ASK_ABORTED`; one standing when the plugin is disposed goes to
  * the next answerer, as dsh asks when nothing answers.
  */
@@ -23,26 +24,41 @@ import type { Node, Placement } from '../../api.ts'
 /** What the waterfall hands an answerer, as dsh declares it on its event map; the package does not export it by name. */
 type Asked = Parameters<Events['user-questions/request']>[0]
 
-/** The region ids the card offers, minted here and read back by the ask they seat. */
+/** The region ids the card offers, minted here and read back by the ask that seats it. */
 const TYPING = 'type an answer'
 const SKIP = 'skip'
 const CANCEL = 'cancel'
 const DONE = 'done'
 
 /**
+ * A rejection dsh's user-questions service reads back as its own: the shape its web client sends — an error named `UserQuestionError`, carrying dsh's code — for the class itself does not cross the wire (`dsh:packages/client/ui-user-questions/src/client/contract/slots.ts`, whose `questionError` is private).
+ * @param code - dsh's code for the refusal, as the client sends it.
+ * @param message - what it says, in dsh's words.
+ * @returns the error to reject the waterfall with.
+ */
+function refused(code: 'ASK_ABORTED' | 'ASK_CANCELLED', message: string): Error {
+  const error = new Error(message) as Error & { code: string }
+  error.name = 'UserQuestionError'
+  error.code = code
+  return error
+}
+
+/**
  * The line an option is offered on: its label, its description beside it in the muted tone, and on a multi-select question the mark of its being marked.
  * @param option - the option.
  * @param multi - whether the question allows more than one option to be marked.
  * @param marked - whether this option is.
- * @returns the line's spans.
+ * @returns the line as a text node.
  */
 function optionLine(option: AskUserQuestionOption, multi: boolean, marked: boolean): Node {
-  const spans = [
-    ...multi && marked ? [{ mark: 'done' } as const] : multi ? [' ' as const] : [],
-    multi ? ` ${option.label}` : option.label,
-    ...option.description === undefined ? [] : [{ text: ` — ${option.description}`, tone: 'muted' } as const],
-  ]
-  return { kind: 'text', text: spans }
+  return {
+    kind: 'text',
+    text: [
+      ...multi && marked ? [{ mark: 'done' } as const] : multi ? [' ' as const] : [],
+      multi ? ` ${option.label}` : option.label,
+      ...option.description === undefined ? [] : [{ text: ` — ${option.description}`, tone: 'muted' } as const],
+    ],
+  }
 }
 
 /**
@@ -82,6 +98,7 @@ class Ask {
   private readonly ctx: Context
   private readonly req: Asked
   private readonly settle: (answer: AskUserQuestionAnswer) => void
+  private readonly refuse: (reason: unknown) => void
   private readonly answers: AskUserQuestionAnswerItem[] = []
   private readonly marks: string[] = []
   private readonly acts = new Map<string, () => void>()
@@ -94,11 +111,13 @@ class Ask {
    * @param ctx - the plugin's context, to seat the card with.
    * @param req - what the waterfall handed.
    * @param settle - resolves the waterfall's promise, once every question is answered.
+   * @param refuse - rejects the waterfall's promise, when the person cancels the ask or its signal withdraws it.
    */
-  constructor(ctx: Context, req: Asked, settle: (answer: AskUserQuestionAnswer) => void) {
+  constructor(ctx: Context, req: Asked, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void) {
     this.ctx = ctx
     this.req = req
     this.settle = settle
+    this.refuse = refuse
   }
 
   /** The question the card is seated for. */
@@ -118,6 +137,10 @@ class Ask {
     if (question.multiSelect === true) this.acts.set(DONE, () => this.answerWith({ id: question.id, selected: [...this.marks] }))
     this.acts.set(TYPING, () => this.typeAnswer())
     this.acts.set(SKIP, () => this.answerWith({ id: question.id, selected: [] }))
+    this.acts.set(CANCEL, () => {
+      this.close()
+      this.refuse(refused('ASK_CANCELLED', 'the user cancelled ask_user_question'))
+    })
     this.unseat?.()
     const seated: Placement = {
       kind: 'lines',
@@ -129,8 +152,8 @@ class Ask {
   }
 
   /**
- * Draw the seated card again, for what answering on it changed: the marks on its options. It is placed again as it stands — the same placement, placed while the copy before it still holds the seat, so the pane that draws it and the focus on it are kept — and the older copy is then taken back.
- */
+   * Draw the seated card again, for what answering on it changed: the marks on its options. It is placed again as it stands — the same placement, placed while the copy before it still holds the seat — and the older copy is then taken back, so the pane that draws the card, and the focus on it, are kept.
+   */
   private redraw(): void {
     const seated = this.seated
     if (seated === undefined) return
@@ -184,11 +207,20 @@ class Ask {
     this.answers.push(item)
     this.index += 1
     if (this.index >= this.req.questions.length) {
-      this.unseat?.()
+      this.close()
       this.settle({ answers: this.answers })
       return
     }
     this.seat()
+  }
+
+  /** Take back everything the ask seated, leaving the composer to the person. */
+  private close(): void {
+    this.unsit?.()
+    this.unsit = undefined
+    this.unseat?.()
+    this.unseat = undefined
+    this.seated = undefined
   }
 }
 
@@ -197,8 +229,8 @@ export const questions = {
   name: 'questions',
   inject: ['binnacle'] satisfies (keyof Context)[],
   apply(ctx: Context): void {
-    ctx.on('user-questions/request', req => new Promise<AskUserQuestionAnswer>((resolve) => {
-      const ask = new Ask(ctx, req, resolve)
+    ctx.on('user-questions/request', req => new Promise<AskUserQuestionAnswer>((resolve, reject) => {
+      const ask = new Ask(ctx, req, resolve, reject)
       ask.seat()
     }))
   },

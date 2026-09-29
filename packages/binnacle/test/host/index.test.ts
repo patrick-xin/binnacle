@@ -1339,6 +1339,25 @@ test('type an answer places a composer in the seat, whose submitted line is the 
   await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
 })
 
+test('cancel rejects the request as cancelled, and the composer returns with what was typed', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.dismiss': 'f8' }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('draft')
+  const answer = askQuestions(ctx, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\x1b[19~')
+  const refusal = await answer.then(() => undefined, (reason: unknown) => reason)
+  assert.equal(refusal instanceof Error && refusal.name === 'UserQuestionError', true, 'the refusal is a UserQuestionError')
+  assert.equal((refusal as { code?: string }).code, 'ASK_CANCELLED')
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
+  terminal.type('\r')
+  assert.deepEqual(session.sent, ['draft'])
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
