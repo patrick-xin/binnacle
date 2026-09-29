@@ -23,11 +23,20 @@ test('a chord is refused as its modifiers and key, however it is joined, and a w
 })
 
 test('the key a plugin offers the key table, as a screen\'s key, is not a word, and is the only such place', () => {
-  const text = "place('trajectory', { key: 'ctrl+o', description: 'open the trajectory' })\nplace('help', { hint: 'ctrl+h' })\n"
+  const text = "ctx.binnacle.screen('trajectory', { key: 'ctrl+o', description: 'open the trajectory' })\nctx.binnacle.screen('help', { hint: 'ctrl+h' })\n"
   assert.deepEqual(spelledKeys('a.ts', text), [refused('a.ts:2', "'ctrl+h'", 'ctrl+h')])
 })
 
 test('what no person reads is not a word: a module a file imports, a type, a property\'s name', () => {
   const text = "import type { Row } from './tab.ts'\nexport * from './space.ts'\ntype Edge = 'up' | 'down'\nconst moves = { 'left': 1 }\nconst row: Edge = moves.left === 1 ? 'up' : 'down'\n"
   assert.deepEqual(spelledKeys('a.ts', text), [refused('a.ts:5', "'up'", 'up'), refused('a.ts:5', "'down'", 'down')])
+})
+
+test('a key property is a binding only in the object a screen is placed with, and anywhere else its words are refused', () => {
+  const text = "ctx.binnacle.screen('go', { key: 'ctrl+g', draw })\nconst row = { key: 'press Enter to continue' }\nctx.binnacle.ask('go', { key: 'ctrl+g' })\nctx.binnacle.screen({ key: 'ctrl+g' }, { title: 'x' })\n"
+  assert.deepEqual(spelledKeys('a.ts', text), [
+    refused('a.ts:2', "'press Enter to continue'", 'Enter'),
+    refused('a.ts:3', "'ctrl+g'", 'ctrl+g'),
+    refused('a.ts:4', "'ctrl+g'", 'ctrl+g'),
+  ])
 })

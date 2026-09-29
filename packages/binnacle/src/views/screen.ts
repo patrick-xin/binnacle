@@ -2,7 +2,7 @@ import type { Fact } from '../facts/adapt.ts'
 import { transcript } from '../models/transcript.ts'
 import type { Entry, Transcript } from '../models/transcript.ts'
 import { layout } from '../ui/layout.ts'
-import type { Frame, Placed } from '../ui/layout.ts'
+import type { Frame, LayoutState, Placed } from '../ui/layout.ts'
 import type { Node, Span } from '../ui/node.ts'
 import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
@@ -110,9 +110,10 @@ function regionsIn(node: Node): string[] {
  * against the views of its key, which are replaced as a whole when one is registered, disposed or invalidated; the
  * layout is kept against the width and against which of its folds are open, which is all of the state layout reads,
  * and against the theme, which is replaced as a whole when a theme registration comes or goes.
+ * @param keys - the keys the one key table binds to each meaning, for an ask to name what answers it; read as an entry is laid out, so a drawer is made anew when a person rebinds a key.
  * @returns the drawer, holding nothing yet.
  */
-export function screens(): DrawScreen {
+export function screens(keys: () => LayoutState['keys'] = () => undefined): DrawScreen {
   const drawings = new WeakMap<Entry, Drawing>()
   const frameOf = (entry: Entry, state: UiState, width: number, views: Views, theme: Theme, now: number | undefined): Frame => {
     const by = views.get(keyOf(entry))
@@ -127,7 +128,8 @@ export function screens(): DrawScreen {
     if (laid?.width === width && laid.theme === theme && drawing.folds.every((id, index) => state.toggled.has(id) === laid.open[index]) && laid.focus === focus && (!drawing.timed || laid.now === now)) return laid.frame
     // The theme is what the layout is kept against, so how folds start needs no key of its own.
     const starts = theme.folds[keyOf(entry)] ?? theme.folds[entry.kind]
-    const frame = layout(drawing.node, width, { ...state, ...starts === undefined ? {} : { folds: starts }, ...now === undefined ? {} : { now } }, theme)
+    const bound = keys()
+    const frame = layout(drawing.node, width, { ...state, ...starts === undefined ? {} : { folds: starts }, ...now === undefined ? {} : { now }, ...bound === undefined ? {} : { keys: bound } }, theme)
     drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.toggled.has(id)), focus, now, frame } })
     return frame
   }

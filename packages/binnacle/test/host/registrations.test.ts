@@ -504,3 +504,10 @@ test('an author types what their lines are invoked with from the author API alon
   if (placement.kind === 'lines') placement.invoke?.('reject', 'dismiss')
   assert.deepEqual(heard, ['dismiss'])
 })
+
+test('a theme changes the gutter a show is drawn along, one column wide as its border pieces are', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.theme({ chrome: { gutter: '||' } }), { message: 'binnacle.theme: chrome.gutter is "||", not one column wide' })
+  registrations.theme({ chrome: { gutter: '┃' } })
+  assert.equal(registrations.currentTheme.chrome.gutter, '┃')
+})

@@ -252,6 +252,7 @@ export interface ThemeChanges {
         readonly cut?: string;
         readonly separator?: string;
         readonly jump?: string;
+        readonly gutter?: string;
         readonly border?: {
             readonly [piece in keyof typeof chrome.border]?: string;
         };

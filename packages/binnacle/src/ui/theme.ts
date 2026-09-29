@@ -199,8 +199,8 @@ export interface ThemeChanges {
   readonly tones?: { readonly [name: string]: Style }
   /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: one of the terminal's sixteen colours. */
   readonly backgrounds?: { readonly [name: string]: Colour }
-  /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. */
-  readonly chrome?: { readonly focus?: string, readonly cut?: string, readonly separator?: string, readonly jump?: string, readonly border?: { readonly [piece in keyof typeof chrome.border]?: string } }
+  /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. The gutter and a border's pieces are each one column wide. */
+  readonly chrome?: { readonly focus?: string, readonly cut?: string, readonly separator?: string, readonly jump?: string, readonly gutter?: string, readonly border?: { readonly [piece in keyof typeof chrome.border]?: string } }
   /**
    * What a fold says of itself, each a template: `{n}` is the count of lines, and `{lines}` the word for that many (`line` or `lines`). `less` and `away` count nothing.
    */

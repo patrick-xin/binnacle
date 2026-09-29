@@ -110,7 +110,8 @@ export function parseThemeChanges(value: unknown, theme: Theme): ThemeChanges {
           break
         case 'chrome': {
           const { border, ...rest } = record(field, 'chrome')
-          const glyphs = known(rest, 'chrome', Object.keys(chrome).filter(key => key !== 'border'), text)
+          // The gutter is measured one column wide, as a border's pieces are.
+          const glyphs = known(rest, 'chrome', Object.keys(chrome).filter(key => key !== 'border'), (glyph, at) => at === 'chrome.gutter' ? piece(glyph, at) : text(glyph, at))
           read.chrome = border === undefined ? glyphs : { ...glyphs, border: known(border, 'chrome.border', Object.keys(chrome.border), piece) }
           break
         }

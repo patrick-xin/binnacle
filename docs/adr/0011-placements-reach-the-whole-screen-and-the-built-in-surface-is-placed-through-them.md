@@ -29,4 +29,4 @@ pi lets an extension replace its header, footer and editor, place a widget near 
 
 - The host shrinks to the terminal, the session, and laying out what is placed.
 - A person can replace the composer or add a line under it, and a feature's dialog has somewhere to be drawn.
-- Until the registration exists, the host's own layout is a private door, one the layer gate does not see.
+- The host's layout is no door of its own: what the page shows, a dialog over it included, is what is placed, so the layer gate sees every way onto it.

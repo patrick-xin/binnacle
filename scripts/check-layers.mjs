@@ -99,11 +99,26 @@ function nameOf(node) {
  * The modules a source text imports or re-exports from.
  * @param {string} path - the file's path, for the parser.
  * @param {string} text - the file's text.
- * @returns {{ named: { spec: string, typeOnly: boolean, names: string[] }[], unnamed: string[] }} each specifier, in order, whether its declaration is `import type` or `export type`, and the names it takes from the module (`default` for a default import, `*` where it takes the whole module at once), a dynamic import's included when a string names it; and the argument of each dynamic import whose module is decided at run time.
+ * @returns {{ named: { spec: string, typeOnly: boolean, names: string[] }[], unnamed: string[], reexports: { spec: string, name: string }[] }} each specifier, in order, whether its declaration is `import type` or `export type`, and the names it takes from the module (`default` for a default import, `*` where it takes the whole module at once), a dynamic import's included when a string names it; and the argument of each dynamic import whose module is decided at run time; and each name a file exports that it took from a module, whether `export from` or an import it exports, with `*` where it is the whole module.
  */
 function specifiers(path, text) {
   const { program } = parseSync(path, text)
   const dynamic = dynamicImports(program, text)
+  /** @type {Map<string, { spec: string, name: string }>} */
+  const bound = new Map()
+  for (const node of program.body) {
+    if (node.type !== 'ImportDeclaration') continue
+    for (const specifier of node.specifiers) {
+      const name = specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : ALL
+      bound.set(specifier.local.name, { spec: node.source.value, name })
+    }
+  }
+  const reexports = program.body.flatMap(node => {
+    if (node.type === 'ExportAllDeclaration') return [{ spec: node.source.value, name: ALL }]
+    if (node.type !== 'ExportNamedDeclaration') return []
+    if (node.source) return node.specifiers.map(specifier => ({ spec: node.source.value, name: nameOf(specifier.local) }))
+    return node.specifiers.flatMap(specifier => bound.get(nameOf(specifier.local)) ?? [])
+  })
   const declared = program.body.flatMap(node => {
     if (node.type === 'ImportDeclaration') {
       const names = node.specifiers.map(specifier => specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : ALL)
@@ -116,6 +131,7 @@ function specifiers(path, text) {
   return {
     named: [...declared, ...dynamic.flatMap(entry => entry.module === undefined ? [] : [{ spec: entry.module, typeOnly: false, names: [ALL] }])],
     unnamed: dynamic.flatMap(entry => entry.module === undefined ? [entry.source] : []),
+    reexports,
   }
 }
 
@@ -134,11 +150,20 @@ function covers(key, spec) {
  * @param {string} path - the file's path, relative to the package.
  * @param {{ spec: string, names: string[] }[]} named - what it imports, as `specifiers` reads it.
  * @param {Rules} rules - the rules.
- * @returns {string[]} one line per owned symbol it reaches without being among its owners: by name, or with the whole package at once, which reaches every symbol the package owns.
+ * @param {{ spec: string, name: string }[]} reexports - what it exports from a module, as `specifiers` reads it.
+ * @returns {string[]} one line per owned symbol it reaches without being among its owners: by name, or with the whole package at once, which reaches every symbol the package owns; and one per owned symbol an owner re-exports, which would let any file reach it through the owner.
  */
-function unowned(path, named, rules) {
+function unowned(path, named, rules, reexports) {
   const self = relative(rules.root, path)
   const problems = []
+  for (const { spec, name } of reexports) {
+    for (const [pkg, symbols] of Object.entries(rules.owners ?? {})) {
+      if (!covers(pkg, spec)) continue
+      for (const symbol of name === ALL ? Object.keys(symbols) : [name]) {
+        if (symbols[symbol]?.includes(self)) problems.push(`${path}: re-exports ${symbol} from ${pkg}, which lets any file import it from here; export what you make of it, and leave the symbol to its owners in layers.json`)
+      }
+    }
+  }
   for (const { spec, names } of named) {
     for (const [pkg, symbols] of Object.entries(rules.owners ?? {})) {
       if (!covers(pkg, spec)) continue
@@ -167,8 +192,8 @@ function unowned(path, named, rules) {
 export function checkLayers(files, rules) {
   const problems = []
   for (const file of files) {
-    const { named, unnamed } = specifiers(file.path, file.text)
-    problems.push(...unowned(file.path, named, rules))
+    const { named, unnamed, reexports } = specifiers(file.path, file.text)
+    problems.push(...unowned(file.path, named, rules, reexports))
     const layer = layerOf(file.path, rules)
     if (layer === undefined) {
       problems.push(`${file.path}: is in no layer; move it under ${rules.root}/<layer>/`)

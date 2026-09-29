@@ -159,3 +159,19 @@ test('an owned symbol cannot be reached around its owners: re-exported, or with 
     whole, whole, whole,
   ])
 })
+
+test('an owner may not re-export an owned symbol with export from, since any file could then import it from the owner', () => {
+  const owner = source('src/ui/pointer.ts', "export { TuiMouseEvent } from '@earendil-works/pi-tui'\n")
+  assert.deepEqual(checkLayers([owner], OWNED), [
+    'src/ui/pointer.ts: re-exports TuiMouseEvent from @earendil-works/pi-tui, which lets any file import it from here; export what you make of it, and leave the symbol to its owners in layers.json',
+  ])
+})
+
+test('an owner may not export an owned symbol it imported, plainly, aliased or as a type', () => {
+  const plain = source('src/ui/pointer.ts', "import { TuiMouseEvent } from '@earendil-works/pi-tui'\nexport { TuiMouseEvent }\n")
+  const aliased = source('src/ui/pointer.ts', "import { TuiMouseEvent as Mouse } from '@earendil-works/pi-tui'\nexport { Mouse as Click }\n")
+  const typed = source('src/ui/pointer.ts', "import type { TuiMouseEvent } from '@earendil-works/pi-tui'\nexport type { TuiMouseEvent }\n")
+  for (const owner of [plain, aliased, typed]) {
+    assert.deepEqual(checkLayers([owner], OWNED), ['src/ui/pointer.ts: re-exports TuiMouseEvent from @earendil-works/pi-tui, which lets any file import it from here; export what you make of it, and leave the symbol to its owners in layers.json'])
+  }
+})
