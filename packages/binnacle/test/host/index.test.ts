@@ -1233,6 +1233,23 @@ test('a click on the card does nothing, allow once or reject: an approval is a k
   assert.equal(settled, 'rejected')
 })
 
+test('an approval still standing when the session closes settles unavailable, and its card is gone from what it left', async () => {
+  const terminal = new XtermTerminal(50, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  let settled: ApprovalOutcome | undefined
+  void askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace' }).then((outcome) => { settled = outcome })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
+  terminal.type('\x03')
+  await until(() => settled !== undefined)
+  assert.equal(settled, 'unavailable')
+  await settle()
+  assert.deepEqual(exits, [0])
+  assert.ok((await terminal.mainScreen()).every(row => !row.includes('allow once')), 'the card is gone from what the session left printed')
+})
+
 test('an approval withdrawn by its signal takes its card back, settled cancelled', async () => {
   const terminal = new XtermTerminal(50, 14)
   const session = new FakeSession([prompt(1, 'fix the build')])
