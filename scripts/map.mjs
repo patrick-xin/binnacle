@@ -32,12 +32,14 @@ function declared(declaration) {
  * What a module exports, in source order.
  * @param {string} path - the module's path, for the parser.
  * @param {string} text - the module's text.
- * @returns {string[]} the names it declares and exports.
+ * @returns {string[]} the names it declares and exports, and those a local export list (`export { a as b }`, no `from`) exports, by the name outside (`b`); a re-export is not here.
  */
 function exportsOf(path, text) {
   const names = []
   for (const node of parseSync(path, text).program.body) {
-    if (node.type === 'ExportNamedDeclaration' && node.declaration) names.push(...declared(node.declaration))
+    if (node.type !== 'ExportNamedDeclaration') continue
+    if (node.declaration) names.push(...declared(node.declaration))
+    else if (!node.source) names.push(...node.specifiers.map(specifier => nameOf(specifier.exported)))
   }
   return names
 }

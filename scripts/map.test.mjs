@@ -100,3 +100,8 @@ test('an imported name is author API only when api.ts re-exports it or an export
   const keys = mapOf(files).find(entry => entry.path === 'ui/keys.ts')
   assert.deepEqual(keys.authorApi, ['KeyId', 'Reg', 'Alias'])
 })
+
+test('a local export list exports the name it exports under', () => {
+  const files = [file('ui/list.ts', 'const local = 1\nconst a = 2\nexport { local }\nexport { a as b }\nexport const c = 3\n')]
+  assert.deepEqual(mapOf(files)[0].exports, ['local', 'b', 'c'])
+})
