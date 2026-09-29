@@ -5,10 +5,8 @@ import type { Node, Placement } from '../../api.ts'
 /** What the waterfall hands an answerer, as dsh declares it on its event map; the package does not export it by name. */
 type Asked = Parameters<Events['user-questions/request']>[0]
 
-/** The rest of the waterfall's chain, handed to an answerer to delegate to. */
 type AnswerNext = Parameters<Events['user-questions/request']>[1]
 
-/** The region ids the card offers, minted here and read back by the ask that seats it. */
 const TYPING = 'type an answer'
 const SKIP = 'skip'
 const CANCEL = 'cancel'
@@ -16,9 +14,6 @@ const DONE = 'done'
 
 /**
  * A rejection dsh's user-questions service reads back as its own: the shape its web client sends — an error named `UserQuestionError`, carrying dsh's code — for the class itself does not cross the wire (`dsh:packages/client/ui-user-questions/src/client/contract/slots.ts`, whose `questionError` is private).
- * @param code - dsh's code for the refusal, as the client sends it.
- * @param message - what it says, in dsh's words.
- * @returns the error to reject the waterfall with.
  */
 function refused(code: 'ASK_ABORTED' | 'ASK_CANCELLED', message: string): Error {
   const error = new Error(message) as Error & { code: string }
@@ -27,13 +22,6 @@ function refused(code: 'ASK_ABORTED' | 'ASK_CANCELLED', message: string): Error 
   return error
 }
 
-/**
- * The line an option is offered on: its label, its description beside it in the muted tone, and on a multi-select question the mark of its being marked.
- * @param option - the option.
- * @param multi - whether the question allows more than one option to be marked.
- * @param marked - whether this option is.
- * @returns the line as a text node.
- */
 function optionLine(option: AskUserQuestionOption, multi: boolean, marked: boolean): Node {
   return {
     kind: 'text',
@@ -45,22 +33,13 @@ function optionLine(option: AskUserQuestionOption, multi: boolean, marked: boole
   }
 }
 
-/**
- * The options of a question as the card offers them: as the asker gave them, except that a plan-review question offers its approve option first, so it is the card's primary — what Enter does (`dsh:packages/interaction/user-questions/src/types.ts#AskUserQuestionIntent`).
- * @param question - the question.
- * @returns its options.
- */
+/** A plan-review question offers its approve option first, so it is the card's primary — what Enter does (`dsh:packages/interaction/user-questions/src/types.ts#AskUserQuestionIntent`). */
 function offered(question: AskUserQuestionItem): readonly AskUserQuestionOption[] {
   const options = question.options ?? []
   const approve = question.intent?.kind === 'plan-review' ? options.findIndex(option => option.label === question.intent?.approve) : -1
   return approve > 0 ? [...options.slice(approve), ...options.slice(0, approve)] : options
 }
 
-/**
- * The question's own lines: the question, and its `detail` beneath as markdown.
- * @param question - the question.
- * @returns what it draws of itself.
- */
 function asked(question: AskUserQuestionItem): readonly Node[] {
   return [
     { kind: 'text', text: question.question },
@@ -68,12 +47,7 @@ function asked(question: AskUserQuestionItem): readonly Node[] {
   ]
 }
 
-/**
- * The card one question is asked with: its `header` as the title, the question, its `detail` beneath as markdown, each option offered `choose`, and after the options type an answer, skip and cancel.
- * @param question - the question.
- * @param marked - the labels marked on its options, in the order they were marked.
- * @returns the card.
- */
+/** `marked` is the labels marked on its options, in the order they were marked. */
 function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
   const multi = question.multiSelect === true
   return {
@@ -99,7 +73,6 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
   }
 }
 
-/** One request standing in the seat: what is answered so far, and the card seated for its current question. */
 class Ask {
   private readonly ctx: Context
   private readonly req: Asked
@@ -117,11 +90,7 @@ class Ask {
   private unshow: (() => void) | undefined
 
   /**
-   * @param ctx - the plugin's context, to seat the card with.
-   * @param req - what the waterfall handed.
    * @param next - the rest of the waterfall's chain, to hand the request to when the plugin is disposed with it standing.
-   * @param settle - resolves the waterfall's promise, once every question is answered.
-   * @param refuse - rejects the waterfall's promise, when the person cancels the ask or its signal withdraws it.
    * @param leave - takes the ask out of what the plugin holds standing, reporting whether it stood; finishing is once, and this is what makes it so.
    */
   constructor(ctx: Context, req: Asked, next: AnswerNext, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void, leave: () => boolean) {
@@ -134,17 +103,16 @@ class Ask {
     req.signal?.addEventListener('abort', this.withdrawn, { once: true })
   }
 
-  /** The request was withdrawn by its signal: take the card back and reject, as dsh's web client does when the host aborts under it. */
+  /** As dsh's web client rejects when the host aborts under it. */
   private readonly withdrawn = (): void => {
     this.finish(() => { this.refuse(refused('ASK_ABORTED', 'ask_user_question was aborted before the user answered')) })
   }
 
-  /** Hand the request to the next answerer, its card taken back: what the plugin leaves standing when it is disposed, as dsh asks when nothing answers. */
+  /** What the plugin leaves standing when it is disposed goes to the next answerer, as dsh asks when nothing answers. */
   handOver(): void {
     this.finish(() => { this.next().then(this.settle, this.refuse) })
   }
 
-  /** The question the card is seated for. */
   private get question(): AskUserQuestionItem {
     const question = this.req.questions[this.index]
     // dsh refuses a request with no question before the waterfall is asked, so one is there.
@@ -152,7 +120,7 @@ class Ask {
     return question
   }
 
-  /** Seat the card of the current question, taking the composer's place until it is answered: the newest placement in the composer's slot, so it takes the keyboard. */
+  /** The newest placement in the composer's slot, so it takes the keyboard until the question is answered. */
   seat(): void {
     // A signal already aborted never fires the listener, so it is answered here, as dsh's own client answers it at construction.
     if (this.req.signal?.aborted === true) {
@@ -179,9 +147,7 @@ class Ask {
     this.unseat = this.ctx.binnacle.place('composer', seated)
   }
 
-  /**
-   * Draw the seated card again, for what answering on it changed: the marks on its options. It is placed again as it stands — the same placement, placed while the copy before it still holds the seat — and the older copy is then taken back, so the pane that draws the card, and the focus on it, are kept.
-   */
+  /** Placed again as it stands, while the copy before it still holds the seat, and the older copy then taken back, so the pane that draws the card, and the focus on it, are kept. */
   private redraw(): void {
     const seated = this.seated
     if (seated === undefined) return
@@ -190,9 +156,7 @@ class Ask {
     this.unseat = unseat
   }
 
-  /**
-   * Place a composer in the seat over the card — the newest placement in the composer's slot, so the person types where they were typing — and the question above it, its header, question and detail without its offers, so they are not typing blind. A line they submit is the question's custom answer, on a multi-select question beside every option marked; a blank line takes the composer and the question above back, and gives the card the seat again.
-   */
+  /** The question is placed above the composer, without its offers, so they are not typing blind. A blank line takes both back and gives the card the seat again. */
   private typeAnswer(): void {
     this.unsit?.()
     this.unsit = this.ctx.binnacle.place('composer', {
@@ -224,10 +188,7 @@ class Ask {
     })
   }
 
-  /**
-   * Choose an option of the current question: on a single-select question it answers, and on a multi-select one it toggles the option's mark, leaving the question open.
-   * @param index - the option's place among those the card offers.
-   */
+  /** On a multi-select question it toggles the option's mark, leaving the question open. */
   private choose(index: number): void {
     const option = offered(this.question)[index]
     if (option === undefined) return
@@ -240,10 +201,6 @@ class Ask {
     this.redraw()
   }
 
-  /**
-   * Answer the current question and seat the next, or settle the request once its last is answered.
-   * @param item - the question's answer.
-   */
   private answerWith(item: AskUserQuestionAnswerItem): void {
     this.answers.push(item)
     this.index += 1
@@ -254,17 +211,13 @@ class Ask {
     this.seat()
   }
 
-  /**
-   * Take back everything the ask seated and finish it, once: settle it, refuse it, or hand it on. Leaving what stands is what makes it once — the first finish takes the ask out, and the rest find it gone — as Approvals' settle does.
-   * @param settled - how it finishes.
-   */
+  /** Once: leaving what stands is what makes it so — the first finish takes the ask out, and the rest find it gone — as Approvals' settle does. */
   private finish(settled: () => void): void {
     if (!this.leave()) return
     this.close()
     settled()
   }
 
-  /** Take back everything the ask seated, leaving the composer to the person. */
   private close(): void {
     this.req.signal?.removeEventListener('abort', this.withdrawn)
     this.unshow?.()
@@ -278,8 +231,7 @@ class Ask {
 }
 
 /**
- * The Questions plugin, loaded by the host beside the surface it draws on.
- * It answers dsh's `user-questions/request` waterfall for the session's agent
+ * Answers dsh's `user-questions/request` waterfall for the session's agent
  * (`dsh:packages/interaction/user-questions/src/index.ts#UserQuestionService`).
  */
 export const questions = {

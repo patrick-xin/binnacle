@@ -5,11 +5,6 @@ import type { Node } from '../../api.ts'
 /** What the waterfall hands an answerer, as dsh declares it on its event map; the package does not export it by name. */
 type Asked = Parameters<Events['approval/request']>[0]
 
-/**
- * The card a request is asked with: the tool, why it asks, and what a person can do about it.
- * @param req - the request.
- * @returns the card.
- */
 function card(req: Asked): Node {
   const reason = req.displayReason?.en ?? req.reason
   return {
@@ -28,9 +23,7 @@ function card(req: Asked): Node {
 }
 
 /**
- * The Approvals plugin, loaded by the host beside the surface it draws on.
- *
- * It answers dsh's `approval/request` waterfall
+ * Answers dsh's `approval/request` waterfall
  * (`dsh:packages/interaction/user-approval/src/types.ts`) for the session's
  * agent alone: the host applies it on a scope of that agent
  * (`dsh:packages/core/scope/src/index.ts#createScope`), so another agent's
