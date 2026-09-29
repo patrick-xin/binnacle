@@ -1604,6 +1604,23 @@ test('a click on a question\'s option chooses it, and a click on cancel cancels 
   assert.equal(reason instanceof Error && reason.name === 'UserQuestionError' && (reason as { code?: string }).code === 'ASK_CANCELLED', true, 'tab and enter cancel the ask')
 })
 
+test('an ask still standing when the session closes goes to the next answerer, and its card is gone from what it left', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestionsFor(ctx, session.agent, { questions: [{ id: 'q1', question: 'which database?', options: [{ label: 'postgres' }] }] })
+  const refusal = answer.then(() => undefined, (reason: unknown) => reason)
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\x03')
+  const reason = await refusal
+  assert.equal(reason instanceof Error && reason.name === 'UserQuestionError' && (reason as { code?: string }).code === 'NO_PROVIDER', true, 'the ask went to the next answerer, and none answered')
+  await settle()
+  assert.deepEqual(exits, [0])
+  assert.ok((await terminal.mainScreen()).every(row => !row.includes('which database?')), 'the card is gone from what the session left printed')
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
