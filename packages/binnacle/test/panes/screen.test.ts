@@ -97,3 +97,40 @@ test('focus moved by a key is reported with its rows, to be brought into view', 
   assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
   assert.deepEqual(inView, [[1, 1]])
 })
+
+/** A screen whose one offer says what it is: the region an invocation lands on. */
+function offerScreen(): { readonly draw: () => Node } {
+  return {
+    draw: () => ({
+      kind: 'stack',
+      children: [
+        { kind: 'offer', id: 'reply', affordances: [{ kind: 'answer', label: 'reply' }], child: { kind: 'text', text: 'reply' } },
+      ],
+    }),
+  }
+}
+
+test('an offer invoked by a key or a click reaches the registration’s invoke, and a report that throws is drawn, not thrown', () => {
+  const invoked: string[] = []
+  let fail = false
+  const pane = new ScreenPane(() => [], {
+    changed: () => {},
+    invoked: (region, affordance) => {
+      invoked.push(`${region} ${affordance}`)
+      if (fail) throw new Error('author invoke failed')
+    },
+  })
+  pane.place('seat', offerScreen(), 'binnacle.place(composer)')
+  assert.deepEqual(drawText(pane, 70), ['reply'])
+  // A key invokes the focused offer; the pane stays up when the report throws, and what went wrong is drawn, naming the registration.
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.next' }), true)
+  fail = true
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'primary' }), true)
+  assert.deepEqual(invoked, ['reply answer'])
+  assert.deepEqual(drawText(pane, 70), ['reply', '▸ reply', '✗ binnacle.place(composer) invoke threw: author invoke failed'])
+  // A click invokes the offer under it the same way, fenced the same way; a report that returns draws the lines clean again.
+  fail = false
+  assert.deepEqual(pane.handleMouse(pointer('click', 1)), { handled: true })
+  assert.deepEqual(invoked, ['reply answer', 'reply answer'])
+  assert.deepEqual(drawText(pane, 70), ['reply', '▸ reply'])
+})

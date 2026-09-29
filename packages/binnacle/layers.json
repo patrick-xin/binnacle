@@ -77,6 +77,9 @@
       "facts",
       "host"
     ],
+    "@deepseek-ai/dsh-scope": [
+      "host"
+    ],
     "@deepseek-ai/dsh-tools": [
       "plugins"
     ],
