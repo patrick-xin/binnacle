@@ -29,6 +29,11 @@ test('a click never grants, and does not fall through to what is behind the appr
   assert.equal(meaning({ kind: 'click' }, [approval, card, transcript]), undefined)
 })
 
+test('a click never dismisses either: refusing an approval is a key pressed on purpose, as allowing it is', () => {
+  const reject: Region = { id: 'reject', affordances: [{ kind: 'dismiss', label: 'reject' }], overflows: false }
+  assert.equal(meaning({ kind: 'click' }, [reject, card, transcript]), undefined)
+})
+
 test('the wheel scrolls the innermost region that overflows', () => {
   assert.deepEqual(meaning({ kind: 'wheel', delta: -3 }, [card, transcript]), { kind: 'scroll', region: 'transcript', delta: -3 })
 })

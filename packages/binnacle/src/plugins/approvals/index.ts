@@ -1,9 +1,13 @@
 /**
  * Approvals: what the agent asks to do, in the composer's seat, allowed once
  * or rejected by a key. A built-in plugin, holding only what an author holds:
- * the `binnacle` service, to seat its card where an author could seat one;
- * and dsh's `approval/request` waterfall, which it answers for every agent
- * that asks (`dsh:packages/interaction/user-approval/src/types.ts`).
+ * the `binnacle` service, to seat its card where an author could seat one.
+ * It answers dsh's `approval/request` waterfall
+ * (`dsh:packages/interaction/user-approval/src/types.ts`) for the session's
+ * agent alone: the host applies it on a scope of that agent
+ * (`dsh:packages/core/scope/src/index.ts#createScope`), so another agent's
+ * ask never reaches it — dsh's dispatch is scope-filtered, and what no
+ * answerer claims fails closed.
  *
  * While a request stands its card is the newest placement in the composer's
  * slot, so it takes the keyboard, and answering it gives the composer back as

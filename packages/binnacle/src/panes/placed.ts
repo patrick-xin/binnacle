@@ -40,7 +40,7 @@ export function drawPlaced(registration: string, draw: (facts: readonly Fact[]) 
  * @param what - the registration and why it failed.
  * @returns the node that says so.
  */
-function refused(what: string): Node {
+export function refused(what: string): Node {
   const spans: readonly Span[] = [{ mark: 'problem' }, ` ${what}`]
   return { kind: 'text', text: spans, tone: 'error' }
 }
