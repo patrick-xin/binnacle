@@ -444,7 +444,7 @@ test('--tui-mode regular prints the session under what the shell printed, and ne
   const shown = await terminal.mainScreen()
   assert.equal(shown[0], '$ dsh --profile binnacle')
   assert.deepEqual(shown.filter(row => row.startsWith(' › ')), twelve.map((_, index) => ` › p${index + 1}`))
-  assert.deepEqual(shown.filter(row => /read|the file|running|author/.test(row)), ['● read {}', 'the file', 'drawn by an author'])
+  assert.deepEqual(shown.filter(row => /read|the file|running|author/.test(row)), ['● read {}', '│ the file', 'drawn by an author'])
 })
 
 test('on the main screen, a command run between turns draws once it settles, its result in place of running…, though no turn wraps it', async () => {
@@ -547,7 +547,7 @@ test('shift+tab steps in from the composer, enter opens the focused fold, and a 
   terminal.type('\x1b[Z')
   await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
   terminal.type('\r')
-  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === '│ z'))
   terminal.type('x')
   await until(async () => !(await terminal.altScreen()).some(row => row.includes('▸')))
   terminal.type('\r')
@@ -571,7 +571,7 @@ test('on the alternate screen, focus brings what it is on into view as it moves 
     terminal.type('\x1b[Z')
     await until(async () => {
       const rows = await terminal.altScreen()
-      return rows[0] === `w${entry}` && rows[3]?.includes('▸ show 1 more line') === true
+      return rows[0] === `│ w${entry}` && rows[3]?.includes('▸ show 1 more line') === true
     })
   }
 })
@@ -620,7 +620,7 @@ test('the key the label names brings the transcript\'s last line back, following
   terminal.type('\x1b[F')
   await until(async () => {
     const rows = await terminal.altScreen()
-    return rows.every(row => row.includes('Jump to latest') === false) && rows[4] === '… 1 more line'
+    return rows.every(row => row.includes('Jump to latest') === false) && rows[4] === '│ … 1 more line'
   })
 })
 
@@ -653,7 +653,7 @@ test('from the main screen, a fold in a printed entry opens on the fullscreen by
   await until(async () => (await terminal.onAlternateScreen()) === true)
   await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
   terminal.type('\r')
-  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === '│ z'))
   terminal.type('\x14')
   await settle()
   const after = await terminal.mainScreen()
@@ -675,7 +675,7 @@ test('focus the main screen could not draw comes back with the fullscreen, drawn
   terminal.type('\x14')
   await until(async () => (await terminal.onAlternateScreen()) === true)
   await settle()
-  assert.deepEqual((await terminal.altScreen()).slice(0, 5), ['w', 'x', 'y', 'z', '▸ fold to 3 lines'])
+  assert.deepEqual((await terminal.altScreen()).slice(0, 5), ['│ w', '│ x', '│ y', '│ z', '│ ▸ fold to 3 lines'])
 })
 
 test('focus the fullscreen gives back is brought into view, however far up the session it sits', async () => {
@@ -691,9 +691,9 @@ test('focus the fullscreen gives back is brought into view, however far up the s
   terminal.type('\x14')
   await until(async () => (await terminal.onAlternateScreen()) === false && (await terminal.mainScreen()).includes('● read6 {}'))
   terminal.type('\x14')
-  await until(async () => (await terminal.onAlternateScreen()) === true && (await terminal.altScreen())[0] === 'w')
+  await until(async () => (await terminal.onAlternateScreen()) === true && (await terminal.altScreen())[0] === '│ w')
   const rows = await terminal.altScreen()
-  assert.deepEqual(rows.slice(0, 4), ['w', 'x', 'y', '▸ show 1 more line'])
+  assert.deepEqual(rows.slice(0, 4), ['│ w', '│ x', '│ y', '│ ▸ show 1 more line'])
   assert.match(rows[4] ?? '', /Jump to latest/)
 })
 
@@ -730,8 +730,8 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
     return rows.some(row => row.trim() === 'a') && rows.some(row => row.trim() === 'b')
   })
   const after = await terminal.mainScreen()
-  assert.deepEqual(after.slice(0, 9), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line'])
-  assert.deepEqual(after.slice(9, 18), ['', '● stat {}', '  running 0s', '', '▸ ⋯ added by system-prompt · fold it', 'away', 'a', 'b', '[tool-addition]'])
+  assert.deepEqual(after.slice(0, 9), ['', ' › one', '', '', '● read {}', '│ w', '│ x', '│ y', '│ … 1 more line'])
+  assert.deepEqual(after.slice(9, 18), ['', '● stat {}', '│ running 0s', '', '▸ ⋯ added by system-prompt · fold it', 'away', 'a', 'b', '[tool-addition]'])
 })
 
 test('the key a plugin offers opens its screen in the transcript\'s place, the composer below it, and the same key returns the transcript as it was', async () => {
@@ -1293,7 +1293,7 @@ test('a key a plugin binds to expand opens the focused fold, and one bound to co
   await settle()
   assert.deepEqual(await terminal.altScreen(), focused)
   terminal.type('\x1b[17~')
-  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === '│ z'))
 })
 
 test('--help says Ctrl+C stops a running turn and quits only when pressed twice', async () => {
@@ -1920,9 +1920,9 @@ test('a running call counts up once a second, and stops counting once it returns
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
   clock.advance(3)
   session.log(called(3, 'read'))
-  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'running 0s'))
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === '│ running 0s'))
   clock.advance(4_000)
-  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'running 4s'))
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === '│ running 4s'))
   session.log(returned(4, 3, 'the file'))
   await until(async () => (await terminal.altScreen()).some(row => row.includes('the file')))
   assert.equal((await terminal.altScreen()).some(row => row.includes('running')), false)

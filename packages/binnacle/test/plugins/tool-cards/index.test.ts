@@ -140,9 +140,9 @@ test('a call to a tool binnacle cannot find, or that presents nothing, reads as 
   })
   const { pane } = await withCards(silent)
   pane.push({ ...asked('missing', '{}'), seq: 4, callId: 'c2' })
-  assert.deepEqual(drawText(pane, 60).slice(0, 2), ['● missing {}', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60).slice(0, 2), ['● missing {}', '│ running 0s'])
   pane.push(asked('silent', '{}'))
-  assert.deepEqual(drawText(pane, 60).slice(2), ['', '● silent {}', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60).slice(2), ['', '● silent {}', '│ running 0s'])
 })
 
 test('a presenter that throws leaves the call to binnacle\'s card, which says what went wrong', async () => {
@@ -165,13 +165,13 @@ test('a presenter that throws leaves the call to binnacle\'s card, which says wh
   })
   const { pane } = await withCards(flaky, unstable)
   pane.push(asked('flaky', '{}'))
-  assert.deepEqual(drawText(pane, 60), ['● flaky {}', '  running 0s', '✗ flaky.presentCall threw: the presenter fell over'])
+  assert.deepEqual(drawText(pane, 60), ['● flaky {}', '│ running 0s', '✗ flaky.presentCall threw: the presenter fell over'])
   pane.push(failed('c1'))
-  assert.deepEqual(drawText(pane, 60), ['✗ flaky {}', '  the command exited 2', 'the model was told', '✗ flaky.presentCall threw: the presenter fell over'])
+  assert.deepEqual(drawText(pane, 60), ['✗ flaky {}', '│ the command exited 2', '│ the model was told', '✗ flaky.presentCall threw: the presenter fell over'])
   pane.push({ ...asked('unstable', '{}'), seq: 5, callId: 'c2' })
   assert.deepEqual(drawText(pane, 60).slice(4), ['', '● Boom', '│ running 0s'])
   pane.push({ ...returned('ok'), callId: 'c2' })
-  assert.deepEqual(drawText(pane, 60).slice(4), ['', '● unstable {}', 'ok', '✗ unstable.presentResult threw: the presenter fell over'])
+  assert.deepEqual(drawText(pane, 60).slice(4), ['', '● unstable {}', '│ ok', '✗ unstable.presentResult threw: the presenter fell over'])
 })
 
 test('presentCall returning undefined, and a call whose arguments are not JSON, read as they do today', async () => {
@@ -188,10 +188,10 @@ test('presentCall returning undefined, and a call whose arguments are not JSON, 
   pane.push({ ...asked('read', '{oops'), seq: 6, callId: 'c3' })
   assert.deepEqual(drawText(pane, 60), [
     '● voided {}',
-    '  running 0s',
+    '│ running 0s',
     '',
     '● read {oops',
-    '  running 0s',
+    '│ running 0s',
   ])
 })
 
@@ -241,14 +241,14 @@ test('a presenter that returns something the cards cannot draw says so under the
   pane.push(asked('hologram', '{}'))
   assert.deepEqual(drawText(pane, 100).slice(0, 3), [
     '● hologram {}',
-    '  running 0s',
+    '│ running 0s',
     '✗ hologram.presentCall returned no drawable view: hologram is no card the tool cards draw',
   ])
   pane.push({ ...asked('lying', '{}'), seq: 5, callId: 'c2' })
   assert.deepEqual(drawText(pane, 100).slice(3, 7), [
     '',
     '● lying {}',
-    '  running 0s',
+    '│ running 0s',
     '✗ lying.presentCall returned no drawable view: it is string',
   ])
   pane.push({ ...asked('crooked', '{}'), seq: 6, callId: 'c3' })
@@ -256,7 +256,7 @@ test('a presenter that returns something the cards cannot draw says so under the
   assert.deepEqual(drawText(pane, 100).slice(7), [
     '',
     '● crooked {}',
-    'crooked',
+    '│ crooked',
     '✗ crooked.presentResult returned no drawable view: a result view\'s title is not text',
   ])
 })
@@ -408,7 +408,7 @@ test('disposing the plugin gives every call back to binnacle\'s card', async () 
   pane.push(returned('the file'))
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ the file'])
   await fiber.dispose()
-  assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'the file'])
+  assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', '│ the file'])
 })
 
 test('a fold a person opened stays open when the plugin drawing it is disposed, for binnacle\'s card names it alike', async () => {
@@ -419,7 +419,7 @@ test('a fold a person opened stays open when the plugin drawing it is disposed, 
   assert.deepEqual(pane.handleMouse(pointer('click', 4, 2, 60)), { handled: true })
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ d', '│ e'])
   await fiber.dispose()
-  assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'a', 'b', 'c', 'd', 'e'])
+  assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', '│ a', '│ b', '│ c', '│ d', '│ e'])
 })
 
 test('a call its turn left without a result says so under its presented title', async () => {

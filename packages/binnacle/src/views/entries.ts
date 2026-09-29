@@ -126,9 +126,8 @@ function drawCompaction(summary: Extract<Fact, { readonly kind: 'summary' }> | u
 }
 
 /**
- * Draw a tool call: what was asked, then whether it is running, failed, left
- * behind by its turn, or what it returned, folded. Its mark says how the
- * call stands.
+ * Draw a tool call: what was asked, then, shown along the gutter, whether it is running, failed, left behind by its
+ * turn, or what it returned, folded. Its mark says how the call stands.
  * @param result - its result, once it has one.
  * @param left - how the turn that ended without this call's result ended, when it did.
  */
@@ -136,16 +135,16 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   const mark: Span = result === undefined
     ? { mark: 'running' }
     : result.failed === true ? { mark: 'failed' } : { mark: 'done' }
-  const head: Node = { kind: 'text', text: [mark, ` ${call.name} ${call.arguments}`] }
+  const title: readonly Span[] = [mark, ` ${call.name} ${call.arguments}`]
   if (result === undefined) {
     const waiting: Node = left === undefined
-      ? { kind: 'text', text: ['  running ', { since: call.time }], tone: 'muted' }
-      : { kind: 'text', text: `  the turn ended without it: ${left}`, tone: 'muted' }
-    return { kind: 'stack', children: [head, waiting] }
+      ? { kind: 'text', text: ['running ', { since: call.time }], tone: 'muted' }
+      : { kind: 'text', text: `the turn ended without it: ${left}`, tone: 'muted' }
+    return { kind: 'show', title, child: waiting }
   }
-  const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: `  ${result.failure.reason}`, tone: 'error' }]
+  const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: result.failure.reason, tone: 'error' }]
   const output: Node = { kind: 'fold', id: 'output', child: { kind: 'text', text: textOf(result.blocks) } }
-  return { kind: 'stack', children: [head, ...reason, output] }
+  return { kind: 'show', title, child: { kind: 'stack', children: [...reason, output] } }
 }
 
 /** Every kind of entry binnacle draws — or, for a quiet one, does not; a view registered under one of these names draws that kind, so no authored fact may take one. */
