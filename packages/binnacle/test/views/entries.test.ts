@@ -7,7 +7,7 @@ import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../../src/ui/draw.ts'
 import { screens } from '../../src/views/screen.ts'
 import type { View, Views } from '../../src/views/entries.ts'
-import { prompt as promptFact, call as callFact, asked as askedFact, decided as decidedFact } from '../support/facts.ts'
+import { prompt as promptFact, call as callFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact } from '../support/facts.ts'
 
 /** An entry alone in a turn of its own: what the screen draws it from. */
 const alone = (entry: Entry): Transcript => ({ turns: [{ turn: null, entries: [entry] }] })
@@ -124,6 +124,26 @@ test('the reasoning\'s line is muted, marker and all, the reasoning under it dim
 
 const call = callFact(9, 21, 'c1', 'bash', '{"command":"pnpm build"}')
 
+const command = runFact(9, 21, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2')
+
+/** The command, done as the outcome names. */
+const doneAs = (outcome: 'success' | 'error', text: string): Entry =>
+  ({ kind: 'command', run: command, done: doneFact(10, 23, 'cmd-1a2b3c4d-1', outcome, text) })
+
+test('a command drawn as /name args, muted, with what it returned beneath: plain on success, in the error tone on failure', () => {
+  assert.deepEqual(lines(doneAs('success', 'compacted: 12 messages folded to a summary')), ['/compact --keep 2', '  compacted: 12 messages folded to a', 'summary'])
+  assert.deepEqual(lines(doneAs('error', 'no such skill')), ['/compact --keep 2', '  no such skill'])
+  assert.equal(styled(doneAs('success', 'compacted'))[0], '\x1b[90m/compact --keep 2\x1b[39m')
+  assert.equal(styled(doneAs('success', 'compacted'))[1], '  compacted')
+  assert.equal(styled(doneAs('error', 'no such skill'))[1], '\x1b[31m  no such skill\x1b[39m')
+})
+
+test('a command still running says so, and a success that said nothing draws only its line', () => {
+  assert.deepEqual(lines({ kind: 'command', run: command }), ['/compact --keep 2', '  running…'])
+  assert.equal(styled({ kind: 'command', run: command })[1], '\x1b[90m  running…\x1b[39m')
+  assert.deepEqual(lines({ kind: 'command', run: command, done: doneFact(10, 23, 'cmd-1a2b3c4d-1', 'success') }), ['/compact --keep 2'])
+})
+
 test('a tool still running says so', () => {
   assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running…'])
 })
@@ -188,6 +208,12 @@ test('a decision whose ask is not in its turn draws on its own, muted, naming th
   const orphan: Entry = { kind: 'decided', fact: decidedFact(9, 40, 'a9', 'rejected') }
   assert.deepEqual(lines(orphan), ['⚑ decision of approval a9: rejected'])
   assert.equal(styled(orphan)[0], '\x1b[90m⚑ decision of approval a9: rejected\x1b[39m')
+})
+
+test('a done whose run is not in its turn draws on its own, muted, naming the command it settled', () => {
+  const orphan: Entry = { kind: 'done', fact: doneFact(9, 40, 'cmd-1a2b3c4d-9', 'error', 'no such skill') }
+  assert.deepEqual(lines(orphan), ['done of command cmd-1a2b3c4d-9: error'])
+  assert.equal(styled(orphan)[0], '\x1b[90mdone of command cmd-1a2b3c4d-9: error\x1b[39m')
 })
 
 /** A tool call with a result whose blocks are one text block, as an output a test reads. */

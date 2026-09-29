@@ -92,7 +92,8 @@
       "host"
     ],
     "@deepseek-ai/dsh-commands": [
-      "host"
+      "host",
+      "facts"
     ],
     "@deepseek-ai/dsh-skill": [
       "host"

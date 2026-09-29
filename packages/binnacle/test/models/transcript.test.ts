@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Fact } from '../../src/facts/adapt.ts'
 import { settled, transcript } from '../../src/models/transcript.ts'
-import { prompt as promptFact, call as callFact, returned as returnedFact, asked as askedFact, decided as decidedFact } from '../support/facts.ts'
+import { prompt as promptFact, call as callFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact } from '../support/facts.ts'
 
 const prompt = promptFact(2, 10, 'fix the build')
 const answer: Fact = { kind: 'answer', seq: 4, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'text', text: 'Done.' }] }
@@ -53,6 +53,19 @@ test('an approval asked and its decision are one entry, where it was asked, as a
   ])
 })
 
+test('a command run and its done are one entry, where it ran, as a call and its result are', () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
+    prompt,
+    runFact(5, 22, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2'),
+    doneFact(6, 24, 'cmd-1a2b3c4d-1', 'success', 'compacted: 12 messages folded to a summary'),
+  ]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    { kind: 'command', run: runFact(5, 22, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2'), done: doneFact(6, 24, 'cmd-1a2b3c4d-1', 'success', 'compacted: 12 messages folded to a summary') },
+  ])
+})
+
 test('a result whose call is not in its turn is kept on its own, never dropped', () => {
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, result]
   assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'result', fact: result }])
@@ -62,6 +75,12 @@ test('a decision whose ask is not in its turn is kept on its own, never dropped,
   const orphan = decidedFact(3, 30, 'a9', 'rejected')
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, orphan]
   assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'decided', fact: orphan }])
+})
+
+test('a done whose run is not in its turn is kept on its own, never dropped, as a decision whose ask is not is', () => {
+  const orphan = doneFact(3, 30, 'cmd-1a2b3c4d-9', 'error', 'no such skill')
+  const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, orphan]
+  assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'done', fact: orphan }])
 })
 
 test('what the log holds before its first turn opens the transcript, in a turn numbered null', () => {
@@ -125,6 +144,13 @@ test('an approval still waiting for its decision holds back settling, as a call 
   // The approval waits between the prompt and the answer: it and the answer after it have not settled, for the decision will change the entry.
   assert.equal(settled(transcript(facts)), 1)
   assert.equal(settled(transcript([...facts, decidedFact(5, 24, 'a1', 'allowed-once')])), 3)
+})
+
+test('a command still running holds back settling, as an approval still waiting for its decision does', () => {
+  const facts: Fact[] = [start(1, 1), prompt, runFact(3, 21, 'cmd-1a2b3c4d-1', 'compact'), answer]
+  // The command waits between the prompt and the answer: it and the answer after it have not settled, for the done will change the entry.
+  assert.equal(settled(transcript(facts)), 1)
+  assert.equal(settled(transcript([...facts, doneFact(5, 24, 'cmd-1a2b3c4d-1', 'success', 'compacted')])), 3)
 })
 
 test('a prompt in a turn that already holds one steered it; the turn\'s first prompt, and one before any turn, did not', () => {

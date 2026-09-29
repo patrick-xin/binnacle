@@ -14,7 +14,7 @@ type FactOf<K extends Fact['kind']> = Extract<Fact, { readonly kind: K }>
 type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, readonly fact: FactOf<K> } : never
 
 /** The kinds of fact that stand as an entry of their own, never paired with another. */
-type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'authored' | 'unknown' | 'quiet'
+type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'authored' | 'unknown' | 'quiet'
 
 /**
  * One thing a turn holds, in log order: a fact, or a tool call with its
@@ -27,13 +27,16 @@ type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'authored'
  * `approval` entry is an approval the agent asked for, with the decision
  * that answered it once it has one, as a tool entry is a call with its
  * result; a `decided` entry is a decision whose ask is not in its turn,
- * kept rather than dropped.
+ * kept rather than dropped. A `command` entry is a command that ran, with
+ * the done that settled it once it has one, paired the same way; a `done`
+ * entry is a done whose run is not in its turn, kept rather than dropped.
  */
 export type Entry =
   | Single<Exclude<Alone, 'prompt'>>
   | { readonly kind: 'prompt', readonly fact: FactOf<'prompt'>, readonly steer?: true }
   | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'>, readonly left?: string }
   | { readonly kind: 'approval', readonly asked: FactOf<'asked'>, readonly decided?: FactOf<'decided'> }
+  | { readonly kind: 'command', readonly run: FactOf<'run'>, readonly done?: FactOf<'done'> }
 
 /** A turn: what a person sent and everything the agent did about it. */
 export interface Turn {
@@ -97,6 +100,12 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     const at = last.entries.findLastIndex(entry => entry.kind === 'approval' && entry.asked.id === fact.id)
     const pending = last.entries[at]
     entries = pending?.kind === 'approval' ? last.entries.with(at, Object.freeze({ kind: 'approval', asked: pending.asked, decided: fact })) : [...last.entries, single(fact)]
+  } else if (fact.kind === 'run') {
+    entries = [...last.entries, Object.freeze({ kind: 'command', run: fact })]
+  } else if (fact.kind === 'done') {
+    const at = last.entries.findLastIndex(entry => entry.kind === 'command' && entry.run.commandId === fact.commandId)
+    const pending = last.entries[at]
+    entries = pending?.kind === 'command' ? last.entries.with(at, Object.freeze({ kind: 'command', run: pending.run, done: fact })) : [...last.entries, single(fact)]
   } else if (fact.kind === 'prompt' && last.turn !== null && last.entries.some(entry => entry.kind === 'prompt')) {
     entries = [...last.entries, Object.freeze({ kind: 'prompt', fact, steer: true })]
   } else {
@@ -107,10 +116,10 @@ export function fold(model: Transcript, fact: Fact): Transcript {
 
 /**
  * How many entries, oldest first and across turns, nothing later in the log
- * can change: every one before a call still waiting for its result, or an
- * approval still waiting for its decision, in a turn still running. Only the
- * last turn is ever folded into, so every turn before it has settled whole,
- * and so has the last once it ends.
+ * can change: every one before a call still waiting for its result, an
+ * approval still waiting for its decision, or a command still running, in a
+ * turn still running. Only the last turn is ever folded into, so every turn
+ * before it has settled whole, and so has the last once it ends.
  * @param model - the transcript so far.
  * @returns a count of entries, taken in log order.
  */
@@ -118,7 +127,7 @@ export function settled(model: Transcript): number {
   const last = model.turns.at(-1)
   const before = model.turns.slice(0, -1).reduce((count, turn) => count + turn.entries.length, 0)
   if (last === undefined) return 0
-  const waiting = last.ending === undefined ? last.entries.findIndex(entry => (entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined)) : -1
+  const waiting = last.ending === undefined ? last.entries.findIndex(entry => (entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined) || (entry.kind === 'command' && entry.done === undefined)) : -1
   return before + (waiting === -1 ? last.entries.length : waiting)
 }
 
