@@ -479,13 +479,14 @@ export function apply(ctx: Context): void {
   // Approvals answers for the session's agent alone: applied on a scope of that agent once the session opens, so another agent's ask never reaches it and fails closed elsewhere (`dsh:packages/core/scope/src/index.ts#createScope`).
   let approvalScope: Scope | undefined
   const close = async (): Promise<void> => {
+    // The approvals scope goes first, so a request still standing is answered and its card unseated before the terminal is given back — the session is left printed without it.
+    const scope = approvalScope
+    approvalScope = undefined
+    await scope?.dispose()
     release?.()
     release = undefined
     const open = session
     session = undefined
-    const scope = approvalScope
-    approvalScope = undefined
-    await scope?.dispose()
     await open?.close()
   }
   const fail = (what: string) => (error: unknown): void => {
