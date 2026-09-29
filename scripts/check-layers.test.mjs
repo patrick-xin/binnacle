@@ -134,3 +134,28 @@ test('a layer typeOnly names imports an external package only through import typ
     refused('@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-tools/kinds'),
   ])
 })
+
+const OWNED = {
+  ...RULES,
+  layers: { ...RULES.layers, panes: ['contract', 'ui'] },
+  external: { ...RULES.external, '@earendil-works/pi-tui': ['ui', 'panes', 'host'] },
+  owners: { '@earendil-works/pi-tui': { TuiMouseEvent: ['ui/pointer.ts', 'panes/screen.ts'] } },
+}
+
+test('a symbol the owners table names is imported by its owners alone, and any other file is told who owns it', () => {
+  const owner = source('src/ui/pointer.ts', "import type { TuiMouseEvent } from '@earendil-works/pi-tui'\n")
+  const stray = source('src/panes/transcript.ts', "import type { Component, TuiMouseEvent } from '@earendil-works/pi-tui'\n")
+  assert.deepEqual(checkLayers([owner, stray], OWNED), [
+    'src/panes/transcript.ts: imports TuiMouseEvent from @earendil-works/pi-tui, which only ui/pointer.ts, panes/screen.ts may; take what you need from one of them, or name this file among its owners in layers.json',
+  ])
+})
+
+test('an owned symbol cannot be reached around its owners: re-exported, or with the whole package at once', () => {
+  const path = 'src/ui/table.ts'
+  const around = source(path, "export type { TuiMouseEvent as Mouse } from '@earendil-works/pi-tui'\nimport * as tui from '@earendil-works/pi-tui'\nexport * from '@earendil-works/pi-tui'\nawait import('@earendil-works/pi-tui')\n")
+  const whole = `${path}: imports all of @earendil-works/pi-tui at once, which reaches TuiMouseEvent, which only ui/pointer.ts, panes/screen.ts may; import by name what you need`
+  assert.deepEqual(checkLayers([around], OWNED), [
+    `${path}: imports TuiMouseEvent from @earendil-works/pi-tui, which only ui/pointer.ts, panes/screen.ts may; take what you need from one of them, or name this file among its owners in layers.json`,
+    whole, whole, whole,
+  ])
+})

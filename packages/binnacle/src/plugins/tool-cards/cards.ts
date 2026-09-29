@@ -15,7 +15,7 @@ export interface CardParts {
   readonly result: PresentedResult | undefined
   /** How the call stands, as the mark its head opens with: `running` while it runs or was left, `done` or `failed` once it returned. */
   readonly mark: Span
-  /** The waiting line — `running` and the time since the call, counting up, or the line saying the turn ended without it; none once the call returned. */
+  /** The waiting line, to be held beneath the head — `running` and the time since the call, counting up, or the line saying the turn ended without it; none once the call returned. */
   readonly waiting: Node | undefined
   /** Why the call failed, when it gave a person a reason. */
   readonly reason: string | undefined
@@ -30,14 +30,19 @@ export interface CardParts {
   fold(child: Node, rows?: number): Node
 }
 
+/** A card as the surface shows it: a `show`, whose title is the card's head and whose child is everything beneath it. */
+export type Shown = Extract<Node, { readonly kind: 'show' }>
+
 /**
- * How one kind of card draws: its kind's whole card — the head its own, lines
- * above and under it, and the fold it chooses — or a decline, when it cannot
- * read what its kind's view holds.
+ * How one kind of card draws: its kind's whole card — the head its own as the
+ * show's title, and what it holds beneath it along the gutter, the fold it
+ * chooses among it — or a decline, when it cannot read what its kind's view
+ * holds. A row draws inside a show, never a bare stack, so every tool call has
+ * the surface's container for what it shows as its parent, whichever kind.
  */
 export interface CardRow {
   /** Draw the card from its parts, or decline with why: the entry is then left to the card beneath, with why said beneath it. */
-  draw(parts: CardParts): Node | { readonly declined: string }
+  draw(parts: CardParts): Shown | { readonly declined: string }
 }
 
 /**

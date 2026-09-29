@@ -1,6 +1,6 @@
 # Tool cards
 
-A person reads each tool call as its tool presents it, rather than as its name and raw JSON: a title saying what this call does — `Read src/api.ts`, `pnpm test` — and once it returns, what it returned, folded beneath as the tool presents it.
+A person reads each tool call as its tool presents it, rather than as its name and raw JSON: a title saying what this call does — `Read src/api.ts`, `pnpm test` — and once it returns, what it returned, folded beneath as the tool presents it, along the gutter that marks what the surface shows and did not write.
 
 The call stands as its mark says — `running` while it runs, `done` once it returned, `failed` in error, with why it failed when it gave a reason ([Theme](theme.md)) — and the completed call reads as the title its result presents, when it presents one. A click opens the fold, as anywhere else ([Keys](keys.md)).
 
@@ -10,10 +10,13 @@ The cards are binnacle's first built-in plugin (`binnacle:packages/binnacle/src/
 
 What a presenter returns is the tool's code, not binnacle's: it is read as data where it enters (`binnacle:packages/binnacle/src/plugins/tool-cards/presentation.ts`), and where it cannot be drawn from — no tool of that name, no presenter, or arguments that are not JSON — the entry is left to the view beneath, binnacle's own card, which still shows the call's name, arguments and result. A presenter that throws, or returns something the cards cannot draw, never takes the surface down either: the entry is left to that card, and what did it is said beneath, in error, naming the tool, the presenter and why. Returning undefined is different — dsh's own word for no presentation — and stays silent: a call presenter's undefined asks for the generic fallback, and a result presenter's keeps the presented title and the raw result. A completed call's presenter is handed the result's content rebuilt from its text blocks, a block binnacle cannot read left out, whether it failed, and its meta as logged.
 
+Each card is a `show`, the surface's container for what it shows and did not write: the head is its title, and everything beneath the head is what it holds. A card kind's row returns a show or declines (`binnacle:packages/binnacle/src/plugins/tool-cards/cards.ts#CardRow`), so every kind of card has that container as its parent, and the theme draws it.
+
 ## Choices
 
 - The tool cards are a row of binnacle's patch, `binnacle-tool-cards`, so a person removes them by disabling that row in their profile's patch ([Authoring](authoring.md#removing-a-built-in-feature)).
-- What the head shows: the mark and the presented title — its first line beside the mark, and each later line indented two columns beneath it, so a command written on more than one line does not read as output; the tool's name and arguments stay on binnacle's own card, beneath.
+- What the head shows, as the show's title: the mark and the presented title — its first line beside the mark, and each later line indented two columns beneath it, so a command written on more than one line does not read as output; the tool's name and arguments stay on binnacle's own card, beneath.
+- Everything under the head — `running` and the time, why it failed, what it returned — is drawn along the show's gutter, indented by it alone ([Theme](theme.md)).
 - The mark the head stands by is the transcript's (`running`, `done`, `failed`), so a presented card reads at a glance beside an unpresented one ([Theme](theme.md)).
 - What it returned folds as a tool's output does, its rows the theme's for the tool kind ([Theme](theme.md)); a presented `content` is folded when the tool gives one, the result's own text when not.
 - A failure's reason stays, in error, above the fold; so does what a presenter did wrong stay, beneath binnacle's own card, beside the `problem` mark: `read.presentCall threw: …`, naming the tool and the presenter.

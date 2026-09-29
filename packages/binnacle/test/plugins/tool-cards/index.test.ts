@@ -71,19 +71,20 @@ const failed = (callId: string): Extract<Fact, { readonly kind: 'result' }> => (
   blocks: [{ kind: 'text', text: 'the model was told' }], meta: undefined,
 })
 
-test('a call to a tool that presents it reads as its presented title', async () => {
+test('a call to a tool that presents it reads as its presented title, and while it runs says so along the gutter of what the surface shows', async () => {
   const { pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s'])
   assert.equal(pane.render(60)[0]?.trimEnd(), '\x1b[90m●\x1b[39m Read src/api.ts')
 })
 
-test('once it returns, what it returned is folded beneath it, as the tool presents it', async () => {
+test('once it returns, what it returned is folded beneath it along the dim gutter, as the tool presents it', async () => {
   const { pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('a\nb\nc\nd\ne'))
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ … 2 more lines'])
   assert.equal(pane.render(60)[0]?.trimEnd(), '\x1b[32m●\x1b[39m Read src/api.ts')
+  assert.equal(pane.render(60)[1]?.trimEnd(), '\x1b[2m│\x1b[22m a')
 })
 
 test('a completed call reads as the title its result presents, when it presents one', async () => {
@@ -98,9 +99,9 @@ test('a completed call reads as the title its result presents, when it presents 
   })
   const { pane } = await withCards(build)
   pane.push(asked('build', '{}'))
-  assert.deepEqual(drawText(pane, 60), ['● Build the package', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60), ['● Build the package', '│ running 0s'])
   pane.push(returned('built'))
-  assert.deepEqual(drawText(pane, 60), ['● Built the package', 'built'])
+  assert.deepEqual(drawText(pane, 60), ['● Built the package', '│ built'])
 })
 
 test('presentResult is handed the result\'s content rebuilt from its text blocks, whether it failed, and its meta as logged', async () => {
@@ -124,9 +125,9 @@ test('presentResult is handed the result\'s content rebuilt from its text blocks
     blocks: [{ kind: 'text', text: 'ok' }, { kind: 'unread', type: 'image' }],
     meta: { pages: 3 },
   })
-  assert.deepEqual(drawText(pane, 90), ['✗ Echo', '  the command exited 2', 'handed {"types":["text"],"isError":true,"meta":{"pages":3}}'])
+  assert.deepEqual(drawText(pane, 90), ['✗ Echo', '│ the command exited 2', '│ handed {"types":["text"],"isError":true,"meta":{"pages":3}}'])
   assert.equal(pane.render(90).map(line => line.trimEnd())[0], '\x1b[31m✗\x1b[39m Echo')
-  assert.equal(pane.render(90).map(line => line.trimEnd())[1], '\x1b[31m  the command exited 2\x1b[39m')
+  assert.equal(pane.render(90).map(line => line.trimEnd())[1], '\x1b[2m│\x1b[22m \x1b[31mthe command exited 2\x1b[39m')
 })
 
 test('a call to a tool binnacle cannot find, or that presents nothing, reads as it does today', async () => {
@@ -168,7 +169,7 @@ test('a presenter that throws leaves the call to binnacle\'s card, which says wh
   pane.push(failed('c1'))
   assert.deepEqual(drawText(pane, 60), ['✗ flaky {}', '  the command exited 2', 'the model was told', '✗ flaky.presentCall threw: the presenter fell over'])
   pane.push({ ...asked('unstable', '{}'), seq: 5, callId: 'c2' })
-  assert.deepEqual(drawText(pane, 60).slice(4), ['', '● Boom', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60).slice(4), ['', '● Boom', '│ running 0s'])
   pane.push({ ...returned('ok'), callId: 'c2' })
   assert.deepEqual(drawText(pane, 60).slice(4), ['', '● unstable {}', 'ok', '✗ unstable.presentResult threw: the presenter fell over'])
 })
@@ -207,7 +208,7 @@ test('presentResult returning undefined keeps the presented title and folds the 
   const { pane } = await withCards(mute)
   pane.push(asked('mute', '{}'))
   pane.push(returned('the raw text'))
-  assert.deepEqual(drawText(pane, 60), ['● Mute', 'the raw text'])
+  assert.deepEqual(drawText(pane, 60), ['● Mute', '│ the raw text'])
 })
 
 test('a presenter that returns something the cards cannot draw says so under the card beneath', async () => {
@@ -271,7 +272,7 @@ test('a presented title of more than one line indents its later lines under the 
   })
   const { pane } = await withCards(heredoc)
   pane.push(asked('bash', '{"command":"cat > greet.txt <<EOF"}'))
-  assert.deepEqual(drawText(pane, 60), ['● cat > greet.txt <<EOF', '  hello', '  EOF', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60), ['● cat > greet.txt <<EOF', '  hello', '  EOF', '│ running 0s'])
 })
 
 test('every other card kind is drawn by its title alone in this slice', async () => {
@@ -294,11 +295,11 @@ test('every other card kind is drawn by its title alone in this slice', async ()
   })
   const { pane } = await withCards(bash, write)
   pane.push(asked('bash', '{"command":"pnpm test"}'))
-  assert.deepEqual(drawText(pane, 60), ['● pnpm test', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60), ['● pnpm test', '│ running 0s'])
   pane.push(returned('ok'))
-  assert.deepEqual(drawText(pane, 60), ['● pnpm test (2 s)', 'ok'])
+  assert.deepEqual(drawText(pane, 60), ['● pnpm test (2 s)', '│ ok'])
   pane.push({ ...asked('write', '{"path":"foo.txt"}'), seq: 7, callId: 'c2' })
-  assert.deepEqual(drawText(pane, 60).slice(2), ['', '● Write foo.txt', '  running 0s'])
+  assert.deepEqual(drawText(pane, 60).slice(2), ['', '● Write foo.txt', '│ running 0s'])
 })
 
 test('a kind with no row of its own draws through generic\'s', () => {
@@ -306,13 +307,13 @@ test('a kind with no row of its own draws through generic\'s', () => {
   assert.equal(rowFor('web'), rowFor('generic'))
 })
 
-test('a row can draw a head of its own and a line under a completed head', () => {
+test('a row draws a head of its own as its show\'s title, and a line under it along the gutter', () => {
   const shell: CardRow = {
     draw: parts => {
-      const head: Node = { kind: 'text', text: [{ text: '$', tone: 'accent' }, ` ${parts.call.title}`] }
-      if (parts.waiting !== undefined) return { kind: 'stack', children: [head, parts.waiting] }
-      const status: Node = { kind: 'text', text: '  exited badly', tone: 'warning' }
-      return { kind: 'stack', children: [head, status, parts.fold({ kind: 'text', text: parts.resultText }, 1)] }
+      const head = [{ text: '$', tone: 'accent' } as const, ` ${parts.call.title}`]
+      if (parts.waiting !== undefined) return { kind: 'show', title: head, child: parts.waiting }
+      const status: Node = { kind: 'text', text: 'exited badly', tone: 'warning' }
+      return { kind: 'show', title: head, child: { kind: 'stack', children: [status, parts.fold({ kind: 'text', text: parts.resultText }, 1)] } }
     },
   }
   const drawn = (parts: CardParts): string[] => lines(shell.draw(parts) as Node)
@@ -320,12 +321,12 @@ test('a row can draw a head of its own and a line under a completed head', () =>
     call: { card: 'generic', title: 'pnpm test', returned: {} },
     result: undefined,
     mark: { mark: 'running' },
-    waiting: { kind: 'text', text: '  running 0s', tone: 'muted' },
+    waiting: { kind: 'text', text: 'running 0s', tone: 'muted' },
     reason: undefined,
     resultText: '',
     fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
   }
-  assert.deepEqual(drawn(running), ['$ pnpm test', '  running 0s'])
+  assert.deepEqual(drawn(running), ['$ pnpm test', '│ running 0s'])
   const done: CardParts = {
     ...running,
     mark: { mark: 'failed' },
@@ -333,7 +334,15 @@ test('a row can draw a head of its own and a line under a completed head', () =>
     reason: 'the command exited 2',
     resultText: 'a\nb\nc',
   }
-  assert.deepEqual(drawn(done), ['$ pnpm test', '  exited badly', 'a', '… 2 more lines'])
+  assert.deepEqual(drawn(done), ['$ pnpm test', '│ exited badly', '│ a', '│ … 2 more lines'])
+})
+
+test('a row draws its card inside a show, or declines', () => {
+  const bare: CardRow = {
+    // @ts-expect-error a card drawn as a bare stack has no show as its parent
+    draw: parts => ({ kind: 'stack', children: [{ kind: 'text', text: parts.call.title }] }),
+  }
+  assert.equal(typeof bare.draw, 'function')
 })
 
 test("a row reads its kind's own fields, and one that cannot read them declines", () => {
@@ -348,17 +357,18 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
   }
   const exit: CardRow = {
     draw: current => {
-      const head: Node = { kind: 'text', text: [current.mark, ` ${current.call.title}`] }
-      if (current.waiting !== undefined) return { kind: 'stack', children: [head, current.waiting] }
+      const head = [current.mark, ` ${current.call.title}`]
+      if (current.waiting !== undefined) return { kind: 'show', title: head, child: current.waiting }
       const code: unknown = current.result?.returned.exitCode
       if (typeof code !== 'number') return { declined: `exitCode is ${code === undefined ? 'absent' : `a ${typeof code}`}` }
       return {
-        kind: 'stack',
-        children: [head, { kind: 'text', text: `  exited ${code}`, tone: code === 0 ? 'success' : 'error' }, current.fold({ kind: 'text', text: current.resultText })],
+        kind: 'show',
+        title: head,
+        child: { kind: 'stack', children: [{ kind: 'text', text: `exited ${code}`, tone: code === 0 ? 'success' : 'error' }, current.fold({ kind: 'text', text: current.resultText })] },
       }
     },
   }
-  assert.deepEqual(lines(exit.draw(parts) as Node), ['✗ pnpm test', '  exited 2', 'tsc: 1 error'])
+  assert.deepEqual(lines(exit.draw(parts) as Node), ['✗ pnpm test', '│ exited 2', '│ tsc: 1 error'])
   assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal' } } }), { declined: 'exitCode is absent' })
   assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal', exitCode: 'two' } } }), { declined: 'exitCode is a string' })
 })
@@ -378,7 +388,7 @@ test('the object a presenter returned is not frozen after drawing', async () => 
   const { pane } = await withCards(cached)
   pane.push(asked('cached', '{}'))
   pane.push(returned('tsc: 1 error'))
-  assert.deepEqual(drawText(pane, 60), ['● pnpm test', 'tsc: 1 error'])
+  assert.deepEqual(drawText(pane, 60), ['● pnpm test', '│ tsc: 1 error'])
   assert.equal(Object.isFrozen(call), false)
   assert.equal(Object.isFrozen(result), false)
 })
@@ -387,16 +397,16 @@ test('a presented output fold shows the rows the theme gives the tool kind, not 
   const { registrations, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('a\nb\nc\nd\ne'))
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ … 2 more lines'])
   registrations.theme({ folds: { tool: { rows: 1 } } })
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', '… 4 more lines'])
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ … 4 more lines'])
 })
 
 test('disposing the plugin gives every call back to binnacle\'s card', async () => {
   const { fiber, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('the file'))
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'the file'])
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ the file'])
   await fiber.dispose()
   assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'the file'])
 })
@@ -405,9 +415,9 @@ test('a fold a person opened stays open when the plugin drawing it is disposed, 
   const { fiber, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('a\nb\nc\nd\ne'))
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', '… 2 more lines'])
-  assert.deepEqual(pane.handleMouse(pointer('click', 4, 0, 60)), { handled: true })
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', 'a', 'b', 'c', 'd', 'e'])
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ … 2 more lines'])
+  assert.deepEqual(pane.handleMouse(pointer('click', 4, 2, 60)), { handled: true })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ d', '│ e'])
   await fiber.dispose()
   assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', 'a', 'b', 'c', 'd', 'e'])
 })
@@ -417,5 +427,5 @@ test('a call its turn left without a result says so under its presented title', 
   pane.push({ kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' })
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push({ kind: 'turn', seq: 3, time: 3, turn: 1, phase: 'end', ending: 'aborted' })
-  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '  the turn ended without it: aborted'])
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ the turn ended without it: aborted'])
 })

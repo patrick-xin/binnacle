@@ -20,9 +20,9 @@ export function apply(ctx: Context): void {
 }
 
 /**
- * The view of a tool entry this plugin registers: the call as its mark and
- * the title its tool presented, and once it returns, what it returned folded
- * beneath, as its tool presents it. Where it cannot draw from a presentation
+ * The view of a tool entry this plugin registers: a show titled by the call's
+ * mark and the title its tool presented, holding how the call stands, and once
+ * it returns, what it returned, folded, as its tool presents it. Where it cannot draw from a presentation
  * it leaves the entry to the view beneath it, binnacle's own card; what a
  * presenter does wrong is said beneath that card, naming the tool, the
  * presenter and why, in error, so the seam never degrades quietly.
@@ -72,8 +72,8 @@ function viewOf(tools: ToolRuntime): View {
         : result.failed === true ? { mark: 'failed' } : { mark: 'done' },
       waiting: result === undefined
         ? (entry.left === undefined
-            ? { kind: 'text', text: ['  running ', { since: entry.call.time }], tone: 'muted' }
-            : { kind: 'text', text: `  the turn ended without it: ${entry.left}`, tone: 'muted' })
+            ? { kind: 'text', text: ['running ', { since: entry.call.time }], tone: 'muted' }
+            : { kind: 'text', text: `the turn ended without it: ${entry.left}`, tone: 'muted' })
         : undefined,
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),

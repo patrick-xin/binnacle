@@ -16,8 +16,12 @@
  * everywhere, so knowing a new package — a new dsh package above all — is a
  * decision written into `layers.json`, not a line slipped into a module.
  * A dynamic import is held as a static one is, and one whose module is
- * decided at run time is refused, since no rule can hold it. Tests sit
- * outside `src` and are not held.
+ * decided at run time is refused, since no rule can hold it. `owners` names,
+ * for a package, the files under the root that alone may import each of its
+ * named symbols, so a header's "the one place" is a failing build once it
+ * stops being true; a file that takes such a package whole — `import *`,
+ * `export *`, a dynamic import — reaches every symbol it owns, and is refused
+ * each one it is not an owner of. Tests sit outside `src` and are not held.
  * @module binnacle/scripts/check-layers
  */
 import { readFileSync } from 'node:fs'
@@ -28,7 +32,7 @@ import { repositoryFiles } from './check-paths.mjs'
 
 /**
  * The layer rules, as `layers.json` holds them.
- * @typedef {{ root: string, entry: string[], layers: Record<string, string[]>, isolated?: string[], typeOnly?: string[], external: Record<string, string[]> }} Rules
+ * @typedef {{ root: string, entry: string[], layers: Record<string, string[]>, isolated?: string[], typeOnly?: string[], external: Record<string, string[]>, owners?: Record<string, Record<string, string[]>> }} Rules
  */
 
 /**
@@ -79,22 +83,38 @@ function dynamicImports(node, text, found = []) {
   return found
 }
 
+/** What a specifier's names hold where it takes the whole module at once: a namespace import, `export *`, or a dynamic import. */
+const ALL = '*'
+
+/**
+ * A name as an import or export specifier writes it.
+ * @param {{ type: string, name?: string, value?: string }} node - the identifier, or the string a name written in quotes is.
+ * @returns {string} the name.
+ */
+function nameOf(node) {
+  return node.type === 'Literal' ? String(node.value) : String(node.name)
+}
+
 /**
  * The modules a source text imports or re-exports from.
  * @param {string} path - the file's path, for the parser.
  * @param {string} text - the file's text.
- * @returns {{ named: { spec: string, typeOnly: boolean }[], unnamed: string[] }} each specifier, in order, and whether its declaration is `import type` or `export type`, a dynamic import's included when a string names it; and the argument of each dynamic import whose module is decided at run time.
+ * @returns {{ named: { spec: string, typeOnly: boolean, names: string[] }[], unnamed: string[] }} each specifier, in order, whether its declaration is `import type` or `export type`, and the names it takes from the module (`default` for a default import, `*` where it takes the whole module at once), a dynamic import's included when a string names it; and the argument of each dynamic import whose module is decided at run time.
  */
 function specifiers(path, text) {
   const { program } = parseSync(path, text)
   const dynamic = dynamicImports(program, text)
   const declared = program.body.flatMap(node => {
-    if (node.type === 'ImportDeclaration') return [{ spec: node.source.value, typeOnly: node.importKind === 'type' }]
-    if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source) return [{ spec: node.source.value, typeOnly: node.exportKind === 'type' }]
+    if (node.type === 'ImportDeclaration') {
+      const names = node.specifiers.map(specifier => specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : ALL)
+      return [{ spec: node.source.value, typeOnly: node.importKind === 'type', names }]
+    }
+    if (node.type === 'ExportNamedDeclaration' && node.source) return [{ spec: node.source.value, typeOnly: node.exportKind === 'type', names: node.specifiers.map(specifier => nameOf(specifier.local)) }]
+    if (node.type === 'ExportAllDeclaration') return [{ spec: node.source.value, typeOnly: node.exportKind === 'type', names: [ALL] }]
     return []
   })
   return {
-    named: [...declared, ...dynamic.flatMap(entry => entry.module === undefined ? [] : [{ spec: entry.module, typeOnly: false }])],
+    named: [...declared, ...dynamic.flatMap(entry => entry.module === undefined ? [] : [{ spec: entry.module, typeOnly: false, names: [ALL] }])],
     unnamed: dynamic.flatMap(entry => entry.module === undefined ? [entry.source] : []),
   }
 }
@@ -110,14 +130,45 @@ function covers(key, spec) {
 }
 
 /**
+ * The symbols a file imports that the owners table gives only to other files.
+ * @param {string} path - the file's path, relative to the package.
+ * @param {{ spec: string, names: string[] }[]} named - what it imports, as `specifiers` reads it.
+ * @param {Rules} rules - the rules.
+ * @returns {string[]} one line per owned symbol it reaches without being among its owners: by name, or with the whole package at once, which reaches every symbol the package owns.
+ */
+function unowned(path, named, rules) {
+  const self = relative(rules.root, path)
+  const problems = []
+  for (const { spec, names } of named) {
+    for (const [pkg, symbols] of Object.entries(rules.owners ?? {})) {
+      if (!covers(pkg, spec)) continue
+      for (const name of names) {
+        if (name === ALL) {
+          for (const [symbol, owners] of Object.entries(symbols)) {
+            if (!owners.includes(self)) problems.push(`${path}: imports all of ${pkg} at once, which reaches ${symbol}, which only ${owners.join(', ')} may; import by name what you need`)
+          }
+          continue
+        }
+        const owners = symbols[name]
+        if (owners === undefined || owners.includes(self)) continue
+        problems.push(`${path}: imports ${name} from ${pkg}, which only ${owners.join(', ')} may; take what you need from one of them, or name this file among its owners in layers.json`)
+      }
+    }
+  }
+  return problems
+}
+
+/**
  * Check every module against the layer rules.
  * @param {{ path: string, text: string }[]} files - the source files, by path relative to the package.
  * @param {Rules} rules - the rules.
- * @returns {string[]} one line per import a layer is not allowed, and per file in no layer.
+ * @returns {string[]} one line per import a layer is not allowed, per file in no layer, and per owned symbol a file is not an owner of.
  */
 export function checkLayers(files, rules) {
   const problems = []
   for (const file of files) {
+    const { named, unnamed } = specifiers(file.path, file.text)
+    problems.push(...unowned(file.path, named, rules))
     const layer = layerOf(file.path, rules)
     if (layer === undefined) {
       problems.push(`${file.path}: is in no layer; move it under ${rules.root}/<layer>/`)
@@ -125,7 +176,6 @@ export function checkLayers(files, rules) {
     }
     const allowed = layer === 'entry' ? rules.entry : rules.layers[layer] ?? []
     const who = layer === 'entry' ? 'the entry' : layer
-    const { named, unnamed } = specifiers(file.path, file.text)
     for (const source of unnamed) problems.push(`${file.path}: imports a module named at run time (${source}); name it with a string so layers.json can hold it`)
     for (const { spec, typeOnly } of named) {
       if (spec.startsWith('.')) {
