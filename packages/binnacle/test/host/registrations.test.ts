@@ -361,7 +361,7 @@ test('a plugin places a screen, read back as lines, and disposing its plugin tak
   const placed = registrations.screens.get('trajectory')
   assert.equal(placed?.key, 'f2')
   const pane = new ScreenPane(() => [prompt])
-  pane.place('trajectory', placed ?? { draw: () => ({ kind: 'blank' }) })
+  pane.place('trajectory', { draw: facts => placed?.draw(facts, { model: 'deepseek/deepseek-v4', running: false }) ?? { kind: 'blank' } })
   assert.deepEqual(pane.render(40).map(line => stripTerminalSequences(line).trimEnd()), ['the turns'])
   await fiber.dispose()
   assert.equal(registrations.screens.has('trajectory'), false)

@@ -27,12 +27,13 @@ export interface PlacedScreen {
   readonly description: string
   /**
    * How the screen draws, with nodes as a view draws, handed the session's
-   * facts read-only; nothing it does reaches the log. It is called again as
-   * the facts arrive, the width changes, a person opens something on the
-   * screen or the registration changes — not at every frame — so it is a
-   * function of the facts and nothing else.
+   * facts and where the session stands, both read-only; nothing it does
+   * reaches the log. It is called again as the facts arrive, where the
+   * session stands changes, the width changes, a person opens something on
+   * the screen or the registration changes — not at every frame — so it is a
+   * function of what it is handed and nothing else.
    */
-  readonly draw: (facts: readonly Fact[]) => Node
+  readonly draw: (facts: readonly Fact[], surface: Surface) => Node
 }
 
 /**

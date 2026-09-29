@@ -1837,3 +1837,23 @@ test('what / offers follows dsh: a command registered after the session opened i
   terminal.type('/')
   await until(async () => (await terminal.altScreen()).some(row => row.includes('plan before acting')))
 })
+
+test('a placed screen is handed where the session stands, and is drawn again as it changes', async () => {
+  const terminal = new XtermTerminal(60, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.screen('review', { key: 'f2', description: 'open the review', draw: (_facts, surface) => ({ kind: 'text', text: `${surface.model} ${surface.running ? 'working' : 'idle'}` }) })
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some(row => row === 'deepseek/deepseek-v4 idle'))
+  session.stands = { model: 'deepseek/deepseek-v4', running: true }
+  session.standsChanged()
+  await until(async () => (await terminal.altScreen()).some(row => row === 'deepseek/deepseek-v4 working'))
+})

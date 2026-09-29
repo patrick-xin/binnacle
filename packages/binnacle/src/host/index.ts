@@ -26,12 +26,13 @@ import { CombinedAutocompleteProvider, Editor, ProcessTerminal, ScrollView, setK
 import type { Component, Keybinding, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
+import type { Node } from '../ui/node.ts'
 import { editorTheme } from '../ui/theme.ts'
 import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
-import type { Placement, Slot, Surface } from '../api.ts'
+import type { PlacedScreen, Placement, Slot, Surface } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
 import { questions } from '../plugins/questions/index.ts'
@@ -283,6 +284,12 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (back === 'regular') show('regular')
     else if (tui instanceof TuiAltScreen) readOn(tui)
   }
+  /**
+   * A placed screen as its pane draws it: handed where the session stands beside the facts, as lines are.
+   * @param placed - the screen as its plugin registered it.
+   * @returns what the pane draws with.
+   */
+  const handed = (placed: PlacedScreen): { readonly draw: (facts: readonly Fact[]) => Node } => ({ draw: drawn => placed.draw(drawn, surface()) })
   /** Open a placed screen: on the alternate screen it takes the transcript's place; from the main screen the person is switched to it, as codex enters the alternate screen for its transcript (`codex:codex-rs/tui/src/app_backtrack.rs`). */
   function openScreen(id: string): void {
     const placed = registrations.screens.get(id)
@@ -294,7 +301,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme, () => internals.clock.now())
       screenPanes.set(id, pane)
     }
-    pane.place(id, placed)
+    pane.place(id, handed(placed), `binnacle.screen(${id})`)
     open = { name: id, pane, on: tui.mode }
     if (tui instanceof TuiAltScreen) readOn(tui)
     else show('fullscreen')
@@ -326,6 +333,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const surface = (): Surface => ({ ...session.standing(), ...notice === undefined ? {} : { notice } })
   const restand = (): void => {
     for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
+    for (const pane of screenPanes.values()) pane.invalidate()
     tui.requestRender()
   }
   const unstand = session.onStanding(restand)
@@ -401,7 +409,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (open === undefined) return
     const placed = registrations.screens.get(open.name)
     if (placed === undefined) closeScreen()
-    else open.pane.place(open.name, placed)
+    else open.pane.place(open.name, handed(placed), `binnacle.screen(${open.name})`)
   }
   offerScreens()
   // Keys arrive ahead of the composer, through pi-tui's input listener. The host answers what is bound to it, quitting

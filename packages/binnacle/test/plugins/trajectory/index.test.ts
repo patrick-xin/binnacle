@@ -7,6 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
+import type { Surface } from '../../../src/api.ts'
 import type { Fact } from '../../../src/facts/adapt.ts'
 import { adapt } from '../../../src/facts/adapt.ts'
 import { RegistrationService } from '../../../src/host/registrations.ts'
@@ -18,6 +19,9 @@ import { componentOf } from '../../support/drawn.ts'
 import { call as callFact, prompt as promptFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact } from '../../support/facts.ts'
 import { logged } from '../../support/log.ts'
 
+
+/** Where the session stands, as the host hands it to a screen: the Trajectory draws from the facts alone. */
+const stands: Surface = { model: 'deepseek/deepseek-v4', running: false }
 /**
  * The Trajectory applied in a Cordis context, with the `binnacle` service,
  * drawing the facts given.
@@ -30,7 +34,7 @@ async function trajectoryOver(facts: readonly Fact[]) {
   const fiber = await ctx.plugin(trajectory)
   const placed = registrations.screens.get('trajectory')
   const pane = new ScreenPane(() => facts)
-  if (placed !== undefined) pane.place('trajectory', placed)
+  if (placed !== undefined) pane.place('trajectory', { draw: drawn => placed.draw(drawn, stands) })
   const lines = () => drawText(pane, 60)
   return { fiber, placed, pane, lines }
 }
@@ -152,10 +156,10 @@ test('each event is one line, its record folded on it: the line says how much it
   const facts = session()
   const { placed } = await trajectoryOver(facts)
   assert.ok(placed !== undefined)
-  const closed = drawText(componentOf(placed.draw(facts), { toggled: new Set() }), 60)
+  const closed = drawText(componentOf(placed.draw(facts, stands), { toggled: new Set() }), 60)
   assert.deepEqual([closed[1], closed[4], closed[11]], ['0 permission/preset · 8 lines', '1 turn 1 begins · 7 lines', '8 turn 1 ended · completed · 8 lines'])
   assert.equal(closed[6], '3 › fix the build · 11 lines')
-  const opened = drawText(componentOf(placed.draw(facts), { toggled: new Set(['3']) }), 60)
+  const opened = drawText(componentOf(placed.draw(facts, stands), { toggled: new Set(['3']) }), 60)
   assert.deepEqual(opened.slice(6, 10), ['3 › fix the build · show less', '{', '  "kind": "prompt",', '  "seq": 3,'])
 })
 
@@ -164,7 +168,7 @@ test('each line folds its record: a read fact\'s opens to the fact binnacle read
   const { placed } = await trajectoryOver(facts)
   assert.ok(placed !== undefined)
   const opened = (id: string): readonly string[] => {
-    const lines = layout(placed.draw(facts), 60, { toggled: new Set([id]) }).lines.map(line => stripTerminalSequences(line).trimEnd())
+    const lines = layout(placed.draw(facts, stands), 60, { toggled: new Set([id]) }).lines.map(line => stripTerminalSequences(line).trimEnd())
     return lines.slice(lines.findIndex(line => line.startsWith(`${id} `)))
   }
   assert.deepEqual(opened('3').slice(0, 12), [
