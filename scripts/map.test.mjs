@@ -105,3 +105,13 @@ test('a local export list exports the name it exports under', () => {
   const files = [file('ui/list.ts', 'const local = 1\nconst a = 2\nexport { local }\nexport { a as b }\nexport const c = 3\n')]
   assert.deepEqual(mapOf(files)[0].exports, ['local', 'b', 'c'])
 })
+
+test('a module is imported by a module that dynamically imports it with a string-literal specifier', () => {
+  const files = [
+    file('ui/dep.ts', 'export const d = 1\n'),
+    file('ui/lazy.ts', "export async function load() { return import('./dep.ts') }\n"),
+    file('ui/computed.ts', "export async function load(name: string) { return import(`./${name}.ts`) }\n"),
+  ]
+  const by = path => mapOf(files).find(entry => entry.path === path).importedBy
+  assert.deepEqual(by('ui/dep.ts'), ['ui/lazy.ts'])
+})

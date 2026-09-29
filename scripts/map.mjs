@@ -101,27 +101,45 @@ function exposedIn(path, text) {
 }
 
 /**
- * Every module a module imports or re-exports from by a relative specifier.
+ * The string-literal specifiers a module imports dynamically.
+ * @param {any} node - a parsed node, or any value inside one.
+ * @param {string[]} into - where the specifiers are collected.
+ * @returns {string[]} `into`; an `import()` of a computed specifier is not in it.
+ */
+function dynamicSpecifiers(node, into) {
+  if (Array.isArray(node)) for (const item of node) dynamicSpecifiers(item, into)
+  else if (node !== null && typeof node === 'object') {
+    if (node.type === 'ImportExpression' && node.source?.type === 'Literal' && typeof node.source.value === 'string') into.push(node.source.value)
+    for (const value of Object.values(node)) if (typeof value === 'object') dynamicSpecifiers(value, into)
+  }
+  return into
+}
+
+/**
+ * Every module a module imports, re-exports from or dynamically imports by a relative specifier.
  * @param {string} path - the module's path relative to `src/`.
  * @param {string} text - the module's text.
  * @param {Set<string>} known - the paths of every module, relative to `src/`.
- * @returns {{ target: string, names: string[], locals: string[] }[]} each relative specifier that resolves to a module (as `./x.ts`, `./x.js`, `./x` or a folder holding `index.ts`), with the names it takes from it: `*` for a namespace import or `export *`, `default` for a default import, and beside each the name it is bound to here (`null` for an export, which needs no other mention); a specifier that resolves to none is left out.
+ * @returns {{ target: string, names: string[], locals: (string | null)[] }[]} each relative specifier that resolves to a module (as `./x.ts`, `./x.js`, `./x` or a folder holding `index.ts`), with the names it takes from it: `*` for a namespace import or `export *`, `default` for a default import, and beside each the name it is bound to here (`null` for an export, which needs no other mention); a dynamic `import()` with a string-literal specifier takes no names; a specifier that resolves to none is left out.
  */
 function importsOf(path, text, known) {
   const found = []
-  for (const node of parseSync(path, text).program.body) {
-    if (!node.source || !['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)) continue
-    const spec = node.source.value
-    if (!spec.startsWith('.')) continue
+  const { program } = parseSync(path, text)
+  /** @param {string} spec @param {string[]} names @param {(string | null)[]} locals */
+  const add = (spec, names, locals) => {
+    if (!spec.startsWith('.')) return
     const base = posix.join(posix.dirname(path), spec)
     const target = [base, base.replace(/\.js$/, '.ts'), `${base}.ts`, `${base}/index.ts`].find(candidate => known.has(candidate))
-    if (target === undefined) continue
+    if (target !== undefined) found.push({ target, names, locals })
+  }
+  for (const node of program.body) {
+    if (!node.source || !['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)) continue
     const names = node.type === 'ImportDeclaration'
       ? node.specifiers.map(specifier => specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : '*')
       : node.type === 'ExportAllDeclaration' ? ['*'] : node.specifiers.map(specifier => nameOf(specifier.local))
-    const locals = node.type === 'ImportDeclaration' ? node.specifiers.map(specifier => specifier.local.name) : names.map(() => null)
-    found.push({ target, names, locals })
+    add(node.source.value, names, node.type === 'ImportDeclaration' ? node.specifiers.map(specifier => specifier.local.name) : names.map(() => null))
   }
+  for (const spec of dynamicSpecifiers(program.body, [])) add(spec, [], [])
   return found
 }
 
