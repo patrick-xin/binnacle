@@ -1,10 +1,3 @@
-/**
- * The transcript: the facts of a session folded into turns.
- *
- * A pure fold, so the host can apply one fact as it arrives and a replay can
- * apply the whole log, and both reach the same transcript.
- */
-
 import type { Fact } from '../facts/adapt.ts'
 
 /** A fact of one kind. */
@@ -72,6 +65,9 @@ function single<K extends Alone>(fact: FactOf<K>): Single<K> {
 
 /**
  * Fold one fact into a transcript.
+ *
+ * A pure fold, so the host can apply one fact as it arrives and a replay can
+ * apply the whole log, and both reach the same transcript.
  *
  * Each entry it makes is frozen: an author's view is handed entries, never
  * turns, so it cannot change what later facts are folded into.
