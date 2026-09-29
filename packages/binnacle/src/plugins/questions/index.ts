@@ -88,6 +88,7 @@ class Ask {
   private index = 0
   private unseat: (() => void) | undefined
   private seated: Placement | undefined
+  private unsit: (() => void) | undefined
 
   /**
    * @param ctx - the plugin's context, to seat the card with.
@@ -115,6 +116,7 @@ class Ask {
     this.acts.clear()
     ;(question.options ?? []).forEach((option, index) => this.acts.set(`option ${index + 1}`, () => this.choose(index)))
     if (question.multiSelect === true) this.acts.set(DONE, () => this.answerWith({ id: question.id, selected: [...this.marks] }))
+    this.acts.set(TYPING, () => this.typeAnswer())
     this.acts.set(SKIP, () => this.answerWith({ id: question.id, selected: [] }))
     this.unseat?.()
     const seated: Placement = {
@@ -135,6 +137,27 @@ class Ask {
     const unseat = this.ctx.binnacle.place('composer', seated)
     this.unseat?.()
     this.unseat = unseat
+  }
+
+  /**
+   * Place a composer in the seat over the card: the newest placement in the composer's slot, so the person types where they were typing. A line they submit is the question's custom answer, on a multi-select question beside every option marked; a blank line takes the composer back and gives the card the seat again.
+   */
+  private typeAnswer(): void {
+    this.unsit?.()
+    this.unsit = this.ctx.binnacle.place('composer', {
+      kind: 'composer',
+      submit: (text) => {
+        this.unsit?.()
+        this.unsit = undefined
+        if (text === '') return
+        const question = this.question
+        this.answerWith({
+          id: question.id,
+          selected: question.multiSelect === true ? [...this.marks] : [],
+          custom: text,
+        })
+      },
+    })
   }
 
   /**
