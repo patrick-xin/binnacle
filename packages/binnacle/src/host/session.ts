@@ -76,9 +76,25 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
   return {
     agent: handle.agent,
     follow: (listener) => {
-      // Drained and subscribed in one synchronous run, so no event can fall between them.
-      for (const event of session.snapshotEvents()) listener(event)
-      return ctx.on('session/event', (from, event) => { if (from === session) listener(event) })
+      // Subscribed before the log is read, and what arrives while it is heard is held until it has been: a listener may
+      // log as it hears, and an event logged then is in no snapshot taken before it. Each is heard once, by its seq.
+      const held: SessionEvent[] = []
+      let replaying = true
+      const off = ctx.on('session/event', (from, event) => {
+        if (from !== session) return
+        if (replaying) held.push(event)
+        else listener(event)
+      })
+      let last = -1
+      const hear = (event: SessionEvent): void => {
+        if (event.seq <= last) return
+        last = event.seq
+        listener(event)
+      }
+      for (const event of session.snapshotEvents()) hear(event)
+      for (let event = held.shift(); event !== undefined; event = held.shift()) hear(event)
+      replaying = false
+      return off
     },
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))

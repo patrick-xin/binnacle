@@ -147,3 +147,38 @@ test('following a session hears what it logged before, then what it logs after, 
   ctx.emit('session/event', {} as never, earlier)
   assert.deepEqual(heard, [earlier, later])
 })
+
+test('following a session misses nothing logged while what was logged before is being heard, and hears each event once', async () => {
+  const ctx = new Context()
+  const first = { type: 'turn/start', seq: 1, time: 0, data: {} } as unknown as SessionEvent
+  const during = { type: 'turn/end', seq: 2, time: 0, data: {} } as unknown as SessionEvent
+  const log = { snapshotEvents: (): readonly SessionEvent[] => [first] }
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('agents', { create: async () => ({ agent: { session: log }, dispose: async () => {} }) } as never)
+  const session = await openSession(ctx)
+  const heard: SessionEvent[] = []
+  session.follow((event) => {
+    heard.push(event)
+    // What a listener does on hearing the first event logs the next, before the replay is over.
+    if (event === first) ctx.emit('session/event', log as never, during)
+  })
+  assert.deepEqual(heard, [first, during])
+})
+
+test('an event both in the log as it is read and on the feed is heard once', async () => {
+  const ctx = new Context()
+  const first = { type: 'turn/start', seq: 1, time: 0, data: {} } as unknown as SessionEvent
+  // dsh announces an event as it appends it, so one appended as the log is read reaches the listener twice over.
+  const log = {
+    snapshotEvents: (): readonly SessionEvent[] => {
+      ctx.emit('session/event', log as never, first)
+      return [first]
+    },
+  }
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('agents', { create: async () => ({ agent: { session: log }, dispose: async () => {} }) } as never)
+  const session = await openSession(ctx)
+  const heard: SessionEvent[] = []
+  session.follow((event) => { heard.push(event) })
+  assert.deepEqual(heard, [first])
+})
