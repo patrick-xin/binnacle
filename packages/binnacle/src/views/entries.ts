@@ -85,7 +85,6 @@ function scaled(over: number): string {
   return over >= 100 ? `${Math.round(over)}` : `${Math.round(over * 10) / 10}`
 }
 
-// What a compaction shadowed stays on the screen above it: compacting removes nothing from the transcript.
 function drawCompaction(summary: Extract<Fact, { readonly kind: 'summary' }> | undefined, end: Extract<Fact, { readonly kind: 'end' }> | undefined): Node {
   if (end === undefined) return { kind: 'text', text: [{ mark: 'compaction' } as const, ' compacting context…'], tone: 'muted' }
   if (end.error !== undefined) {
@@ -114,7 +113,6 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   return { kind: 'show', title, child: { kind: 'stack', children: [...reason, output] } }
 }
 
-// A view registered under one of these names draws that kind, so no authored fact may take one.
 const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true }
 
 /**
@@ -215,7 +213,6 @@ function builtIn(entry: Entry, problem?: string): Node {
     case 'unknown':
       return noted(folded('record', [{ mark: 'unknown' } as const, ` ${entry.fact.type}`], { kind: 'text', text: shown(entry.fact.record) }), problem ?? entry.fact.problem)
     case 'quiet':
-      // A blank node is a line of its own; a stack of nothing is no lines at all.
       return problem === undefined ? { kind: 'stack', children: [] } : problemLine(problem)
   }
 }

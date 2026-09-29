@@ -213,10 +213,8 @@ export class RegistrationService extends Service implements Registrations {
       const newest = stack.at(-1)
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
-    // A new theme object each change, so what was kept against the old one is known stale.
     // Each id bound by the newest registration that binds it, as one config for pi-tui's manager.
     if (table === 'keys') this.bound = overlaid(...this.bindingTable.get('keys') ?? [])
-    // A new theme object each change, so what was kept against the old one is known stale.
     if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
     for (const listener of this.listeners) listener(table)
   }
