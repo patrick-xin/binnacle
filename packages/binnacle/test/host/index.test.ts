@@ -95,6 +95,8 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
     },
   })
   ctx.provide('agents', {} as never)
+  // dsh's session projections, whose snapshot the real opening reads; the host's tests fake the session, so a stub answers the seam the row names.
+  ctx.provide('sessionProjections', { snapshot: () => ({ values: {} }) } as never)
   // dsh's default model, which opening a session reads; the host's tests fake the session, so nothing here varies it.
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
   const fiber = ctx.plugin(host)
@@ -102,9 +104,9 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
-test('the row is named binnacle and needs the command line, the agents and the default model', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model and the session projections', () => {
   assert.equal(host.name, 'binnacle')
-  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel'])
+  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections'])
 })
 
 test('--check opens a session on the default model once startup commits, reports it, closes it, and exits 0 drawing nothing', async () => {

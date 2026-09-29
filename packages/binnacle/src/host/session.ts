@@ -17,6 +17,10 @@ import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-mod
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+// Type-only: `ProjectionSnapshot` arrives with the `sessionProjections` Context declaration, and the token meter's
+// projections augment the keys a snapshot may ask for.
+import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
+import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter'
 import type { Surface } from '../api.ts'
 
 /** Where the session stands, as the host reads it from the live session; the notice is the host's own. */
@@ -63,15 +67,14 @@ const count = (value: unknown): number | undefined => typeof value === 'number' 
 
 /**
  * The tokens used, from the token meter's `tokenUsage` projection (`dsh:packages/llm/token-meter/src/projection.ts#TokenUsageProjection`).
- * @param value - the projection's value, unknown until parsed.
+ * @param value - the projection's value, parsed where it enters: a field that holds no count is left out, never guessed.
  * @returns the usage, or nothing when the projection holds none.
  */
-function usageOf(value: unknown): Pick<SessionStands, 'usage'> {
-  if (typeof value !== 'object' || value === null) return {}
-  const totals = value as Record<string, unknown>
-  const input = count(totals.uncachedInputTokens)
-  const output = count(totals.outputTokens)
-  const cacheRead = count(totals.cacheReadTokens)
+function usageOf(value: TokenUsageProjection | undefined): Pick<SessionStands, 'usage'> {
+  if (value === undefined) return {}
+  const input = count(value.uncachedInputTokens)
+  const output = count(value.outputTokens)
+  const cacheRead = count(value.cacheReadTokens)
   return input === undefined || output === undefined || cacheRead === undefined ? {} : { usage: { input, output, cacheRead } }
 }
 
@@ -79,20 +82,19 @@ function usageOf(value: unknown): Pick<SessionStands, 'usage'> {
  * The context the session fills, from the token meter's `contextPressure` projection
  * (`dsh:packages/llm/token-meter/src/projection.ts#ContextPressureProjection`): what the next request would cost, or
  * the last one's size, out of the window the latest request context named.
- * @param value - the projection's value, unknown until parsed.
+ * @param value - the projection's value, parsed where it enters: a field that holds no count is left out, never guessed.
  * @returns the context, or nothing until both are known.
  */
-function contextOf(value: unknown): Pick<SessionStands, 'context'> {
-  if (typeof value !== 'object' || value === null) return {}
-  const pressure = value as Record<string, unknown>
-  const used = count(pressure.projectedTokens) ?? count(pressure.pressureTokens)
-  const window = count(pressure.contextWindow)
+function contextOf(value: ContextPressureProjection | undefined): Pick<SessionStands, 'context'> {
+  if (value === undefined) return {}
+  const used = count(value.projectedTokens) ?? count(value.pressureTokens)
+  const window = count(value.contextWindow)
   return used === undefined || window === undefined || window === 0 ? {} : { context: { used, window } }
 }
 
 /**
  * Open a session on the default model.
- * @param ctx - the row's context, carrying dsh's `agents` and `agentDefaultModel`.
+ * @param ctx - the row's context, carrying dsh's `agents`, `agentDefaultModel` and `sessionProjections`.
  * @returns the open session.
  */
 export async function openSession(ctx: Context): Promise<OpenedSession> {
@@ -123,9 +125,10 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       // opened on (the reading on #42: the agent's options are fixed at creation).
       const asked = session.requestHeader()?.config
       const model = asked === undefined ? `${selection.provider}/${selection.model}` : `${asked.provider}/${asked.model}`
-      // The token meter's projections, where dsh-base mounts them, read as one cut of the log and parsed here.
-      const values = ctx.get('sessionProjections')?.snapshot(session, ['tokenUsage', 'contextPressure']).values
-      return { model, running: handle.agent.status === 'running', ...usageOf(values?.tokenUsage), ...contextOf(values?.contextPressure) }
+      // The token meter's projections, where dsh-base mounts them, read as one cut of the log and parsed here: a
+      // registry without them refuses the row, for the service is one the row names in inject, not one it may miss.
+      const values: ProjectionSnapshot['values'] = ctx.sessionProjections.snapshot(session, ['tokenUsage', 'contextPressure']).values
+      return { model, running: handle.agent.status === 'running', ...usageOf(values.tokenUsage), ...contextOf(values.contextPressure) }
     },
     onStanding: listener => ctx.on('session/event', (from) => { if (from === session) listener() }),
     get running() { return handle.agent.status === 'running' },

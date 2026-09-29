@@ -44,8 +44,8 @@ import type { OpenedSession } from './session.ts'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, and its default model. Each is a key dsh declares on `Context`. */
-export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel'] satisfies (keyof Context)[]
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, and the session projections the token meter's readings ride. Each is a key dsh declares on `Context`. */
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {
