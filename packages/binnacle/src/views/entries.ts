@@ -103,7 +103,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   const head: Node = { kind: 'text', text: [mark, ` ${call.name} ${call.arguments}`] }
   if (result === undefined) {
     const waiting: Node = left === undefined
-      ? { kind: 'text', text: '  running…', tone: 'muted' }
+      ? { kind: 'text', text: ['  running ', { since: call.time }], tone: 'muted' }
       : { kind: 'text', text: `  the turn ended without it: ${left}`, tone: 'muted' }
     return { kind: 'stack', children: [head, waiting] }
   }

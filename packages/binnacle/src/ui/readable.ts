@@ -52,7 +52,7 @@ export function readable(node: Node): Node {
  */
 function readableSpan(span: Span): Span {
   if (typeof span === 'string') return treated(span)
-  if ('mark' in span) return span
+  if ('mark' in span || 'since' in span) return span
   return { ...span, text: treated(span.text) }
 }
 

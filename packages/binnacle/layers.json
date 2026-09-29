@@ -77,6 +77,12 @@
       "facts",
       "host"
     ],
+    "@deepseek-ai/dsh-session-projection": [
+      "host"
+    ],
+    "@deepseek-ai/dsh-token-meter": [
+      "host"
+    ],
     "@deepseek-ai/dsh-scope": [
       "host"
     ],

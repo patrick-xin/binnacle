@@ -36,6 +36,24 @@ export interface PlacedScreen {
 }
 
 /**
+ * Where the session stands, as the host reads it from the live session, never
+ * folded again from the log: handed to what lines draw, read-only. What dsh
+ * has not measured yet is absent.
+ */
+export interface Surface {
+  /** The model the session runs, as `provider/model`. */
+  readonly model: string
+  /** Whether a turn is running. */
+  readonly running: boolean
+  /** The tokens the session has used, as dsh's token meter counts them: sent, received, and read from the cache. */
+  readonly usage?: { readonly input: number, readonly output: number, readonly cacheRead: number }
+  /** How much of the model's context the session fills, in tokens, and the window it fills. */
+  readonly context?: { readonly used: number, readonly window: number }
+  /** A notice for the person while one stands: what a second Ctrl+C does, or what went wrong. */
+  readonly notice?: string
+}
+
+/**
  * Where a placement goes on the page, top to bottom: the transcript's place,
  * lines above the composer, the composer, lines below it. The transcript's
  * place grows to fill the alternate screen; the rest take their height.
@@ -64,12 +82,13 @@ export type Placement =
     readonly kind: 'lines'
     /**
      * How the lines draw, with nodes as a view draws, handed the session's
-     * facts read-only. It is called again as the facts arrive, the width or
-     * the theme changes, or the registrations change — not at every frame —
-     * so it is a function of the facts and of what its plugin read at the
+     * facts and where the session stands, both read-only. It is called again
+     * as the facts arrive, where the session stands changes, the width or the
+     * theme changes, or the registrations change — not at every frame — so it
+     * is a function of what it is handed and of what its plugin read at the
      * last of those.
      */
-    readonly draw: (facts: readonly Fact[]) => Node
+    readonly draw: (facts: readonly Fact[], surface: Surface) => Node
     /**
      * What an offer the lines draw does once a person invokes it: handed the
      * offer's id and the kind invoked. Any kind but `expand`, which opens a

@@ -19,6 +19,14 @@ import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-mod
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+// Type-only: `ProjectionSnapshot` arrives with the `sessionProjections` Context declaration, and the token meter's
+// projections augment the keys a snapshot may ask for.
+import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
+import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter'
+import type { Surface } from '../api.ts'
+
+/** Where the session stands, as the host reads it from the live session; the notice is the host's own. */
+export type SessionStands = Omit<Surface, 'notice'>
 
 /** An open session: what the surface reads from it and sends to it. */
 export interface OpenedSession {
@@ -38,6 +46,14 @@ export interface OpenedSession {
    * @param text - what they typed.
    */
   send(text: string): void
+  /** Where the session stands now: the model it runs, whether a turn runs, and what dsh has measured. */
+  standing(): SessionStands
+  /**
+   * Hear when where the session stands may have changed: as it logs anything, and as the agent's own status flips.
+   * @param listener - called on each change.
+   * @returns a function that stops listening.
+   */
+  onStanding(listener: () => void): () => void
   /**
    * Run a line as one of dsh's commands for the agent, without sending it to the model
    * (`dsh:packages/interaction/commands/src/index.ts`). A command that failed still
@@ -68,13 +84,53 @@ export interface OpenedSession {
 }
 
 /**
+ * A count, when a projection holds one.
+ * @param value - what the projection holds.
+ * @returns the count, or undefined when it is none.
+ */
+const count = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+
+/**
+ * The tokens used, from the token meter's `tokenUsage` projection (`dsh:packages/llm/token-meter/src/projection.ts#TokenUsageProjection`).
+ * @param value - the projection's value, parsed where it enters: a field that holds no count is left out, never guessed.
+ * @returns the usage, or nothing when the projection holds none.
+ */
+function usageOf(value: TokenUsageProjection | undefined): Pick<SessionStands, 'usage'> {
+  if (value === undefined) return {}
+  const input = count(value.uncachedInputTokens)
+  const output = count(value.outputTokens)
+  const cacheRead = count(value.cacheReadTokens)
+  return input === undefined || output === undefined || cacheRead === undefined ? {} : { usage: { input, output, cacheRead } }
+}
+
+/**
+ * The context the session fills, from the token meter's `contextPressure` projection
+ * (`dsh:packages/llm/token-meter/src/projection.ts#ContextPressureProjection`): what the next request would cost, or
+ * the last one's size, out of the window the latest request context named.
+ * @param value - the projection's value, parsed where it enters: a field that holds no count is left out, never guessed.
+ * @returns the context, or nothing until both are known.
+ */
+function contextOf(value: ContextPressureProjection | undefined): Pick<SessionStands, 'context'> {
+  if (value === undefined) return {}
+  const used = count(value.projectedTokens) ?? count(value.pressureTokens)
+  const window = count(value.contextWindow)
+  return used === undefined || window === undefined || window === 0 ? {} : { context: { used, window } }
+}
+
+/**
  * Open a session on the default model.
- * @param ctx - the row's context, carrying dsh's `agents` and `agentDefaultModel`.
+ * @param ctx - the row's context, carrying dsh's `agents`, `agentDefaultModel` and `sessionProjections`.
  * @returns the open session.
  */
 export async function openSession(ctx: Context): Promise<OpenedSession> {
   const defaults: AgentDefaultModelConfig = ctx.agentDefaultModel
   const selection = defaults.currentSelection()
+  // Where the session stands is heard on two doors: the agent flips to idle after the last event of its turn is
+  // logged — kick's finally sets the phase only after `turn/end` is appended, and says so as `agent/status`
+  // (`dsh:packages/core/agent-loop/src/agent.ts`) — so a listener on session events alone would keep reading a
+  // running turn; and the projections and the model it last asked for ride the events themselves.
+  const standsChanged = new Set<() => void>()
+  const restand = (): void => { for (const listener of standsChanged) listener() }
   const handle: AgentHandle = await ctx.agents.create({
     sessionId: SessionId(`session-${randomUUID()}`),
     meta: { cwd: process.cwd() },
@@ -82,6 +138,8 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     setup: (agentCtx) => {
       const selected: ModelSelectionRef = { current: selection, assembled: undefined }
       installModelSelection(agentCtx, selected)
+      // Scoped to this agent, and gone with its world when the handle is disposed.
+      agentCtx.on('agent/status', restand)
     },
   })
   const { session } = handle.agent
@@ -96,6 +154,21 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     },
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
+    },
+    standing: () => {
+      // The model the session last asked for, from its latest request header; before its first request, the one it
+      // opened on (the reading on #42: the agent's options are fixed at creation).
+      const asked = session.requestHeader()?.config
+      const model = asked === undefined ? `${selection.provider}/${selection.model}` : `${asked.provider}/${asked.model}`
+      // The token meter's projections, where dsh-base mounts them, read as one cut of the log and parsed here: a
+      // registry without them refuses the row, for the service is one the row names in inject, not one it may miss.
+      const values: ProjectionSnapshot['values'] = ctx.sessionProjections.snapshot(session, ['tokenUsage', 'contextPressure']).values
+      return { model, running: handle.agent.status === 'running', ...usageOf(values.tokenUsage), ...contextOf(values.contextPressure) }
+    },
+    onStanding: (listener) => {
+      standsChanged.add(listener)
+      const off = ctx.on('session/event', (from) => { if (from === session) listener() })
+      return () => { standsChanged.delete(listener); off() }
     },
     offers: async () => {
       const named = commands.list(handle.agent).map(({ name, description }) => ({ name, description }))

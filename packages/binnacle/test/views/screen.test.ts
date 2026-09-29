@@ -5,7 +5,9 @@ import type { Fact } from '../../src/facts/adapt.ts'
 import type { Frame } from '../../src/ui/layout.ts'
 import { initial } from '../../src/ui/state.ts'
 import { adapt } from '../../src/facts/adapt.ts'
-import { screen } from '../../src/views/screen.ts'
+import { screen, screens } from '../../src/views/screen.ts'
+import { transcript } from '../../src/models/transcript.ts'
+import { binnacleTheme } from '../../src/ui/theme.ts'
 import { logged } from '../support/log.ts'
 import { prompt as promptFact } from '../support/facts.ts'
 
@@ -152,4 +154,15 @@ test('a region sits on the rows of the whole transcript, and what offers somethi
   assert.deepEqual(plain(drawn).lines.slice(0, 6), ['⋯ added by goal · 2 lines', '', '', ' › question 1', '', ''])
   assert.deepEqual(drawn.regions.map(({ region, top, height }) => [region.id, top, height]), [['5/context', 0, 1]])
   assert.deepEqual(drawn.focusable, ['5/context'])
+})
+
+test('an entry whose view draws the time since a moment is drawn at the time the screen is handed, and the screen says it is timed', () => {
+  const draw = screens()
+  const views = new Map([['prompt', [() => ({ kind: 'text' as const, text: ['asked ', { since: 10_000 }] })]]])
+  const model = transcript([promptFact(1, 10_000, 'fix the build')])
+  const at = (now: number) => draw(model, initial, 40, views, binnacleTheme, now)
+  assert.deepEqual(at(12_000).lines.map(line => stripTerminalSequences(line).trimEnd()), ['asked 2s'])
+  assert.deepEqual(at(15_000).lines.map(line => stripTerminalSequences(line).trimEnd()), ['asked 5s'])
+  assert.equal(at(15_000).timed, true)
+  assert.equal(draw(transcript([promptFact(1, 10_000, 'fix the build')]), initial, 40, new Map(), binnacleTheme, 15_000).timed, false)
 })

@@ -15,7 +15,12 @@ import { binnacleTheme } from './theme.ts'
 import type { Background, Mark, Theme, Tone } from './theme.ts'
 
 /** One run of a text node's line: its text drawn in the node's tone as a bare string, or in a tone of its own; or one of the theme's marks, whose glyph the theme draws in the mark's tone, or in a tone of the span's own. */
-export type Span = string | { readonly text: string, readonly tone: Tone } | { readonly mark: Mark, readonly tone?: Tone }
+export type Span =
+  | string
+  | { readonly text: string, readonly tone: Tone }
+  | { readonly mark: Mark, readonly tone?: Tone }
+  /** The time since a moment, in milliseconds since the epoch, as dsh logs a fact's time: `4s`, `1m 05s`, `1h 02m`, laid out at the time the host hands layout, so a view drawing it stays a function of its entry. */
+  | { readonly since: number, readonly tone?: Tone }
 
 /** Something a view draws. */
 export type Node =
@@ -165,7 +170,7 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
  * @param value - the span, as returned.
  * @param theme - the theme whose tones and marks it may name.
  * @returns it, as data.
- * @throws when it is neither a bare string, a text with a tone, nor a mark with a tone; when its mark is no mark or its tone is no tone; or when it names a mark and carries text anyway.
+ * @throws when it is neither a bare string, a text with a tone, a mark with a tone, nor the time since a moment; when its mark is no mark, its moment no number or its tone no tone; or when it names a mark and carries text anyway.
  */
 function spanOf(value: unknown, theme: Theme): Span {
   if (typeof value === 'string') return value
@@ -173,6 +178,13 @@ function spanOf(value: unknown, theme: Theme): Span {
   const record = value as Record<string, unknown>
   const tone = 'tone' in record ? record.tone : undefined
   const toned = tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(theme.tones, tone))
+  if ('since' in record) {
+    const since = record.since
+    if (typeof since !== 'number' || !Number.isFinite(since)) throw new Error(`${describe(since)} is no moment`)
+    if (toned) throw new Error(`${describe(tone)} is no tone`)
+    if ('text' in record || 'mark' in record) throw new Error('a span that says the time since a moment carries no text and no mark')
+    return tone === undefined ? { since } : { since, tone: tone as Tone }
+  }
   if ('mark' in record) {
     const mark = record.mark
     if (typeof mark !== 'string' || !Object.hasOwn(theme.marks, mark)) throw new Error(`${describe(mark)} is no mark`)

@@ -12,7 +12,8 @@
  * a placed screen answers the transcript's gestures with state nothing else
  * touches. A frame costs what changed: the screen is drawn and laid out
  * again as its facts arrive, its width changes, a person opens something on
- * it or its registration changes, and not otherwise. A drawing that throws
+ * it, its registration changes, or — where its drawing says the time since a
+ * moment — as that time passes, and not otherwise. A drawing that throws
  * or returns no node binnacle can lay out draws what went wrong, naming its
  * registration, and never takes the surface down; so does the report an
  * invoked offer reaches, drawn the same way until a later one returns.
@@ -32,6 +33,7 @@ import { initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
 import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
+import { timedIn } from '../views/screen.ts'
 
 /** What the pane reports about the screen it drew, for the host to act on beyond drawing. */
 export interface ScreenReports {
@@ -51,6 +53,8 @@ interface Laid {
   readonly state: UiState
   /** The theme it was laid out in, by identity: the registrations hand a new one at each change. */
   readonly theme: Theme
+  /** The time it was laid out at, when its drawing says the time since a moment: a later one lays it out again. */
+  readonly now: number | undefined
   /** What it drew, and the regions on it. */
   readonly frame: Frame
   /** The regions that offer something, in screen order. */
@@ -61,6 +65,7 @@ interface Laid {
 export class ScreenPane implements Component {
   readonly #facts: () => readonly Fact[]
   readonly #theme: () => Theme
+  readonly #now: () => number | undefined
   readonly #changed: () => void
   readonly #inView: (top: number, height: number) => void
   readonly #invoked: (region: string, affordance: AffordanceKind) => void
@@ -69,6 +74,7 @@ export class ScreenPane implements Component {
   #state: UiState = initial
   #laid: Laid | undefined
   #stale = true
+  #timed = false
   /** What the last report an invoked offer reached did wrong, drawn beneath what the pane drew until one returns. */
   #said: string | undefined
 
@@ -76,10 +82,13 @@ export class ScreenPane implements Component {
    * @param facts - the session's facts, as they stand, handed to the placed screen's drawing as they change.
    * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
    * @param theme - the theme as it stands, read at every frame; the screen is laid out again when it changes.
+   * @param now - the time, in milliseconds since the epoch, as the host hands it at every frame: what a drawing that
+   * says the time since a moment is laid out at, counting up. The pane reads no clock of its own.
    */
-  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme) {
+  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined) {
     this.#facts = facts
     this.#theme = theme
+    this.#now = now
     this.#changed = reports.changed ?? (() => {})
     this.#inView = reports.inView ?? (() => {})
     this.#invoked = reports.invoked ?? (() => {})
@@ -111,6 +120,11 @@ export class ScreenPane implements Component {
   /** Whether something on the screen has focus. */
   get focused(): boolean {
     return this.#state.focus !== undefined
+  }
+
+  /** Whether what it last drew says the time since a moment, so a later time draws it again: the host's to tick. */
+  get ticking(): boolean {
+    return this.#timed
   }
 
   /**
@@ -219,9 +233,12 @@ export class ScreenPane implements Component {
   private laidAt(width: number, state: UiState): Laid {
     const laid = this.#laid
     const theme = this.#theme()
-    if (!this.#stale && laid !== undefined && laid.width === width && laid.state === state && laid.theme === theme) return laid
-    const frame = layout(this.#drawn(theme), width, state, theme)
-    const next: Laid = { width, state, theme, frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
+    const now = this.#now()
+    if (!this.#stale && laid !== undefined && laid.width === width && laid.state === state && laid.theme === theme && (!this.#timed || laid.now === now)) return laid
+    const node = this.#drawn(theme)
+    this.#timed = timedIn(node)
+    const frame = layout(node, width, { ...state, ...now === undefined ? {} : { now } }, theme)
+    const next: Laid = { width, state, theme, now, frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
     this.#laid = next
     this.#stale = false
     return next
