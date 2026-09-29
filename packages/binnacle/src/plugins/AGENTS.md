@@ -13,4 +13,5 @@ binnacle's built-in features, each a Cordis plugin beside the surface it draws o
 ## Keep
 
 - A built-in feature holds only what an author holds: the author API, type-only; the dsh services it names in `inject`; grants for its effects ([ADR 5](../../../../docs/adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)). It places or registers where an author could, so an author can place something newer over it.
+- A plugin spells no key: which keys answer something is the key table's, and an ask names them on its edge. `check:words` refuses a key named in a plugin's words.
 - A feature's `index.ts` is the plugin a row loads: it exports `name`, `inject` and `apply`, and no default, for dsh's loader takes the module as the plugin.
