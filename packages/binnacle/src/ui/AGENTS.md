@@ -3,7 +3,6 @@
 What a view draws with and how a person's input changes what is shown: nodes laid out through pi-tui, the theme, the key table, the gesture table and UI state. The input vocabulary (gestures, actions, regions) is `contract`'s; scrolling, search and selection are pi-tui's; installing the key table and the merged theme, and touching the terminal, are the host's.
 
 - `answer.ts` — a landed gesture answered: its meaning from the gesture table, applied to UI state, saying what changed and what was invoked.
-- `draw.ts` — `drawText`: a component at a width as the plain lines a person reads, so tests assert views, layouts and screens as lines.
 - `gestures.ts` — the gesture table: what a gesture means on the regions it lands on, or nothing.
 - `keys.ts` — the key table: binnacle's and pi-tui's bindings in one manager, the keys plugins offer for their screens, and what key bytes resolve to.
 - `layout.ts` — a node at a width as a frame: the lines it draws and the regions placed on them; `under` finds the regions at a point.
