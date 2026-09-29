@@ -47,6 +47,11 @@ test('a row the patch inserts is a peerDependency, and makes one needed', () => 
   ])
 })
 
+test('a row naming a subpath of binnacle is binnacle\'s own, and a row naming another package\'s subpath needs that package', () => {
+  const patch = "- insert:\n    - id: binnacle-status-line\n      name: 'binnacle/plugins/status-line'\n    - id: deep\n      name: '@scope/a/deep'\n"
+  assert.deepEqual(check({ patch, peerDependencies: { '@scope/a': '1' } }), [])
+})
+
 test('problems come in a stable order, sorted, however the files and lists are ordered', () => {
   const files = [{ path: 'src/b.ts', text: "import 'z'\nimport 'a'\n" }]
   assert.deepEqual(check({ files }).map(line => line.split(' ')[0]), ['a', 'z'])
