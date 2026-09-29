@@ -1138,15 +1138,37 @@ test('the line names the tokens the session used and the share of its context, e
 /** An offer a person chooses, labelled by its id. */
 const chosen = (id: string): Node => ({ kind: 'offer', id, affordances: [{ kind: 'choose', label: id }], child: { kind: 'text', text: id } })
 
-test('an ask a plugin places names on its bottom edge the keys the one key table binds, as a person rebinds them', async () => {
+test('an ask a plugin places in the dialog names on its bottom edge the keys the one key table binds, as a person rebinds them', async () => {
+  const terminal = new XtermTerminal(50, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('dialog', { kind: 'lines', draw: () => ({ kind: 'ask', title: 'pick', child: { kind: 'stack', children: [chosen('a'), chosen('b')] } }) }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row === '     ╰─ enter select · tab/down next ───────╯'))
+  await ctx.plugin({ name: 'rebinder', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.primary': 'space' }) } })
+  await until(async () => (await terminal.altScreen()).some(row => row === '     ╰─ space select · tab/down next ───────╯'))
+})
+
+test('an ask an author\'s view draws in the transcript names the keys that answer it, as a person rebinds them', async () => {
+  const terminal = new XtermTerminal(50, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.view('prompt', () => ({ kind: 'ask', title: 'pick', child: { kind: 'stack', children: [chosen('a'), chosen('b')] } })) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row === '╰─ enter select · tab/down next ─────────────────╯'))
+  await ctx.plugin({ name: 'rebinder', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.primary': 'space' }) } })
+  await until(async () => (await terminal.altScreen()).some(row => row === '╰─ space select · tab/down next ─────────────────╯'))
+})
+
+test('an ask placed above the composer names no keys on its bottom edge, for no key reaches it', async () => {
   const terminal = new XtermTerminal(50, 12)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('above-composer', { kind: 'lines', draw: () => ({ kind: 'ask', title: 'pick', child: { kind: 'stack', children: [chosen('a'), chosen('b')] } }) }) } })
   commit()
-  await until(async () => (await terminal.altScreen()).some(row => row === '╰─ enter select · tab/down next ─────────────────╯'))
-  await ctx.plugin({ name: 'rebinder', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.primary': 'space' }) } })
-  await until(async () => (await terminal.altScreen()).some(row => row === '╰─ space select · tab/down next ─────────────────╯'))
+  await until(async () => (await terminal.altScreen()).some(row => row.startsWith('╭─ pick')))
+  const bottom = (await terminal.altScreen()).find(row => row.startsWith('╰'))
+  assert.equal(bottom, `╰${'─'.repeat(48)}╯`)
 })
 
 test('lines that read what no session event announces are drawn again when their plugin asks', async () => {
@@ -1421,6 +1443,36 @@ test('the dialog stands over whichever screen the person switches to, and answer
   assert.deepEqual(invoked, ['asked'])
   terminal.type('\x14')
   await until(async () => (await terminal.onAlternateScreen()) && (await terminal.altScreen()).some(row => row === '    asked'))
+})
+
+test('quitting leaves the session printed on the main screen without the dialog that stood over it', async () => {
+  const terminal = new XtermTerminal(40, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit, exits } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'dialog', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.place('dialog', { kind: 'lines', draw: () => ({ kind: 'text', text: 'asked' }) }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row === '    asked'))
+  terminal.type('\x03')
+  terminal.type('\x03')
+  await until(() => exits.length === 1)
+  const left = await terminal.mainScreen()
+  assert.ok(left.some(row => row.includes('fix the build')), 'the session is left printed')
+  assert.ok(left.every(row => !row.includes('asked')), 'the dialog is not')
+})
+
+test('quitting from the main screen leaves the session printed there without the dialog', async () => {
+  const terminal = new XtermTerminal(40, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit, exits } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  await ctx.plugin({ name: 'dialog', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.place('dialog', { kind: 'lines', draw: () => ({ kind: 'text', text: 'asked' }) }) } })
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.startsWith('    asked')))
+  terminal.type('\x03')
+  terminal.type('\x03')
+  await until(() => exits.length === 1)
+  const left = await terminal.mainScreen()
+  assert.ok(left.some(row => row.includes('fix the build')), 'the session is left printed')
+  assert.ok(left.every(row => !row.includes('asked')), 'the dialog is not')
 })
 
 /**

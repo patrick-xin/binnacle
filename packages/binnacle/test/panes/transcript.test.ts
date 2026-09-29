@@ -447,3 +447,18 @@ test('a call its turn left without a result is drawn that way on both screens', 
   regular.push(ended)
   assert.deepEqual(shown(regular), ['', ' › one', '', '', '● read {}', '│ the turn ended without it: aborted'])
 })
+
+/** A view that asks a person to choose between two offers. */
+const asking: View = () => ({ kind: 'ask', child: { kind: 'stack', children: [
+  { kind: 'offer', id: 'a', affordances: [{ kind: 'choose', label: 'a' }], child: { kind: 'text', text: 'a' } },
+  { kind: 'offer', id: 'b', affordances: [{ kind: 'choose', label: 'b' }], child: { kind: 'text', text: 'b' } },
+] } })
+
+/** The keys a key table binds: enter for the primary, tab for the next, nothing else. */
+const boundKeys = (binding: string): readonly string[] => ({ primary: ['enter'], 'focus.next': ['tab'] } as Record<string, readonly string[]>)[binding] ?? []
+
+test('an ask an author\'s view draws in the transcript names on its bottom edge the keys the pane is handed', () => {
+  const pane = new TranscriptPane(() => {}, () => new Map([['prompt', [asking]]]), {}, undefined, undefined, () => boundKeys)
+  pane.push(prompt)
+  assert.equal(shown(pane).at(-1), '╰─ enter select · tab next ────────────╯')
+})

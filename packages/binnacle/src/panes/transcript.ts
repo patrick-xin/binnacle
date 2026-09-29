@@ -5,6 +5,7 @@ import { empty, fold, settled, transcript } from '../models/transcript.ts'
 import type { Transcript } from '../models/transcript.ts'
 import { answer } from '../ui/answer.ts'
 import { under } from '../ui/layout.ts'
+import type { LayoutState } from '../ui/layout.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { act, initial } from '../ui/state.ts'
 import type { UiState } from '../ui/state.ts'
@@ -41,8 +42,9 @@ export class TranscriptPane implements Component {
   readonly #inView: (top: number, height: number) => void
   readonly #fullscreen: (top: number, height: number) => void
   #state: UiState = initial
-  #draw: DrawScreen = screens()
+  #draw: DrawScreen
   readonly #now: () => number | undefined
+  readonly #keys: () => LayoutState['keys']
   #drawn: { readonly width: number, readonly screen: Screen } | undefined
   #on: TuiMode = 'fullscreen'
   // On the main screen the pane never changes a row it has printed.
@@ -56,9 +58,12 @@ export class TranscriptPane implements Component {
    * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
    * @param theme - the theme as it stands, read at every frame; every entry is laid out again when it changes.
    * @param now - the time, in milliseconds since the epoch, as the host hands it at every frame: what an entry that draws the time since a moment is laid out at. The pane reads no clock of its own.
+   * @param keys - the keys the one key table binds to each meaning, for an ask to name what answers it; read as an entry is laid out, which the host has the pane do again when a person rebinds a key.
    */
-  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined) {
+  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined, keys: () => LayoutState['keys'] = () => undefined) {
     this.#changed = changed
+    this.#keys = keys
+    this.#draw = screens(keys)
     this.#now = now
     this.#views = views
     this.#theme = theme
@@ -81,7 +86,7 @@ export class TranscriptPane implements Component {
    */
   reset(facts: readonly Fact[]): void {
     this.#transcript = transcript(facts)
-    this.#draw = screens()
+    this.#draw = screens(this.#keys)
     this.#printed = undefined
     this.#changed()
   }
@@ -229,7 +234,7 @@ export class TranscriptPane implements Component {
 
   /** Draw every entry again, as pi-tui asks when the theme changes, on the main screen what it printed included. */
   invalidate(): void {
-    this.#draw = screens()
+    this.#draw = screens(this.#keys)
     this.#printed = undefined
   }
 }

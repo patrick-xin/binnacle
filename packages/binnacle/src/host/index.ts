@@ -162,7 +162,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
-  }, () => registrations.currentTheme, () => internals.clock.now())
+  }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
   // The screens plugins placed, each in a pane of its own with a scroll view of its own, so what a person did to
   // one — where they scrolled it — is kept while its registration stands. One is open at a time: it takes the
   // transcript's place in the alternate screen's scroll view, so pi-tui's scrolling, search and selection read it
@@ -213,11 +213,13 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const kept = inSlot.get(placement)
     if (kept !== undefined) return kept
     // Lines are drawn as a placed screen is, UI state and all, so what they offer answers a person through the one
-    // gesture table; an offer UI state does not answer reaches the placement's invoke.
+    // gesture table; an offer UI state does not answer reaches the placement's invoke. Keys reach only the composer's
+    // seat and the dialog, so only an ask there names them; elsewhere the pointer alone answers.
+    const answered = slot === 'composer' || slot === 'dialog'
     const pane = new ScreenPane(() => facts, {
       changed: () => { tui.requestRender() },
       invoked: (region, affordance) => { placement.invoke?.(region, affordance) },
-    }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
+    }, () => registrations.currentTheme, () => internals.clock.now(), () => answered ? table.keysOf : undefined)
     pane.place(slot, { draw: drawn => placement.draw(drawn, surface()) }, `binnacle.place(${slot})`)
     inSlot.set(placement, pane)
     return pane
@@ -303,7 +305,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     else if (changed === 'keys') {
       table.bind(registrations.bindings)
       setKeybindings(table.manager)
-      // An ask names the keys that answer it, so what is placed is laid out again with the keys as they now stand.
+      // An ask names the keys that answer it, so what is drawn is laid out again with the keys as they now stand.
+      transcript.invalidate()
       for (const pane of screenPanes.values()) pane.invalidate()
       tui.requestRender()
     } else if (changed === 'drawn') {
@@ -512,6 +515,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     unoffer()
     closeGrants()
     unregister()
+    // The dialog goes with the surface, so the session is left printed without it.
+    page = { ...page, dialog: undefined }
+    unshowDialog()
     // A placed screen open at the quit is closed first, so the session is left where the person can read it, plain.
     if (open !== undefined) closeScreen()
     // Quitting from the alternate screen goes by the main screen, as pi's does, so the session is left printed there once, after what it printed before.
@@ -519,7 +525,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       leave()
       tui = build('regular')
       tui.renderNow()
-    }
+    } else if (started) tui.renderNow()
     tui.stop()
   }
   try {
