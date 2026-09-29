@@ -104,6 +104,9 @@
       "host",
       "facts"
     ],
+    "@deepseek-ai/dsh-compaction": [
+      "facts"
+    ],
     "@deepseek-ai/dsh-skill": [
       "host"
     ],
