@@ -44,10 +44,11 @@ export interface Surface {
 
 /**
  * Where a placement goes on the page, top to bottom: the transcript's place,
- * lines above the composer, the composer, lines below it. The transcript's
- * place grows to fill the alternate screen; the rest take their height.
+ * lines above the composer, the composer, lines below it; and the dialog,
+ * drawn over the page, centred. The transcript's place grows to fill the
+ * alternate screen; the rest take their height.
  */
-export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-composer'
+export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-composer' | 'dialog'
 
 /**
  * What a placement draws: binnacle's transcript, binnacle's composer, or
@@ -145,14 +146,15 @@ export interface Registrations {
    */
   screen(name: string, screen: PlacedScreen): () => void
   /**
-   * Place what draws in a slot of the page. The transcript's and the
-   * composer's slots draw their newest placement, and disposing it gives
+   * Place what draws in a slot of the page. The transcript's, the composer's
+   * and the dialog's slots draw their newest placement, and disposing it gives
    * back the one before; with none, the slot draws nothing — with no
    * composer, nothing takes typing, and what the host answers itself,
    * quitting included, still answers. The lines slots draw every placement,
    * oldest first, top to bottom. Lines in the composer's slot that offer
    * something take the keyboard while they stand, and an offer a person
-   * invokes other than `expand` reaches their `invoke`; lines elsewhere take
+   * invokes other than `expand` reaches their `invoke`; lines in the dialog
+   * that offer something take it ahead of them. Lines elsewhere take
    * no focus and answer only the pointer, which a `grant` or a `dismiss`
    * never invokes. A drawing that throws, or returns no node binnacle can
    * lay out, and an `invoke` that throws, draw what went wrong, naming the

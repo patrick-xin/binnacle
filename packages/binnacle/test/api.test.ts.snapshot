@@ -404,7 +404,7 @@ export interface Surface {
     readonly notice?: string;
 }
 // api.d.ts
-export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-composer';
+export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-composer' | 'dialog';
 // api.d.ts
 export type Placement = {
     readonly kind: 'transcript';

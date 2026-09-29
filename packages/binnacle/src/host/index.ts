@@ -4,7 +4,7 @@ import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { CombinedAutocompleteProvider, Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
-import type { Component, Keybinding, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
+import type { Component, Keybinding, OverlayHandle, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { editorTheme } from '../ui/theme.ts'
@@ -62,6 +62,8 @@ interface Page {
   readonly composer: Component | undefined
   /** The lines placed below the composer, oldest first. */
   readonly below: readonly Component[]
+  /** The newest lines placed in the dialog, drawn over the page. */
+  readonly dialog: ScreenPane | undefined
 }
 
 /** How long a first Ctrl+C waits for a second to quit, in milliseconds. */
@@ -199,6 +201,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // place — binnacle's composer, lines, or nothing. Each lines placement in a slot is drawn by a pane of its own, kept
   // while it stands there, so one placement in two slots is named by each slot when it goes wrong.
   const linesPanes = new Map<Slot, Map<Placement, ScreenPane>>()
+  let dialog: OverlayHandle | undefined
   /**
    * The pane that draws a lines placement in its slot, kept for as long as the placement stands there.
    * @param slot - where it is placed, to name it by.
@@ -223,13 +226,15 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   function arrange(): Page {
     const lines = (slot: Slot): readonly ScreenPane[] => registrations.placed(slot).flatMap(placement => placement.kind === 'lines' ? [linesPane(slot, placement)] : [])
     const inComposer = registrations.placed('composer').at(-1)
+    const inDialog = registrations.placed('dialog').at(-1)
     const arranged: Page = {
       transcript: registrations.placed('transcript').at(-1)?.kind === 'transcript',
       above: lines('above-composer'),
       composer: inComposer === undefined ? undefined : inComposer.kind === 'lines' ? linesPane('composer', inComposer) : composer,
       below: lines('below-composer'),
+      dialog: inDialog?.kind === 'lines' ? linesPane('dialog', inDialog) : undefined,
     }
-    const standing = new Set<Component | undefined>([...arranged.above, arranged.composer, ...arranged.below])
+    const standing = new Set<Component | undefined>([...arranged.above, arranged.composer, ...arranged.below, arranged.dialog])
     for (const [slot, panes] of linesPanes) {
       for (const [placement, pane] of panes) if (!standing.has(pane)) panes.delete(placement)
       if (panes.size === 0) linesPanes.delete(slot)
@@ -243,12 +248,20 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
    * @param on - the screen.
    */
   function stack(on: TuiMainScreen | TuiAltScreen): void {
+    unshowDialog()
     on.clear()
     if (page.transcript) on.addChild(transcript)
     for (const component of around()) on.addChild(component)
     if (on instanceof TuiAltScreen) readOn(on)
     // Typing reaches binnacle's composer where it is placed, and nothing where it is not.
     on.setFocus(page.composer === composer ? composer : null)
+    // The dialog takes no focus of pi-tui's: the host hands it keys, ahead of the composer's seat, as it hands the seat.
+    if (page.dialog !== undefined) dialog = on.showOverlay(page.dialog, { anchor: 'center', width: '80%', maxHeight: '80%', nonCapturing: true })
+  }
+  /** Take the dialog off the screen it is shown on; clearing a screen leaves its overlays standing. */
+  function unshowDialog(): void {
+    dialog?.hide()
+    dialog = undefined
   }
   /** Close the placed screen that is open: the transcript returns to its place, and one opened from the main screen returns there. */
   function closeScreen(): void {
@@ -395,8 +408,11 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // scrolling, search and selection are the alternate screen's own, and the composer below stays live.
   const keys = (data: string): TuiInputListenerResult => {
     // Lines in the composer's seat that offer something take the keyboard while they stand, ahead of what is being
-    // read, their first offer focused as they take it: what they ask is the person's to answer next.
-    const seat = page.composer instanceof ScreenPane && page.composer.offering ? page.composer : undefined
+    // read, their first offer focused as they take it: what they ask is the person's to answer next. A dialog that
+    // offers something takes it ahead of the seat, as it stands over the page.
+    const seat = page.dialog?.offering === true
+      ? page.dialog
+      : page.composer instanceof ScreenPane && page.composer.offering ? page.composer : undefined
     if (seat !== undefined && !seat.focused) seat.handleKey({ kind: 'key', binding: 'focus.next' })
     const reading = seat ?? (open === undefined ? (page.transcript ? transcript : undefined) : open.pane)
     const resolved = table.resolve(data, reading?.focused ?? false, seat === undefined && open !== undefined)
@@ -461,6 +477,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   const leave = (): void => {
     if (tui instanceof TuiMainScreen) left = tui.captureRenderState()
+    unshowDialog()
     tui.stop({ preserveScreen: true })
     tui.setFocus(null)
     tui.clear()

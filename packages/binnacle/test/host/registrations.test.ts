@@ -404,7 +404,7 @@ test('a transcript or composer placed outside its own slot, or lines in the tran
 
 test('a slot or a placement binnacle has not is refused, naming what it has', () => {
   const { registrations } = surface()
-  assert.throws(() => registrations.place('footer' as never, { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(footer): no such slot; the slots are transcript, above-composer, composer and below-composer' })
+  assert.throws(() => registrations.place('footer' as never, { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(footer): no such slot; the slots are transcript, above-composer, composer, below-composer and dialog' })
   assert.throws(() => registrations.place('below-composer', { kind: 'status' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
   assert.throws(() => registrations.place('below-composer', { kind: 'lines' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
   assert.throws(() => registrations.place('composer', { kind: 'composer' } as never), { message: 'binnacle.place(composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })

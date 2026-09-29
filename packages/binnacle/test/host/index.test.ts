@@ -26,7 +26,7 @@ import { called, seed as seedEvent } from '../support/events.ts'
 import { FakeClock } from '../support/clock.ts'
 import { FakeSession } from '../support/session.ts'
 import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
-import type { Node } from '../../src/api.ts'
+import type { Node, Placement } from '../../src/api.ts'
 import type { Fact } from '../../src/facts/adapt.ts'
 
 /** A person's line, as dsh logs it. */
@@ -1365,6 +1365,62 @@ test('lines in the composer\'s seat that offer something take the keyboard: ente
   terminal.type('\r')
   assert.deepEqual(invoked, ['allow grant', 'reject dismiss'])
   assert.deepEqual(session.sent, [])
+})
+
+test('lines placed in the dialog slot are drawn over the page, centred at four fifths of its width, and disposing them gives the page back', async () => {
+  const terminal = new XtermTerminal(40, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.place('dialog', { kind: 'lines', draw: () => ({ kind: 'ask', title: 'note', child: { kind: 'text', text: 'hello' } }) }) } })
+  await until(async () => (await terminal.altScreen()).slice(3, 6).join('\n') === [
+    '    ╭─ note ───────────────────────╮',
+    '    │ hello                        │',
+    '    ╰──────────────────────────────╯',
+  ].join('\n'))
+  await (await author).dispose()
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('hello')))
+})
+
+test('a dialog that offers something takes the keyboard ahead of the composer\'s seat, and gives it back once disposed', async () => {
+  const terminal = new XtermTerminal(40, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const invoked: string[] = []
+  const offering = (id: string): Extract<Placement, { readonly kind: 'lines' }> => ({
+    kind: 'lines',
+    draw: () => ({ kind: 'offer', id, affordances: [{ kind: 'grant', label: id }], child: { kind: 'text', text: id } }),
+    invoke: (region) => { invoked.push(region) },
+  })
+  await ctx.plugin({ name: 'seat', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.place('composer', offering('seated')) } })
+  const dialog = ctx.plugin({ name: 'dialog', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.place('dialog', offering('asked')) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('asked')))
+  terminal.type('\r')
+  assert.deepEqual(invoked, ['asked'])
+  await (await dialog).dispose()
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('asked')))
+  terminal.type('\r')
+  assert.deepEqual(invoked, ['asked', 'seated'])
+})
+
+test('the dialog stands over whichever screen the person switches to, and answers there', async () => {
+  const terminal = new XtermTerminal(40, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const invoked: string[] = []
+  await ctx.plugin({ name: 'dialog', inject: ['binnacle'], apply: (plugin: Context) => {
+    plugin.binnacle.place('dialog', { kind: 'lines', draw: () => ({ kind: 'offer', id: 'asked', affordances: [{ kind: 'grant' }], child: { kind: 'text', text: 'asked' } }), invoke: (region) => { invoked.push(region) } })
+  } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row === '    asked'))
+  terminal.type('\x14')
+  await until(async () => !(await terminal.onAlternateScreen()) && (await terminal.mainScreen()).some(row => row.startsWith('    asked')))
+  terminal.type('\r')
+  assert.deepEqual(invoked, ['asked'])
+  terminal.type('\x14')
+  await until(async () => (await terminal.onAlternateScreen()) && (await terminal.altScreen()).some(row => row === '    asked'))
 })
 
 /**
