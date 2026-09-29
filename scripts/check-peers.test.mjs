@@ -1,9 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkPeers } from './check-peers.mjs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { checkPeers, servicesProvidedBy } from './check-peers.mjs'
 
 const manifest = (fields = {}) => ({ name: 'binnacle', ...fields })
-const check = ({ files = [], patch = '', ...fields } = {}) => checkPeers({ manifest: manifest(fields), files, patch })
+const check = ({ files = [], patch = '', services, provided, ...fields } = {}) => checkPeers({ manifest: manifest(fields), files, patch, services, provided })
 
 test('a package whose code is imported, declared nowhere, is named with its file', () => {
   const files = [{ path: 'src/a.ts', text: "import { x } from '@deepseek-ai/dsh-session/surface'\n" }]
@@ -55,4 +58,68 @@ test('a row naming a subpath of binnacle is binnacle\'s own, and a row naming an
 test('problems come in a stable order, sorted, however the files and lists are ordered', () => {
   const files = [{ path: 'src/b.ts', text: "import 'z'\nimport 'a'\n" }]
   assert.deepEqual(check({ files }).map(line => line.split(' ')[0]), ['a', 'z'])
+})
+
+const INJECT = "export const inject = ['binnacle', 'tools'] satisfies (keyof Context)[]\n"
+const injecting = { path: 'src/plugins/tool-cards/index.ts', text: INJECT }
+
+test('a service an inject names, with no row in the services table, is told to name its provider there', () => {
+  assert.deepEqual(check({ files: [injecting] }), [
+    "tools is named by src/plugins/tool-cards/index.ts's inject, but the services table in layers.json has no row for it — name the package that provides it there",
+  ])
+})
+
+const provides = table => name => table[name] === undefined ? undefined : new Set(table[name])
+const withServices = (fields = {}) => check({ files: [injecting], services: { tools: '@scope/tools' }, provided: provides({ '@scope/tools': ['tools'] }), ...fields })
+
+test('a provider of a service an inject names is a peerDependency, told with the service and the module', () => {
+  assert.deepEqual(withServices({ devDependencies: { '@scope/tools': '1' } }), [
+    "@scope/tools provides tools, which src/plugins/tool-cards/index.ts's inject names, but is not a peerDependency — add it to peerDependencies, for the dsh install must provide it",
+  ])
+  assert.deepEqual(withServices({ peerDependencies: { '@scope/tools': '1' } }), [])
+})
+
+test('a services row naming a package whose types do not augment Context with the service is refused', () => {
+  const peerDependencies = { '@scope/tools': '1' }
+  assert.deepEqual(withServices({ peerDependencies, provided: provides({ '@scope/tools': ['other'] }) }), [
+    '@scope/tools is named in the services table of layers.json as the provider of tools, but its types do not declare tools on Context — name the package that does',
+  ])
+  assert.deepEqual(withServices({ peerDependencies, provided: provides({}) }), [
+    '@scope/tools is named in the services table of layers.json as the provider of tools, but it is not installed to read — add it to devDependencies',
+  ])
+})
+
+test('a services row no module names is held to upstream too', () => {
+  assert.deepEqual(check({ services: { ghost: '@scope/a' }, provided: provides({ '@scope/a': [] }) }), [
+    '@scope/a is named in the services table of layers.json as the provider of ghost, but its types do not declare ghost on Context — name the package that does',
+  ])
+})
+
+const install = files => {
+  const dir = mkdtempSync(join(tmpdir(), 'check-peers-'))
+  for (const [name, text] of Object.entries(files)) {
+    mkdirSync(join(dir, name, '..'), { recursive: true })
+    writeFileSync(join(dir, name), text)
+  }
+  return dir
+}
+
+test('the services a package provides are the Context members its types, and the files they reach, declare', () => {
+  const dir = install({
+    'package.json': JSON.stringify({ name: 'p', exports: { '.': { types: './lib/index.d.ts' } } }),
+    'lib/index.d.ts': [
+      "import type { Sub } from './sub.ts'",
+      "export * from './more.ts'",
+      "declare module '@deepseek-ai/cordis' {",
+      '  interface Context { agents: Sub; agentDefaultModel?: Sub }',
+      '  interface Events { notAService: Sub }',
+      '}',
+      "declare module 'elsewhere' { interface Context { notThisEither: 1 } }",
+      'interface Context { notInAModule: 1 }',
+    ].join('\n'),
+    'lib/more.d.ts': "declare module '@deepseek-ai/cordis' { interface Context { tools: 1 } }",
+    'lib/sub.d.ts': "export type Sub = 1\ndeclare module '@deepseek-ai/cordis' { interface Context { fromSub: 1 } }",
+    'lib/unreached.d.ts': "declare module '@deepseek-ai/cordis' { interface Context { unreached: 1 } }",
+  })
+  assert.deepEqual([...servicesProvidedBy(dir)].toSorted(), ['agentDefaultModel', 'agents', 'fromSub', 'tools'])
 })
