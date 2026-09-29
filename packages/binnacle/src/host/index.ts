@@ -20,6 +20,7 @@
 import { Command, Option } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
+import { createScope } from '@deepseek-ai/dsh-scope'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
 import type { Component, Keybinding, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
@@ -41,6 +42,7 @@ import { trajectory } from '../plugins/trajectory/index.ts'
 import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
+import type { Scope } from '@deepseek-ai/dsh-scope'
 
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
@@ -460,8 +462,6 @@ export function apply(ctx: Context): void {
   // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
   ctx.plugin(transcriptFeature)
   ctx.plugin(composerFeature)
-  ctx.plugin(approvals)
-  ctx.plugin(questions)
   ctx.plugin(statusLine)
   ctx.plugin(toolCards)
   ctx.plugin(trajectory)
@@ -477,7 +477,13 @@ export function apply(ctx: Context): void {
   let disposed = false
   let session: OpenedSession | undefined
   let release: (() => void) | undefined
+  // Approvals and Questions answer for the session's agent alone: applied on a scope of that agent once the session opens, so another agent's ask never reaches them and fails closed elsewhere (`dsh:packages/core/scope/src/index.ts#createScope`).
+  let agentScope: Scope | undefined
   const close = async (): Promise<void> => {
+    // The approvals scope goes first, so a request still standing is answered and its card unseated before the terminal is given back — the session is left printed without it.
+    const scope = agentScope
+    agentScope = undefined
+    await scope?.dispose()
     release?.()
     release = undefined
     const open = session
@@ -507,6 +513,9 @@ export function apply(ctx: Context): void {
       quit()
       return
     }
+    agentScope = createScope(ctx, opened.agent)
+    void agentScope.ctx.plugin(approvals)
+    void agentScope.ctx.plugin(questions)
     release = takeTerminal(opened, registrations, quit, mode)
   }
   const cancel = ready.onReady(() => {

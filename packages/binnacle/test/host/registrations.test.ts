@@ -5,7 +5,7 @@ import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { KeyId } from '@earendil-works/pi-tui'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
-import type { Fact, Node } from '../../src/api.ts'
+import type { AffordanceKind, Fact, Node, Placement } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
 import { ScreenPane } from '../../src/panes/screen.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
@@ -473,4 +473,11 @@ test('what is no record of binding ids is refused where it is registered, saying
   assert.throws(() => registrations.keys(null as never), { message: 'binnacle.keys: bindings is null; bind a record from binding ids to keys, such as { \'binnacle.quit\': \'ctrl+q\' }' })
   assert.throws(() => registrations.keys('ctrl+q' as never), { message: 'binnacle.keys: bindings is ctrl+q; bind a record from binding ids to keys, such as { \'binnacle.quit\': \'ctrl+q\' }' })
   assert.deepEqual(registrations.bindings, {})
+})
+
+test('an author types what their lines are invoked with from the author API alone', () => {
+  const heard: AffordanceKind[] = []
+  const placement: Placement = { kind: 'lines', draw: () => ({ kind: 'blank' }), invoke: (_region, affordance) => { heard.push(affordance) } }
+  if (placement.kind === 'lines') placement.invoke?.('reject', 'dismiss')
+  assert.deepEqual(heard, ['dismiss'])
 })
