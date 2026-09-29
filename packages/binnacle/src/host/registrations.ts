@@ -9,6 +9,7 @@
  * which a `#private` field refuses as its receiver.
  */
 
+import type { Fact } from '../facts/adapt.ts'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
@@ -34,6 +35,14 @@ export interface GrantedSession {
    * @returns whether a command ran.
    */
   command(line: string): Promise<boolean>
+  /**
+   * Follow a session's facts: those it logged so far, then each as it is logged, adapted as binnacle adapts its own.
+   * @param sessionId - the session's id.
+   * @param listener - called with each fact, in log order and once each.
+   * @returns once caught up, a function that stops following.
+   * @throws when the session cannot be observed, saying why.
+   */
+  follow(sessionId: string, listener: (fact: Fact) => void): Promise<() => void>
 }
 
 /** The slots of the page, top to bottom. */
@@ -164,6 +173,20 @@ export class RegistrationService extends Service implements Registrations {
     const session = this.granted
     if (session === undefined) throw new Error('binnacle.command: no session is open; a command can be run once the session opens, and until it closes')
     return await session.command(line)
+  }
+
+  /** @inheritDoc */
+  async follow(sessionId: string, listener: (fact: Fact) => void): Promise<() => void> {
+    const session = this.granted
+    if (session === undefined) throw new Error('binnacle.follow: no session is open; a session can be followed once the session opens, and until it closes')
+    // Following is an effect of the caller's fiber, as a registration is: disposing the plugin stops it, and so does
+    // the function handed back, whichever comes first. It is taken once the followed session is caught up.
+    let stop: (() => void) | undefined
+    let stopped = false
+    const dispose = this.ctx.effect(() => () => { stopped = true; stop?.() }, 'binnacle.follow')
+    stop = await session.follow(sessionId, (fact) => { if (!stopped) listener(fact) })
+    if (stopped) stop()
+    return dispose
   }
 
   /**

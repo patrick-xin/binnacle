@@ -462,7 +462,7 @@ test('a line sent before the session opens, or after it closes, is refused, sayi
   const { registrations } = surface()
   assert.throws(() => registrations.send('hello'), { message: 'binnacle.send: no session is open; a line can be sent once the session opens, and until it closes' })
   const sent: string[] = []
-  const close = registrations.open({ send: (text) => { sent.push(text) }, command: async () => false })
+  const close = registrations.open({ send: (text) => { sent.push(text) }, command: async () => false, follow: async () => () => {} })
   registrations.send('hello')
   assert.deepEqual(sent, ['hello'])
   close()
@@ -480,7 +480,7 @@ test('a line run as a command before the session opens is refused, saying so; wh
   const { registrations } = surface()
   await assert.rejects(registrations.command('/compact'), { message: 'binnacle.command: no session is open; a command can be run once the session opens, and until it closes' })
   const run: string[] = []
-  const close = registrations.open({ send: () => {}, command: async (line) => { run.push(line); return line === '/compact' } })
+  const close = registrations.open({ send: () => {}, command: async (line) => { run.push(line); return line === '/compact' }, follow: async () => () => {} })
   assert.equal(await registrations.command('/compact'), true)
   assert.equal(await registrations.command('/nothing'), false)
   assert.deepEqual(run, ['/compact', '/nothing'])
@@ -492,4 +492,29 @@ test('an author types what their lines are invoked with from the author API alon
   const placement: Placement = { kind: 'lines', draw: () => ({ kind: 'blank' }), invoke: (_region, affordance) => { heard.push(affordance) } }
   if (placement.kind === 'lines') placement.invoke?.('reject', 'dismiss')
   assert.deepEqual(heard, ['dismiss'])
+})
+
+test('following a session before one is open is refused, saying so; while one is open it hands that session\'s facts, and stops as the plugin goes', async () => {
+  const { registrations, author } = surface()
+  await assert.rejects(registrations.follow('child-1', () => {}), { message: 'binnacle.follow: no session is open; a session can be followed once the session opens, and until it closes' })
+  // The host's session, which hands what the followed session logged so far, then each fact as it is logged.
+  const heard = new Set<(fact: Fact) => void>()
+  const followed: string[] = []
+  registrations.open({
+    send: () => {},
+    command: async () => false,
+    follow: async (id, listener) => {
+      followed.push(id)
+      heard.add(listener)
+      listener(prompt)
+      return () => { heard.delete(listener) }
+    },
+  })
+  const seen: Fact[] = []
+  const fiber = await author((plugin) => { void plugin.binnacle.follow('child-1', (fact) => { seen.push(fact) }) })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.deepEqual(followed, ['child-1'])
+  assert.deepEqual(seen, [prompt])
+  await fiber.dispose()
+  assert.equal(heard.size, 0, 'disposing the plugin stops following')
 })

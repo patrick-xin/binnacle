@@ -165,3 +165,39 @@ test('where the session stands is heard again as an agent it delegated to flips,
   emit('session/event', stranger, { type: 'turn/start' })
   assert.equal(heard, 2, 'another session logging is not')
 })
+
+/**
+ * An event another session logged, at its place in the log.
+ * @param at - its seq.
+ * @returns the event.
+ */
+const event = (at: number): SessionEvent => ({ type: 'turn/start', seq: at, time: 0, data: { turn: 1 } }) as unknown as SessionEvent
+
+test('observing another session hands what it logged so far, then each event as it is logged, once each, until stopped', async () => {
+  const ctx = new Context()
+  let released = 0
+  // dsh's session query: one cut of the child's log, a lease the observer releases.
+  ctx.provide('sessionQuery', {
+    observeSession: async (id: string) => {
+      if (id !== 'child-1') throw new Error(`no session ${id}`)
+      return { events: [event(0), event(1)], cursor: 1, [Symbol.dispose]: () => { released++ } }
+    },
+  } as never)
+  ctx.provide('sessionProjections', { snapshot: () => ({ values: {} }) } as never)
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('commands', {} as never)
+  ctx.provide('agents', { create: async () => ({ agent: { session: {}, status: 'idle' }, dispose: async () => {} }) } as never)
+  const session = await openSession(ctx)
+  const seen: number[] = []
+  const stop = await session.observe('child-1', (observed) => { seen.push(observed.seq) })
+  assert.equal(released, 1, 'the cut is released once read')
+  const emit = ctx.emit.bind(ctx) as (name: string, ...args: unknown[]) => void
+  emit('session/event', { id: 'child-1' }, event(1))
+  emit('session/event', { id: 'child-1' }, event(2))
+  emit('session/event', { id: 'elsewhere' }, event(3))
+  stop()
+  emit('session/event', { id: 'child-1' }, event(4))
+  // The event the cut already held is not handed twice; another session's is not the child's; after stopping, nothing.
+  assert.deepEqual(seen, [0, 1, 2])
+  await assert.rejects(session.observe('child-9', () => {}), { message: 'no session child-9' })
+})

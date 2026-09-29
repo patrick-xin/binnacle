@@ -107,14 +107,16 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
   // dsh's commands, which the row names; the host's tests fake the session, whose commands a test names, so nothing reads this.
   ctx.provide('commands', {} as never)
+  // dsh's session query, which following another session reads; the host's tests fake the session, so nothing reads this.
+  ctx.provide('sessionQuery', {} as never)
   const fiber = ctx.plugin(host)
   await fiber
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
-test('the row is named binnacle and needs the command line, the agents, the default model, the session projections and the commands', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model, the session projections, the commands and the session query', () => {
   assert.equal(host.name, 'binnacle')
-  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'])
+  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands', 'sessionQuery'])
 })
 
 test('--check opens a session on the default model once startup commits, reports it, closes it, and exits 0 drawing nothing', async () => {

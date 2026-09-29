@@ -229,6 +229,19 @@ export interface Registrations {
    * @throws when no session is open — before it opens, or after it closes — saying so.
    */
   command(line: string): Promise<boolean>
+  /**
+   * Follow a session's log — a child agent's, named in `surface.agents` — as
+   * facts: a grant, performed on dsh's session query and its live events.
+   * The listener is handed every fact the session logged so far, then each
+   * as it is logged, adapted as binnacle adapts its own session's, in log
+   * order and once each. Following stops when the returned function is
+   * called or the calling plugin is disposed, whichever comes first.
+   * @param sessionId - the session's id.
+   * @param listener - called with each fact.
+   * @returns once the session is caught up, a function that stops following.
+   * @throws when no session is open — before it opens, or after it closes — or the session cannot be observed, saying so.
+   */
+  follow(sessionId: string, listener: (fact: Fact) => void): Promise<() => void>
 }
 
 declare module '@deepseek-ai/cordis' {

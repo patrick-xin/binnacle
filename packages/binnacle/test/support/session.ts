@@ -53,6 +53,23 @@ export class FakeSession implements OpenedSession {
   }
   /** Say that what `/` offers changed, as dsh does when a command or skill comes or goes. */
   offersChanged(): void { this.#offersChanged?.() }
+  /** Other sessions' logs, by id, as a test names them: what `observe` hands, then what `logTo` adds. */
+  readonly others = new Map<string, SessionEvent[]>()
+  #observers = new Map<string, Set<(event: SessionEvent) => void>>()
+  async observe(sessionId: string, listener: (event: SessionEvent) => void): Promise<() => void> {
+    const log = this.others.get(sessionId)
+    if (log === undefined) throw new Error(`no session ${sessionId}`)
+    for (const event of log) listener(event)
+    const observers = this.#observers.get(sessionId) ?? new Set()
+    this.#observers.set(sessionId, observers)
+    observers.add(listener)
+    return () => { observers.delete(listener) }
+  }
+  /** Log an event to another session, as dsh does as a child works. */
+  logTo(sessionId: string, event: SessionEvent): void {
+    this.others.get(sessionId)?.push(event)
+    for (const observer of this.#observers.get(sessionId) ?? []) observer(event)
+  }
   async command(line: string): Promise<boolean> {
     const name = /^\/(\S+)/.exec(line)?.[1]
     if (name === undefined || !this.commands.has(name)) return false

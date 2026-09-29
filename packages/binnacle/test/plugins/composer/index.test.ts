@@ -27,6 +27,7 @@ test('a line naming no command whose session closes under it sends nothing and r
   const close = registrations.open({
     send: (text) => { sent.push(text); throw new Error('binnacle.send: no session is open') },
     command: () => new Promise<boolean>(resolve => { gate.resolve = resolve }),
+    follow: async () => () => {},
   })
 
   // What the process holds against a plugin that leaves a rejection unhandled: heard here, so the test can name it.

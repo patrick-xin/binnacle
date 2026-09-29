@@ -23,6 +23,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 // projections augment the keys a snapshot may ask for.
 import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter'
+import type { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
 // Type-only: the subagent catalog and timing projections augment the keys a snapshot may ask for.
 import type { SubagentTimingProjection } from '@deepseek-ai/dsh-subagent'
 import type { Delegated, Surface } from '../api.ts'
@@ -48,6 +49,15 @@ export interface OpenedSession {
    * @param text - what they typed.
    */
   send(text: string): void
+  /**
+   * Observe another session's log, a child agent's: the events it logged so far, then each as it is logged, in order
+   * and once each.
+   * @param sessionId - the session's id.
+   * @param listener - called with each event.
+   * @returns once caught up, a function that stops observing.
+   * @throws when dsh cannot observe the session, saying why.
+   */
+  observe(sessionId: string, listener: (event: SessionEvent) => void): Promise<() => void>
   /** Where the session stands now: the model it runs, whether a turn runs, and what dsh has measured. */
   standing(): SessionStands
   /**
@@ -156,7 +166,7 @@ function delegatedOf(
 
 /**
  * Open a session on the default model.
- * @param ctx - the row's context, carrying dsh's `agents`, `agentDefaultModel` and `sessionProjections`.
+ * @param ctx - the row's context, carrying dsh's `agents`, `agentDefaultModel`, `sessionProjections`, `commands` and `sessionQuery`.
  * @returns the open session.
  */
 export async function openSession(ctx: Context): Promise<OpenedSession> {
@@ -181,6 +191,7 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
   })
   const { session } = handle.agent
   const commands: CommandRuntime = ctx.commands
+  const query: SessionQueryEngine = ctx.sessionQuery
   return {
     model: `${selection.provider}/${selection.model}`,
     agent: handle.agent,
@@ -188,6 +199,39 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       // Drained and subscribed in one synchronous run, so no event can fall between them.
       for (const event of session.snapshotEvents()) listener(event)
       return ctx.on('session/event', (from, event) => { if (from === session) listener(event) })
+    },
+    observe: async (sessionId, listener) => {
+      // Subscribed before the cut is read, so an event logged while dsh reads it is held, not lost; each is handed once,
+      // past the last seq handed, so one the cut already held is not handed twice.
+      let last = -1
+      let caughtUp = false
+      let stopped = false
+      const held: SessionEvent[] = []
+      const hand = (event: SessionEvent): void => {
+        if (stopped || event.seq <= last) return
+        last = event.seq
+        listener(event)
+      }
+      const off = ctx.on('session/event', (from, event) => {
+        if (from.id !== sessionId) return
+        if (caughtUp) hand(event)
+        else held.push(event)
+      })
+      try {
+        // One cut of the log, from the live session or its persisted copy (`dsh:packages/session-query/session-query/src/observation.ts#SessionObservation`), released once read.
+        const observation = await query.observeSession(SessionId(sessionId), { projectionMode: 'none' })
+        try {
+          for (const event of observation.events) hand(event)
+        } finally {
+          observation[Symbol.dispose]()
+        }
+      } catch (error) {
+        off()
+        throw error
+      }
+      caughtUp = true
+      for (const event of held) hand(event)
+      return () => { stopped = true; off() }
     },
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))

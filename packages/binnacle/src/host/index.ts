@@ -49,8 +49,8 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, and its commands. Each is a key dsh declares on `Context`. */
-export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'] satisfies (keyof Context)[]
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, its commands, and the session query another session's log is read through. Each is a key dsh declares on `Context`. */
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands', 'sessionQuery'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {
@@ -389,7 +389,12 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   offer()
   const unoffer = session.onOffers(offer)
-  const closeGrants = registrations.open({ send: (text) => { session.send(text) }, command: line => session.command(line) })
+  const closeGrants = registrations.open({
+    send: (text) => { session.send(text) },
+    command: line => session.command(line),
+    // Another session's events are adapted as this session's are, by the adapters registered when each arrives.
+    follow: (id, listener) => session.observe(id, (event) => { listener(adapt(event, registrations.adapters)) }),
+  })
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
   // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()
