@@ -65,7 +65,7 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
 }
 
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
-async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, clock: { now(): number, after(ms: number, then: () => void): () => void } = new FakeClock(), selection: { readonly provider: string, readonly model: string } = { provider: 'deepseek', model: 'deepseek-v4' }) {
+async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, clock: { now(): number, after(ms: number, then: () => void): () => void } = new FakeClock()) {
   const exits: number[] = []
   const out: string[] = []
   // The launcher's readiness: every listener runs once, in one go, at the commit — as the real one does (`dsh:apps/cli/src/profile-boot.ts#createAppReady`).
@@ -95,8 +95,8 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
     },
   })
   ctx.provide('agents', {} as never)
-  // The default model the status line names, as dsh's own selection reads it; a test varies it to prove the line follows the service.
-  ctx.provide('agentDefaultModel', { currentSelection: () => selection } as never)
+  // dsh's default model, which opening a session reads; the host's tests fake the session, so nothing here varies it.
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
   const fiber = ctx.plugin(host)
   await fiber
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
@@ -1015,12 +1015,43 @@ test('out of the box, the line under the composer names the model the session ru
   assert.ok(terminal.written.includes('\x1b[90mdeepseek/deepseek-v4\x1b[39m'), 'the model is drawn in the muted tone')
 })
 
-test('the line names whatever dsh\'s default model selects, not a model of binnacle\'s own', async () => {
+test('the line names the model the session runs, and follows it as the session stands elsewhere', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
-  const { commit } = await mount([], session, async () => session, terminal, async () => {}, new FakeClock(), { provider: 'moonshot', model: 'kimi-k2' })
+  const { commit } = await mount([], session, async () => session, terminal)
   commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  session.stands = { model: 'moonshot/kimi-k2', running: true }
+  session.standsChanged()
   await until(async () => (await terminal.altScreen()).at(-1) === 'moonshot/kimi-k2')
+})
+
+test('the line names the tokens the session used and the share of its context, each as it is measured', async () => {
+  const terminal = new XtermTerminal(60, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  session.stands = { model: 'deepseek/deepseek-v4', running: false, usage: { input: 12_000, output: 400, cacheRead: 0 } }
+  session.standsChanged()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 12.4k tokens')
+  session.stands = { model: 'deepseek/deepseek-v4', running: false, usage: { input: 12_000, output: 400, cacheRead: 0 }, context: { used: 12_400, window: 32_768 } }
+  session.standsChanged()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 12.4k tokens · 38% of context')
+})
+
+test('a notice stands in the line\'s place while one stands, and the line returns once it goes', async () => {
+  const terminal = new XtermTerminal(50, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  terminal.type('\x03')
+  await until(async () => (await terminal.altScreen()).at(-1) === 'ctrl+c again to quit')
+  assert.ok(terminal.written.includes('\x1b[90mctrl+c again to quit\x1b[39m'), 'the notice is drawn in the muted tone')
+  clock.advance(3_000)
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
 })
 
 test('a quit key a plugin rebinds quits, and the key it had no longer does', async () => {
@@ -1242,48 +1273,6 @@ test('the key a person binds to dismiss rejects an approval while allow once has
   terminal.type('\x1b[19~')
   await until(() => settled !== undefined)
   assert.equal(settled, 'rejected')
-})
-
-test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
-  const terminal = new XtermTerminal(40, 8)
-  const session = new FakeSession([prompt(1, 'fix the build')])
-  const selection = { provider: 'first', model: 'old' }
-  const { commit } = await mount([], session, async () => session, terminal, async () => {}, new FakeClock(), selection)
-  selection.provider = 'next'
-  selection.model = 'new'
-  commit()
-  await until(async () => (await terminal.altScreen()).at(-1) === 'next/new')
-})
-
-test('a change of the default after the session opened does not move the line, for the session still runs what it opened on', async () => {
-  const terminal = new XtermTerminal(40, 8)
-  const session = new FakeSession([prompt(1, 'fix the build')])
-  const selection = { provider: 'deepseek', model: 'deepseek-v4' }
-  const { commit } = await mount([], session, async () => session, terminal, async () => {}, new FakeClock(), selection)
-  commit()
-  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
-  selection.provider = 'moonshot'
-  selection.model = 'kimi-k2'
-  session.log(prompt(2, 'and the tests'))
-  await until(async () => (await terminal.altScreen()).some(row => row.includes('and the tests')))
-  assert.equal((await terminal.altScreen()).at(-1), 'deepseek/deepseek-v4')
-})
-
-test('a change of the default while the session is opening does not move the line, for the session runs what it opened on', async () => {
-  const terminal = new XtermTerminal(40, 8)
-  const session = new FakeSession([prompt(1, 'fix the build')])
-  const selection = { provider: 'first', model: 'old' }
-  let opened: (() => void) | undefined
-  // The opening stands for openSession: it begins at the commit of startup, reading the selection on that tick, and holds while the agent is created.
-  const opening = new Promise<OpenedSession>(resolve => { opened = () => resolve(session) })
-  const { commit } = await mount([], session, () => opening, terminal, async () => {}, new FakeClock(), selection)
-  commit()
-  await settle()
-  selection.provider = 'next'
-  selection.model = 'new'
-  opened?.()
-  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  assert.equal((await terminal.altScreen()).at(-1), 'first/old')
 })
 
 test('lines are handed where the session stands, and are drawn again as it changes', async () => {
