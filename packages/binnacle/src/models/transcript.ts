@@ -1,10 +1,12 @@
 import type { Fact } from '../facts/adapt.ts'
 
+/** A fact of one kind. */
 type FactOf<K extends Fact['kind']> = Extract<Fact, { readonly kind: K }>
 
-// Distributed so each kind narrows its fact.
+/** An entry holding one fact, its kind the fact's: distributed so each kind narrows its fact. */
 type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, readonly fact: FactOf<K> } : never
 
+/** The kinds of fact that stand as an entry of their own, never paired with another. */
 type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'authored' | 'unknown' | 'quiet'
 
 /**

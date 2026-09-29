@@ -225,6 +225,7 @@ export interface Registrations {
   agent(): Agent
 }
 
+/** Every Cordis context carries `ctx.binnacle` for an author whose plugin imports the author API: the registrations, once the host provides them. */
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** What an author registers with the surface: `ctx.binnacle`, typed for anything that imports the author API, as the host provides it. */

@@ -31,3 +31,17 @@ test('what an author reads is held: every name the entry exports, and each name 
   }
   assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ['src/api.ts:4: Bare', 'src/ui/node.ts:1: Kept'])
 })
+
+test('a declaration an author reaches through another is held too, through the files it is imported from, and nothing it does not reach', () => {
+  const files = {
+    'src/api.ts': `export type { Node } from './ui/node.ts'\n`,
+    'src/ui/node.ts': `import type { Tone } from './theme.ts'\n/** Doc. */\nexport type Node = { span: Span, tone: Tone }\ntype Span = string\ntype Unreached = number\n`,
+    'src/ui/theme.ts': `export type Tone = 'dim'\n`,
+  }
+  assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ['src/ui/node.ts:4: Span', 'src/ui/theme.ts:1: Tone'])
+})
+
+test('a module augmentation an author reaches is held: ctx.binnacle is what every author reads', () => {
+  const files = { 'src/api.ts': `/** Doc. */\nexport interface Registrations {}\ndeclare module '@deepseek-ai/cordis' {\n  interface Context { binnacle: Registrations }\n}\n` }
+  assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ["src/api.ts:3: declare module '@deepseek-ai/cordis'"])
+})
