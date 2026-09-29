@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import type { Events } from '@deepseek-ai/cordis'
+import { CommandId } from '@deepseek-ai/dsh-commands'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -345,6 +346,18 @@ const returned = (seq: number, callSeq: number, text: string): SessionEvent<'too
   data: { turn: 1, step: 1, message: { role: 'tool', id: MessageId(`m${seq}`), source: { kind: 'tool', callId: ToolCallId(`c${callSeq}`) }, toolCallId: ToolCallId(`c${callSeq}`), content: [{ type: 'text', text }] } },
 })
 
+/** A command that ran, as dsh logs it: log-only, no turn around it. */
+const ran = (seq: number, commandId: string, name: string): SessionEvent<'command/run'> => ({
+  type: 'command/run', seq: SessionSeq(seq), time: seq,
+  data: { commandId: CommandId(commandId), name, args: '', source: { kind: 'user' } },
+})
+
+/** The done that settled a command, as dsh logs it. */
+const done = (seq: number, commandId: string, text: string): SessionEvent<'command/done'> => ({
+  type: 'command/done', seq: SessionSeq(seq), time: seq,
+  data: { commandId: CommandId(commandId), kind: 'success', text },
+})
+
 /** Twelve lines a person sent, taller together than the terminal. */
 const twelve = Array.from({ length: 12 }, (_, index) => prompt(index + 1, `p${index + 1}`))
 
@@ -367,6 +380,26 @@ test('--tui-mode regular prints the session under what the shell printed, and ne
   assert.equal(shown[0], '$ dsh --profile binnacle')
   assert.deepEqual(shown.filter(row => row.startsWith(' › ')), twelve.map((_, index) => ` › p${index + 1}`))
   assert.deepEqual(shown.filter(row => /read|the file|running|author/.test(row)), ['● read {}', 'the file', 'drawn by an author'])
+})
+
+test('on the main screen, a command run between turns draws once it settles, its result in place of running…, though no turn wraps it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  terminal.write('$ dsh --profile binnacle\r\n')
+  const session = new FakeSession([
+    { type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } },
+    prompt(2, 'fix the build'),
+    { type: 'turn/end', seq: SessionSeq(3), time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
+  ])
+  const { commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('fix the build')))
+  session.log(ran(4, 'cmd-1a2b3c4d-1', 'compact'))
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('running…')))
+  session.log(done(5, 'cmd-1a2b3c4d-1', 'compacted: 12 messages'))
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('compacted: 12 messages')))
+  const shown = await terminal.mainScreen()
+  assert.equal(shown.some(row => row.includes('running…')), false)
+  assert.ok(shown.some(row => row === '/compact'), 'the line the person typed heads the entry')
 })
 
 test('ctrl+t switches screens both ways, and what is typed, what every entry drew, and ctrl+c come along', async () => {

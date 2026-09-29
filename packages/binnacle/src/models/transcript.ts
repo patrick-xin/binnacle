@@ -116,10 +116,12 @@ export function fold(model: Transcript, fact: Fact): Transcript {
 
 /**
  * How many entries, oldest first and across turns, nothing later in the log
- * can change: every one before a call still waiting for its result, an
- * approval still waiting for its decision, or a command still running, in a
- * turn still running. Only the last turn is ever folded into, so every turn
- * before it has settled whole, and so has the last once it ends.
+ * can change: every one before a call still waiting for its result or an
+ * approval still waiting for its decision in a turn still running, or before
+ * a command still running — a command dsh logs with no turn around it
+ * (`dsh:packages/interaction/commands/src/index.ts`), so one that ran while
+ * the session idled waits in a turn already ended. Only the last turn is
+ * ever folded into, so every turn before it has settled whole.
  * @param model - the transcript so far.
  * @returns a count of entries, taken in log order.
  */
@@ -127,7 +129,10 @@ export function settled(model: Transcript): number {
   const last = model.turns.at(-1)
   const before = model.turns.slice(0, -1).reduce((count, turn) => count + turn.entries.length, 0)
   if (last === undefined) return 0
-  const waiting = last.ending === undefined ? last.entries.findIndex(entry => (entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined) || (entry.kind === 'command' && entry.done === undefined)) : -1
+  // A call its turn left, and an approval its turn outlived, have settled as they stand; a command still running has not,
+  // wherever it sits, for its done is still to come and will change the entry.
+  const waiting = last.entries.findIndex(entry => (entry.kind === 'command' && entry.done === undefined)
+    || (last.ending === undefined && ((entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined))))
   return before + (waiting === -1 ? last.entries.length : waiting)
 }
 

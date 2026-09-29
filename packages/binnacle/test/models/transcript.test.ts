@@ -153,6 +153,18 @@ test('a command still running holds back settling, as an approval still waiting 
   assert.equal(settled(transcript([...facts, doneFact(5, 24, 'cmd-1a2b3c4d-1', 'success', 'compacted')])), 3)
 })
 
+test('a command still running holds back settling in a turn that has ended, for dsh logs commands with no turn around them', () => {
+  const facts: Fact[] = [
+    start(1, 1),
+    prompt,
+    { kind: 'turn', seq: 3, time: 3, turn: 1, phase: 'end', ending: 'completed' },
+    runFact(4, 40, 'cmd-1a2b3c4d-1', 'compact'),
+  ]
+  // The command ran while the session idled, past its last turn's end: it has not settled, for its done will change the entry.
+  assert.equal(settled(transcript(facts)), 1)
+  assert.equal(settled(transcript([...facts, doneFact(5, 50, 'cmd-1a2b3c4d-1', 'success', 'compacted')])), 2)
+})
+
 test('a prompt in a turn that already holds one steered it; the turn\'s first prompt, and one before any turn, did not', () => {
   const steer = promptFact(8, 30, 'use pnpm')
   const facts: Fact[] = [
