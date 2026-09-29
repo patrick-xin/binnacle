@@ -45,7 +45,7 @@ export const BINNACLE_BINDINGS = {
   'binnacle.focusPrevious': { defaultKeys: 'up', description: 'focus the previous thing that offers something' },
   'binnacle.primary': { defaultKeys: 'enter', description: 'do what the focused thing offers first' },
   'binnacle.stepOut': { defaultKeys: 'escape', description: 'give the keyboard back to the composer' },
-  'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'quit' },
+  'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'stop a running turn; pressed twice, quit' },
   'binnacle.switchScreens': { defaultKeys: 'ctrl+t', description: 'switch screens' },
   'binnacle.interrupt': { defaultKeys: 'escape', description: 'interrupt the running turn, while nothing has focus' },
 } as const satisfies KeybindingDefinitions

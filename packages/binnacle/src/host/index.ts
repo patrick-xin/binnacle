@@ -123,7 +123,7 @@ function keysHelp(): string {
 function surfaceCommand(chosen: (mode: Mode) => void): Command {
   return new Command()
     .name('dsh --profile binnacle')
-    .description('Open a terminal session with an agent. Ctrl+T switches screens; Ctrl+C quits.')
+    .description('Open a terminal session with an agent. Ctrl+T switches screens; Ctrl+C stops a running turn, and twice quits.')
     .helpOption('-h, --help', 'show this help')
     .addHelpText('after', `\n${keysHelp()}`)
     .option('--check', 'open a session on the default model, report it, close it, and exit, drawing nothing')

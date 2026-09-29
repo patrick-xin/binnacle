@@ -1224,6 +1224,12 @@ test('a key a plugin binds to expand opens the focused fold, and one bound to co
   await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
 })
 
+test('--help says Ctrl+C stops a running turn and quits only when pressed twice', async () => {
+  const { out } = await mount(['--help'])
+  assert.match(out.join(''), /Ctrl\+C stops a\s+running turn, and twice quits\./)
+  assert.match(out.join(''), /\n  ctrl\+c  stop a running turn; pressed twice, quit\n/)
+})
+
 test('--help names each affordance\'s binding, unbound until a person binds it', async () => {
   const { out } = await mount(['--help'])
   assert.match(out.join(''), /  \(unbound\)  copy the focused thing\n/)
