@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { CommandId } from '@deepseek-ai/dsh-commands'
+import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -33,9 +34,9 @@ test('a kind no adapter knows is an unknown fact, carrying its type and the raw 
 })
 
 test('a kind named unread is left to the fallback on purpose: an unknown fact, as a kind dsh does not know is', () => {
-  // `compaction/end`'s declaration lives in a dsh package binnacle does not name, so it is not on the union the adapter is typed against — though the run-time set of dsh's kinds counts it, which is what the table is held to.
-  const event = { type: 'compaction/end' as string, seq: SessionSeq(7), time: 1_500, data: {} } as SessionEvent
-  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 7, time: 1_500, type: 'compaction/end', record: event })
+  // `llm/retry`'s declaration lives in a dsh package binnacle does not name, so it is not on the union the adapter is typed against — though the run-time set of dsh's kinds counts it, which is what the table is held to.
+  const event = { type: 'llm/retry' as string, seq: SessionSeq(7), time: 1_500, data: {} } as SessionEvent
+  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 7, time: 1_500, type: 'llm/retry', record: event })
 })
 
 test('an event of a quiet kind is a quiet fact, carrying its type and the event for a view an author registers for the kind', () => {
@@ -230,6 +231,79 @@ test('an approval\'s decision is a fact carrying the id of its ask and the outco
     data: { id: ApprovalRequestId('a1'), outcome: 'rejected' },
   }
   assert.deepEqual(adapt(event), { kind: 'decided', seq: 11, time: 2_050, id: ApprovalRequestId('a1'), outcome: 'rejected' })
+})
+
+test('a compaction\'s start is read as a fact carrying dsh\'s id of it, which joins its summary and its end', () => {
+  const event: SessionEvent<'compaction/start'> = {
+    type: 'compaction/start', seq: SessionSeq(20), time: 3_000,
+    data: { compactionId: CompactionId('cmp-1'), turn: 1 },
+  }
+  assert.deepEqual(adapt(event), { kind: 'start', seq: 20, time: 3_000, compactionId: CompactionId('cmp-1') })
+})
+
+test('a compaction\'s summary is read as a fact carrying how many items and about how many tokens it shadowed, and the summary itself', () => {
+  const event: SessionEvent<'compaction/summary'> = {
+    type: 'compaction/summary', seq: SessionSeq(21), time: 3_100,
+    data: {
+      compactionId: CompactionId('cmp-1'),
+      summary: [{ type: 'text', text: 'The person asked to fix the build, and it did.' }],
+      shadowedRange: { start: SessionSeq(3), end: SessionSeq(19) },
+      shadowedSeqs: [SessionSeq(3), SessionSeq(4), SessionSeq(19)],
+      shadowedTokenCount: 18_300,
+      provider: 'deepseek',
+      model: 'deepseek-v4',
+      rawOutput: [{ type: 'text', text: 'The person asked to fix the build, and it did.' }],
+      llmStreamCall: true,
+    },
+  }
+  assert.deepEqual(adapt(event), {
+    kind: 'summary', seq: 21, time: 3_100, compactionId: CompactionId('cmp-1'),
+    items: 3, tokens: 18_300, blocks: [{ kind: 'text', text: 'The person asked to fix the build, and it did.' }],
+  })
+})
+
+test('a compaction\'s end is read as a fact carrying the id of its compaction, and why it failed when it did', () => {
+  const ended: SessionEvent<'compaction/end'> = {
+    type: 'compaction/end', seq: SessionSeq(22), time: 3_200,
+    data: { compactionId: CompactionId('cmp-1'), turn: 1 },
+  }
+  assert.deepEqual(adapt(ended), { kind: 'end', seq: 22, time: 3_200, compactionId: CompactionId('cmp-1') })
+  const failed: SessionEvent<'compaction/end'> = {
+    type: 'compaction/end', seq: SessionSeq(23), time: 3_300,
+    data: { compactionId: CompactionId('cmp-2'), turn: null, error: 'summary: the provider refused the call' },
+  }
+  assert.deepEqual(adapt(failed), { kind: 'end', seq: 23, time: 3_300, compactionId: CompactionId('cmp-2'), error: 'summary: the provider refused the call' })
+})
+
+test('a user/message that replaced a surface range is quiet, never a prompt, whatever its source', () => {
+  const checkpoint: SessionEvent<'user/message'> = {
+    type: 'user/message',
+    seq: SessionSeq(21), time: 3_150,
+    surfaceOp: { op: 'replace', startSeq: SessionSeq(3), endSeq: SessionSeq(19) },
+    data: {
+      role: 'user', id: MessageId('m9'),
+      source: { kind: 'compact-checkpoint', compactionId: CompactionId('cmp-1') },
+      content: [{ type: 'text', text: 'The person asked to fix the build, and it did.' }],
+    },
+  }
+  assert.deepEqual(adapt(checkpoint), { kind: 'quiet', seq: 21, time: 3_150, type: 'user/message', record: checkpoint })
+  const asThePerson: SessionEvent<'user/message'> = {
+    ...checkpoint,
+    data: { ...checkpoint.data, source: { kind: 'user' } },
+  }
+  assert.deepEqual(adapt(asThePerson), { kind: 'quiet', seq: 21, time: 3_150, type: 'user/message', record: asThePerson })
+})
+
+test('a pruned tool/result copy that replaced the call\'s result is quiet, never a second result', () => {
+  const event: SessionEvent<'tool/result'> = {
+    type: 'tool/result', seq: SessionSeq(12), time: 2_450,
+    surfaceOp: { op: 'replace', startSeq: SessionSeq(11), endSeq: SessionSeq(11) },
+    data: {
+      turn: 1, step: 1,
+      message: { role: 'tool', id: MessageId('m7'), source: { kind: 'tool', callId: ToolCallId('c1') }, toolCallId: ToolCallId('c1'), content: [{ type: 'text', text: 'pruned for context' }] },
+    },
+  }
+  assert.deepEqual(adapt(event), { kind: 'quiet', seq: 12, time: 2_450, type: 'tool/result', record: event })
 })
 
 test('a step opening or closing is a step fact', () => {

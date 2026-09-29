@@ -90,6 +90,51 @@ function drawCommand(run: Extract<Fact, { readonly kind: 'run' }>, done: Extract
 }
 
 /**
+ * A count of tokens as a person reads it: `517`, `12.4k`, `517k`, `1.2m` — dsh web's compact count
+ * (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`), restated lowercase and without its
+ * locale seat, as the status line restates it and #44's marker writes it.
+ * @param value - the count.
+ * @returns it, compact.
+ */
+function compact(value: number): string {
+  if (value < 1_000) return `${value}`
+  if (value < 1_000_000) return `${scaled(value / 1_000)}k`
+  return `${scaled(value / 1_000_000)}m`
+}
+
+/**
+ * A count scaled down from a unit, as a person reads it: rounded to a whole once a hundred, one decimal beneath
+ * that — dsh web's compact count's own rule (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`).
+ * @param over - the count over the unit.
+ * @returns it, as written.
+ */
+function scaled(over: number): string {
+  return over >= 100 ? `${Math.round(over)}` : `${Math.round(over * 10) / 10}`
+}
+
+/**
+ * Draw a compaction: where the model stopped seeing earlier history — one
+ * muted line naming how many items and about how many tokens it shadowed,
+ * the summary the model now sees in their place folded beneath as the
+ * markdown document it is — or that it still runs, or why it failed, in
+ * error. What it shadowed stays on the screen above it: compacting removes
+ * nothing from the transcript.
+ * @param summary - the summary it landed, once it has one.
+ * @param end - the end that settled it, once it has one.
+ */
+function drawCompaction(summary: Extract<Fact, { readonly kind: 'summary' }> | undefined, end: Extract<Fact, { readonly kind: 'end' }> | undefined): Node {
+  if (end === undefined) return { kind: 'text', text: [{ mark: 'compaction' } as const, ' compacting context…'], tone: 'muted' }
+  if (end.error !== undefined) {
+    return { kind: 'stack', children: [
+      { kind: 'text', text: [{ mark: 'compaction' } as const, ' compaction failed'], tone: 'muted' },
+      { kind: 'text', text: `  ${end.error}`, tone: 'error' },
+    ] }
+  }
+  if (summary === undefined) return { kind: 'text', text: [{ mark: 'compaction' } as const, ' context compacted'], tone: 'muted' }
+  return folded('summary', [{ mark: 'compaction' } as const, ` context compacted · ${summary.items} items (~${compact(summary.tokens)} tokens)`], { kind: 'markdown', text: textOf(summary.blocks) })
+}
+
+/**
  * Draw a tool call: what was asked, then whether it is running, failed, left
  * behind by its turn, or what it returned, folded. Its mark says how the
  * call stands.
@@ -113,7 +158,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
 }
 
 /** Every kind of entry binnacle draws — or, for a quiet one, does not; a view registered under one of these names draws that kind, so no authored fact may take one. */
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, authored: true, unknown: true, quiet: true }
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true }
 
 /**
  * Draw one entry.
@@ -184,6 +229,24 @@ function builtIn(entry: Entry, problem?: string): Node {
       return noted(drawApproval(entry.asked, entry.decided), problem)
     case 'command':
       return noted(drawCommand(entry.run, entry.done), problem)
+    case 'compaction':
+      return noted(drawCompaction(entry.summary, entry.end), problem)
+    case 'summary': {
+      // A summary whose compaction is not in its turn reaches the screen only from a log torn between the two; it names
+      // the compaction it summarized, as a result without its call names its call.
+      const title: Node = { kind: 'text', text: [{ mark: 'compaction', tone: 'muted' } as const, ` summary of compaction ${entry.fact.compactionId}`], tone: 'muted' }
+      const fold: Node = { kind: 'fold', id: 'summary', child: { kind: 'markdown', text: textOf(entry.fact.blocks) } }
+      return problem === undefined ? { kind: 'stack', children: [title, fold] } : { kind: 'stack', children: [title, problemLine(problem), fold] }
+    }
+    case 'end': {
+      // An end whose compaction is not in its turn reaches the screen only from a log torn between the two; it names
+      // the compaction it ended, as a done without its run names its command.
+      const title: Node = { kind: 'text', text: [{ mark: 'compaction', tone: 'muted' } as const, ` end of compaction ${entry.fact.compactionId}`], tone: 'muted' }
+      const why = entry.fact.error === undefined ? undefined : { kind: 'text' as const, text: `  ${entry.fact.error}`, tone: 'error' }
+      return problem === undefined
+        ? why === undefined ? title : { kind: 'stack', children: [title, why] }
+        : { kind: 'stack', children: [title, problemLine(problem), ...why === undefined ? [] : [why]] }
+    }
     case 'done': {
       // A done whose run is not in its turn reaches the screen only from a log torn between the two; it names the command it settled, as a decision without its ask names its approval.
       const title: Node = { kind: 'text', text: `done of command ${entry.fact.commandId}: ${entry.fact.outcome}`, tone: 'muted' }

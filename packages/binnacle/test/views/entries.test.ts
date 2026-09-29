@@ -7,7 +7,7 @@ import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../../src/ui/draw.ts'
 import { screens } from '../../src/views/screen.ts'
 import type { View, Views } from '../../src/views/entries.ts'
-import { prompt as promptFact, call as callFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact } from '../support/facts.ts'
+import { prompt as promptFact, call as callFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact, started as startedFact, summarized as summarizedFact, ended as endedFact } from '../support/facts.ts'
 
 /** An entry alone in a turn of its own: what the screen draws it from. */
 const alone = (entry: Entry): Transcript => ({ turns: [{ turn: null, entries: [entry] }] })
@@ -184,6 +184,14 @@ test('a failed tool is marked, with the reason dsh gave a person', () => {
 
 const approval = askedFact(5, 22, 'a1', 'bash', 'writes outside the repo')
 
+/** A compaction that landed, shadowing 42 items of about 18.3k tokens, its summary one paragraph. */
+const compaction: Entry = {
+  kind: 'compaction',
+  start: startedFact(20, 100, 'cmp-1'),
+  summary: summarizedFact(21, 110, 'cmp-1', 42, 18_300, 'The person asked to fix the build, and it did.'),
+  end: endedFact(22, 120, 'cmp-1'),
+}
+
 /** The approval, decided as the outcome names. */
 const decidedAs = (outcome: 'allowed-once' | 'rejected' | 'cancelled'): Entry =>
   ({ kind: 'approval', asked: approval, decided: decidedFact(6, 24, 'a1', outcome) })
@@ -202,6 +210,45 @@ test('an approval still waiting for its answer says so, and asks without a reaso
   assert.deepEqual(lines({ kind: 'approval', asked: approval }), ['⚑ bash asks: writes outside the repo', '  waiting…'])
   assert.deepEqual(lines({ kind: 'approval', asked: askedFact(7, 30, 'a2', 'bash') }), ['⚑ bash asks', '  waiting…'])
   assert.equal(styled({ kind: 'approval', asked: approval })[1], '\x1b[90m  waiting…\x1b[39m')
+})
+
+test('a landed compaction is one muted line: the mark, how many items it shadowed, and about how many tokens', () => {
+  assert.deepEqual(seen(compaction, [], new Map(), 80), ['≡ context compacted · 42 items (~18.3k tokens) · 1 line'])
+  const wide = onScreen(compaction, { toggled: new Set() }, new Map(), 80).map(line => line.trimEnd())
+  assert.equal(wide[0], '\x1b[90m≡ context compacted · 42 items (~18.3k tokens) · 1 line\x1b[39m')
+  // At a width where the line wraps, the fold's marker rides the line it folds under where it ends.
+  assert.deepEqual(lines(compaction), ['≡ context compacted · 42 items (~18.3k', 'tokens) · 2 lines'])
+})
+
+test('opening a landed compaction shows the summary the model now sees, folded beneath the marker as markdown', () => {
+  assert.deepEqual(seen(compaction, ['20/summary'], new Map(), 80), [
+    '≡ context compacted · 42 items (~18.3k tokens) · show less',
+    'The person asked to fix the build, and it did.',
+  ])
+})
+
+test('a compaction still running says so', () => {
+  const running: Entry = { kind: 'compaction', start: startedFact(20, 100, 'cmp-1') }
+  assert.deepEqual(lines(running), ['≡ compacting context…'])
+  assert.equal(styled(running)[0], '\x1b[90m≡ compacting context…\x1b[39m')
+})
+
+test('a compaction that failed says why, in error', () => {
+  const failed: Entry = {
+    kind: 'compaction',
+    start: startedFact(20, 100, 'cmp-2'),
+    end: endedFact(22, 120, 'cmp-2', 'summary: the provider refused the call'),
+  }
+  assert.deepEqual(lines(failed), ['≡ compaction failed', '  summary: the provider refused the call'])
+  assert.equal(styled(failed)[0], '\x1b[90m≡ compaction failed\x1b[39m')
+  assert.equal(styled(failed)[1], '\x1b[31m  summary: the provider refused the call\x1b[39m')
+})
+
+test('a summary or end whose compaction is not in its turn draws on its own, muted, naming the compaction', () => {
+  const half: Entry = { kind: 'summary', fact: summarizedFact(3, 30, 'cmp-9', 3, 300, 'half a log') }
+  assert.deepEqual(lines(half), ['≡ summary of compaction cmp-9', 'half a log'])
+  const failed: Entry = { kind: 'end', fact: endedFact(4, 40, 'cmp-8', 'summary: the provider refused the call') }
+  assert.deepEqual(lines(failed), ['≡ end of compaction cmp-8', '  summary: the provider refused the call'])
 })
 
 test('a decision whose ask is not in its turn draws on its own, muted, naming the approval it answered', () => {

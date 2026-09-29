@@ -15,7 +15,7 @@ import { trajectory } from '../../../src/plugins/trajectory/index.ts'
 import { drawText } from '../../../src/ui/draw.ts'
 import { layout } from '../../../src/ui/layout.ts'
 import { componentOf } from '../../support/drawn.ts'
-import { call as callFact, prompt as promptFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact } from '../../support/facts.ts'
+import { call as callFact, prompt as promptFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact, started as startedFact, summarized as summarizedFact, ended as endedFact } from '../../support/facts.ts'
 import { logged } from '../../support/log.ts'
 
 /**
@@ -73,6 +73,9 @@ test('a second turn opens under its own heading, a blank line between, and the k
     { kind: 'authored', seq: 21, time: 21, name: 'seeded', data: { from: 'fork' } },
     { kind: 'answer', seq: 22, time: 22, turn: 2, step: 1, provider: 'p', model: 'm', interrupted: true, blocks: [{ kind: 'text', text: 'half said' }] },
     { kind: 'result', seq: 23, time: 23, turn: 2, step: 1, callId: 'c9', failed: true, blocks: [], meta: undefined, failure: { name: 'ENOENT', code: 'not-found' } },
+    startedFact(24, 24, 'cmp-1'),
+    summarizedFact(25, 25, 'cmp-1', 42, 18_300, 'The person asked to fix the build, and it did.'),
+    endedFact(26, 26, 'cmp-1'),
     ...secondTurn(),
   ]
   const { lines } = await trajectoryOver(facts)
@@ -82,6 +85,9 @@ test('a second turn opens under its own heading, a blank line between, and the k
     '21 ? seeded',
     '22 answer by p/m · interrupted',
     '23 ✗ result of c9',
+    '24 ≡ compaction begins',
+    '25 ≡ summary of 42 items',
+    '26 ≡ compaction ends',
     '',
     'turn 2',
     '10 turn 2 begins',
