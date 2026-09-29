@@ -235,7 +235,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const pane = new ScreenPane(() => facts, {
       changed: () => { tui.requestRender() },
       invoked: (region, affordance) => { placement.invoke?.(region, affordance) },
-    }, () => registrations.currentTheme)
+    }, () => registrations.currentTheme, () => internals.clock.now())
     pane.place(slot, { draw: drawn => placement.draw(drawn, surface()) }, `binnacle.place(${slot})`)
     inSlot.set(placement, pane)
     return pane
@@ -288,7 +288,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
-      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme)
+      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme, () => internals.clock.now())
       screenPanes.set(id, pane)
     }
     pane.place(id, placed)
@@ -327,10 +327,13 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   const unstand = session.onStanding(restand)
   // While what the transcript drew holds the time since a moment, a frame each second draws it at the time; an entry
-  // that holds none is laid out once for all times.
+  // that holds none is laid out once for all times. A placed screen or a placed line that drew one ticks the same.
+  const ticking = (): boolean => transcript.ticking
+    || [...screenPanes.values()].some(pane => pane.ticking)
+    || [...linesPanes.values()].some(panes => [...panes.values()].some(pane => pane.ticking))
   let untick: (() => void) | undefined
   const tick = (): void => {
-    if (transcript.ticking) tui.requestRender()
+    if (ticking()) tui.requestRender()
     untick = internals.clock.after(1_000, tick)
   }
   untick = internals.clock.after(1_000, tick)

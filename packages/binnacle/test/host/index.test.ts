@@ -1056,6 +1056,32 @@ test('a notice stands in the line\'s place while one stands, and the line return
   await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
 })
 
+test('lines a plugin places that say the time since a moment count up as it passes', async () => {
+  const terminal = new XtermTerminal(40, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { ctx, commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('below-composer', { kind: 'lines', draw: () => ({ kind: 'text', text: ['elapsed ', { since: 1_000 }] }) }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'elapsed 0s'))
+  clock.advance(4_000)
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'elapsed 3s'))
+})
+
+test('a screen a plugin places that says the time since a moment counts up as it passes, open', async () => {
+  const terminal = new XtermTerminal(40, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { ctx, commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  await placesAScreen(ctx, () => ({ kind: 'text', text: ['up ', { since: 0 }] }))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'up 0s'))
+  clock.advance(2_000)
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'up 2s'))
+})
+
 test('a quit key a plugin rebinds quits, and the key it had no longer does', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])

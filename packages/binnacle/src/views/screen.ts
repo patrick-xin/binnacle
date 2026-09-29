@@ -187,11 +187,12 @@ function timedSpans(text: string | readonly Span[] | undefined): boolean {
 }
 
 /**
- * Whether a node draws the time since a moment anywhere in it.
+ * Whether a node draws the time since a moment anywhere in it: what a pane keeps a layout for against the time,
+ * so a later one lays it out again.
  * @param node - the node.
  * @returns true when a span of it, or of anything it holds, says the time since a moment.
  */
-function timedIn(node: Node): boolean {
+export function timedIn(node: Node): boolean {
   switch (node.kind) {
     case 'blank':
     case 'markdown':
