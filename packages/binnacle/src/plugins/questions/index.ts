@@ -27,6 +27,7 @@ type Asked = Parameters<Events['user-questions/request']>[0]
 const TYPING = 'type an answer'
 const SKIP = 'skip'
 const CANCEL = 'cancel'
+const DONE = 'done'
 
 /**
  * The line an option is offered on: its label, its description beside it in the muted tone, and on a multi-select question the mark of its being marked.
@@ -37,7 +38,7 @@ const CANCEL = 'cancel'
  */
 function optionLine(option: AskUserQuestionOption, multi: boolean, marked: boolean): Node {
   const spans = [
-    ...multi && marked ? [{ mark: 'done' } as const] : multi ? ['  ' as const] : [],
+    ...multi && marked ? [{ mark: 'done' } as const] : multi ? [' ' as const] : [],
     multi ? ` ${option.label}` : option.label,
     ...option.description === undefined ? [] : [{ text: ` — ${option.description}`, tone: 'muted' } as const],
   ]
@@ -67,6 +68,7 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
           affordances: [{ kind: 'choose', label: option.label }],
           child: optionLine(option, multi, marked.includes(option.label)),
         })),
+        ...multi ? [{ kind: 'offer' as const, id: DONE, affordances: [{ kind: 'choose' as const, label: 'done' }], child: { kind: 'text' as const, text: 'done' } }] : [],
         { kind: 'offer', id: TYPING, affordances: [{ kind: 'answer', label: 'type an answer' }], child: { kind: 'text', text: 'type an answer' } },
         { kind: 'offer', id: SKIP, affordances: [{ kind: 'choose', label: 'skip' }], child: { kind: 'text', text: 'skip' } },
         { kind: 'offer', id: CANCEL, affordances: [{ kind: 'dismiss', label: 'cancel' }], child: { kind: 'text', text: 'cancel' } },
@@ -85,6 +87,7 @@ class Ask {
   private readonly acts = new Map<string, () => void>()
   private index = 0
   private unseat: (() => void) | undefined
+  private seated: Placement | undefined
 
   /**
    * @param ctx - the plugin's context, to seat the card with.
@@ -111,23 +114,43 @@ class Ask {
     this.marks.length = 0
     this.acts.clear()
     ;(question.options ?? []).forEach((option, index) => this.acts.set(`option ${index + 1}`, () => this.choose(index)))
+    if (question.multiSelect === true) this.acts.set(DONE, () => this.answerWith({ id: question.id, selected: [...this.marks] }))
+    this.acts.set(SKIP, () => this.answerWith({ id: question.id, selected: [] }))
     this.unseat?.()
     const seated: Placement = {
       kind: 'lines',
       draw: () => card(question, this.marks),
       invoke: (region, _affordance) => { this.acts.get(region)?.() },
     }
+    this.seated = seated
     this.unseat = this.ctx.binnacle.place('composer', seated)
   }
 
   /**
-   * Choose an option of the current question: it answers the question.
+ * Draw the seated card again, for what answering on it changed: the marks on its options. It is placed again as it stands — the same placement, placed while the copy before it still holds the seat, so the pane that draws it and the focus on it are kept — and the older copy is then taken back.
+ */
+  private redraw(): void {
+    const seated = this.seated
+    if (seated === undefined) return
+    const unseat = this.ctx.binnacle.place('composer', seated)
+    this.unseat?.()
+    this.unseat = unseat
+  }
+
+  /**
+   * Choose an option of the current question: on a single-select question it answers, and on a multi-select one it toggles the option's mark, leaving the question open.
    * @param index - the option's place among those the card offers.
    */
   private choose(index: number): void {
     const option = this.question.options?.[index]
     if (option === undefined) return
-    this.answerWith({ id: this.question.id, selected: [option.label] })
+    if (this.question.multiSelect !== true) {
+      this.answerWith({ id: this.question.id, selected: [option.label] })
+      return
+    }
+    if (this.marks.includes(option.label)) this.marks.splice(this.marks.indexOf(option.label), 1)
+    else this.marks.push(option.label)
+    this.redraw()
   }
 
   /**

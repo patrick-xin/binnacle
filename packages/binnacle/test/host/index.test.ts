@@ -1264,6 +1264,57 @@ test('a question asked sits in the composer\'s seat, naming the question, and en
   await until(async () => (await terminal.altScreen()).every(row => !row.includes('which database?')))
 })
 
+test('skip answers a question with nothing selected, and the next question takes the seat', async () => {
+  const terminal = new XtermTerminal(50, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestions(ctx, { questions: [
+    { id: 'q1', question: 'which database?', options: [{ label: 'postgres' }, { label: 'sqlite' }] },
+    { id: 'q2', question: 'which port?', options: [{ label: '5432' }, { label: '8080' }] },
+  ] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which database?')))
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which port?')))
+  assert.ok((await terminal.altScreen()).every(row => !row.includes('which database?')), 'the first question\'s card is gone')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [
+    { id: 'q1', selected: [] },
+    { id: 'q2', selected: ['5432'] },
+  ] })
+})
+
+test('a multi-select question answers with every option marked, once done is chosen', async () => {
+  const terminal = new XtermTerminal(50, 18)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestions(ctx, { questions: [{
+    id: 'q1',
+    question: 'which checks should run?',
+    multiSelect: true,
+    options: [{ label: 'types' }, { label: 'lint' }, { label: 'tests' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('which checks should run?')))
+  assert.ok((await terminal.altScreen()).some(row => row.includes('done')), 'a multi-select question offers done')
+  terminal.type('\r')
+  // The marked option's line draws the done mark beside its label.
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('● types')))
+  terminal.type('\t')
+  terminal.type('\t')
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('● tests')))
+  terminal.type('\t')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['types', 'tests'] }] })
+  await until(async () => (await terminal.altScreen()).every(row => !row.includes('which checks should run?')))
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
