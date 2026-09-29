@@ -7,6 +7,7 @@
  * @module binnacle/test/support/facts
  */
 import type { Fact } from '../../src/facts/adapt.ts'
+import { CommandId } from '@deepseek-ai/dsh-commands'
 import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
 import { ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 
@@ -69,4 +70,30 @@ export const asked = (seq: number, time: number, id: string, toolName: string, r
  */
 export const decided = (seq: number, time: number, id: string, outcome: ApprovalOutcome): Extract<Fact, { readonly kind: 'decided' }> => ({
   kind: 'decided', seq, time, id: ApprovalRequestId(id), outcome,
+})
+
+/**
+ * A command that ran, as dsh logged it.
+ * @param seq - its place in the log.
+ * @param time - when it was logged.
+ * @param commandId - dsh's id of the run, which its done names.
+ * @param name - the command's name.
+ * @param args - the text that followed the name; left out when the command's own event owns the payload.
+ * @returns the run fact.
+ */
+export const run = (seq: number, time: number, commandId: string, name: string, args?: string): Extract<Fact, { readonly kind: 'run' }> => ({
+  kind: 'run', seq, time, commandId: CommandId(commandId), name, source: 'user', ...args === undefined ? {} : { args },
+})
+
+/**
+ * The done that settled a command, in dsh's words.
+ * @param seq - its place in the log.
+ * @param time - when it was logged.
+ * @param commandId - dsh's id of the run it settles.
+ * @param outcome - how the command settled.
+ * @param text - what it returned; left out when it said nothing.
+ * @returns the done fact.
+ */
+export const done = (seq: number, time: number, commandId: string, outcome: 'success' | 'error', text?: string): Extract<Fact, { readonly kind: 'done' }> => ({
+  kind: 'done', seq, time, commandId: CommandId(commandId), outcome, ...text === undefined ? {} : { text },
 })

@@ -77,6 +77,19 @@ function drawApproval(asked: Extract<Fact, { readonly kind: 'asked' }>, decided:
 }
 
 /**
+ * Draw a command: the line as the person wrote it, muted, then what the
+ * command returned beneath — plain on success, in error on failure — or that
+ * it still runs. Nothing beneath a success that said nothing.
+ * @param done - the done that settled it, once it has one.
+ */
+function drawCommand(run: Extract<Fact, { readonly kind: 'run' }>, done: Extract<Fact, { readonly kind: 'done' }> | undefined): Node {
+  const head: Node = { kind: 'text', text: `/${run.name}${run.args ?? ''}`, tone: 'muted' }
+  if (done === undefined) return { kind: 'stack', children: [head, { kind: 'text', text: '  running…', tone: 'muted' }] }
+  if (done.outcome === 'error') return { kind: 'stack', children: [head, { kind: 'text', text: `  ${done.text}`, tone: 'error' }] }
+  return done.text === undefined ? head : { kind: 'stack', children: [head, { kind: 'text', text: `  ${done.text}` }] }
+}
+
+/**
  * Draw a tool call: what was asked, then whether it is running, failed, left
  * behind by its turn, or what it returned, folded. Its mark says how the
  * call stands.
@@ -100,7 +113,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
 }
 
 /** Every kind of entry binnacle draws — or, for a quiet one, does not; a view registered under one of these names draws that kind, so no authored fact may take one. */
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, result: true, authored: true, unknown: true, quiet: true }
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, authored: true, unknown: true, quiet: true }
 
 /**
  * Draw one entry.
@@ -169,6 +182,13 @@ function builtIn(entry: Entry, problem?: string): Node {
       return noted(drawTool(entry.call, entry.result, entry.left), problem)
     case 'approval':
       return noted(drawApproval(entry.asked, entry.decided), problem)
+    case 'command':
+      return noted(drawCommand(entry.run, entry.done), problem)
+    case 'done': {
+      // A done whose run is not in its turn reaches the screen only from a log torn between the two; it names the command it settled, as a decision without its ask names its approval.
+      const title: Node = { kind: 'text', text: `done of command ${entry.fact.commandId}: ${entry.fact.outcome}`, tone: 'muted' }
+      return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
+    }
     case 'decided': {
       // A decision without its ask reaches the screen only from a log torn between the two; it names the approval it answered, as a result without its call names its call.
       const title: Node = { kind: 'text', text: [{ mark: 'approval', tone: 'muted' } as const, ` decision of approval ${entry.fact.id}: ${entry.fact.outcome}`], tone: 'muted' }
