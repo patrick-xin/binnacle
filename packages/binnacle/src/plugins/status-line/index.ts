@@ -4,22 +4,25 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter'
 
+/** The Status line plugin's Cordis name. The module is the plugin, as dsh's loader takes a row's: its `name`, `inject` and `apply`, with no default export. */
+export const name = 'status-line'
+
+/** The services it needs before it applies: the `binnacle` service it places through, and dsh's session projections it reads the token meter's from. */
+export const inject = ['binnacle', 'sessionProjections'] satisfies (keyof Context)[]
+
 /**
- * The Status line plugin, loaded by the host beside the surface it draws on.
- * What it says of the session it reads from dsh as its line is drawn — the
- * agent on screen, and the token meter's projections through the service it
- * names — and it reads nothing at any tick of its own: lines are drawn again
- * as the session logs anything and as its agent starts or ends a turn.
+ * Place the Status line below the composer. What it says of the session it
+ * reads from dsh as its line is drawn — the agent on screen, and the token
+ * meter's projections through the service it names — and it reads nothing at
+ * any tick of its own: lines are drawn again as the session logs anything and
+ * as its agent starts or ends a turn.
+ * @param ctx - the plugin's context, holding the services it names; disposing it takes the line back.
  */
-export const statusLine = {
-  name: 'status-line',
-  inject: ['binnacle', 'sessionProjections'] satisfies (keyof Context)[],
-  apply(ctx: Context): void {
-    ctx.binnacle.place('below-composer', {
-      kind: 'lines',
-      draw: (_facts, surface) => ({ kind: 'text', text: surface.notice ?? measured(ctx).join(' · '), tone: 'muted' }),
-    })
-  },
+export function apply(ctx: Context): void {
+  ctx.binnacle.place('below-composer', {
+    kind: 'lines',
+    draw: (_facts, surface) => ({ kind: 'text', text: surface.notice ?? measured(ctx).join(' · '), tone: 'muted' }),
+  })
 }
 
 /**

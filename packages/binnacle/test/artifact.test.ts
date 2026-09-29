@@ -37,3 +37,16 @@ test('plain node loads the built entry as a Cordis row, with no default export a
     apply: 'function',
   })
 })
+
+/** The built-in features the patch loads as rows of their own, in the order it inserts them. */
+const FEATURES = ['transcript', 'composer', 'status-line', 'tool-cards', 'trajectory']
+
+test('plain node loads each built-in feature\'s subpath, as the manifest exports it, as a Cordis row with no default export', () => {
+  for (const feature of FEATURES) {
+    const probe = `const m = await import('${manifest.name}/plugins/${feature}'); console.log(JSON.stringify({ keys: Object.keys(m).sort(), apply: typeof m.apply }))`
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], { cwd: packageDir, encoding: 'utf8' })
+    assert.equal(run.status, 0, `${feature}: ${run.stderr}`)
+    assert.deepEqual(JSON.parse(run.stdout), { keys: ['apply', 'inject', 'name'], apply: 'function' }, feature)
+    assert.deepEqual(manifest.exports[`./plugins/${feature}`], { types: `./dist/plugins/${feature}/index.d.ts`, default: `./dist/plugins/${feature}/index.js` }, feature)
+  }
+})

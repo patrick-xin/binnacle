@@ -18,7 +18,7 @@ import { layout } from '../../../src/ui/layout.ts'
 import type { Node } from '../../../src/api.ts'
 import type { CardParts, CardRow } from '../../../src/plugins/tool-cards/cards.ts'
 import { rowFor } from '../../../src/plugins/tool-cards/cards.ts'
-import { toolCards } from '../../../src/plugins/tool-cards/index.ts'
+import * as toolCards from '../../../src/plugins/tool-cards/index.ts'
 import { call as callFact, returned as returnedFact } from '../../support/facts.ts'
 import { pointer } from '../../support/pointer.ts'
 

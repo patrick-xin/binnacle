@@ -12,6 +12,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./plugins/transcript": {
+      "types": "./dist/plugins/transcript/index.d.ts",
+      "default": "./dist/plugins/transcript/index.js"
+    },
+    "./plugins/composer": {
+      "types": "./dist/plugins/composer/index.d.ts",
+      "default": "./dist/plugins/composer/index.js"
+    },
+    "./plugins/status-line": {
+      "types": "./dist/plugins/status-line/index.d.ts",
+      "default": "./dist/plugins/status-line/index.js"
+    },
+    "./plugins/tool-cards": {
+      "types": "./dist/plugins/tool-cards/index.d.ts",
+      "default": "./dist/plugins/tool-cards/index.js"
+    },
+    "./plugins/trajectory": {
+      "types": "./dist/plugins/trajectory/index.d.ts",
+      "default": "./dist/plugins/trajectory/index.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
