@@ -1,13 +1,3 @@
-/**
- * The transcript pane: the screen as a pi-tui component, on either of pi-tui's screens.
- *
- * It folds the session's facts into turns as they arrive, holds the UI state,
- * draws the screen at the width pi-tui gives it, and answers a pointer or a
- * key through the gesture table on the screen it last drew, which is the one
- * the person acted on. On the main screen it never changes a row it has
- * printed.
- */
-
 import type { Component, TuiMode, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
 import type { Fact } from '../facts/adapt.ts'
 import type { Gesture } from '../contract/index.ts'
@@ -55,6 +45,7 @@ export class TranscriptPane implements Component {
   readonly #now: () => number | undefined
   #drawn: { readonly width: number, readonly screen: Screen } | undefined
   #on: TuiMode = 'fullscreen'
+  // On the main screen the pane never changes a row it has printed.
   #printed: Printed | undefined
   /** Focus the main screen dropped from a printed entry, given back when the fullscreen is. */
   #parked: string | undefined
