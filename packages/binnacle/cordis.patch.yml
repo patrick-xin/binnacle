@@ -9,3 +9,8 @@
 - insert:
     - id: binnacle
       name: 'binnacle'
+    # dsh-base serves the questions an agent asks (user-questions) but loads no
+    # tool to ask them with; dsh's web app adds this one. binnacle answers
+    # questions in the composer's seat, so it lets the agent ask them.
+    - id: tool-ask-user
+      name: '@deepseek-ai/dsh-tool-ask-user'
