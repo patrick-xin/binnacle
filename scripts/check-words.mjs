@@ -9,8 +9,8 @@
  * `esc`, `escape`, `tab`, `space`, `backspace`, `up`, `down`, `left`,
  * `right`, whole and in any case — nor a chord of pi-tui's modifiers and a
  * key (`ctrl+c`, `shift+tab`, `alt-x`). What no person reads is not a word:
- * a module path, a type, a property's name, and a screen's `key`, the
- * binding its plugin offers the table. The short directions are matched as
+ * a module path, a type, a property's name, and the `key` of the object a
+ * `.screen(name, {...})` call places, the binding its plugin offers the table. The short directions are matched as
  * whole words: `set up` and `left out` are refused too, and are rephrased.
  * Its own gate, not a rule of check-layers, which reads what a module
  * imports, never what it says.
@@ -41,27 +41,33 @@ const MODULES = new Set(['ImportDeclaration', 'ExportNamedDeclaration', 'ExportA
  * Every literal in a program that says words, with what each says.
  * @param {unknown} node - the program, or a node in it.
  * @param {{ start: number, end: number, says: string[] }[]} found - where each is added, in order.
+ * @param {Set<unknown>} bindings - the `key` properties of the objects screens are placed with, which say no words; found as the walk reaches each call.
  * @returns {{ start: number, end: number, says: string[] }[]} `found`.
  */
-function literals(node, found = []) {
+function literals(node, found = [], bindings = new Set()) {
   if (Array.isArray(node)) {
-    for (const child of node) literals(child, found)
+    for (const child of node) literals(child, found, bindings)
     return found
   }
   if (node === null || typeof node !== 'object') return found
-  // A screen's key is the binding its plugin offers the key table (`binnacle:packages/binnacle/src/api.ts#PlacedScreen`), which a person rebinds there: a key id, not a word.
-  if (node.type === 'Property' && !node.computed && node.key.type === 'Identifier' && node.key.name === 'key' && node.value.type === 'Literal') return found
+  // A screen's key is the binding its plugin offers the key table (`binnacle:packages/binnacle/src/api.ts#PlacedScreen`), which a person rebinds there: a key id, not a word. It is one only in the object a `.screen(name, {...})` call places; a `key` anywhere else says what its value says.
+  if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.name === 'screen' && node.arguments[1]?.type === 'ObjectExpression') {
+    for (const property of node.arguments[1].properties) {
+      if (property.type === 'Property' && !property.computed && property.key.type === 'Identifier' && property.key.name === 'key' && property.value.type === 'Literal') bindings.add(property)
+    }
+  }
+  if (bindings.has(node)) return found
   // A type says what a value may be, and a module path where code is; neither is drawn.
   if (node.type === 'TSLiteralType') return found
   if (MODULES.has(node.type)) {
-    for (const [field, value] of Object.entries(node)) if (field !== 'source') literals(value, found)
+    for (const [field, value] of Object.entries(node)) if (field !== 'source') literals(value, found, bindings)
     return found
   }
   // A property's name is the code's; its value is what may be said.
-  if (node.type === 'Property' && !node.computed) return literals(node.value, found)
+  if (node.type === 'Property' && !node.computed) return literals(node.value, found, bindings)
   if (node.type === 'Literal' && typeof node.value === 'string') found.push({ start: node.start, end: node.end, says: [node.value] })
   if (node.type === 'TemplateLiteral') found.push({ start: node.start, end: node.end, says: node.quasis.map(quasi => quasi.value.cooked ?? quasi.value.raw) })
-  for (const value of Object.values(node)) literals(value, found)
+  for (const value of Object.values(node)) literals(value, found, bindings)
   return found
 }
 
