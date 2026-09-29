@@ -424,5 +424,11 @@ export interface Registrations {
     send(text: string): void;
     command(line: string): Promise<boolean>;
 }
+// api.d.ts
+declare module '@deepseek-ai/cordis' {
+    interface Context {
+        binnacle: Registrations;
+    }
+}
 
 `;

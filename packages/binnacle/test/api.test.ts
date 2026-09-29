@@ -6,7 +6,9 @@
  * @module binnacle/test/api
  */
 import { test } from 'node:test'
-import { readFileSync } from 'node:fs'
+import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseSync } from 'oxc-parser'
@@ -43,6 +45,7 @@ function read(file: string): Declarations {
   const declared = new Map<string, string>()
   const imported = new Map<string, { module: string, name: string }>()
   const exported: string[] = []
+  const localExports: { readonly name: string, readonly local: string }[] = []
   const declare = (name: string, statement: string): void => {
     const before = declared.get(name)
     declared.set(name, before === undefined ? statement : `${before}\n${statement}`)
@@ -56,7 +59,19 @@ function read(file: string): Declarations {
       continue
     }
     if (node.type === 'ExportAllDeclaration') throw new Error(`${file}: follow export * too`)
+    // A module augmentation reaches every author who imports the file, as `ctx.binnacle` does, so it is surface too.
+    if (node.type === 'TSModuleDeclaration' && node.id.type === 'Literal') {
+      const name = `declare module '${String(node.id.value)}'`
+      declare(name, bare(node.start, node.end))
+      exported.push(name)
+      continue
+    }
     const exporting = node.type === 'ExportNamedDeclaration'
+    // A local export list names what the file declares or imports, under the name it exports it by.
+    if (exporting && (node.source === null || node.source === undefined) && (node.declaration === null || node.declaration === undefined)) {
+      for (const specifier of node.specifiers) localExports.push({ name: nameOf(specifier.exported), local: nameOf(specifier.local) })
+      continue
+    }
     const declaration = exporting ? node.declaration : node
     if (exporting && node.source !== null && node.source !== undefined) {
       for (const specifier of node.specifiers) {
@@ -74,6 +89,13 @@ function read(file: string): Declarations {
       declare(name, bare(node.start, node.end))
       if (exporting && !exported.includes(name)) exported.push(name)
     }
+  }
+  for (const { name, local } of localExports) {
+    const statement = declared.get(local)
+    const from = imported.get(local)
+    if (statement !== undefined && name !== local) declared.set(name, statement)
+    else if (from !== undefined) imported.set(name, from)
+    exported.push(name)
   }
   return { declared, imported, exported }
 }
@@ -100,6 +122,7 @@ function surface(entry: string): string {
   const files = new Map<string, Declarations>()
   const fileOf = (file: string): Declarations => files.get(file) ?? files.set(file, read(file)).get(file)!
   const seen = new Set<string>()
+  const emitted = new Set<string>()
   const lines: string[] = []
   const visit = (file: string, name: string): void => {
     if (seen.has(`${file}#${name}`)) return
@@ -107,6 +130,9 @@ function surface(entry: string): string {
     const module = fileOf(file)
     const statement = module.declared.get(name)
     if (statement !== undefined) {
+      // A name exported under another shares its declaration, which is surface once.
+      if (emitted.has(`${file}#${statement}`)) return
+      emitted.add(`${file}#${statement}`)
       lines.push(`// ${relative(dist, file)}`, statement)
       for (const mentioned of new Set(statement.match(/[A-Za-z_$][\w$]*/g))) {
         if (mentioned !== name && (module.declared.has(mentioned) || module.imported.has(mentioned))) visit(file, mentioned)
@@ -124,4 +150,14 @@ function surface(entry: string): string {
 
 test('an author reaches exactly these declarations: changing one changes what authors depend on, and this snapshot', (t) => {
   t.assert.snapshot(surface(join(dist, 'api.d.ts')), { serializers: [(value: unknown) => String(value)] })
+})
+
+test('an author reaches ctx.binnacle through the Context declaration api.ts augments, so it is part of the surface', () => {
+  assert.match(surface(join(dist, 'api.d.ts')), /declare module '@deepseek-ai\/cordis' \{\n\s+interface Context \{\n\s+binnacle: Registrations;/)
+})
+
+test('a name a declaration file exports from a local list, under its own name or another, is surface too', () => {
+  const at = mkdtempSync(join(tmpdir(), 'binnacle-surface-'))
+  writeFileSync(join(at, 'entry.d.ts'), 'declare const kept: number;\ntype Hidden = string;\nexport { kept, Hidden as Shown };\n')
+  assert.equal(surface(join(at, 'entry.d.ts')), `// ${relative(dist, join(at, 'entry.d.ts'))}\ndeclare const kept: number;\n// ${relative(dist, join(at, 'entry.d.ts'))}\ntype Hidden = string;\n`)
 })
