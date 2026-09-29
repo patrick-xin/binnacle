@@ -5,29 +5,19 @@ import type { CardParts } from './cards.ts'
 import { rowFor } from './cards.ts'
 import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks } from './presentation.ts'
 
-/** The tool-cards plugin's Cordis name. The module is the plugin, as dsh's loader takes a row's: its `name`, `inject` and `apply`, with no default export. */
 export const name = 'tool-cards'
 
-/** The services it needs before it applies: the `binnacle` service it registers its view through, and dsh's `tools`, whose definitions present each call. */
+/** `tools` is dsh's registry, whose definitions present each call. */
 export const inject = ['binnacle', 'tools'] satisfies (keyof Context)[]
 
-/**
- * Register the tool cards' view for the `tool` entry kind.
- * @param ctx - the plugin's context, holding the services it names; disposing it takes the view back.
- */
 export function apply(ctx: Context): void {
   ctx.binnacle.view('tool', viewOf(ctx.tools))
 }
 
 /**
- * The view of a tool entry this plugin registers: a show titled by the call's
- * mark and the title its tool presented, holding how the call stands, and once
- * it returns, what it returned, folded, as its tool presents it. Where it cannot draw from a presentation
- * it leaves the entry to the view beneath it, binnacle's own card; what a
- * presenter does wrong is said beneath that card, naming the tool, the
- * presenter and why, in error, so the seam never degrades quietly.
- * @param tools - dsh's tool registry, reached through the `tools` service.
- * @returns the view.
+ * Where it cannot draw from a presentation it leaves the entry to the view
+ * beneath it, binnacle's own card; what a presenter does wrong is said beneath
+ * that card, naming the tool, the presenter and why, so the seam never degrades quietly.
  */
 function viewOf(tools: ToolRuntime): View {
   return (entry, next) => {
@@ -45,7 +35,7 @@ function viewOf(tools: ToolRuntime): View {
     try {
       presented = callViewOf(tool.presentCall(args))
     } catch (error) {
-      // What a presenter does wrong never takes the surface down, and the failure is the tool's, not the view's; the entry is the view beneath's, with what did it said beneath.
+      // What a presenter does wrong never takes the surface down; the entry is the view beneath's, with the failure said beneath.
       return refused(next(), `${entry.call.name}.presentCall threw: ${readable(error)}`)
     }
     if (presented === undefined) return next()
@@ -58,7 +48,6 @@ function viewOf(tools: ToolRuntime): View {
       try {
         completed = resultViewOf(tool.presentResult(args, handedResult(result)))
       } catch (error) {
-        // As a throwing call presenter: the entry is the view beneath's, with what did it said beneath.
         return refused(next(), `${entry.call.name}.presentResult threw: ${readable(error)}`)
       }
       if (completed !== undefined && 'why' in completed) return refused(next(), `${entry.call.name}.presentResult returned no drawable view: ${completed.why}`)
@@ -77,7 +66,7 @@ function viewOf(tools: ToolRuntime): View {
         : undefined,
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
-      // Named as binnacle's own card names its result fold, so a fold a person opened is the plugin's and the card's alike: what they opened stays open when the plugin is disposed, or a presenter throws and the card beneath draws the call. Its rows are the theme's for the tool kind, as binnacle's own card's are.
+      // Named as binnacle's own card names its result fold, so a fold a person opened stays open when the plugin is disposed or a presenter throws and the card beneath draws the call.
       fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
     }
     const kind = shown?.card ?? call.card
@@ -87,12 +76,6 @@ function viewOf(tools: ToolRuntime): View {
   }
 }
 
-/**
- * The card beneath's drawing, with what a presenter did wrong said beneath it: the problem mark and what did it, in error.
- * @param beneath - what the view beneath drew.
- * @param what - the tool, the presenter and what went wrong.
- * @returns the drawing a person reads.
- */
 function refused(beneath: Node, what: string): Node {
   return { kind: 'stack', children: [beneath, { kind: 'text', text: [{ mark: 'problem' }, ` ${what}`], tone: 'error' }] }
 }

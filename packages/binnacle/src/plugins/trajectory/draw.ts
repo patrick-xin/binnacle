@@ -1,15 +1,9 @@
 import type { Fact, Mark, Node } from '../../api.ts'
 
-/** A run of a text line, as the author API's `Node` draws one: its text in a tone of its own, or one of the theme's marks. */
 type Span = Exclude<Extract<Node, { readonly kind: 'text' }>['text'], string>[number]
 
-/** The blocks a fact carries, as the author API's `Fact` types them. */
 type Blocks = Extract<Fact, { readonly blocks: readonly unknown[] }>['blocks']
 
-/**
- * A value as the record shows it: JSON where it can be, the value's string
- * form where it cannot — a cycle, a bigint — as the fallback shows one.
- */
 function shown(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2) ?? String(value)
@@ -19,12 +13,6 @@ function shown(value: unknown): string {
   }
 }
 
-/**
- * What one line opens to: the record of what the fact knows. A quiet or
- * unknown fact carries its event as logged, and a read one is binnacle's
- * reading of it, so that is what its line opens to; an unknown fact that
- * names what went wrong says it above the event.
- */
 function recordOf(fact: Fact): Node {
   const text = fact.kind === 'quiet'
     ? shown(fact.record)
@@ -34,35 +22,23 @@ function recordOf(fact: Fact): Node {
   return { kind: 'text', text }
 }
 
-/** What one line says of one fact: its place in the log, dim, then its kind — a mark where one stands for it — and a few words. */
 function lineOf(fact: Fact, words: readonly Span[], mark?: Mark): readonly Span[] {
   const spans: Span[] = [{ text: `${fact.seq} `, tone: 'dim' }]
   if (mark !== undefined) spans.push({ mark })
   return [...spans, ...words]
 }
 
-/**
- * The first line of some blocks' text, where a block binnacle cannot read is
- * its type in brackets; what the blocks say beyond the first line is the
- * record's to hold.
- */
 function firstLine(blocks: Blocks): string {
   return blocks.map(block => block.kind === 'unread' ? `[${block.type}]` : block.text).join('\n').split('\n')[0] ?? ''
 }
 
-/**
- * One line for one fact: its kind, and what it says in a few words, its
- * record folded on that line.
- * @param fact - the fact.
- * @param tools - the name of each call in the log, by its id, so a result says what it answered.
- */
+/** `tools` is each call's name by its id, so a result says what it answered. */
 function eventOf(fact: Fact, tools: ReadonlyMap<string, string>): Node {
   const said = wordsOf(fact, tools)
   const line = lineOf(fact, said.words, said.mark)
   return { kind: 'fold', id: `${fact.seq}`, rows: 0, title: line, ...said.tone === undefined ? {} : { tone: said.tone }, child: recordOf(fact) }
 }
 
-/** What one line says of one fact, by its kind. */
 function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly words: readonly Span[], readonly mark?: Mark, readonly tone?: 'muted' | 'dim' } {
   switch (fact.kind) {
     case 'turn':
@@ -103,12 +79,9 @@ function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly wor
 }
 
 /**
- * What the Trajectory draws of a session: one line per event, grouped by turn.
- * It reads only the facts it is handed, never the events: what binnacle has
- * read of an event is the fact, and what it has not — a quiet or unknown
- * kind — is the record the fact carries. So a read fact's line opens to the
- * fact binnacle read, and a quiet or unknown one to the event as logged, as
- * the fallback view shows it.
+ * One line per event, grouped by turn. It reads only the facts it is handed,
+ * never the events: a read fact's line opens to the fact binnacle read, and a
+ * quiet or unknown one to the event as logged, as the fallback view shows it.
  */
 export function drawTrajectory(facts: readonly Fact[]): Node {
   const tools = new Map<string, string>()

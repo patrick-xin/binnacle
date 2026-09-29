@@ -9,26 +9,20 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
-/** An open session: what the surface reads from it and sends to it. */
 export interface OpenedSession {
   /** The agent whose session this is: the scope its approvals are answered under, and the identity of everything it logs. */
   readonly agent: Agent
   /**
    * Hear every event of the session: those logged so far, then each as it is logged, in order and once each.
-   * @param listener - called with each event.
-   * @returns a function that stops listening.
    */
   follow(listener: (event: SessionEvent) => void): () => void
   /**
    * Send a line from the person: it steers the agent, reaching a turn already running at its next step, or starting
    * one when none runs (`dsh:packages/core/agent-loop/src/agent.ts`, where `steer` sends to the next step).
-   * @param text - what they typed.
    */
   send(text: string): void
   /**
    * Hear when where the session stands may have changed: as it logs anything, and as the agent's own status flips.
-   * @param listener - called on each change.
-   * @returns a function that stops listening.
    */
   onStanding(listener: () => void): () => void
   /**
@@ -36,21 +30,15 @@ export interface OpenedSession {
    * (`dsh:packages/interaction/commands/src/index.ts`). A command that failed still
    * ran — dsh logs its failure as the command's `done` before rethrowing, and the
    * failure is drawn from the log — so it is contained here.
-   * @param line - the line, as the person wrote it.
-   * @returns whether a command ran, whatever it returned; false when no command has the name.
+   * Resolves whether a command ran, whatever it returned; false when no command has the name.
    */
   command(line: string): Promise<boolean>
   /**
    * What `/` offers: dsh's commands for the agent, and the skills a person may invoke, as dsh's web lists them
    * (`dsh:packages/api/session-controller/src/skill-catalog.ts`).
-   * @returns each by name, with what it does.
    */
   offers(): Promise<readonly { readonly name: string, readonly description: string }[]>
-  /**
-   * Hear when what `/` offers may have changed: dsh's commands, or its skills.
-   * @param listener - called on each change.
-   * @returns a function that stops listening.
-   */
+  /** Hear when dsh's commands, or its skills, may have changed. */
   onOffers(listener: () => void): () => void
   /** Interrupt the running turn, keeping what waits in the agent's inbox, as dsh's web does; with none running, nothing. */
   interrupt(): void
@@ -62,8 +50,6 @@ export interface OpenedSession {
  * Open a session on the default model. It composes no preset roster, as dsh's headless bundle does not: the agent
  * reads its rows from the global layer, and its model from the default selection installed in `setup`
  * (`dsh:packages/bundle/headless/src/index.ts`).
- * @param ctx - the row's context, carrying dsh's `agents` and `agentDefaultModel`.
- * @returns the open session.
  */
 export async function openSession(ctx: Context): Promise<OpenedSession> {
   const defaults: AgentDefaultModelConfig = ctx.agentDefaultModel
