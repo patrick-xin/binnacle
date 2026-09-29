@@ -31,7 +31,7 @@ import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
-import type { Placement, Slot } from '../api.ts'
+import type { Placement, Slot, Surface } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
 import { composer as composerFeature } from '../plugins/composer/index.ts'
 import { statusLine } from '../plugins/status-line/index.ts'
@@ -46,8 +46,8 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, and its commands. Each is a key dsh declares on `Context`. */
-export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'] satisfies (keyof Context)[]
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, and its commands. Each is a key dsh declares on `Context`. */
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {
@@ -59,11 +59,20 @@ export const internals: {
   stderr: { write(chunk: string): unknown }
   /** Open the session the surface draws. */
   open: (ctx: Context) => Promise<OpenedSession>
+  /** The time, the one place binnacle reads it: now, in milliseconds, and a call back after some. */
+  clock: { now(): number, after(ms: number, then: () => void): () => void }
 } = {
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
   stderr: process.stderr,
   open: openSession,
+  clock: {
+    now: () => Date.now(),
+    after: (ms, then) => {
+      const timer = setTimeout(then, ms)
+      return () => { clearTimeout(timer) }
+    },
+  },
 }
 
 /** The page as placed, read from the placements as they stand. */
@@ -77,6 +86,12 @@ interface Page {
   /** The lines placed below the composer, oldest first. */
   readonly below: readonly Component[]
 }
+
+/** How long a first Ctrl+C waits for a second to quit, in milliseconds. */
+const quitWindow = 3_000
+
+/** How long a notice saying what went wrong stands, in milliseconds. */
+const problemWindow = 5_000
 
 /** What the alternate screen's reading place holds when neither the transcript nor a screen is placed there: nothing, growing. */
 const nothing: Component = { render: () => [], invalidate: () => {} }
@@ -108,7 +123,7 @@ function keysHelp(): string {
 function surfaceCommand(chosen: (mode: Mode) => void): Command {
   return new Command()
     .name('dsh --profile binnacle')
-    .description('Open a terminal session with an agent. Ctrl+T switches screens; Ctrl+C quits.')
+    .description('Open a terminal session with an agent. Ctrl+T switches screens; Ctrl+C stops a running turn, and twice quits.')
     .helpOption('-h, --help', 'show this help')
     .addHelpText('after', `\n${keysHelp()}`)
     .option('--check', 'open a session on the default model, report it, close it, and exit, drawing nothing')
@@ -168,7 +183,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
-  }, () => registrations.currentTheme)
+  }, () => registrations.currentTheme, () => internals.clock.now())
   // The screens plugins placed, each in a pane of its own with a scroll view of its own, so what a person did to
   // one — where they scrolled it — is kept while its registration stands. One is open at a time: it takes the
   // transcript's place in the alternate screen's scroll view, so pi-tui's scrolling, search and selection read it
@@ -222,8 +237,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const pane = new ScreenPane(() => facts, {
       changed: () => { tui.requestRender() },
       invoked: (region, affordance) => { placement.invoke?.(region, affordance) },
-    }, () => registrations.currentTheme)
-    pane.place(slot, placement, `binnacle.place(${slot})`)
+    }, () => registrations.currentTheme, () => internals.clock.now())
+    pane.place(slot, { draw: drawn => placement.draw(drawn, surface()) }, `binnacle.place(${slot})`)
     inSlot.set(placement, pane)
     return pane
   }
@@ -275,7 +290,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
-      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme)
+      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme, () => internals.clock.now())
       screenPanes.set(id, pane)
     }
     pane.place(id, placed)
@@ -304,6 +319,39 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       tui.requestRender()
     } else tui.requestRender()
   })
+  // Where the session stands, as the session reads it live, with the notice the host raises laid over it: what lines
+  // are handed, and drawn again as it changes.
+  let notice: string | undefined
+  const surface = (): Surface => ({ ...session.standing(), ...notice === undefined ? {} : { notice } })
+  const restand = (): void => {
+    for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
+    tui.requestRender()
+  }
+  const unstand = session.onStanding(restand)
+  // While what the transcript drew holds the time since a moment, a frame each second draws it at the time; an entry
+  // that holds none is laid out once for all times. A placed screen or a placed line that drew one ticks the same.
+  const ticking = (): boolean => transcript.ticking
+    || [...screenPanes.values()].some(pane => pane.ticking)
+    || [...linesPanes.values()].some(panes => [...panes.values()].some(pane => pane.ticking))
+  let untick: (() => void) | undefined
+  const tick = (): void => {
+    if (ticking()) tui.requestRender()
+    untick = internals.clock.after(1_000, tick)
+  }
+  untick = internals.clock.after(1_000, tick)
+  // A notice stands for its time, and goes; a newer one takes its place.
+  let unraise: (() => void) | undefined
+  let arming: (() => void) | undefined
+  const raise = (text: string, ms: number): void => {
+    unraise?.()
+    notice = text
+    unraise = internals.clock.after(ms, () => {
+      notice = undefined
+      unraise = undefined
+      restand()
+    })
+    restand()
+  }
   const composer = new Editor(reaching(() => tui), editorTheme)
   let page = arrange()
   // A submitted line is the composer placement's to act on: the built-in Composer plugin sends it, through the grant
@@ -311,7 +359,13 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   composer.onSubmit = (text) => {
     composer.setText('')
     const placed = registrations.placed('composer').at(-1)
-    if (placed?.kind === 'composer') placed.submit(text)
+    if (placed?.kind !== 'composer') return
+    // An author's submit is fenced: what it throws is said in a notice, naming its registration, and the surface stays up.
+    try {
+      placed.submit(text)
+    } catch (error) {
+      raise(`binnacle.place(composer) submit threw: ${describe(error)}`, problemWindow)
+    }
   }
   // What `/` completes in binnacle's composer: dsh's commands and the skills a person may invoke, read as the session
   // opens and again as dsh says either changed, through pi-tui's own provider.
@@ -363,7 +417,16 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const reading = seat ?? (open === undefined ? (page.transcript ? transcript : undefined) : open.pane)
     const resolved = table.resolve(data, reading?.focused ?? false, seat === undefined && open !== undefined)
     if (resolved?.kind === 'quit') {
-      quit()
+      // Cancel twice to quit: the first stops a running turn and says what a second does; a second while that is said
+      // quits, and after it the first press is a first again.
+      if (arming !== undefined) {
+        quit()
+        return { consume: true }
+      }
+      if (session.running) session.interrupt()
+      const quitKeys = table.manager.getKeys('binnacle.quit').join(', ')
+      raise(`${quitKeys} again to quit`, quitWindow)
+      arming = internals.clock.after(quitWindow, () => { arming = undefined })
       return { consume: true }
     }
     if (resolved?.kind === 'switch-screens') {
@@ -441,6 +504,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (!held) return
     held = false
     unfollow()
+    unstand()
+    unraise?.()
+    arming?.()
+    untick?.()
     unoffer()
     closeGrants()
     unregister()

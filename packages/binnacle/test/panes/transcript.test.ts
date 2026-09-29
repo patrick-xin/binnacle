@@ -127,10 +127,10 @@ test('on the main screen, focus below what was printed stays drawn there, and fo
   pane.push(result)
   pane.push(waiting)
   pane.push(below)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running…', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running 0s', '', '⋯ added by goal · 2 lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(fullscreen, [])
-  assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '  running…', '', '▸ ⋯ added by goal · show 2 more lines'])
+  assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '  running 0s', '', '▸ ⋯ added by goal · show 2 more lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(fullscreen, [[5, 4]])
 })
@@ -150,7 +150,7 @@ test('switching to the main screen drops focus that sits on a printed entry, and
   assert.equal(pane.focused, true)
   pane.drawOn('regular')
   assert.equal(pane.focused, false)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running…', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', '● stat {}', '  running 0s', '', '⋯ added by goal · 2 lines'])
 })
 
 test('when what is focused settles into the printed rows, focus is dropped rather than a printed row changed', () => {
@@ -276,13 +276,13 @@ const below: Fact = { kind: 'context', seq: 5, time: 5, source: 'goal', blocks: 
 /** A fold a person can open, after the call. */
 const goal: Fact = { ...context, seq: 2, time: 2 }
 
-/** The call's result, arriving once the fold is on screen: more lines than the call's `running…`. */
+/** The call's result, arriving once the fold is on screen: more lines than the call's `running 0s`. */
 const result = returnedFact(3, 3, 'c1', 'w\nx\ny\nz')
 
 test('a result draws its call again, with it', () => {
   const pane = new TranscriptPane(() => {})
   pane.push(call)
-  assert.deepEqual(shown(pane), ['● read {}', '  running…'])
+  assert.deepEqual(shown(pane), ['● read {}', '  running 0s'])
   pane.push(result)
   assert.deepEqual(shown(pane), ['● read {}', 'w', 'x', 'y', '… 1 more line'])
 })
@@ -291,7 +291,7 @@ test('a click answers the screen last drawn, the one the person pointed at, thou
   const pane = new TranscriptPane(() => {})
   pane.push(call)
   pane.push(goal)
-  assert.deepEqual(shown(pane), ['● read {}', '  running…', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane), ['● read {}', '  running 0s', '', '⋯ added by goal · 2 lines'])
   pane.push(result)
   assert.deepEqual(pane.handleMouse(pointer('click', 3)), { handled: true })
   assert.deepEqual(shown(pane), ['● read {}', 'w', 'x', 'y', '… 1 more line', '', '⋯ added by goal · show less', 'a', 'b'])
@@ -385,9 +385,9 @@ test('on the main screen, what is printed stays as printed; a call still waiting
   pane.push(sent(1, 'one'))
   pane.push(call)
   pane.push(sent(3, 'three'))
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', '  running…', '', '', ' › three', ''])
+  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', '  running 0s', '', '', ' › three', ''])
   views.set('prompt', [drawing('mine')])
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', '  running…', '', 'mine'])
+  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', '  running 0s', '', 'mine'])
   pane.push({ ...result, seq: 4, time: 4 })
   assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line', '', 'mine'])
   views.set('prompt', [drawing('yours')])
@@ -439,11 +439,11 @@ const unanswered = (on: 'fullscreen' | 'regular'): TranscriptPane => {
 test('a call its turn left without a result is drawn that way on both screens', () => {
   const ended: Fact = { kind: 'turn', seq: 4, time: 4, turn: 1, phase: 'end', ending: 'aborted' }
   const fullscreen = unanswered('fullscreen')
-  assert.deepEqual(shown(fullscreen), ['', ' › one', '', '', '● read {}', '  running…'])
+  assert.deepEqual(shown(fullscreen), ['', ' › one', '', '', '● read {}', '  running 0s'])
   fullscreen.push(ended)
   assert.deepEqual(shown(fullscreen), ['', ' › one', '', '', '● read {}', '  the turn ended without it: aborted'])
   const regular = unanswered('regular')
-  assert.deepEqual(shown(regular), ['', ' › one', '', '', '● read {}', '  running…'])
+  assert.deepEqual(shown(regular), ['', ' › one', '', '', '● read {}', '  running 0s'])
   regular.push(ended)
   assert.deepEqual(shown(regular), ['', ' › one', '', '', '● read {}', '  the turn ended without it: aborted'])
 })

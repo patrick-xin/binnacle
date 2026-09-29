@@ -52,6 +52,7 @@ export class TranscriptPane implements Component {
   readonly #fullscreen: (top: number, height: number) => void
   #state: UiState = initial
   #draw: DrawScreen = screens()
+  readonly #now: () => number | undefined
   #drawn: { readonly width: number, readonly screen: Screen } | undefined
   #on: TuiMode = 'fullscreen'
   #printed: Printed | undefined
@@ -63,9 +64,11 @@ export class TranscriptPane implements Component {
    * @param views - authors' views as they stand, read at every frame; an entry is drawn again when the views of its key change.
    * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
    * @param theme - the theme as it stands, read at every frame; every entry is laid out again when it changes.
+   * @param now - the time, in milliseconds since the epoch, as the host hands it at every frame: what an entry that draws the time since a moment is laid out at. The pane reads no clock of its own.
    */
-  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => binnacleTheme) {
+  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined) {
     this.#changed = changed
+    this.#now = now
     this.#views = views
     this.#theme = theme
     this.#inView = reports.inView ?? (() => {})
@@ -136,14 +139,14 @@ export class TranscriptPane implements Component {
    */
   render(width: number): string[] {
     const now = settled(this.#transcript)
-    let screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme())
+    let screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme(), this.#now())
     if (this.#on === 'regular' && this.#state.focus !== undefined) {
       // Focus never sits within the rows this render prints: its own row could not be drawn without changing a row already printed.
       const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
       const placed = screen.regions.find(candidate => candidate.region.id === this.#state.focus)
       if (placed !== undefined && placed.top < through(now)) {
         this.#park(screen)
-        screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme())
+        screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme(), this.#now())
       }
     }
     this.#drawn = { width, screen }
@@ -162,8 +165,13 @@ export class TranscriptPane implements Component {
     const drawn = this.#drawn
     const focus = this.#state.focus
     if (drawn === undefined || focus === undefined) return
-    const placed = this.#draw(this.#transcript, this.#state, drawn.width, this.#views(), this.#theme()).regions.find(candidate => candidate.region.id === focus)
+    const placed = this.#draw(this.#transcript, this.#state, drawn.width, this.#views(), this.#theme(), this.#now()).regions.find(candidate => candidate.region.id === focus)
     if (placed !== undefined) this.#inView(placed.top, placed.height)
+  }
+
+  /** Whether what it last drew holds the time since a moment, so a later time draws it again: the host's to tick. */
+  get ticking(): boolean {
+    return this.#drawn?.screen.timed === true
   }
 
   /** Whether something on screen has focus. */
@@ -179,7 +187,7 @@ export class TranscriptPane implements Component {
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
-    const drawn = this.#drawn?.width === event.width ? this.#drawn.screen : this.#draw(this.#transcript, this.#state, event.width, this.#views(), this.#theme())
+    const drawn = this.#drawn?.width === event.width ? this.#drawn.screen : this.#draw(this.#transcript, this.#state, event.width, this.#views(), this.#theme(), this.#now())
     const next = answer(this.#state, gesture, under(drawn.regions, event.y, event.x), drawn)
     if (next === undefined || next.state === this.#state) return undefined
     this.#state = next.state
@@ -205,7 +213,7 @@ export class TranscriptPane implements Component {
     if (next.state !== this.#state) {
       this.#state = next.state
       if (next.focus !== undefined) {
-        const screen = this.#draw(this.#transcript, next.state, drawn.width, this.#views(), this.#theme())
+        const screen = this.#draw(this.#transcript, next.state, drawn.width, this.#views(), this.#theme(), this.#now())
         const placed = screen.regions.find(candidate => candidate.region.id === next.focus)
         if (placed !== undefined) {
           // On the fullscreen the focused thing is brought into view; on the main screen, focus that reaches a printed entry asks for the fullscreen.

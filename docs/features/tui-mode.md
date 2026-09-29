@@ -17,7 +17,7 @@ A person reads the session on either of the terminal's screens, which pi calls T
 
 - Both screens, switched while running, as pi offers them. The alternate screen alone gives up the terminal's own scrollback, search and selection, which pi keeps as its default. Choosing once at start carries nothing across a switch, and a fold in a printed entry can only be opened on the other screen, which a key reaches by switching ([Keys](keys.md)).
 - fullscreen by default, where a click or a key reaches what content offers. pi's default is regular.
-- Ctrl+T switches and Ctrl+C quits, answered by the host through the one key table, as placements keep them ([ADR 11](../adr/0011-placements-reach-the-whole-screen-and-the-built-in-surface-is-placed-through-them.md), [ADR 13](../adr/0013-a-key-means-something-only-through-the-one-key-table.md)).
+- Ctrl+T switches, and Ctrl+C pressed twice quits, answered by the host through the one key table, as placements keep them ([ADR 11](../adr/0011-placements-reach-the-whole-screen-and-the-built-in-surface-is-placed-through-them.md), [ADR 13](../adr/0013-a-key-means-something-only-through-the-one-key-table.md)).
 - pi's words, `regular` and `fullscreen`.
 - A switch moves the pane, not a new one. A new pane would draw every entry again, at a cost that grows with the session ([ADR 9](../adr/0009-a-view-is-drawn-once-for-each-entry-and-again-when-its-author-invalidates-it.md)), and would lose what a person had opened.
 - Quitting leaves the session printed on the main screen, as pi's fullscreen does by default.

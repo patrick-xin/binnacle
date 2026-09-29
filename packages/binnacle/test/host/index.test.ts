@@ -16,6 +16,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import * as host from '../../src/host/index.ts'
 import type { OpenedSession } from '../../src/host/session.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
+import { FakeClock } from '../support/clock.ts'
 import { FakeSession } from '../support/session.ts'
 import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
 import type { Node } from '../../src/api.ts'
@@ -67,7 +68,7 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
 }
 
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
-async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, selection: { readonly provider: string, readonly model: string } = { provider: 'deepseek', model: 'deepseek-v4' }) {
+async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, clock: { now(): number, after(ms: number, then: () => void): () => void } = new FakeClock()) {
   const exits: number[] = []
   const out: string[] = []
   // The launcher's readiness: every listener runs once, in one go, at the commit — as the real one does (`dsh:apps/cli/src/profile-boot.ts#createAppReady`).
@@ -79,6 +80,7 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   host.internals.stdout = { write: (chunk: string) => { out.push(chunk); return true } }
   host.internals.stderr = { write: (chunk: string) => { out.push(chunk); return true } }
   host.internals.open = open
+  host.internals.clock = clock
   const ctx = new Context()
   await provide(ctx)
   provideCmdline(ctx, {
@@ -96,17 +98,20 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
     },
   })
   ctx.provide('agents', {} as never)
+  // dsh's session projections, whose snapshot the real opening reads; the host's tests fake the session, so a stub answers the seam the row names.
+  ctx.provide('sessionProjections', { snapshot: () => ({ values: {} }) } as never)
+  // dsh's default model, which opening a session reads; the host's tests fake the session, so nothing here varies it.
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  // dsh's commands, which the row names; the host's tests fake the session, whose commands a test names, so nothing reads this.
   ctx.provide('commands', {} as never)
-  // The default model the status line names, as dsh's own selection reads it; a test varies it to prove the line follows the service.
-  ctx.provide('agentDefaultModel', { currentSelection: () => selection } as never)
   const fiber = ctx.plugin(host)
   await fiber
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
-test('the row is named binnacle and needs the command line, the agents, the default model and the commands', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model, the session projections and the commands', () => {
   assert.equal(host.name, 'binnacle')
-  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'])
+  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'])
 })
 
 test('--check opens a session on the default model once startup commits, reports it, closes it, and exits 0 drawing nothing', async () => {
@@ -175,10 +180,11 @@ test('a submitted line reaches the placement as the Editor hands it on, trimmed 
   assert.deepEqual(seen, ['', 'hello'])
 })
 
-test('ctrl+c gives the terminal back, closes the session, and asks to exit 0', async () => {
+test('ctrl+c twice gives the terminal back, closes the session, and asks to exit 0', async () => {
   const { terminal, exits, session, commit } = await mount([])
   commit()
   await settle()
+  terminal.type('\x03')
   terminal.type('\x03')
   await settle()
   assert.equal(terminal.started, false)
@@ -304,6 +310,7 @@ test('a session that fails to close on ctrl+c still gives the terminal back, say
   commit()
   await settle()
   terminal.type('\x03')
+  terminal.type('\x03')
   await settle()
   assert.equal(terminal.started, false)
   assert.deepEqual(out, ['binnacle: could not close the session: the agent did not stop\n'])
@@ -397,7 +404,7 @@ test('--tui-mode regular prints the session under what the shell printed, and ne
   commit()
   await until(() => /p12/.test(terminal.written))
   session.log(called(13, 'read'))
-  await until(() => /running…/.test(terminal.written))
+  await until(() => /running 0s/.test(terminal.written))
   session.log(returned(14, 13, 'the file'))
   await until(() => /the file/.test(terminal.written))
   const author = ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (plugin: Context) => { plugin.binnacle.view('prompt', () => ({ kind: 'text', text: 'drawn by an author' })) } })
@@ -453,6 +460,7 @@ test('ctrl+t switches screens both ways, and what is typed, what every entry dre
   assert.equal(await terminal.onAlternateScreen(), true)
   assert.equal(calls, 1)
   terminal.type('\x03')
+  terminal.type('\x03')
   await settle()
   assert.equal(terminal.started, false)
   assert.deepEqual(exits, [0])
@@ -472,12 +480,13 @@ test('whichever screen a person quits from, the main screen is left holding the 
     session.log(prompt(4, 'p4'))
     await settle()
     terminal.type('\x03')
+  terminal.type('\x03')
     await settle()
     assert.deepEqual((await terminal.mainScreen()).filter(row => row.startsWith(' › ')), [' › p1', ' › p2', ' › p3', ' › p4'], `${args.join(' ') || 'fullscreen'}, switched ${switches} times`)
   }
 })
 
-test('where the terminal reports holding and releasing a key, as pi-tui asks a kitty-protocol one to, ctrl+t switches once and ctrl+c asks to exit once', async () => {
+test('where the terminal reports holding and releasing a key, as pi-tui asks a kitty-protocol one to, ctrl+t switches once and ctrl+c pressed twice asks to exit once', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { exits, commit } = await mount([], session, async () => session, terminal)
@@ -488,6 +497,11 @@ test('where the terminal reports holding and releasing a key, as pi-tui asks a k
     await settle()
     assert.equal(await terminal.onAlternateScreen(), false, JSON.stringify(event))
   }
+  // A press let go is one press: the first says a second quits, and the second quits, once.
+  terminal.type('\x1b[99;5u')
+  terminal.type('\x1b[99;5:3u')
+  await settle()
+  assert.deepEqual(exits, [])
   terminal.type('\x1b[99;5u')
   terminal.type('\x1b[99;5:3u')
   await settle()
@@ -687,7 +701,7 @@ test('on the main screen, focus on something not yet printed stays there, drawn,
   })
   const after = await terminal.mainScreen()
   assert.deepEqual(after.slice(0, 9), ['', ' › one', '', '', '● read {}', 'w', 'x', 'y', '… 1 more line'])
-  assert.deepEqual(after.slice(9, 18), ['', '● stat {}', '  running…', '', '▸ ⋯ added by system-prompt · fold it', 'away', 'a', 'b', '[tool-addition]'])
+  assert.deepEqual(after.slice(9, 18), ['', '● stat {}', '  running 0s', '', '▸ ⋯ added by system-prompt · fold it', 'away', 'a', 'b', '[tool-addition]'])
 })
 
 test('the key a plugin offers opens its screen in the transcript\'s place, the composer below it, and the same key returns the transcript as it was', async () => {
@@ -755,6 +769,7 @@ test('quitting answers on a placed screen, and the session is left printed plain
   await until(async () => (await terminal.altScreen()).some(row => row.includes('three')))
   terminal.type('\x1bOQ')
   await until(async () => (await terminal.altScreen()).slice(0, 5).every(row => row.startsWith('screen ')))
+  terminal.type('\x03')
   terminal.type('\x03')
   await settle()
   assert.deepEqual(exits, [0])
@@ -1008,6 +1023,7 @@ test('with lines in the composer\'s place, what is typed is sent nowhere, and ct
   await settle()
   assert.deepEqual(session.sent, [])
   terminal.type('\x03')
+  terminal.type('\x03')
   await until(() => exits.length > 0)
   assert.deepEqual(exits, [0])
 })
@@ -1064,12 +1080,69 @@ test('out of the box, the line under the composer names the model the session ru
   assert.ok(terminal.written.includes('\x1b[90mdeepseek/deepseek-v4\x1b[39m'), 'the model is drawn in the muted tone')
 })
 
-test('the line names whatever dsh\'s default model selects, not a model of binnacle\'s own', async () => {
+test('the line names the model the session runs, and follows it as the session stands elsewhere', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
-  const { commit } = await mount([], session, async () => session, terminal, async () => {}, { provider: 'moonshot', model: 'kimi-k2' })
+  const { commit } = await mount([], session, async () => session, terminal)
   commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  session.stands = { model: 'moonshot/kimi-k2', running: true }
+  session.standsChanged()
   await until(async () => (await terminal.altScreen()).at(-1) === 'moonshot/kimi-k2')
+})
+
+test('the line names the tokens the session used and the share of its context, each as it is measured', async () => {
+  const terminal = new XtermTerminal(60, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  session.stands = { model: 'deepseek/deepseek-v4', running: false, usage: { input: 12_000, output: 400, cacheRead: 0 } }
+  session.standsChanged()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 12.4k tokens')
+  session.stands = { model: 'deepseek/deepseek-v4', running: false, usage: { input: 12_000, output: 400, cacheRead: 0 }, context: { used: 12_400, window: 32_768 } }
+  session.standsChanged()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 12.4k tokens · 38% of context')
+})
+
+test('a notice stands in the line\'s place while one stands, and the line returns once it goes', async () => {
+  const terminal = new XtermTerminal(50, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  terminal.type('\x03')
+  await until(async () => (await terminal.altScreen()).at(-1) === 'ctrl+c again to quit')
+  assert.ok(terminal.written.includes('\x1b[90mctrl+c again to quit\x1b[39m'), 'the notice is drawn in the muted tone')
+  clock.advance(3_000)
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+})
+
+test('lines a plugin places that say the time since a moment count up as it passes', async () => {
+  const terminal = new XtermTerminal(40, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { ctx, commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('below-composer', { kind: 'lines', draw: () => ({ kind: 'text', text: ['elapsed ', { since: 1_000 }] }) }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'elapsed 0s'))
+  clock.advance(4_000)
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'elapsed 3s'))
+})
+
+test('a screen a plugin places that says the time since a moment counts up as it passes, open', async () => {
+  const terminal = new XtermTerminal(40, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { ctx, commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  await placesAScreen(ctx, () => ({ kind: 'text', text: ['up ', { since: 0 }] }))
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'up 0s'))
+  clock.advance(2_000)
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'up 2s'))
 })
 
 test('a quit key a plugin rebinds quits, and the key it had no longer does', async () => {
@@ -1082,6 +1155,7 @@ test('a quit key a plugin rebinds quits, and the key it had no longer does', asy
   terminal.type('\x03')
   await settle()
   assert.deepEqual(exits, [])
+  terminal.type('\x11')
   terminal.type('\x11')
   await until(() => exits.length > 0)
   assert.deepEqual(exits, [0])
@@ -1128,6 +1202,7 @@ test('disposing the plugin that rebound quit gives ctrl+c back', async () => {
   assert.deepEqual(exits, [])
   await author.dispose()
   terminal.type('\x03')
+  terminal.type('\x03')
   await until(() => exits.length > 0)
   assert.deepEqual(exits, [0])
 })
@@ -1147,6 +1222,12 @@ test('a key a plugin binds to expand opens the focused fold, and one bound to co
   assert.deepEqual(await terminal.altScreen(), focused)
   terminal.type('\x1b[17~')
   await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'z'))
+})
+
+test('--help says Ctrl+C stops a running turn and quits only when pressed twice', async () => {
+  const { out } = await mount(['--help'])
+  assert.match(out.join(''), /Ctrl\+C stops a\s+running turn, and twice quits\./)
+  assert.match(out.join(''), /\n  ctrl\+c  stop a running turn; pressed twice, quit\n/)
 })
 
 test('--help names each affordance\'s binding, unbound until a person binds it', async () => {
@@ -1303,6 +1384,7 @@ test('an approval still standing when the session closes settles unavailable, an
   void askApproval(ctx, { toolName: 'bash', reason: 'writes outside the workspace' }).then((outcome) => { settled = outcome })
   await until(async () => (await terminal.altScreen()).some(row => row.includes('allow once')))
   terminal.type('\x03')
+  terminal.type('\x03')
   await until(() => settled !== undefined)
   assert.equal(settled, 'unavailable')
   await settle()
@@ -1339,46 +1421,93 @@ test('the key a person binds to dismiss rejects an approval while allow once has
   assert.equal(settled, 'rejected')
 })
 
-test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
-  const terminal = new XtermTerminal(40, 8)
+test('lines are handed where the session stands, and are drawn again as it changes', async () => {
+  const terminal = new XtermTerminal(60, 10)
   const session = new FakeSession([prompt(1, 'fix the build')])
-  const selection = { provider: 'first', model: 'old' }
-  const { commit } = await mount([], session, async () => session, terminal, async () => {}, selection)
-  selection.provider = 'next'
-  selection.model = 'new'
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('above-composer', { kind: 'lines', draw: (_facts, surface) => ({ kind: 'text', text: `${surface.model} ${surface.running ? 'working' : 'idle'} ${surface.usage?.output ?? 0}` }) })
+    },
+  })
   commit()
-  await until(async () => (await terminal.altScreen()).at(-1) === 'next/new')
+  await until(async () => (await terminal.altScreen()).some(row => row === 'deepseek/deepseek-v4 idle 0'))
+  session.stands = { model: 'moonshot/kimi-k2', running: true, usage: { input: 1200, output: 340, cacheRead: 0 } }
+  session.standsChanged()
+  await until(async () => (await terminal.altScreen()).some(row => row === 'moonshot/kimi-k2 working 340'))
 })
 
-test('a change of the default after the session opened does not move the line, for the session still runs what it opened on', async () => {
-  const terminal = new XtermTerminal(40, 8)
-  const session = new FakeSession([prompt(1, 'fix the build')])
-  const selection = { provider: 'deepseek', model: 'deepseek-v4' }
-  const { commit } = await mount([], session, async () => session, terminal, async () => {}, selection)
-  commit()
-  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
-  selection.provider = 'moonshot'
-  selection.model = 'kimi-k2'
-  session.log(prompt(2, 'and the tests'))
-  await until(async () => (await terminal.altScreen()).some(row => row.includes('and the tests')))
-  assert.equal((await terminal.altScreen()).at(-1), 'deepseek/deepseek-v4')
-})
+/** A plugin that places the notice the session stands at above the composer, or nothing. */
+const placesTheNotice = (ctx: Context) =>
+  ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('above-composer', { kind: 'lines', draw: (_facts, surface) => ({ kind: 'text', text: surface.notice ?? '' }) }) } })
 
-test('a change of the default while the session is opening does not move the line, for the session runs what it opened on', async () => {
-  const terminal = new XtermTerminal(40, 8)
+test('ctrl+c mid-turn interrupts the turn and says a second quits, and a second within three seconds quits', async () => {
+  const terminal = new XtermTerminal(50, 10)
   const session = new FakeSession([prompt(1, 'fix the build')])
-  const selection = { provider: 'first', model: 'old' }
-  let opened: (() => void) | undefined
-  // The opening stands for openSession: it begins at the commit of startup, reading the selection on that tick, and holds while the agent is created.
-  const opening = new Promise<OpenedSession>(resolve => { opened = () => resolve(session) })
-  const { commit } = await mount([], session, () => opening, terminal, async () => {}, selection)
+  const clock = new FakeClock()
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  await placesTheNotice(ctx)
   commit()
-  await settle()
-  selection.provider = 'next'
-  selection.model = 'new'
-  opened?.()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
-  assert.equal((await terminal.altScreen()).at(-1), 'first/old')
+  session.running = true
+  terminal.type('\x03')
+  assert.equal(session.interrupted, 1)
+  await until(async () => (await terminal.altScreen()).some(row => row === 'ctrl+c again to quit'))
+  assert.deepEqual(exits, [])
+  clock.advance(2_999)
+  terminal.type('\x03')
+  await until(() => exits.length > 0)
+  assert.deepEqual(exits, [0])
+})
+
+test('ctrl+c while nothing runs only says a second quits; after three seconds the notice goes, and one ctrl+c no longer quits', async () => {
+  const terminal = new XtermTerminal(50, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { ctx, exits, commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  await placesTheNotice(ctx)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x03')
+  await until(async () => (await terminal.altScreen()).some(row => row === 'ctrl+c again to quit'))
+  assert.equal(session.interrupted, 0)
+  clock.advance(3_000)
+  await until(async () => (await terminal.altScreen()).every(row => row !== 'ctrl+c again to quit'))
+  terminal.type('\x03')
+  await settle()
+  assert.deepEqual(exits, [])
+})
+
+test('a composer placement whose submit throws is named in a notice, and the surface stays up', async () => {
+  const terminal = new XtermTerminal(60, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesTheNotice(ctx)
+  await ctx.plugin({ name: 'composer author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('composer', { kind: 'composer', submit: () => { throw new Error('no network') } }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('hello')
+  terminal.type('\r')
+  await until(async () => (await terminal.altScreen()).some(row => row === 'binnacle.place(composer) submit threw: no network'))
+})
+
+test('a running call counts up once a second, and stops counting once it returns', async () => {
+  const terminal = new XtermTerminal(40, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, clock)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  clock.advance(3)
+  session.log(called(3, 'read'))
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'running 0s'))
+  clock.advance(4_000)
+  await until(async () => (await terminal.altScreen()).some(row => row.trim() === 'running 4s'))
+  session.log(returned(4, 3, 'the file'))
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('the file')))
+  assert.equal((await terminal.altScreen()).some(row => row.includes('running')), false)
 })
 
 test('a /name line naming one of the session\'s commands runs it and is not sent, and one naming none is sent as prose', async () => {

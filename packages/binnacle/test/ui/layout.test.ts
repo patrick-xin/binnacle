@@ -323,3 +323,17 @@ test('a filled card stays filled around what it holds that is filled otherwise: 
     assert.equal(inner.split('\x1b[49m').slice(1).every(rest => rest.startsWith('\x1b[41m')), true, JSON.stringify(line))
   }
 })
+
+/**
+ * A line saying the time since a moment a second in, laid out at a time.
+ * @param now - the time.
+ * @returns the line, plain.
+ */
+const since = (now: number): string => stripTerminalSequences(layout({ kind: 'text', text: ['running ', { since: 1_000 }] }, 40, { toggled: new Set(), now }).lines[0] ?? '').trimEnd()
+
+test('a span that says the time since a moment is laid out at the time it is given: seconds, then minutes and seconds, then hours and minutes', () => {
+  assert.equal(since(1_000), 'running 0s')
+  assert.equal(since(5_400), 'running 4s')
+  assert.equal(since(66_000), 'running 1m 05s')
+  assert.equal(since(1_000 + 3_723_000), 'running 1h 02m')
+})

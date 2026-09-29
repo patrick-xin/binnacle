@@ -1,34 +1,74 @@
 /**
- * The Status line: one line under the composer naming the model the session
- * runs, as `provider/model`, muted. A built-in plugin, holding only what an
+ * The Status line: one line under the composer saying what the session runs
+ * and where it stands — the model it runs, the tokens it has used and the
+ * share of its context, muted — with a notice in its place while one stands. A built-in plugin, holding only what an
  * author holds: the `binnacle` service, to place its line where an author
- * could place one of their own; and dsh's default model and startup
- * readiness, to read the selection the session opens on at the tick it
- * reads it.
+ * could place one of their own. What it says arrives in the surface the host
+ * hands every lines drawing, read live from the session, so it names no
+ * service of dsh's and reads nothing at any tick of its own.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { Surface } from '../../api.ts'
 
 /** The Status line plugin, loaded by the host beside the surface it draws on. */
 export const statusLine = {
   name: 'status-line',
-  inject: ['binnacle', 'agentDefaultModel', 'appReady'] satisfies (keyof Context)[],
+  inject: ['binnacle'] satisfies (keyof Context)[],
   apply(ctx: Context): void {
-    const ready = ctx.appReady
-    if (ready === undefined) throw new Error('status-line: the launcher must provide ctx.appReady before the tree mounts')
-    // Named at the commit of startup, the tick the session itself reads the selection it runs: the readiness listeners
-    // run in one go, with no turn of the loop between them, so however the default changes around the opening — before
-    // the commit, or while the agent is being created — the line and the session cannot disagree. What the default
-    // turns to after is the live session's to say, not the default's.
-    let named: string | undefined
-    ctx.effect(() => ready.onReady(() => {
-      const { provider, model } = ctx.agentDefaultModel.currentSelection()
-      named = `${provider}/${model}`
-    }), 'status-line: the model named at startup')
-    // The surface draws nothing before the commit, for the session opens only then, so the line is always named by its first drawing.
     ctx.binnacle.place('below-composer', {
       kind: 'lines',
-      draw: () => ({ kind: 'text', text: named ?? '', tone: 'muted' }),
+      draw: (_facts, surface) => ({ kind: 'text', text: lineOf(surface), tone: 'muted' }),
     })
   },
+}
+
+/**
+ * What the status line says: the notice while one stands, in the line's
+ * place; otherwise the model the session runs, the tokens it has used and
+ * the share of its context, each measure as it is known, joined by ` · `.
+ * @param surface - where the session stands.
+ * @returns the line's text.
+ */
+function lineOf(surface: Surface): string {
+  if (surface.notice !== undefined) return surface.notice
+  const parts = [surface.model]
+  if (surface.usage !== undefined) parts.push(`${compact(surface.usage.input + surface.usage.output + surface.usage.cacheRead)} tokens`)
+  if (surface.context !== undefined) parts.push(`${share(surface.context.used, surface.context.window)} of context`)
+  return parts.join(' · ')
+}
+
+/**
+ * A count scaled down from a unit, as a person reads it: rounded to a whole once a hundred, one decimal beneath
+ * that — dsh web's compact count's own rule (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`).
+ * @param over - the count over the unit.
+ * @returns it, as written.
+ */
+function scaled(over: number): string {
+  return over >= 100 ? `${Math.round(over)}` : `${Math.round(over * 10) / 10}`
+}
+
+/**
+ * A count of tokens as a person reads it: `517`, `12.4k`, `517k`, `1.2m` — dsh web's compact count
+ * (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`), restated lowercase and without its
+ * locale seat, as #42's worked example writes it.
+ * @param value - the count.
+ * @returns it, compact.
+ */
+function compact(value: number): string {
+  if (value < 1_000) return `${value}`
+  if (value < 1_000_000) return `${scaled(value / 1_000)}k`
+  return `${scaled(value / 1_000_000)}m`
+}
+
+/**
+ * The share of the context the session fills, rounded as dsh web's occupancy meter rounds it
+ * (`dsh:packages/client/ui-conversation/src/client/context-occupancy.ts#contextOccupancy`): to a whole, never past
+ * full.
+ * @param used - the tokens the session's context fills.
+ * @param window - the window it fills.
+ * @returns the share, as `38%`.
+ */
+function share(used: number, window: number): string {
+  return `${Math.min(100, Math.round(used / window * 100))}%`
 }

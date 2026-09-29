@@ -17,6 +17,8 @@ export interface LayoutState {
   readonly focus?: string
   /** How the folds of what is laid out start, when a fold does not say: the theme's for the kind of entry it is drawn in. */
   readonly folds?: FoldStart
+  /** The time a span saying the time since a moment is laid out at, in milliseconds since the epoch: the host's to hand, for nothing below it reads the clock. */
+  readonly now?: number
 }
 
 /** A region, and the rows and columns it covers. */
@@ -95,7 +97,8 @@ function written(node: Extract<Node, { readonly kind: 'text' }>, theme: Theme): 
       ? { text: span, tone: node.tone }
       : 'mark' in span
         ? { text: markIn(span.mark, theme).glyph, tone: span.tone ?? markIn(span.mark, theme).tone }
-        : { text: span.text, tone: span.tone }
+        // `at` writes the time since a moment before anything is drawn; one reaching here reads as none.
+        : 'since' in span ? { text: elapsed(0), tone: span.tone ?? node.tone } : { text: span.text, tone: span.tone }
     const last = runs.at(-1)
     if (last !== undefined && last.tone === run.tone) last.text += run.text
     else runs.push(run)
@@ -121,7 +124,7 @@ function titleLine(spans: readonly Span[], tone: Tone | undefined, theme: Theme)
  * @returns their text, joined.
  */
 function plainTitle(spans: readonly Span[], theme: Theme): string {
-  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? markIn(span.mark, theme).glyph : span.text).join('')
+  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? markIn(span.mark, theme).glyph : 'since' in span ? elapsed(0) : span.text).join('')
 }
 
 /**
@@ -149,7 +152,51 @@ function focusWithTitle(title: string, label: string, width: number, theme: Them
  * @returns its lines and regions.
  */
 export function layout(node: Node, width: number, state: LayoutState, theme: Theme = binnacleTheme): Frame {
-  return drawn(readable(node), width, state, theme)
+  return drawn(readable(at(node, state.now)), width, state, theme)
+}
+
+/**
+ * The time from a moment to another, as a person reads it: seconds under a minute, then minutes and seconds, then
+ * hours and minutes. A moment later than the other reads as none.
+ * @param ms - how long, in milliseconds.
+ * @returns it, as written.
+ */
+export function elapsed(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1_000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
+}
+
+/**
+ * A node as it reads at a time: each span saying the time since a moment written as the time from it, in its tone.
+ * Exhaustive over the node kinds, so a kind added to `Node` fails to compile until its spans are written too.
+ * @param node - the node a view drew.
+ * @param now - the time, in milliseconds since the epoch; none reads every moment as now.
+ * @returns the node, its time written.
+ */
+function at(node: Node, now: number | undefined): Node {
+  const span = (each: Span): Span => {
+    if (typeof each === 'string' || !('since' in each)) return each
+    const text = elapsed((now ?? each.since) - each.since)
+    return each.tone === undefined ? text : { text, tone: each.tone }
+  }
+  switch (node.kind) {
+    case 'blank':
+    case 'markdown':
+      return node
+    case 'text':
+      return typeof node.text === 'string' ? node : { ...node, text: node.text.map(span) }
+    case 'stack':
+      return { ...node, children: node.children.map(child => at(child, now)) }
+    case 'offer':
+    case 'card':
+    case 'band':
+      return { ...node, child: at(node.child, now) }
+    case 'fold':
+      return node.title === undefined ? { ...node, child: at(node.child, now) } : { ...node, title: node.title.map(span), child: at(node.child, now) }
+  }
 }
 
 /**
