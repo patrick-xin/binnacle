@@ -22,7 +22,7 @@ export function readable(node: Node): Node {
     case 'offer':
       return {
         ...node,
-        affordances: node.affordances.map(affordance => ({ ...affordance, label: treated(affordance.label) })),
+        affordances: node.affordances.map(affordance => affordance.label === undefined ? affordance : { ...affordance, label: treated(affordance.label) }),
         child: readable(node.child),
       }
     case 'ask': {

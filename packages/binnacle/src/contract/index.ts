@@ -20,8 +20,8 @@ export type AffordanceKind = keyof typeof affordances
 export interface Affordance {
   /** What it does. */
   readonly kind: AffordanceKind
-  /** What it does to this content, in words a person reads in help and on focus. */
-  readonly label: string
+  /** What it does to this content, in words a person reads in help and on focus; when absent, the theme's words for its kind say it, so a label is written only where it means something more. */
+  readonly label?: string
 }
 
 /** A part of the screen a gesture can land on. */

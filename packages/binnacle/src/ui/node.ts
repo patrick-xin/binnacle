@@ -214,12 +214,12 @@ function spanOf(value: unknown, theme: Theme): Span {
  * Read one affordance an author's offer declares.
  * @param value - the affordance, as returned.
  * @returns it, as data.
- * @throws when its kind is not one binnacle knows, or it has no label.
+ * @throws when its kind is not one binnacle knows, or its label is no string.
  */
 function affordanceOf(value: unknown): Affordance {
   const kind: unknown = typeof value === 'object' && value !== null && 'kind' in value ? value.kind : undefined
   const label: unknown = typeof value === 'object' && value !== null && 'label' in value ? value.label : undefined
   if (typeof kind !== 'string' || !Object.hasOwn(affordances, kind)) throw new Error(`${describe(kind)} is no affordance`)
-  if (typeof label !== 'string') throw new Error('an affordance needs a label')
-  return { kind: kind as Affordance['kind'], label }
+  if (label !== undefined && typeof label !== 'string') throw new Error(`an affordance's label is ${describe(label)}`)
+  return label === undefined ? { kind: kind as Affordance['kind'] } : { kind: kind as Affordance['kind'], label }
 }

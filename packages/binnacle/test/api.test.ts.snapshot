@@ -304,6 +304,7 @@ export declare const chrome: {
         readonly bottomRight: '╯';
     };
     readonly jump: '↓';
+    readonly gutter: '│';
 };
 // ui/theme.d.ts
 export declare const words: {
@@ -313,6 +314,15 @@ export declare const words: {
     readonly show: (count: number) => string;
     readonly away: 'fold it away';
     readonly to: (count: number) => string;
+    readonly select: 'select';
+    readonly next: 'next';
+    readonly 'offer.expand': 'expand';
+    readonly 'offer.choose': 'choose';
+    readonly 'offer.open': 'open';
+    readonly 'offer.copy': 'copy';
+    readonly 'offer.answer': 'answer';
+    readonly 'offer.grant': 'allow';
+    readonly 'offer.dismiss': 'dismiss';
 };
 // ui/theme.d.ts
 export interface FoldStart {
@@ -340,10 +350,15 @@ export type Node = {
     readonly affordances: readonly Affordance[];
     readonly child: Node;
 } | {
-    readonly kind: 'card';
+    readonly kind: 'ask';
     readonly title?: string;
     readonly background?: Background;
     readonly edge?: Tone;
+    readonly child: Node;
+} | {
+    readonly kind: 'show';
+    readonly title: readonly Span[];
+    readonly tone?: Tone;
     readonly child: Node;
 } | {
     readonly kind: 'band';
@@ -372,7 +387,7 @@ export type Span = string | {
 // contract/index.d.ts
 export interface Affordance {
     readonly kind: AffordanceKind;
-    readonly label: string;
+    readonly label?: string;
 }
 // views/entries.d.ts
 export type View = (entry: Entry, next: () => Node) => Node;

@@ -235,7 +235,7 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
       const placed = { region, top: 0, height: frame.lines.length, left: 0, width }
       const primary = node.affordances[0]
       if (state.focus !== node.id || primary === undefined) return { lines: frame.lines, regions: [placed, ...frame.regions] }
-      const row = focusRow(primary.label, width, theme)
+      const row = focusRow(primary.label ?? theme.words[`offer.${primary.kind}`], width, theme)
       return { lines: [...frame.lines, ...row], regions: [{ ...placed, height: frame.lines.length + row.length }, ...frame.regions] }
     }
     case 'ask':

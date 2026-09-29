@@ -1,4 +1,5 @@
 import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
+import type { AffordanceKind } from '../contract/index.ts'
 
 /** Leave text as it is. */
 const plain = (text: string): string => text
@@ -78,10 +79,18 @@ export const words = {
   select: 'select',
   /** What the keys that move focus on in an ask do, as its bottom edge names them. */
   next: 'next',
-} as const
+  /** What each kind of offer does, said where an offer names no label of its own. */
+  'offer.expand': 'expand',
+  'offer.choose': 'choose',
+  'offer.open': 'open',
+  'offer.copy': 'copy',
+  'offer.answer': 'answer',
+  'offer.grant': 'allow',
+  'offer.dismiss': 'dismiss',
+} as const satisfies { readonly [kind in AffordanceKind as `offer.${kind}`]: string } & Readonly<Record<string, string | ((count: number) => string)>>
 
 /** The words that say no count: each is said as it is, where the rest are templates of a count. */
-const plainWords = ['less', 'away', 'select', 'next'] as const
+const plainWords = ['less', 'away', 'select', 'next', 'offer.expand', 'offer.choose', 'offer.open', 'offer.copy', 'offer.answer', 'offer.grant', 'offer.dismiss'] as const
 
 /** A word that says no count. */
 type PlainWord = typeof plainWords[number]

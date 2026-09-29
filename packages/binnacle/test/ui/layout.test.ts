@@ -369,3 +369,10 @@ test('a span that says the time since a moment is laid out at the time it is giv
   assert.equal(since(66_000), 'running 1m 05s')
   assert.equal(since(1_000 + 3_723_000), 'running 1h 02m')
 })
+
+test('an offer that names no label says what it does in the theme\'s words for its kind, as a person changes them', () => {
+  const unlabelled = { kind: 'offer', id: 'allow', affordances: [{ kind: 'grant' }], child: { kind: 'text', text: 'allow once' } } as const
+  assert.deepEqual(plain(layout(unlabelled, 30, { toggled: new Set(), focus: 'allow' })).lines, ['allow once', '▸ allow'])
+  const renamed = themed(binnacleTheme, [{ words: { 'offer.grant': 'yes' } }])
+  assert.deepEqual(plain(layout(unlabelled, 30, { toggled: new Set(), focus: 'allow' }, renamed)).lines, ['allow once', '▸ yes'])
+})
