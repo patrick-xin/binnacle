@@ -1,5 +1,5 @@
 import { isKeyRepeat, isKeyRelease, KeybindingsManager, TUI_KEYBINDINGS } from '@earendil-works/pi-tui'
-import type { Keybinding, KeybindingDefinition, KeybindingDefinitions, KeybindingsConfig } from '@earendil-works/pi-tui'
+import type { KeyId, Keybinding, KeybindingDefinition, KeybindingDefinitions, KeybindingsConfig } from '@earendil-works/pi-tui'
 import { affordances } from '../contract/index.ts'
 import type { AffordanceKind, KeyBinding } from '../contract/index.ts'
 
@@ -67,6 +67,14 @@ export type ResolvedKey =
   | { readonly kind: 'screen', readonly name: string }
   | { readonly kind: 'screen-close' }
 
+/** The binding id of each meaning a key gives a gesture that is not an affordance kind's; an affordance kind's is `binnacle.<kind>`. */
+const bindingIds: Readonly<Partial<Record<KeyBinding, Keybinding>>> = {
+  'focus.next': 'binnacle.focusNext',
+  'focus.previous': 'binnacle.focusPrevious',
+  'focus.out': 'binnacle.stepOut',
+  'primary': 'binnacle.primary',
+}
+
 /** The binding id a placed screen's key is offered under: the one table's, named for the screen. */
 const offeredBinding = (name: string): string => `binnacle.screen.${name}`
 
@@ -89,6 +97,12 @@ export interface KeyTable {
    * @returns what the key resolved to, or undefined when nothing binnacle binds answers it.
    */
   readonly resolve: (data: string, focused: boolean, open?: boolean) => ResolvedKey | undefined
+  /**
+   * The keys that give a gesture a meaning, as they stand: the defaults, and over them what a person bound.
+   * @param binding - what the keys mean.
+   * @returns the keys, as pi-tui names them, in the order they are bound; none where nothing is bound to it, as an affordance kind is until a person binds it.
+   */
+  readonly keysOf: (binding: KeyBinding) => readonly KeyId[]
   /**
    * Offer the key that opens a placed screen, as a binding in this table, so a person can rebind it. The manager is
    * rebuilt with the offer; installing it is the host's, which reads `manager` as it now stands.
@@ -135,6 +149,7 @@ export function keyTable(): KeyTable {
         rebuild()
       }
     },
+    keysOf: (binding: KeyBinding): readonly KeyId[] => manager.getKeys(bindingIds[binding] ?? `binnacle.${binding}` as Keybinding),
     resolve: (data: string, focused: boolean, open = false): ResolvedKey | undefined => {
       if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
       // The bindings live in this context, in the order the table resolves them: the host's own everywhere, then a

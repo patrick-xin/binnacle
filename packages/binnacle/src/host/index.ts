@@ -214,7 +214,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const pane = new ScreenPane(() => facts, {
       changed: () => { tui.requestRender() },
       invoked: (region, affordance) => { placement.invoke?.(region, affordance) },
-    }, () => registrations.currentTheme, () => internals.clock.now())
+    }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
     pane.place(slot, { draw: drawn => placement.draw(drawn, surface()) }, `binnacle.place(${slot})`)
     inSlot.set(placement, pane)
     return pane
@@ -267,7 +267,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
-      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme, () => internals.clock.now())
+      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
       screenPanes.set(id, pane)
     }
     pane.place(id, placed)
@@ -290,6 +290,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     else if (changed === 'keys') {
       table.bind(registrations.bindings)
       setKeybindings(table.manager)
+      // An ask names the keys that answer it, so what is placed is laid out again with the keys as they now stand.
+      for (const pane of screenPanes.values()) pane.invalidate()
+      tui.requestRender()
     } else if (changed === 'placements') {
       page = arrange()
       stack(tui)

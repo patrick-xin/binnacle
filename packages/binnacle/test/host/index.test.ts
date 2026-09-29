@@ -1135,6 +1135,20 @@ test('the line names the tokens the session used and the share of its context, e
   await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 12.4k tokens · 38% of context')
 })
 
+/** An offer a person chooses, labelled by its id. */
+const chosen = (id: string): Node => ({ kind: 'offer', id, affordances: [{ kind: 'choose', label: id }], child: { kind: 'text', text: id } })
+
+test('an ask a plugin places names on its bottom edge the keys the one key table binds, as a person rebinds them', async () => {
+  const terminal = new XtermTerminal(50, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.place('above-composer', { kind: 'lines', draw: () => ({ kind: 'ask', title: 'pick', child: { kind: 'stack', children: [chosen('a'), chosen('b')] } }) }) } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row === '╰─ enter select · tab/down next ─────────────────╯'))
+  await ctx.plugin({ name: 'rebinder', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.primary': 'space' }) } })
+  await until(async () => (await terminal.altScreen()).some(row => row === '╰─ space select · tab/down next ─────────────────╯'))
+})
+
 test('a notice stands in the line\'s place while one stands, and the line returns once it goes', async () => {
   const terminal = new XtermTerminal(50, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
