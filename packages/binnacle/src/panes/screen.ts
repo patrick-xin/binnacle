@@ -139,16 +139,20 @@ export class ScreenPane implements Component {
 
   /**
    * Answer a key gesture through the gesture table, on the screen last drawn:
-   * a key lands on the focused region.
+   * a key lands on the focused region, and, for lines in the composer's seat,
+   * on every region beyond it that offers something, top to bottom — so a key
+   * bound to a kind answers what the seat offers, whichever offer has focus.
    * @param gesture - the gesture a resolved key became.
+   * @param seated - whether these are lines in the composer's seat; a placed screen that is open is read, not answered, so its keys land on focus alone.
    * @returns whether the pane answered it, so the key is consumed; false leaves it to the composer.
    */
-  handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>): boolean {
+  handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>, seated = false): boolean {
     const drawn = this.#laid
     if (drawn === undefined) return false
     const focus = this.#state.focus
-    const focused = focus === undefined ? undefined : drawn.frame.regions.find(placed => placed.region.id === focus)
-    const next = answer(this.#state, gesture, focused === undefined ? [] : [focused.region], drawn)
+    const focused = drawn.frame.regions.find(placed => placed.region.id === focus)?.region
+    const beyond = seated ? drawn.frame.regions.map(placed => placed.region).filter(region => region !== focused && region.affordances.length > 0) : []
+    const next = answer(this.#state, gesture, focused === undefined ? beyond : [focused, ...beyond], drawn)
     if (next === undefined) return false
     if (next.invoked !== undefined) this.#invoked(next.invoked.region, next.invoked.affordance)
     if (next.state !== this.#state) {
