@@ -293,6 +293,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       // An ask names the keys that answer it, so what is placed is laid out again with the keys as they now stand.
       for (const pane of screenPanes.values()) pane.invalidate()
       tui.requestRender()
+    } else if (changed === 'drawn') {
+      // What a plugin's drawings read changed where no session event says so; its lines are drawn again above, its placed screens here.
+      for (const pane of screenPanes.values()) pane.invalidate()
+      tui.requestRender()
     } else if (changed === 'placements') {
       page = arrange()
       stack(tui)
@@ -403,7 +407,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
         quit()
         return { consume: true }
       }
-      if (session.running) session.interrupt()
+      if (session.agent.status === 'running') session.interrupt()
       const quitKeys = table.manager.getKeys('binnacle.quit').join(', ')
       raise(`${quitKeys} again to quit`, quitWindow)
       arming = internals.clock.after(quitWindow, () => { arming = undefined })
@@ -426,7 +430,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     }
     // Interrupting is the host's to answer, as quitting is; while nothing runs, the key is the composer's, as any key
     // nothing answers.
-    if (resolved?.kind === 'interrupt' && session.running) {
+    if (resolved?.kind === 'interrupt' && session.agent.status === 'running') {
       session.interrupt()
       return { consume: true }
     }
@@ -562,7 +566,7 @@ export function apply(ctx: Context): void {
     }
     session = opened
     if (mode === 'check') {
-      internals.stdout.write(`binnacle: ok (${opened.model})\n`)
+      internals.stdout.write(`binnacle: ok (${opened.agent.options.provider}/${opened.agent.options.model})\n`)
       quit()
       return
     }

@@ -138,5 +138,13 @@
         "host/index.ts"
       ]
     }
+  },
+  "services": {
+    "agentDefaultModel": "@deepseek-ai/dsh-agent-default-model",
+    "agents": "@deepseek-ai/dsh-agent",
+    "cmdlineArgs": "@deepseek-ai/dsh-cmdline",
+    "commands": "@deepseek-ai/dsh-commands",
+    "sessionProjections": "@deepseek-ai/dsh-session-projection",
+    "tools": "@deepseek-ai/dsh-tools"
   }
 }

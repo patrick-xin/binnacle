@@ -112,7 +112,7 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   })
   ctx.provide('agents', {} as never)
   // dsh's session projections, which the Status line reads for the agent on screen: a stub answering with what the fake session says dsh has measured.
-  ctx.provide('sessionProjections', { snapshot: () => ({ values: session.projections }) } as never)
+  ctx.provide('sessionProjections', { snapshot: () => ({ values: session.projections }), onChanged: (listener: () => void) => session.onProjections(listener) } as never)
   // dsh's default model, which opening a session reads; the host's tests fake the session, so nothing here varies it.
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
   // dsh's commands, which the row names; the host's tests fake the session, whose commands a test names, so nothing reads this.
@@ -1147,6 +1147,34 @@ test('an ask a plugin places names on its bottom edge the keys the one key table
   await until(async () => (await terminal.altScreen()).some(row => row === '╰─ enter select · tab/down next ─────────────────╯'))
   await ctx.plugin({ name: 'rebinder', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.primary': 'space' }) } })
   await until(async () => (await terminal.altScreen()).some(row => row === '╰─ space select · tab/down next ─────────────────╯'))
+})
+
+test('lines that read what no session event announces are drawn again when their plugin asks', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const read = { count: 0 }
+  const plugin: { redraw?: () => void } = {}
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => {
+    author.binnacle.place('above-composer', { kind: 'lines', draw: () => ({ kind: 'text', text: `read ${read.count}` }) })
+    plugin.redraw = () => { author.binnacle.redraw() }
+  } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row === 'read 0'))
+  read.count = 1
+  plugin.redraw?.()
+  await until(async () => (await terminal.altScreen()).some(row => row === 'read 1'))
+})
+
+test('the line follows the token meter\'s own change feed, not only the session\'s events', async () => {
+  const terminal = new XtermTerminal(60, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  session.projections = { tokenUsage: { uncachedInputTokens: 900, outputTokens: 100, cacheReadTokens: 0 } }
+  session.projectionsChanged()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 1k tokens')
 })
 
 test('a notice stands in the line\'s place while one stands, and the line returns once it goes', async () => {

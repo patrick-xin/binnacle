@@ -11,8 +11,6 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 /** An open session: what the surface reads from it and sends to it. */
 export interface OpenedSession {
-  /** The model it runs, as `provider/model`. */
-  readonly model: string
   /** The agent whose session this is: the scope its approvals are answered under, and the identity of everything it logs. */
   readonly agent: Agent
   /**
@@ -54,8 +52,6 @@ export interface OpenedSession {
    * @returns a function that stops listening.
    */
   onOffers(listener: () => void): () => void
-  /** Whether a turn is running now, as the agent says. */
-  readonly running: boolean
   /** Interrupt the running turn, keeping what waits in the agent's inbox, as dsh's web does; with none running, nothing. */
   interrupt(): void
   /** Stop the agent and remove it; the session log stays where dsh stored it. */
@@ -92,7 +88,6 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
   const { session } = handle.agent
   const commands: CommandRuntime = ctx.commands
   return {
-    model: `${selection.provider}/${selection.model}`,
     agent: handle.agent,
     follow: (listener) => {
       // Drained and subscribed in one synchronous run, so no event can fall between them.
@@ -126,7 +121,6 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
         return true
       }
     },
-    get running() { return handle.agent.status === 'running' },
     interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
     close: () => handle.dispose(),
   }

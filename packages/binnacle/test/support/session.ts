@@ -11,10 +11,9 @@ import type { OpenedSession } from '../../src/host/session.ts'
 
 /** A session that records what the host does with it; the harness behind it is dsh's, proven by `check:boot`. */
 export class FakeSession implements OpenedSession {
-  readonly model = 'deepseek/deepseek-v4'
   readonly sent: string[] = []
   closed = false
-  /** Whether a turn runs: what the host reads, and the agent's status as dsh says it. */
+  /** Whether a turn runs, as the agent's status says it: a test changes it and says so. */
   running = false
   interrupted = 0
   /** The model the session last asked for, in its latest request header; none before its first request. A test changes it and says so. */
@@ -46,6 +45,18 @@ export class FakeSession implements OpenedSession {
     this.#standsChanged = listener
     return () => { this.#standsChanged = undefined }
   }
+  readonly #projectionListeners = new Set<() => void>()
+  /**
+   * Hear dsh's session projections change, as their change feed says it.
+   * @param listener - called at each change.
+   * @returns a function that stops listening.
+   */
+  onProjections(listener: () => void): () => void {
+    this.#projectionListeners.add(listener)
+    return () => { this.#projectionListeners.delete(listener) }
+  }
+  /** Say that the projections changed, as dsh's change feed does after an event is committed. */
+  projectionsChanged(): void { for (const listener of this.#projectionListeners) listener() }
   /** Say that where the session stands changed, as dsh does when a turn starts or tokens are counted. */
   standsChanged(): void { this.#standsChanged?.() }
   async offers(): Promise<readonly { readonly name: string, readonly description: string }[]> {

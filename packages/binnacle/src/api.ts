@@ -119,6 +119,14 @@ export interface Registrations {
    */
   invalidate(key: string): void
   /**
+   * Draw again, at the next frame, every placement's lines and every placed
+   * screen. They are drawn again as the session logs anything and as its
+   * agent starts or ends a turn, so a drawing that reads anything else — a
+   * dsh service's own change feed, a setting — calls this when what it read
+   * has changed.
+   */
+  redraw(): void
+  /**
    * Place a screen in the transcript's place: drawn with nodes as a view
    * draws, in the alternate screen's scroll view, handed the session's facts
    * read-only — and from the main screen, opened by switching to the

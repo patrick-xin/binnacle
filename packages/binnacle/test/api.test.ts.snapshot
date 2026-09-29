@@ -421,6 +421,7 @@ export interface Registrations {
     facts(type: string, adapter: AuthorAdapter): () => void;
     view(key: string, view: View): () => void;
     invalidate(key: string): void;
+    redraw(): void;
     screen(name: string, screen: PlacedScreen): () => void;
     place(slot: Slot, placement: Placement): () => void;
     theme(changes: ThemeChanges): () => void;

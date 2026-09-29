@@ -19,6 +19,8 @@ export const inject = ['binnacle', 'sessionProjections'] satisfies (keyof Contex
  * @param ctx - the plugin's context, holding the services it names; disposing it takes the line back.
  */
 export function apply(ctx: Context): void {
+  // The token meter's projections change on dsh's own feed, which the line follows as well as the session's events.
+  ctx.sessionProjections.onChanged(() => { ctx.binnacle.redraw() })
   ctx.binnacle.place('below-composer', {
     kind: 'lines',
     draw: (_facts, surface) => ({ kind: 'text', text: surface.notice ?? measured(ctx).join(' · '), tone: 'muted' }),
