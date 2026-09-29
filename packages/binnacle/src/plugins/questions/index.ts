@@ -65,6 +65,17 @@ function optionLine(option: AskUserQuestionOption, multi: boolean, marked: boole
 }
 
 /**
+ * The options of a question as the card offers them: as the asker gave them, except that a plan-review question offers its approve option first, so it is the card's primary — what Enter does (`dsh:packages/interaction/user-questions/src/types.ts#AskUserQuestionIntent`).
+ * @param question - the question.
+ * @returns its options.
+ */
+function offered(question: AskUserQuestionItem): readonly AskUserQuestionOption[] {
+  const options = question.options ?? []
+  const approve = question.intent?.kind === 'plan-review' ? options.findIndex(option => option.label === question.intent?.approve) : -1
+  return approve > 0 ? [...options.slice(approve), ...options.slice(0, approve)] : options
+}
+
+/**
  * The card one question is asked with: its `header` as the title, the question, its `detail` beneath as markdown, each option offered `choose`, and after the options type an answer, skip and cancel.
  * @param question - the question.
  * @param marked - the labels marked on its options, in the order they were marked.
@@ -81,7 +92,7 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
       children: [
         { kind: 'text', text: question.question },
         ...question.detail === undefined ? [] : [{ kind: 'markdown' as const, text: question.detail }],
-        ...(question.options ?? []).map((option, index): Node => ({
+        ...offered(question).map((option, index): Node => ({
           kind: 'offer',
           id: `option ${index + 1}`,
           affordances: [{ kind: 'choose', label: option.label }],
@@ -156,7 +167,7 @@ class Ask {
     const question = this.question
     this.marks.length = 0
     this.acts.clear()
-    ;(question.options ?? []).forEach((option, index) => this.acts.set(`option ${index + 1}`, () => this.choose(index)))
+    ;offered(question).forEach((option, index) => this.acts.set(`option ${index + 1}`, () => this.choose(index)))
     if (question.multiSelect === true) this.acts.set(DONE, () => this.answerWith({ id: question.id, selected: [...this.marks] }))
     this.acts.set(TYPING, () => this.typeAnswer())
     this.acts.set(SKIP, () => this.answerWith({ id: question.id, selected: [] }))
@@ -210,7 +221,7 @@ class Ask {
    * @param index - the option's place among those the card offers.
    */
   private choose(index: number): void {
-    const option = this.question.options?.[index]
+    const option = offered(this.question)[index]
     if (option === undefined) return
     if (this.question.multiSelect !== true) {
       this.answerWith({ id: this.question.id, selected: [option.label] })

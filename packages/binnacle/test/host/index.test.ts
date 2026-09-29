@@ -1389,6 +1389,28 @@ test('a request already withdrawn when it arrives seats nothing and is rejected 
   assert.ok((await terminal.altScreen()).every(row => !row.includes('which database?')), 'no card was seated')
 })
 
+test('a plan-review question is drawn the same way, its plan as markdown and its approve option primary', async () => {
+  const terminal = new XtermTerminal(50, 18)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  const answer = askQuestions(ctx, { questions: [{
+    id: 'q1',
+    header: 'Plan review',
+    question: 'does this plan do it?',
+    detail: '## The plan\n\n1. read the code\n2. write the test',
+    intent: { kind: 'plan-review', approve: 'ship it' },
+    options: [{ label: 'rethink it' }, { label: 'ship it' }],
+  }] })
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('does this plan do it?')))
+  const card = await terminal.altScreen()
+  assert.ok(card.some(row => row.includes('The plan')), 'the card draws the plan')
+  assert.ok(card.some(row => row.includes('read the code')), 'the plan\'s steps are drawn')
+  terminal.type('\r')
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['ship it'] }] })
+})
+
 test('the line names the selection as it stands when the session opens, not as it stood at mount', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
