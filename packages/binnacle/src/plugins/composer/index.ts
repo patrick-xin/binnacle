@@ -23,10 +23,18 @@ export const composer = {
           ctx.binnacle.send(text)
           return
         }
-        // A line naming one of dsh's commands runs it; one naming none is prose, sent as any other line.
-        ctx.binnacle.command(text).then((ran) => { if (!ran) ctx.binnacle.send(text) }, () => {
-          // The grant resolves whatever the command returned — a failure is logged as its done and drawn from the log;
-          // it rejects only once the session has closed under the line, with nothing to run it on.
+        // A line naming one of dsh's commands runs it; one naming none is prose, sent as any other line. The command
+        // settles after this submit has returned, and the session may be gone by then, so each step keeps what it throws.
+        ctx.binnacle.command(text).then((ran) => {
+          if (ran) return
+          try {
+            ctx.binnacle.send(text)
+          } catch {
+            // The session closed under the line: there is nothing left to send it to.
+          }
+        }, () => {
+          // The session closed under the line: there is nothing left to run the command on — a command that failed
+          // still ran, its failure logged as its done, so the grant resolves rather than rejecting.
         })
       },
     })
