@@ -10,11 +10,11 @@ What it says it is handed, as every lines drawing is: the surface (`binnacle:pac
 
 ## Choices
 
-- The model is named as `provider/model`, the two words the session's request names.
+- The model is named as `provider/model`, as the session asks for it.
 - The tokens used are all the meter counts — sent, received and read from the cache — as one count: `517`, `12.4k`, `1.2m`, dsh web's compact count (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`) restated lowercase.
 - The share of context is rounded as dsh web's occupancy meter rounds it (`dsh:packages/client/ui-conversation/src/client/context-occupancy.ts#contextOccupancy`), never past full: `38% of context`.
 - What is not measured is left out, and the parts join with ` · `.
-- A notice stands in the line's place while one stands; how long one stands is what raised it to say.
+- A notice takes the line's place while it stands; how long one stands is for what raised it to say ([Session](session.md), [Authoring](authoring.md)).
 - The line is drawn in the muted tone: chrome a person reads without reading.
 - The line sits below the composer, the last line of the page; a person who wants more around it asks an author to place lines of their own above and below it.
 
