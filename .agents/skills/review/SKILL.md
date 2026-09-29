@@ -42,31 +42,42 @@ Then a verdict: `clean`, or `findings`. A finding you could not make fail is sai
 
 ## Running it with codex
 
-The Sheepdog runs a second reviewer from another model family, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It reviews a Charge in rounds with the Sheep directly, and reports to the Sheepdog once, at the end. It runs as `gpt-5.6-sol` at high effort, named on every run: codex's own default model may be a heavier one, and a review does not need it.
+The Sheepdog runs a second reviewer from another model family, with full access in a checkout of its own, so it can install, build, run and write probe tests without touching the Sheep's Fold. It runs as `gpt-5.6-sol` at high effort, named on every run: codex's own default model may be a heavier one, and a review does not need it.
+
+**One `codex exec` is one round.** codex sends the whole conversation to the model again on every tool call, so a review costs its calls times the size its context has grown to. A second round in the same run pays the first round's whole context on every call. On one change here, that was 93 calls and 11M input tokens, and three reviews at once used up the usage window. So a round ends when its findings are sent, and the next round is a fresh run that starts from them:
 
 ```sh
 git worktree add --detach /tmp/review-<charge> charge-<charge>
-codex exec -m gpt-5.6-sol -c model_reasoning_effort=high --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>.md \
-  "Load the review skill and review Charge <charge> against issue #<n>, from its base <base>, in rounds with its Sheep. Push nothing; write nothing outside this checkout, where probes and caches are yours."
+codex exec -m gpt-5.6-sol -c model_reasoning_effort=high --dangerously-bypass-approvals-and-sandbox -C /tmp/review-<charge> -o /tmp/review-<charge>-<round>.md \
+  "Load the review skill. Round <round> of Charge <charge> against issue #<n>, from its base <base>; its own commits are <shas>, <whose each is>. <For round 2 on: round <round-1>'s findings are in /tmp/review-<charge>-<round-1>.md, answered by <shas>.> Push nothing; write nothing outside this checkout, where probes and caches are yours."
 git worktree remove --force /tmp/review-<charge>
 ```
 
 A temporary directory set inside the checkout (`TMPDIR`) needs `GIT_CEILING_DIRECTORIES` set to the checkout too, or git in a test's own repository finds the checkout around it.
 
+## Keeping a review small
+
+What each call returns stays in the context for every call after it.
+
+- **The issue without its comments**: `gh issue view <n>`. Read a comment only when the brief names it; the tracking issue's comments are readings, each many pages long.
+- **The named commits' diffs**, and a file around a hunk by range (`sed -n '<from>,<to>p'`), never whole files or a diff of every doc at once.
+- **The tests' summary**: `pnpm test 2>&1 | tail -15`, then a failing test alone with `--test-name-pattern`.
+- **A search bounded to what the change touches**, and a reference only at the package a commit cites. Never search `.refs` whole, `node_modules`, or a home directory.
+- **Only what the change claims.** A change to a skill or a record is checked against the lines it changed, not by reading the implementation of every tool it names.
+
 ## Rounds with the Sheep
 
-When asked to review a Charge in rounds with its Sheep:
+When asked to review round `<round>` of a Charge with its Sheep:
 
-1. **Review** the checkout, as above.
+1. **Review** the checkout, as above. From round 2, check each earlier finding is answered, then what the fixes touched.
 2. **Send the Sheep its defects**, directly: `herdr agent prompt binnacle-<charge> "<findings>"`, each with where, what, and how it fails, ending "fix each red-first, add commits, and settle DONE again".
-3. **Wait** for it to settle: `herdr agent wait binnacle-<charge> --until done --until idle --until blocked --timeout 3600000`. Blocked means it asked the Sheepdog a question: stop, and report.
-4. **Move to what it committed**, `git checkout --detach charge-<charge>`, and review again: the fixes, and what they touched.
+3. **Report and stop.** Never wait for the Sheep: the Sheepdog starts the next round when it settles.
 
-Stop after three rounds, or when a round finds nothing.
+The Sheepdog stops after three rounds, or when a round finds nothing.
 
 **What goes to the Sheep is only a defect against the issue as written**: a bug, a missing or wrong test, a gate, a record left behind. **What is a decision goes to the Sheepdog instead, and never to the Sheep**: work outside the issue's scope, the issue contradicting itself or the code, a choice the issue leaves open, anything that changes the author API beyond what the issue says. You never write in the Sheep's Fold, and never tell it to widen or narrow its scope.
 
-The report to the Sheepdog is the last message: each round's findings and the commit that answered each; what is still open; the decisions it needs, each with a recommendation; a verdict, `clean` or `findings`; and what this skill or the docs lacked.
+The report to the Sheepdog is the last message: this round's findings, and for an earlier round's, the commit that answered each; what is still open; the decisions it needs, each with a recommendation; a verdict, `clean` or `findings`; and what this skill or the docs lacked.
 
 ## After the review
 
