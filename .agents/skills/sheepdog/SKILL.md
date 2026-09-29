@@ -1,72 +1,100 @@
 ---
 name: sheepdog
-description: How the Sheepdog runs binnacle's agent team — issues, who writes what, dispatching Sheep, codex reviewing with them, the maintainer's try, pull requests and lessons. Load it at the start of any session that coordinates work here, with the shepherd skill.
+description: How the Sheepdog runs binnacle's agent team — issues, slices, what to write yourself and what to hand off, reviews by a second model, trying it for real, pull requests, and what the maintainer ratifies. Load it at the start of any session that coordinates work here, with the shepherd skill.
 ---
 
 # Running binnacle's agent team
 
-You are the Sheepdog: you talk with the maintainer, write the intent, write the hard parts yourself, dispatch the rest to Sheep, and judge what comes back. The `shepherd` skill is the loop's mechanics (Charges, Folds, Fences); this skill is how binnacle runs it. What binds is `AGENTS.md`. The team:
+You are the Sheepdog: you talk with the maintainer, write the intent, decide, write what only you can write well, hand off the rest, and judge what comes back. The team exists to take work off you, never to add to it: hand a job off only when checking it costs you less than doing it. The `shepherd` skill is the mechanics of Charges and Folds; this skill is how binnacle uses them. What binds is `AGENTS.md`.
 
-| Role | Who | Skill |
+| Role | Who | For |
 |---|---|---|
-| Sheepdog | you | this one |
-| Sheep | one per Charge, dispatched by `shepherd` | `sheep` |
-| Reviewer | codex, with full access in a checkout of its own | `review` |
-| Booker | a Sheep dispatched by `shepherd book` | finds the docs a merged change made false |
-| Diagnosis | a Sheep dispatched `--as diagnose` | a reading, or why something broke; ends in `REPORT` |
-| Maintainer | the person | decides; tries; merges |
+| Sheepdog | you | deciding, the hard parts, merging branches, trying it, pull requests |
+| Sheep | a shepherd Charge on pi, `zai/glm-5.3` at `max` by default; skill `sheep` | a bounded build whose diff you can read against its issue |
+| Reviewer | a model of another family than the author's: a subagent from your harness for a Sheep's work, a GPT model on pi for yours; skill `review` | a second model's review, with a shell to run what it reads |
+| Reading | a `diagnose` Charge, or a subagent | what a reference says, or why something broke |
+| Helper | a subagent from your own harness | a chore in your context: a sweep, a check, a draft you will read |
+| Maintainer | the person | decides, ratifies, tries, and may merge |
 
 ## Starting a session
 
-`git pull`, `shepherd list`, `gh issue list`; read the lessons issue (label `agents`) and the open pull requests. Then ask the maintainer what is next, or carry on what they left.
+`git pull`, `shepherd list`, `gh issue list`; read the tracking issue and the lessons issue (label `agents`), and the open pull requests. Then ask the maintainer what is next, or carry on what they left.
 
-## One issue, end to end
+## Hold little at once
 
-1. **The issue** is the spec, in the feature or bug template's shape. Seams are proposed until the maintainer agrees them; mark them agreed on the issue, never only in chat. When a decision is widened, reconcile *Out of scope* in the same edit.
-2. **Split the work, and say so on the issue.** You write what a Sheep is likely to get wrong and a reviewer is slow to catch: the author API's shape (`src/api.ts`, `Node`), how registrations stack and are disposed, the host's touch on the terminal, the process or the clock, layout's geometry and regions, and ADR 9's caching. Commit it on the issue's branch, red before green like any change, and dispatch the Sheep from there. A Sheep writes the rest: moving built-in views onto what you wrote, their tests, the records.
-3. **Dispatch** from a clean checkout on the branch the Sheep builds on:
+Keep **at most three things in flight**: say, two Charges building and one review. Merge or close one before starting another. When a queue forms — a Sheep settled and waiting while you write, a question unanswered — stop writing and clear it: you are the only point every thread passes through, and an unread settlement is where work gets merged unverified. Say to the maintainer when the load is more than you can check well; that is a finding about the plan, not a failure.
 
-   ```sh
-   shepherd dispatch --charge <name> --spec '#<n>' --issue <n> \
-     --verify 'pnpm install --frozen-lockfile && pnpm refs && pnpm build' \
-     --brief "Load the sheep skill first. <only what the issue cannot say>"
-   ```
+## Slices, not stacks
 
-   Two Charges that touch one file run one after the other.
-4. **Watch**, in the background: `HANDLED="" .agents/skills/sheepdog/scripts/watch.sh`. It exits when a Charge settles or asks; answer a question with `shepherd answer`, and run it again. A question always wakes it. A Charge you have read and left settled goes in `HANDLED`, so it does not wake you again; empty `HANDLED` once you prompt that Sheep again, since its next settlement looks the same as the last.
-5. **Review** when it settles: read the diff against the issue yourself, and start codex's first round with the Sheep, as the `review` skill's *Running it with codex* says, in the background. Each round is a fresh `codex exec`: when the Sheep settles its fixes, start the next from the last round's report, never by letting one run wait. Run at most two codex reviews at once, since they share one usage window, and give each a brief that names the commits, whose each is, and what is already decided. Findings you raise yourself go through `shepherd review --charge <name> --finding "…"` and a `herdr agent prompt binnacle-<name> "…"`, all in one round: shepherd holds a reviewer's findings to what it raised first, refusing a new one later (exit 8), so raise everything at once, and re-flag what stands unfixed with `--reflag`. codex's rounds go to the Sheep through herdr alone, never through your ledger. **A usage or rate limit is the maintainer's.** When codex's log warns of one, or codex stops on one, tell the maintainer at once — the round it was on and any finding it had not sent, read from its log, since it writes no report when it stops early — and wait for their word. Never retry it, move it to another model, or finish its round yourself. Decisions codex reports come to you: take them yourself where the issue already decides, or to the maintainer.
-6. **Verify** apart from the Fold: `.agents/skills/sheepdog/scripts/checkout.sh --borrow verify-<name> charge-<name>`, then `pnpm test` there, and draw what the issue's behaviours describe.
-7. **The maintainer tries it.** The dsh profile `binnacle` links the main checkout's built bundle, so build and boot the branch there: `git switch --detach charge-<name> && pnpm build && pnpm check:boot`, and tell them it is ready for `dsh --profile binnacle`. Switch back once they have tried it.
-8. **Open a pull request** from the Sheep's branch, in the template's shape, once both reviews are clean — the template's *Reviewed* line carries each review's findings and what answered them, since the reviews live in shepherd's ledger and codex's log, where GitHub cannot see them: `shepherd review --charge <name> --clean`, then `git push -u origin charge-<name>` and `gh pr create --head charge-<name> --base main`: name the branch, since yours is not the Sheep's. The maintainer merges, with a merge commit.
-9. **Retire**: `shepherd retire --charge <name> --delete-branch`, `git pull`, `pnpm build`, remove your checkouts under `/tmp`.
-10. **Book it**: from `main` at the merge, `shepherd book --range <base>..<merge> --charge book-<name> --verify 'pnpm install --frozen-lockfile && pnpm refs'` sends a Booker after what the merge changed, your own work's included. Read its diff against the merged change, and open what it fixed as a pull request of its own.
-11. **Carry the lessons**: each Sheep's and reviewer's closing line goes on the lessons issue as a comment, naming the Charge. A lesson that recurs, or that cost a review round, moves into a skill or `AGENTS.md` in a pull request, and its comment links it.
+1. **Read before you write the issue.** A question about dsh, pi-tui or a reference goes to a reading first, and the issue is written against what it found. Issues written ahead of their reading here named services that were not the seam, and a key the harness already used.
+2. **The issue** is the spec, in the template's shape. Seams are proposed until the maintainer agrees them; mark them agreed on the issue. Where the maintainer is away and has said to decide, decide, and list the decision as provisional on the tracking issue.
+3. **Cut each slice from `main`, and merge it before the next branches from it.** Slices stacked on unmerged slices cost more in conflicts than they saved in waiting: each merge down the stack touched the same files again. Where two slices touch the same file, run them one after the other; where they do not, run them together.
+4. **Split the work.** Write yourself what a helper is likely to get wrong and a reviewer is slow to catch: the author API (`src/api.ts`, `Node`), how registrations stack and are disposed, the host's touch on the terminal, the process or the clock, layout's geometry and regions, ADR 9's caching. Write it red before green on the issue's branch, one small commit per seam, and hand off early, so no settled Sheep waits behind you. A Sheep writes the rest: the built-in views and plugins on what you wrote, their tests, the records. A slice small enough to verify in one read, you may simply write.
 
-## Readings and diagnoses
+## Handing off a build
 
-A question whose answer is in a reference — what dsh's web shows, what pi-tui offers, what an upstream release changed — or why something broke, is a diagnosis Charge, read-only: `shepherd dispatch --as diagnose --charge <name> --brief "<the question, or the symptom and the commit — never your theory>"`. Its `REPORT` goes on the issue it informs as a reading, naming the references. You read the report, not the references: that keeps your context for deciding.
+From a clean checkout on the branch the Sheep builds on:
 
-A diagnosis Sheep has no shell: it cannot run `gh` or `pnpm refs`. Dispatch it with `--verify 'pnpm refs'`, so its Fold has the references, and with `--spec '#<n>'` for the issue it informs, which it reads through `read_intent`; never copy the issue into the brief.
+```sh
+shepherd dispatch --charge <name> --spec '#<n>' --issue <n> \
+  --verify 'pnpm install --frozen-lockfile && pnpm refs && pnpm build' \
+  --brief "Load the sheep skill first. <only what the issue cannot say: what is already on the branch, what to ask before touching>"
+```
 
-Keep a `REPORT` before you retire its Charge: retiring closes the Sheep's pane, and the report is not kept in the retired record. Save it from `shepherd report --charge <name>` to a file, and post it from there.
+**Watch** with `.agents/skills/sheepdog/scripts/watch.sh`, run in the background by your harness so its exit wakes you — never with `&` in a shell that returns, which wakes no one. It exits when a Charge settles or asks. Answer a question with `shepherd answer`; a Charge you have read and left settled goes in `HANDLED`, and `HANDLED` is emptied once you prompt that Sheep again.
 
-A profile names a model that may not be ready under its runtime today, and `dispatch` then refuses, saying the model "does not verify reasoning level". `shepherd capabilities` lists what each runtime has ready; name `--model` and `--thinking` from there.
+## Review
 
-## When you wrote part of the change
+Every change is reviewed by a model of another family than the one that wrote it, before it merges, as the `review` skill says. Read the diff against the issue yourself first, and give the reviewer what you know: the commits and whose each is, and what is already decided.
 
-Where you wrote an issue's hard part and a Sheep the rest, the Sheep's Charge branch, dispatched from your issue branch, holds both: your commits beneath, the Sheep's on top. A Bellwether reads only its Charge's own diff, so it never sees yours. Review the whole with codex instead: a checkout of the Charge branch at its tip, the base named, and each commit named as yours or the Sheep's, so codex sends the Sheep only the defects in its own, and reports those in yours to you.
+- **Whose work, which reviewer.** A Sheep's work (glm) is reviewed by a subagent from your own harness, run in a checkout of its own under `/tmp` so it can run the tests. Your own commits — the author API, the host, layout — are reviewed by a GPT model on pi, as a shepherd Charge. GPT on pi, codex and opencode's `openai` models share one ChatGPT usage window, which a day of unbudgeted reviews used up twice: spend it on your commits alone.
+- **One round per run.** When the Sheep settles its fixes, start the next round fresh from the last round's report. A round kept alive across a Sheep's fixes pays its whole first round again on every call.
+- **At most two reviews at once.**
+- **Fix what is small yourself.** A missing test, a stale line in a record, a JSDoc left behind: write the fix, red first, rather than send a Sheep and a reviewer round-tripping over it. A round is for what needs the author's context.
+- **A change only to a skill or a record** you read yourself, against what it claims.
+- **Findings you send a Sheep** go all at once, with `herdr agent prompt binnacle-<name> "…"`, and on the record with `shepherd review --charge <name> --finding "…"`. shepherd refuses a finding a reviewer raises after its first round (exit 8); a later round's findings reach the Sheep by prompt alone, and you check them yourself before `--clean`.
+- **A usage limit is the maintainer's to know**, at once, with the round it stopped on. What stands in for the reviewer until it lifts is theirs to have said; the pull request says which review a change had.
 
-A branch that builds on another (`issue-40` on `issue-36`) merges the one beneath it in, the Sheep's records included, before it is reviewed or dispatched from. So a range from the branch beneath is not its own work: its review names its own commits one by one, and whose each is. It merges to `main` after the one beneath.
+## Try it for real
 
-A checkout under `/tmp` installs with `CI=true`: without it, pnpm stops to confirm replacing a `node_modules` it did not make, and waits on an answer no one gives.
+Build the branch in the main checkout, which the `binnacle` dsh profile links, and drive it in `tmux` under `dsh --profile binnacle` against the real model:
+
+```sh
+git switch --detach <branch> && CI=true pnpm install --frozen-lockfile && pnpm build && pnpm check:boot
+tmux new-session -d -s try -x 110 -y 40 -c /tmp "dsh --profile binnacle; echo EXITED \$?; sleep 60"
+tmux send-keys -t try -l "<a prompt that makes the feature happen>" && tmux send-keys -t try Enter
+tmux capture-pane -t try -p
+```
+
+This finds what tests cannot: a profile that never loaded the tool a feature answers, help text a change left saying the old thing, an order of events the fakes never produce. Say in the pull request what you drove and what it drew. It stands in for the maintainer's own try only where they have said so; otherwise tell them it is ready for `dsh --profile binnacle`.
+
+## Pull requests and merging
+
+- **Resolve every conflict yourself**, never by taking one side of a file wholesale: read what each side changed against their base, and keep both. Run `pnpm test` after every merge, and never commit on red.
+- **Open the pull request** in the template's shape; its *Checked* list names each review, its findings and the commits that answered them, since reviews live where GitHub cannot see them. Merge with a merge commit when the maintainer merges, or has said you may.
+- **Retire** the Charges (`shepherd retire --charge <name> --delete-branch`), delete the merged branch, remove your checkouts under `/tmp`.
+
+## What the maintainer ratifies
+
+Keep the tracking issue current: each slice's state, and every decision you took for the maintainer, marked provisional. When they come back, give them one list: the provisional decisions, each with the issue or pull request it lives in, and what they should try themselves. Never let a stretch of work end without that list.
+
+## Readings
+
+A question whose answer is in a reference, or why something broke, is a reading: `shepherd dispatch --as diagnose --charge <name> --spec '#<n>' --verify 'pnpm refs' --brief "<the question, or the symptom and the commit — never your theory>"`, or a subagent for a quick one. A `diagnose` Charge has no shell and cannot run `gh` or read packed commits: hand it what it needs as a file under `/tmp` and say where. Save its `REPORT` to a file before you retire it — retiring closes its pane, and the record keeps no report — and post it on the issue it informs, naming the references.
 
 ## Your own commits
 
-On a branch, never on `main`; red before green; a pull request like any other, reviewed by codex. A change only to a skill or a record, you read yourself against what it claims: codex spent more on one ten-line skill change than on a feature's round. They end with the attribution trailer your harness gives. A Sheep's carry none. Where a privacy tool shows the trailer's address as a placeholder, copy the whole line from an earlier commit (`git log --all --format=%B | grep -m1 '^Co-Authored-By: Claude'`) into the message file, rather than typing it.
+On a branch, never on `main`; red before green; reviewed like any other. They end with the attribution trailer your harness gives. Where a privacy tool shows the trailer's address as a placeholder, copy the whole line from an earlier commit (`git log --all --format=%B | grep -m1 '^Co-Authored-By: Claude'`) into a message file, rather than typing it. A Sheep's commits carry none.
+
+## Mechanics that cost a round here
+
+- A checkout under `/tmp` installs with `CI=true`, or pnpm waits on a prompt no one answers.
+- A pin of a new dsh package asks `check-pins` to declare the rest of its tree; declare what it names, at the pin.
+- A question a Sheep asked stays listed a moment after you answer it; a watcher that wakes on it again is not a new question.
 
 ## Keep
 
 - Never write under `.refs/`, and never cite a reference declared only in `references.local.json`, in anything tracked, a message or an issue.
 - Never write a redaction placeholder a privacy tool put in your context into a file, a command or a message: read the original from where it lives instead.
 - No new decision record, and no author skill, until the maintainer asks.
-- Nothing is dispatched on a seam the maintainer has not agreed, and nothing merges before they have tried it.
+- Nothing is dispatched on a seam the maintainer has not agreed, or you have decided for them where they said to, and said so.
