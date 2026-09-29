@@ -6,8 +6,6 @@ import type { Node, Span } from './node.ts'
  * holds as it is. Every kind of node is named here and none is skipped, so a
  * kind added to `Node` fails to compile until its carried strings are treated
  * too.
- * @param node - the node a view drew.
- * @returns the node, its carried strings readable and inert.
  */
 export function readable(node: Node): Node {
   switch (node.kind) {
@@ -41,9 +39,7 @@ export function readable(node: Node): Node {
 }
 
 /**
- * One span of a text node's line: a text span's text treated, its tone as it was; a mark span left as it is, for the theme's glyph is not a string a view carried.
- * @param span - the span a view drew.
- * @returns the span, its carried text readable and inert.
+ * A text span's text treated, its tone as it was; a mark span left as it is, for the theme's glyph is not a string a view carried.
  */
 function readableSpan(span: Span): Span {
   if (typeof span === 'string') return treated(span)
@@ -58,21 +54,17 @@ function readableSpan(span: Span): Span {
  * character left but tab and newline is drawn visibly — a C0 control or DEL
  * as its control picture, a C1 control as `�` — except a carriage return
  * before a newline, which is the line ending and is dropped.
- * @param text - the string as it was carried.
- * @returns the string as it is drawn.
  */
 function treated(text: string): string {
   const stripped = stripTerminalSequences(text)
   let read = ''
   for (let index = 0; index < stripped.length; index++) {
     const code = stripped.charCodeAt(index)
-    // Tab, newline and every printable character are drawn as they are.
     if (code === 0x09 || code === 0x0a || (code >= 0x20 && code <= 0x7e) || code > 0x9f) read += stripped[index]
     // A carriage return before a newline is the line ending; anywhere else it is drawn ␍.
     else if (code === 0x0d) {
       if (stripped.charCodeAt(index + 1) !== 0x0a) read += '␍'
     }
-    // A C0 control or DEL is drawn as its control picture, a C1 control as �.
     else if (code < 0x20) read += String.fromCharCode(0x2400 + code)
     else if (code === 0x7f) read += '␡'
     else read += '�'

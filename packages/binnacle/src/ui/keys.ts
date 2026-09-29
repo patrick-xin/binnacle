@@ -90,47 +90,34 @@ export interface KeyTable {
    * What a key resolves to. The bindings live in the context in a fixed order, and within it a binding the person
    * set resolves before one that only defaults to the same key, so an explicit binding is never defeated by a
    * default that shares its key. It answers a press only, once: a repeat or a release, which a kitty-protocol
-   * terminal also reports, is answered by nothing binnacle binds.
-   * @param data - the key's bytes, as the terminal reported them.
-   * @param focused - whether something on the screen being read — the transcript, or a placed screen that is open — has focus, which decides which bindings are live.
-   * @param open - whether a placed screen is open, which takes the keys the transcript would answer.
-   * @returns what the key resolved to, or undefined when nothing binnacle binds answers it.
+   * terminal also reports, is answered by nothing binnacle binds. `focused` is whether something on the screen
+   * being read — the transcript, or a placed screen that is open — has focus, which decides which bindings are
+   * live; `open` is whether a placed screen is open, which takes the keys the transcript would answer.
    */
   readonly resolve: (data: string, focused: boolean, open?: boolean) => ResolvedKey | undefined
   /**
-   * The keys that give a gesture a meaning, as they stand: the defaults, and over them what a person bound.
-   * @param binding - what the keys mean.
-   * @returns the keys, as pi-tui names them, in the order they are bound; none where nothing is bound to it, as an affordance kind is until a person binds it.
+   * The keys that give a gesture a meaning, as they stand: the defaults, and over them what a person bound, in
+   * the order they are bound; none where nothing is bound to it, as an affordance kind is until a person binds it.
    */
   readonly keysOf: (binding: KeyBinding) => readonly KeyId[]
   /**
    * Offer the key that opens a placed screen, as a binding in this table, so a person can rebind it. The manager is
-   * rebuilt with the offer; installing it is the host's, which reads `manager` as it now stands.
-   * @param name - the placed screen's name.
-   * @param definition - the key it opens with, and its description, as any binding's.
-   * @returns a function that withdraws the offer.
+   * rebuilt with the offer; installing it is the host's, which reads `manager` as it now stands. Returns a
+   * function that withdraws the offer.
    */
   readonly offer: (name: string, definition: KeybindingDefinition) => () => void
   /**
    * Bind keys as a person asked, over the defaults, by binding id; what an earlier call bound and this one leaves out
    * returns to its default. The manager is rebuilt with them; installing it is the host's.
-   * @param bindings - each binding id, and the key or keys it answers to now.
    */
   readonly bind: (bindings: KeybindingsConfig) => void
 }
 
-/**
- * Build the one key table.
- * @returns the table, holding a manager of its own.
- */
 export function keyTable(): KeyTable {
   const offered = new Map<string, KeybindingDefinition>()
   let manager = new KeybindingsManager(KEYBINDINGS)
   let set: KeybindingsConfig = {}
-  /**
-   * Build the manager again: a new manager is the only way a binding joins the table.
-   * @param bindings - what the person bound, over the defaults.
-   */
+  // A new manager is the only way a binding joins the table.
   const rebuild = (bindings: KeybindingsConfig = manager.getUserBindings()): void => {
     manager = new KeybindingsManager({ ...KEYBINDINGS, ...Object.fromEntries(offered) }, bindings)
     set = manager.getUserBindings()
@@ -189,8 +176,7 @@ export function keyTable(): KeyTable {
  * screen's id stands whether or not its screen is placed yet. Two ids sharing a key is what pi-tui's manager reports
  * as a conflict among a person's bindings, taken from it rather than found again; whether a string names a key is
  * pi-tui's to say, and it exports nothing that says it, so only a key that is no string is refused here.
- * @param bindings - everything a person bound, together.
- * @returns the reason, or undefined when they stand.
+ * Undefined when they stand.
  */
 export function refusedBindings(bindings: KeybindingsConfig): string | undefined {
   const screens: Record<string, KeybindingDefinition> = {}
