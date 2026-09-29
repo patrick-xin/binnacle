@@ -22,7 +22,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
+import { CombinedAutocompleteProvider, Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
 import type { Component, Keybinding, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
@@ -46,8 +46,8 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, and the session projections the token meter's readings ride. Each is a key dsh declares on `Context`. */
-export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections'] satisfies (keyof Context)[]
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, and its commands. Each is a key dsh declares on `Context`. */
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {
@@ -367,7 +367,18 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       raise(`binnacle.place(composer) submit threw: ${describe(error)}`, problemWindow)
     }
   }
-  const closeGrants = registrations.open({ send: (text) => { session.send(text) } })
+  // What `/` completes in binnacle's composer: dsh's commands and the skills a person may invoke, read as the session
+  // opens and again as dsh says either changed, through pi-tui's own provider.
+  const offer = (): void => {
+    session.offers().then((offers) => {
+      composer.setAutocompleteProvider(new CombinedAutocompleteProvider([...offers], process.cwd()))
+    }, () => {
+      // A catalog that cannot be read leaves `/` offering what it offered before: a stale list costs completions, never a command.
+    })
+  }
+  offer()
+  const unoffer = session.onOffers(offer)
+  const closeGrants = registrations.open({ send: (text) => { session.send(text) }, command: line => session.command(line) })
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
   // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()
@@ -497,6 +508,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     unraise?.()
     arming?.()
     untick?.()
+    unoffer()
     closeGrants()
     unregister()
     // A placed screen open at the quit is closed first, so the session is left where the person can read it, plain.

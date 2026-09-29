@@ -16,7 +16,8 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { describe } from '../contract/index.ts'
 import { kinds } from './kinds.ts'
-import type { SessionEvent, SessionEventType } from '@deepseek-ai/dsh-session'
+import type { CommandId } from '@deepseek-ai/dsh-commands'
+import type { SessionEvent, SessionEventType, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
@@ -109,6 +110,28 @@ export type Fact =
     readonly blocks: readonly Block[]
     /** The tool's own payload for presenting its result, opaque to everyone but that tool; undefined when it attached none. */
     readonly meta: unknown
+  }
+  | Logged & {
+    readonly kind: 'run'
+    /** dsh's id of the run, which pairs it with the done that settles it (`dsh:packages/interaction/commands/src/brand.ts#CommandId`). */
+    readonly commandId: CommandId
+    /** The command's name, dsh's own split of the line: lowercase, with no slash. */
+    readonly name: string
+    /** The text that followed the name, exactly as the person typed it, separator whitespace included; absent when the command's own domain event owns the input's payload. */
+    readonly args?: string
+    /** Who issued the line, a dsh source kind; `user` today (`dsh:packages/interaction/commands/src/types.ts#CommandSource`). */
+    readonly source: string
+  }
+  | Logged & {
+    readonly kind: 'done'
+    /** dsh's id of the run this settles, the run fact's `commandId`. */
+    readonly commandId: CommandId
+    /** How the command settled, in dsh's words. */
+    readonly outcome: 'success' | 'error'
+    /** What the command returned, as a person reads it; a failure always has one. */
+    readonly text?: string
+    /** An earlier authoritative event that owns what the command did, when one does (`dsh:packages/interaction/commands/src/types.ts#CommandResult`); present only on a success that named one. */
+    readonly sourceEventSeq?: SessionSeq
   }
   | Logged & {
     readonly kind: 'authored'
@@ -217,6 +240,15 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
     ...data.reason === undefined ? {} : { reason: data.reason },
   }),
   'approval/decided': ({ seq, time, data }) => ({ kind: 'decided', seq, time, id: data.id, outcome: data.outcome }),
+  'command/run': ({ seq, time, data }) => ({
+    kind: 'run', seq, time, commandId: data.commandId, name: data.name, source: data.source.kind,
+    ...data.args === undefined ? {} : { args: data.args },
+  }),
+  'command/done': ({ seq, time, data }) => ({
+    kind: 'done', seq, time, commandId: data.commandId, outcome: data.kind,
+    ...data.text === undefined ? {} : { text: data.text },
+    ...data.sourceEventSeq === undefined ? {} : { sourceEventSeq: data.sourceEventSeq },
+  }),
   'tool/result': ({ seq, time, data }) => ({
     kind: 'result',
     seq,

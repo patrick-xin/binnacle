@@ -28,6 +28,12 @@ export interface GrantedSession {
    * @param text - the line.
    */
   send(text: string): void
+  /**
+   * Run a line as a command.
+   * @param line - the line.
+   * @returns whether a command ran.
+   */
+  command(line: string): Promise<boolean>
 }
 
 /** The slots of the page, top to bottom. */
@@ -151,6 +157,13 @@ export class RegistrationService extends Service implements Registrations {
     const session = this.granted
     if (session === undefined) throw new Error('binnacle.send: no session is open; a line can be sent once the session opens, and until it closes')
     session.send(text)
+  }
+
+  /** @inheritDoc */
+  async command(line: string): Promise<boolean> {
+    const session = this.granted
+    if (session === undefined) throw new Error('binnacle.command: no session is open; a command can be run once the session opens, and until it closes')
+    return await session.command(line)
   }
 
   /**

@@ -11,6 +11,8 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
+import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentHandle, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-model'
@@ -52,6 +54,27 @@ export interface OpenedSession {
    * @returns a function that stops listening.
    */
   onStanding(listener: () => void): () => void
+  /**
+   * Run a line as one of dsh's commands for the agent, without sending it to the model
+   * (`dsh:packages/interaction/commands/src/index.ts`). A command that failed still
+   * ran — dsh logs its failure as the command's `done` before rethrowing, and the
+   * failure is drawn from the log — so it is contained here.
+   * @param line - the line, as the person wrote it.
+   * @returns whether a command ran, whatever it returned; false when no command has the name.
+   */
+  command(line: string): Promise<boolean>
+  /**
+   * What `/` offers: dsh's commands for the agent, and the skills a person may invoke, as dsh's web lists them
+   * (`dsh:packages/api/session-controller/src/skill-catalog.ts`).
+   * @returns each by name, with what it does.
+   */
+  offers(): Promise<readonly { readonly name: string, readonly description: string }[]>
+  /**
+   * Hear when what `/` offers may have changed: dsh's commands, or its skills.
+   * @param listener - called on each change.
+   * @returns a function that stops listening.
+   */
+  onOffers(listener: () => void): () => void
   /** Whether a turn is running now, as the agent says. */
   readonly running: boolean
   /** Interrupt the running turn, keeping what waits in the agent's inbox, as dsh's web does; with none running, nothing. */
@@ -120,6 +143,7 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
     },
   })
   const { session } = handle.agent
+  const commands: CommandRuntime = ctx.commands
   return {
     model: `${selection.provider}/${selection.model}`,
     agent: handle.agent,
@@ -145,6 +169,25 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       standsChanged.add(listener)
       const off = ctx.on('session/event', (from) => { if (from === session) listener() })
       return () => { standsChanged.delete(listener); off() }
+    },
+    offers: async () => {
+      const named = commands.list(handle.agent).map(({ name, description }) => ({ name, description }))
+      const skills = await ctx.get('skills')?.list({ cwd: process.cwd(), scope: handle.agent }) ?? []
+      return [...named, ...skills.filter(isUserInvocable).map(({ name, description }) => ({ name, description }))]
+    },
+    onOffers: (listener) => {
+      const stops = [ctx.on('commands/change', listener), ctx.on('skills/change', listener)]
+      return () => { for (const stop of stops) stop() }
+    },
+    command: async (line) => {
+      try {
+        return await commands.execute(handle.agent, line, [], new AbortController().signal) !== undefined
+      } catch {
+        // dsh's executor rethrows a failed command's own failure after logging it as the command's `done`
+        // (`dsh:packages/interaction/commands/src/index.ts`): the command ran, and what it did is on the log, so the
+        // grant keeps its contract — it resolves, and throws only where the session is gone.
+        return true
+      }
     },
     get running() { return handle.agent.status === 'running' },
     interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },

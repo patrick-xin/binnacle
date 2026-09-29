@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import type { Events } from '@deepseek-ai/cordis'
+import { CommandId } from '@deepseek-ai/dsh-commands'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
@@ -101,14 +102,16 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   ctx.provide('sessionProjections', { snapshot: () => ({ values: {} }) } as never)
   // dsh's default model, which opening a session reads; the host's tests fake the session, so nothing here varies it.
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  // dsh's commands, which the row names; the host's tests fake the session, whose commands a test names, so nothing reads this.
+  ctx.provide('commands', {} as never)
   const fiber = ctx.plugin(host)
   await fiber
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
-test('the row is named binnacle and needs the command line, the agents, the default model and the session projections', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model, the session projections and the commands', () => {
   assert.equal(host.name, 'binnacle')
-  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections'])
+  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'])
 })
 
 test('--check opens a session on the default model once startup commits, reports it, closes it, and exits 0 drawing nothing', async () => {
@@ -378,6 +381,18 @@ const returned = (seq: number, callSeq: number, text: string): SessionEvent<'too
   data: { turn: 1, step: 1, message: { role: 'tool', id: MessageId(`m${seq}`), source: { kind: 'tool', callId: ToolCallId(`c${callSeq}`) }, toolCallId: ToolCallId(`c${callSeq}`), content: [{ type: 'text', text }] } },
 })
 
+/** A command that ran, as dsh logs it: log-only, no turn around it. */
+const ran = (seq: number, commandId: string, name: string): SessionEvent<'command/run'> => ({
+  type: 'command/run', seq: SessionSeq(seq), time: seq,
+  data: { commandId: CommandId(commandId), name, args: '', source: { kind: 'user' } },
+})
+
+/** The done that settled a command, as dsh logs it. */
+const done = (seq: number, commandId: string, text: string): SessionEvent<'command/done'> => ({
+  type: 'command/done', seq: SessionSeq(seq), time: seq,
+  data: { commandId: CommandId(commandId), kind: 'success', text },
+})
+
 /** Twelve lines a person sent, taller together than the terminal. */
 const twelve = Array.from({ length: 12 }, (_, index) => prompt(index + 1, `p${index + 1}`))
 
@@ -400,6 +415,26 @@ test('--tui-mode regular prints the session under what the shell printed, and ne
   assert.equal(shown[0], '$ dsh --profile binnacle')
   assert.deepEqual(shown.filter(row => row.startsWith(' › ')), twelve.map((_, index) => ` › p${index + 1}`))
   assert.deepEqual(shown.filter(row => /read|the file|running|author/.test(row)), ['● read {}', 'the file', 'drawn by an author'])
+})
+
+test('on the main screen, a command run between turns draws once it settles, its result in place of running…, though no turn wraps it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  terminal.write('$ dsh --profile binnacle\r\n')
+  const session = new FakeSession([
+    { type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } },
+    prompt(2, 'fix the build'),
+    { type: 'turn/end', seq: SessionSeq(3), time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
+  ])
+  const { commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('fix the build')))
+  session.log(ran(4, 'cmd-1a2b3c4d-1', 'compact'))
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('running…')))
+  session.log(done(5, 'cmd-1a2b3c4d-1', 'compacted: 12 messages'))
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('compacted: 12 messages')))
+  const shown = await terminal.mainScreen()
+  assert.equal(shown.some(row => row.includes('running…')), false)
+  assert.ok(shown.some(row => row === '/compact'), 'the line the person typed heads the entry')
 })
 
 test('ctrl+t switches screens both ways, and what is typed, what every entry drew, and ctrl+c come along', async () => {
@@ -1467,4 +1502,49 @@ test('a running call counts up once a second, and stops counting once it returns
   session.log(returned(4, 3, 'the file'))
   await until(async () => (await terminal.altScreen()).some(row => row.includes('the file')))
   assert.equal((await terminal.altScreen()).some(row => row.includes('running')), false)
+})
+
+test('a /name line naming one of the session\'s commands runs it and is not sent, and one naming none is sent as prose', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  session.commands.set('compact', 'summarize the session so far')
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('/compact now')
+  terminal.type('\r')
+  await until(() => session.ran.length > 0)
+  assert.deepEqual(session.ran, ['/compact now'])
+  terminal.type('/nothing here')
+  terminal.type('\r')
+  await until(() => session.sent.length > 0)
+  assert.deepEqual(session.sent, ['/nothing here'])
+})
+
+test('typing / offers the session\'s commands and the skills a person may invoke, as dsh lists them', async () => {
+  const terminal = new XtermTerminal(60, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  session.commands.set('compact', 'summarize the session so far')
+  session.skills.set('review', 'review a change')
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('/')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some(row => row.includes('compact') && row.includes('summarize the session so far')) && rows.some(row => row.includes('review') && row.includes('review a change'))
+  })
+})
+
+test('what / offers follows dsh: a command registered after the session opened is offered once dsh says so', async () => {
+  const terminal = new XtermTerminal(60, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  session.commands.set('plan', 'plan before acting')
+  session.offersChanged()
+  await settle()
+  terminal.type('/')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('plan before acting')))
 })
