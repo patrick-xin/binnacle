@@ -5,7 +5,9 @@
  * Every folder under `packages/binnacle/src/`, `src/` included, holds an
  * `AGENTS.md` whose bullets before the first `## ` heading each begin with a
  * backticked name and together name every `.ts` file and subfolder (with a
- * trailing `/`) directly in it, and nothing else. Later sections are free text.
+ * trailing `/`) directly in it, and nothing else. Each is named by one bullet
+ * only, and the bullet says something: its name, ` — ` (or ` - `), then a line
+ * of text. Later sections are free text.
  * @module binnacle/scripts/check-folder-notes
  */
 import { dirname, join } from 'node:path'
@@ -52,14 +54,14 @@ function heldBy(files, folder) {
 /**
  * The files and folders a note names.
  * @param {string} text - the note's text.
- * @returns {string[]} the name in each bullet that starts with a backticked name, in order, before the first `## ` heading; a folder keeps its trailing `/`.
+ * @returns {{ name: string, says: string }[]} the name in each bullet that starts with a backticked name, in order, before the first `## ` heading, a folder keeping its trailing `/`, and the text after the dash that follows it (empty when there is none).
  */
 function named(text) {
   const names = []
   for (const line of text.split('\n')) {
     if (line.startsWith('## ')) break
-    const match = /^- `([^`]+)`/.exec(line)
-    if (match) names.push(match[1])
+    const match = /^- `([^`]+)`(.*)$/.exec(line)
+    if (match) names.push({ name: match[1], says: /^\s*[—-]\s+(\S.*)$/.exec(match[2])?.[1] ?? '' })
   }
   return names
 }
@@ -77,13 +79,16 @@ export function checkFolderNotes(files) {
       problems.push(`${folder}: no AGENTS.md — add one saying in a line what each file here is for`)
       continue
     }
-    const says = named(note.text)
+    const bullets = named(note.text)
+    const says = bullets.map(bullet => bullet.name)
     const held = heldBy(files, folder)
     for (const name of held) {
       if (!says.includes(name)) problems.push(`${note.path}: says nothing of ${name} — add a line for it`)
     }
-    for (const name of says) {
+    for (const [index, { name, says: line }] of bullets.entries()) {
       if (!held.includes(name)) problems.push(`${note.path}: names ${name}, which is not here — remove its line`)
+      else if (says.indexOf(name) !== index) problems.push(`${note.path}: names ${name} twice — keep one line for it`)
+      else if (line === '') problems.push(`${note.path}: says nothing of what ${name} is for — follow its name with " — " and a line saying it`)
     }
   }
   return problems
