@@ -52,14 +52,15 @@ export function checkPeers({ manifest, files, patch }) {
  * The packages a patch inserts rows of.
  * @param {string} patch - the patch's YAML text.
  * @param {string} own - binnacle's own package name, skipped.
- * @returns {Set<string>} the `name` of every row under an `insert`, at any depth.
+ * @returns {Set<string>} the package each row under an `insert` names, at any depth: a row may name a subpath of one.
  */
 function rowsOf(patch, own) {
   const names = new Set()
   const walk = (node, inserted) => {
     if (Array.isArray(node)) return node.forEach(item => walk(item, inserted))
     if (typeof node !== 'object' || node === null) return
-    if (inserted && typeof node.name === 'string' && node.name !== own) names.add(node.name)
+    const name = inserted && typeof node.name === 'string' ? packageOf(node.name) : undefined
+    if (name !== undefined && name !== own) names.add(name)
     for (const [key, value] of Object.entries(node)) walk(value, inserted || key === 'insert')
   }
   walk(load(patch) ?? [], false)

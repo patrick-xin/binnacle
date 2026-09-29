@@ -9,6 +9,21 @@
 - insert:
     - id: binnacle
       name: 'binnacle'
+    # binnacle's built-in features, each a row of its own so a person can
+    # remove one as they remove any dsh plugin: disable it by its id in their
+    # own profile's patch (`- id: binnacle-status-line` / `disabled: true`).
+    # Approvals and Questions are not rows: the host applies them on a scope
+    # of the session's agent, which a row cannot be bound to.
+    - id: binnacle-transcript
+      name: 'binnacle/plugins/transcript'
+    - id: binnacle-composer
+      name: 'binnacle/plugins/composer'
+    - id: binnacle-status-line
+      name: 'binnacle/plugins/status-line'
+    - id: binnacle-tool-cards
+      name: 'binnacle/plugins/tool-cards'
+    - id: binnacle-trajectory
+      name: 'binnacle/plugins/trajectory'
     # dsh-base serves the questions an agent asks (user-questions) but loads no
     # tool to ask them with; dsh's web app adds this one. binnacle answers
     # questions in the composer's seat, so it lets the agent ask them.

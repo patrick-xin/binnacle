@@ -13,7 +13,7 @@ import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { RegistrationService } from '../../../src/host/registrations.ts'
-import { composer } from '../../../src/plugins/composer/index.ts'
+import * as composer from '../../../src/plugins/composer/index.ts'
 
 test('a line naming no command whose session closes under it sends nothing and rejects nothing', async () => {
   const ctx = new Context()

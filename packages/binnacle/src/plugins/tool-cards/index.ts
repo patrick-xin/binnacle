@@ -5,13 +5,18 @@ import type { CardParts } from './cards.ts'
 import { rowFor } from './cards.ts'
 import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks } from './presentation.ts'
 
-/** The tool-cards plugin, loaded by the host beside the surface it draws on. */
-export const toolCards = {
-  name: 'tool-cards',
-  inject: ['binnacle', 'tools'] satisfies (keyof Context)[],
-  apply(ctx: Context): void {
-    ctx.binnacle.view('tool', viewOf(ctx.tools))
-  },
+/** The tool-cards plugin's Cordis name. The module is the plugin, as dsh's loader takes a row's: its `name`, `inject` and `apply`, with no default export. */
+export const name = 'tool-cards'
+
+/** The services it needs before it applies: the `binnacle` service it registers its view through, and dsh's `tools`, whose definitions present each call. */
+export const inject = ['binnacle', 'tools'] satisfies (keyof Context)[]
+
+/**
+ * Register the tool cards' view for the `tool` entry kind.
+ * @param ctx - the plugin's context, holding the services it names; disposing it takes the view back.
+ */
+export function apply(ctx: Context): void {
+  ctx.binnacle.view('tool', viewOf(ctx.tools))
 }
 
 /**
