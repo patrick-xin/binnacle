@@ -1,17 +1,4 @@
 /**
- * What a tool's presenters are handed and what they return, read as data.
- *
- * Presenter code belongs to the tool, not to binnacle, so what it returns is
- * parsed here, where it enters: a view of a kind binnacle does not draw reads
- * as no view at all, and nothing a presenter does can take the surface down.
- * The shapes it returns are dsh's presentation vocabulary
- * (`dsh:packages/core/tools/src/presentation.ts`); this module never imports
- * it at run time, only narrows what was already read off a definition. The
- * head a presented title draws is read here too, for every row that draws
- * one.
- */
-
-/**
  * A thrown presenter's error, or a value one returned, as a person reads it:
  * an error's message, or the value's string form, and something still said
  * even when reading that throws.

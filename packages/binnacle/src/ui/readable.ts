@@ -1,10 +1,3 @@
-/**
- * The treatment every string a node carries goes through as it is laid out,
- * so no text a view draws acts on the terminal: what clears a screen, writes
- * a clipboard or sets a title is gone, and every control character left is a
- * symbol a person can read.
- */
-
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Node, Span } from './node.ts'
 

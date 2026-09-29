@@ -1,24 +1,3 @@
-/**
- * The screen pane: a placed screen as a pi-tui component, in the
- * transcript's place on the alternate screen; and placed lines, around the
- * composer or in its seat, which answer a person the same way.
- *
- * It draws what the screen's registration returns, with nodes as a view
- * draws, laid out at the width pi-tui gives it — every line, unwindowed,
- * for the scroll view that holds it: pi-tui windows, scrolls, searches and
- * selects what sits in that place, and a placed screen is no exception. It
- * holds UI state of its own and answers a pointer or a key through the
- * gesture table on the screen it last drew, as the transcript pane does, so
- * a placed screen answers the transcript's gestures with state nothing else
- * touches. A frame costs what changed: the screen is drawn and laid out
- * again as its facts arrive, its width changes, a person opens something on
- * it, its registration changes, or — where its drawing says the time since a
- * moment — as that time passes, and not otherwise. A drawing that throws
- * or returns no node binnacle can lay out draws what went wrong, naming its
- * registration, and never takes the surface down; so does the report an
- * invoked offer reaches, drawn the same way until a later one returns.
- */
-
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
 import type { Fact } from '../facts/adapt.ts'
 import type { AffordanceKind, Gesture } from '../contract/index.ts'
@@ -75,7 +54,7 @@ export class ScreenPane implements Component {
   #laid: Laid | undefined
   #stale = true
   #timed = false
-  /** What the last report an invoked offer reached did wrong, drawn beneath what the pane drew until one returns. */
+  /** What the last report an invoked offer reached did wrong, drawn beneath what the pane drew until one returns: fenced as a drawing is, so it never takes the surface down. */
   #said: string | undefined
 
   /**
@@ -130,7 +109,7 @@ export class ScreenPane implements Component {
   /**
    * Draw the screen.
    * @param width - the columns pi-tui gives it.
-   * @returns every line it draws, for the scroll view it sits in; what it last drew, drawn and laid out again only as its facts, its width or what a person opened on it changed.
+   * @returns every line it draws, for the scroll view it sits in; what it last drew, drawn and laid out again only as its facts, its width, what a person opened on it or its registration changed, or — where its drawing says the time since a moment — as that time passes.
    */
   render(width: number): string[] {
     return [...this.laidAt(width, this.#state).frame.lines]

@@ -1,7 +1,3 @@
-/**
- * Layout: a node at a width, as the lines it draws and the regions on them.
- */
-
 import { Box, Markdown, Text, visibleWidth } from '@earendil-works/pi-tui'
 import type { Region } from '../contract/index.ts'
 import type { Node, Span } from './node.ts'

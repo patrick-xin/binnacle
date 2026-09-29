@@ -1,20 +1,16 @@
-/**
- * The Status line: one line under the composer saying what the session runs
- * and where it stands — the model it runs, the tokens it has used and the
- * share of its context, muted — with a notice in its place while one stands. A built-in plugin, holding only what an
- * author holds: it places its line through the `binnacle` service, and reads
- * what dsh knows of the session from dsh itself — the agent on screen, which
- * `binnacle.agent()` hands it, and the token meter's projections, through
- * the `sessionProjections` service it names in `inject`.
- */
-
 import type { Context } from '@deepseek-ai/cordis'
 // Type-only: `ProjectionSnapshot` arrives with the `sessionProjections` Context declaration, and the token meter's
 // projections augment the keys a snapshot may ask for.
 import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter'
 
-/** The Status line plugin, loaded by the host beside the surface it draws on. */
+/**
+ * The Status line plugin, loaded by the host beside the surface it draws on.
+ * What it says of the session it reads from dsh as its line is drawn — the
+ * agent on screen, and the token meter's projections through the service it
+ * names — and it reads nothing at any tick of its own: lines are drawn again
+ * as the session logs anything and as its agent starts or ends a turn.
+ */
 export const statusLine = {
   name: 'status-line',
   inject: ['binnacle', 'sessionProjections'] satisfies (keyof Context)[],

@@ -1,10 +1,9 @@
 /**
- * Draw to text: what a component shows at a width, as the lines a person reads.
- *
- * The screen as a test sees it — no terminal, no styling — so a view, a
- * layout or a whole screen is asserted as lines.
+ * Draw to text: what a component shows at a width, as the lines a person
+ * reads — no terminal, no styling — so a view, a layout or a whole screen is
+ * asserted as lines.
+ * @module binnacle/test/support/draw
  */
-
 import { stripTerminalSequences, visibleWidth } from '@earendil-works/pi-tui'
 import type { Component } from '@earendil-works/pi-tui'
 

@@ -1,12 +1,3 @@
-/**
- * The table of cards: which kind of card draws how, generic its one row.
- *
- * A kind with no row of its own draws through generic's until its own
- * lands. A later card is a new file beside this one, holding its row, plus
- * one row here naming it — touching nothing else. A row draws its kind's
- * whole card, from the parts the view prepares.
- */
-
 import type { Node } from '../../api.ts'
 import { genericCard } from './generic.ts'
 import type { CardKind, PresentedCall, PresentedResult } from './presentation.ts'
@@ -49,7 +40,11 @@ export interface CardRow {
   draw(parts: CardParts): Node | { readonly declined: string }
 }
 
-/** Every row the cards hold, by the card kind it draws; generic's is the one today. */
+/**
+ * Every row the cards hold, by the card kind it draws; generic's is the one today.
+ * A later card is a new file beside this one, holding its row, plus one row
+ * here naming it — touching nothing else.
+ */
 const table: Readonly<Partial<Record<CardKind, CardRow>>> = { generic: genericCard }
 
 /**

@@ -1,22 +1,3 @@
-/**
- * Questions: what the agent asks a person, answered in the composer's seat,
- * a question at a time. A built-in plugin, holding only what an author
- * holds: the `binnacle` service, to seat its card where an author could
- * seat one; and dsh's `user-questions/request` waterfall, which it answers
- * for the session's agent
- * (`dsh:packages/interaction/user-questions/src/index.ts#UserQuestionService`).
- *
- * While a request stands, the card of its current question is the newest
- * placement in the composer's slot, so it takes the keyboard: its `header`
- * as the title, the question, its `detail` beneath as markdown, each option
- * offered `choose`, and after the options type an answer (`answer`), skip
- * (`choose`) and cancel (`dismiss`). The answer collects every question's
- * answer, in order. Cancelling rejects the whole request with dsh's
- * `ASK_CANCELLED`; a request withdrawn by its signal takes its card back,
- * rejected `ASK_ABORTED`; one standing when the plugin is disposed goes to
- * the next answerer, as dsh asks when nothing answers.
- */
-
 import type { Context, Events } from '@deepseek-ai/cordis'
 import type { AskUserQuestionAnswer, AskUserQuestionAnswerItem, AskUserQuestionItem, AskUserQuestionOption } from '@deepseek-ai/dsh-user-questions'
 import type { Node, Placement } from '../../api.ts'
@@ -158,7 +139,7 @@ class Ask {
     this.finish(() => { this.refuse(refused('ASK_ABORTED', 'ask_user_question was aborted before the user answered')) })
   }
 
-  /** Hand the request to the next answerer, its card taken back: what the plugin leaves standing when it is disposed. */
+  /** Hand the request to the next answerer, its card taken back: what the plugin leaves standing when it is disposed, as dsh asks when nothing answers. */
   handOver(): void {
     this.finish(() => { this.next().then(this.settle, this.refuse) })
   }
@@ -171,7 +152,7 @@ class Ask {
     return question
   }
 
-  /** Seat the card of the current question, taking the composer's place until it is answered. */
+  /** Seat the card of the current question, taking the composer's place until it is answered: the newest placement in the composer's slot, so it takes the keyboard. */
   seat(): void {
     // A signal already aborted never fires the listener, so it is answered here, as dsh's own client answers it at construction.
     if (this.req.signal?.aborted === true) {
@@ -296,7 +277,11 @@ class Ask {
   }
 }
 
-/** The Questions plugin, loaded by the host beside the surface it draws on. */
+/**
+ * The Questions plugin, loaded by the host beside the surface it draws on.
+ * It answers dsh's `user-questions/request` waterfall for the session's agent
+ * (`dsh:packages/interaction/user-questions/src/index.ts#UserQuestionService`).
+ */
 export const questions = {
   name: 'questions',
   inject: ['binnacle'] satisfies (keyof Context)[],

@@ -1,15 +1,3 @@
-/**
- * The Trajectory's drawing: every event the session logged, one line each —
- * its kind and what it says in a few words, its record folded on that line —
- * grouped by turn.
- *
- * It reads only the facts it is handed, never the events: what binnacle has
- * read of an event is the fact, and what it has not — a quiet or unknown
- * kind — is the record the fact carries. So a read fact's line opens to the
- * fact binnacle read, and a quiet or unknown one to the event as logged, as
- * the fallback view shows it. dsh's own shapes are the facts layer's to read.
- */
-
 import type { Fact, Mark, Node } from '../../api.ts'
 
 /** A run of a text line, as the author API's `Node` draws one: its text in a tone of its own, or one of the theme's marks. */
@@ -114,7 +102,14 @@ function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly wor
   }
 }
 
-/** What the Trajectory draws of a session: one line per event, grouped by turn. */
+/**
+ * What the Trajectory draws of a session: one line per event, grouped by turn.
+ * It reads only the facts it is handed, never the events: what binnacle has
+ * read of an event is the fact, and what it has not — a quiet or unknown
+ * kind — is the record the fact carries. So a read fact's line opens to the
+ * fact binnacle read, and a quiet or unknown one to the event as logged, as
+ * the fallback view shows it.
+ */
 export function drawTrajectory(facts: readonly Fact[]): Node {
   const tools = new Map<string, string>()
   for (const fact of facts) if (fact.kind === 'call') tools.set(fact.callId, fact.name)
