@@ -47,7 +47,7 @@ test('a module is imported by every module whose relative import or re-export re
 
 test('a module lists which of its names src/api.ts imports or re-exports from it', () => {
   const files = [
-    file('api.ts', "import type { Node, Span as S } from './ui/node.ts'\nexport { parseNode } from './ui/node.ts'\nexport type { Kind } from './ui/node.ts'\nexport * from './ui/whole.ts'\nimport { hidden } from './ui/none.ts'\n"),
+    file('api.ts', "import type { Node, Span as S } from './ui/node.ts'\nexport { parseNode } from './ui/node.ts'\nexport type { Kind } from './ui/node.ts'\nexport * from './ui/whole.ts'\nimport { hidden } from './ui/none.ts'\nexport interface Shape { node: Node; span: S }\n"),
     file('ui/node.ts', "export type Span = string\nexport type Node = string\nexport function parseNode() {}\nexport function other() {}\nexport type { Kind } from '../contract/index.ts'\n"),
     file('ui/whole.ts', 'export const a = 1\nexport const b = 2\n'),
     file('ui/none.ts', 'export const shown = 1\n'),
@@ -90,4 +90,13 @@ test('a map is drawn as a line per module with only its non-empty facts beneath'
     'ui/bare.ts',
     '',
   ].join('\n'))
+})
+
+test('an imported name is author API only when api.ts re-exports it or an exported declaration of api.ts mentions it', () => {
+  const files = [
+    file('api.ts', "import type { KeyId, Hidden, Reg, Alias as A, Unused } from './ui/keys.ts'\nexport interface PlacedScreen { key: KeyId; other: A }\ndeclare module './x.ts' { interface Registrations { r: Reg } }\nfunction helper(h: Hidden) { return h }\n"),
+    file('ui/keys.ts', 'export type KeyId = string\nexport type Hidden = string\nexport type Reg = string\nexport type Alias = string\nexport type Unused = string\nexport type Other = string\n'),
+  ]
+  const keys = mapOf(files).find(entry => entry.path === 'ui/keys.ts')
+  assert.deepEqual(keys.authorApi, ['KeyId', 'Reg', 'Alias'])
 })
