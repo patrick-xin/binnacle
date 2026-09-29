@@ -31,9 +31,12 @@ export interface PlacedScreen {
    * reaches the log. It is called again as the facts arrive, where the
    * session stands changes, the width changes, a person opens something on
    * the screen or the registration changes — not at every frame — so it is a
-   * function of what it is handed and nothing else.
+   * function of what it is handed and nothing else. `transcript` draws any
+   * session's facts as the transcript draws them, with the views registered
+   * for each kind and the theme's fold starts, as a node the screen can
+   * return or hold — a child agent's log, say, followed with `follow`.
    */
-  readonly draw: (facts: readonly Fact[], surface: Surface) => Node
+  readonly draw: (facts: readonly Fact[], surface: Surface, transcript: (facts: readonly Fact[]) => Node) => Node
 }
 
 /**

@@ -7,6 +7,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
 import type { AffordanceKind, Fact, Node, Placement } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
+import { drawnAsTranscript } from '../../src/views/screen.ts'
 import { ScreenPane } from '../../src/panes/screen.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
 import { initial } from '../../src/ui/state.ts'
@@ -361,7 +362,7 @@ test('a plugin places a screen, read back as lines, and disposing its plugin tak
   const placed = registrations.screens.get('trajectory')
   assert.equal(placed?.key, 'f2')
   const pane = new ScreenPane(() => [prompt])
-  pane.place('trajectory', { draw: facts => placed?.draw(facts, { model: 'deepseek/deepseek-v4', running: false }) ?? { kind: 'blank' } })
+  pane.place('trajectory', { draw: facts => placed?.draw(facts, { model: 'deepseek/deepseek-v4', running: false }, drawnAsTranscript) ?? { kind: 'blank' } })
   assert.deepEqual(pane.render(40).map(line => stripTerminalSequences(line).trimEnd()), ['the turns'])
   await fiber.dispose()
   assert.equal(registrations.screens.has('trajectory'), false)

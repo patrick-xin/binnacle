@@ -222,3 +222,50 @@ export function timedIn(node: Node): boolean {
 export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map(), theme: Theme = binnacleTheme): Screen {
   return screens()(transcript(facts), state, width, views, theme)
 }
+
+/**
+ * Draw facts as the transcript draws them, as one node a plugin's screen can return: each entry drawn by the views
+ * registered for it, its regions scoped to it as the transcript scopes them, one blank line between two entries that
+ * draw something, and each fold that does not say how many rows it shows given what the theme gives its entry's kind.
+ * Drawn again whole each time it is asked for, so it suits a screen of one session's log, not a transcript's length of
+ * frames. XXX: a theme's `open` start for a kind has no field on a node to ride, so every fold here starts closed.
+ * @param facts - a session's facts, in log order.
+ * @param views - authors' views, as `drawEntry` takes them.
+ * @param theme - the theme they are drawn in.
+ * @returns the node that draws them.
+ */
+export function drawnAsTranscript(facts: readonly Fact[], views: Views = new Map(), theme: Theme = binnacleTheme): Node {
+  const children: Node[] = []
+  for (const turn of transcript(facts).turns) {
+    for (const entry of turn.entries) {
+      const node = scopedWithin(drawEntry(entry, views, theme), scopeOf(entry))
+      // What draws nothing — a quiet entry — takes no line and no gap.
+      if (node.kind === 'stack' && node.children.length === 0) continue
+      if (children.length > 0) children.push({ kind: 'blank' })
+      children.push(startedAs(node, (theme.folds[keyOf(entry)] ?? theme.folds[entry.kind])?.rows))
+    }
+  }
+  return { kind: 'stack', children }
+}
+
+/**
+ * A node with each fold that does not say how many rows it shows given the rows its entry's kind starts at.
+ * @param node - an entry's drawing.
+ * @param rows - the rows the theme gives its kind's folds, if it gives any.
+ * @returns the node, its folds saying their rows.
+ */
+function startedAs(node: Node, rows: number | undefined): Node {
+  if (rows === undefined) return node
+  switch (node.kind) {
+    case 'stack':
+      return { ...node, children: node.children.map(child => startedAs(child, rows)) }
+    case 'fold':
+      return { ...node, rows: node.rows ?? rows, child: startedAs(node.child, rows) }
+    case 'offer':
+    case 'card':
+    case 'band':
+      return { ...node, child: startedAs(node.child, rows) }
+    default:
+      return node
+  }
+}

@@ -23,6 +23,7 @@ import { FakeSession } from '../support/session.ts'
 import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
 import type { Node } from '../../src/api.ts'
 import type { Fact } from '../../src/facts/adapt.ts'
+import { prompt as promptFact } from '../support/facts.ts'
 
 /** A person's line, as dsh logs it. */
 const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
@@ -1856,4 +1857,29 @@ test('a placed screen is handed where the session stands, and is drawn again as 
   session.stands = { model: 'deepseek/deepseek-v4', running: true }
   session.standsChanged()
   await until(async () => (await terminal.altScreen()).some(row => row === 'deepseek/deepseek-v4 working'))
+})
+
+test('a placed screen draws facts it is handed as the transcript draws them, each kind\'s folds starting as the theme gives them', async () => {
+  const terminal = new XtermTerminal(60, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const child: readonly Fact[] = [
+    promptFact(1, 1, 'look for the flaky test'),
+    { kind: 'context', seq: 2, time: 2, source: 'goal', blocks: [{ kind: 'text', text: 'ship it' }] },
+  ]
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.screen('child', { key: 'f2', description: 'open the child', draw: (_facts, _surface, transcript) => transcript(child) })
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some(row => row.includes('look for the flaky test')))
+  const screen = await terminal.altScreen()
+  // A context entry's fold starts folded to nothing under its title, as the transcript draws it.
+  assert.ok(screen.some(row => row.includes('added by goal')), 'the context entry is drawn under its title')
+  assert.ok(screen.every(row => !row.includes('ship it')), 'its fold starts as the theme gives the context kind: folded to nothing')
 })

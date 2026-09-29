@@ -27,6 +27,7 @@ import type { Component, Keybinding, Terminal, TUI, TuiInputListenerResult, TuiM
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import type { Node } from '../ui/node.ts'
+import { drawnAsTranscript } from '../views/screen.ts'
 import { editorTheme } from '../ui/theme.ts'
 import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
@@ -285,11 +286,12 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     else if (tui instanceof TuiAltScreen) readOn(tui)
   }
   /**
-   * A placed screen as its pane draws it: handed where the session stands beside the facts, as lines are.
+   * A placed screen as its pane draws it: handed where the session stands beside the facts, as lines are, and a way to
+   * draw any session's facts as the transcript does.
    * @param placed - the screen as its plugin registered it.
    * @returns what the pane draws with.
    */
-  const handed = (placed: PlacedScreen): { readonly draw: (facts: readonly Fact[]) => Node } => ({ draw: drawn => placed.draw(drawn, surface()) })
+  const handed = (placed: PlacedScreen): { readonly draw: (facts: readonly Fact[]) => Node } => ({ draw: drawn => placed.draw(drawn, surface(), logged => drawnAsTranscript(logged, registrations.views, registrations.currentTheme)) })
   /** Open a placed screen: on the alternate screen it takes the transcript's place; from the main screen the person is switched to it, as codex enters the alternate screen for its transcript (`codex:codex-rs/tui/src/app_backtrack.rs`). */
   function openScreen(id: string): void {
     const placed = registrations.screens.get(id)

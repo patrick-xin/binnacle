@@ -5,11 +5,12 @@ import type { Fact } from '../../src/facts/adapt.ts'
 import type { Frame } from '../../src/ui/layout.ts'
 import { initial } from '../../src/ui/state.ts'
 import { adapt } from '../../src/facts/adapt.ts'
-import { screen, screens } from '../../src/views/screen.ts'
+import { drawnAsTranscript, screen, screens } from '../../src/views/screen.ts'
+import { layout } from '../../src/ui/layout.ts'
 import { transcript } from '../../src/models/transcript.ts'
 import { binnacleTheme } from '../../src/ui/theme.ts'
 import { logged } from '../support/log.ts'
-import { prompt as promptFact } from '../support/facts.ts'
+import { call as callFact, prompt as promptFact, returned as returnedFact } from '../support/facts.ts'
 
 /** A frame as a person reads it. */
 const plain = (frame: Frame): Frame => ({ lines: frame.lines.map(line => stripTerminalSequences(line).trimEnd()), regions: frame.regions })
@@ -165,4 +166,16 @@ test('an entry whose view draws the time since a moment is drawn at the time the
   assert.deepEqual(at(15_000).lines.map(line => stripTerminalSequences(line).trimEnd()), ['asked 5s'])
   assert.equal(at(15_000).timed, true)
   assert.equal(draw(transcript([promptFact(1, 10_000, 'fix the build')]), initial, 40, new Map(), binnacleTheme, 15_000).timed, false)
+})
+
+test('facts drawn as the transcript draws them scope each entry\'s regions to it: two calls\' outputs are two regions', () => {
+  const facts: readonly Fact[] = [
+    promptFact(1, 1, 'look'),
+    callFact(2, 2, 'c1', 'read', 'a.ts'),
+    returnedFact(3, 3, 'c1', 'a\nb\nc\nd\ne'),
+    callFact(4, 4, 'c2', 'read', 'b.ts'),
+    returnedFact(5, 5, 'c2', 'v\nw\nx\ny\nz'),
+  ]
+  const ids = layout(drawnAsTranscript(facts), 60, initial).regions.map(placed => placed.region.id)
+  assert.deepEqual(ids.filter(id => id.endsWith('/output')), ['2/output', '4/output'])
 })
