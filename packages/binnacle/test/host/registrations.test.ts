@@ -128,9 +128,9 @@ test('a theme says how many rows a tool\'s output fold shows', async () => {
   const { registrations, author } = surface()
   const facts: Fact[] = [call(2, 2, 'c1', 'bash', '{}'), returned(3, 3, 'c1', 'a\nb\nc\nd\ne')]
   const lines = () => screen(facts, initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
-  assert.deepEqual(lines(), ['● bash {}', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(lines(), ['● bash {}', '│ a', '│ b', '│ c', '│ … 2 more lines'])
   await author((ctx) => { ctx.binnacle.theme({ folds: { tool: { rows: 1 } } }) })
-  assert.deepEqual(lines(), ['● bash {}', 'a', '… 4 more lines'])
+  assert.deepEqual(lines(), ['● bash {}', '│ a', '│ … 4 more lines'])
 })
 
 test('a theme says how many rows the fold of a result no call claims shows', async () => {
@@ -328,7 +328,7 @@ test('two plugins can each draw one tool\'s card, and every other card stays bin
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'bash' ? { kind: 'text', text: '$ make' } : next()) })
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'read' ? { kind: 'text', text: 'read a file' } : next()) })
-  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['', ' › fix the build', '', '', '$ make', '', 'read a file', '', '● grep {}', '  running 0s'])
+  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['', ' › fix the build', '', '', '$ make', '', 'read a file', '', '● grep {}', '│ running 0s'])
 })
 
 test('a view that read something besides its entry invalidates its key, and only that key\'s entries are drawn again', async () => {
