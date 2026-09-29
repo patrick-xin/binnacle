@@ -14,12 +14,7 @@ import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
 import type { Placement, Slot, Surface } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
-import { composer as composerFeature } from '../plugins/composer/index.ts'
 import { questions } from '../plugins/questions/index.ts'
-import { statusLine } from '../plugins/status-line/index.ts'
-import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
-import { toolCards } from '../plugins/tool-cards/index.ts'
-import { trajectory } from '../plugins/trajectory/index.ts'
 import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
@@ -28,7 +23,7 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, and its commands. Each is a key dsh declares on `Context`. */
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, and its commands. Each is a key dsh declares on `Context`. */
 export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
@@ -520,12 +515,6 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
  */
 export function apply(ctx: Context): void {
   const registrations = new RegistrationService(ctx)
-  // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
-  ctx.plugin(transcriptFeature)
-  ctx.plugin(composerFeature)
-  ctx.plugin(statusLine)
-  ctx.plugin(toolCards)
-  ctx.plugin(trajectory)
   let parsed: Mode | undefined
   parseCmdline(ctx, surfaceCommand((chosen) => { parsed = chosen }))
   if (parsed === undefined) return

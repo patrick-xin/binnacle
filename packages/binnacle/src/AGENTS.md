@@ -11,7 +11,7 @@ binnacle's source: layers, each importing only what [`layers.json`](../layers.js
 - `api.ts` — the author API: what an author, or a built-in feature, may depend on — the `binnacle` service and the types its registrations take and return.
 - `plugins/` — binnacle's built-in features, each a plugin holding only what an author holds.
 - `host/` — the one layer that touches the terminal and the process: the Cordis row, the session and the `binnacle` service.
-- `index.ts` — binnacle's entry: the Cordis row the bundle patch inserts, and the author API's types.
+- `index.ts` — binnacle's entry: the Cordis row the bundle patch inserts, and the author API's types. Each built-in feature is a row of its own, loaded from its subpath (`plugins/<feature>`).
 
 ## Keep
 
@@ -30,7 +30,7 @@ binnacle's source: layers, each importing only what [`layers.json`](../layers.js
 | keep something a person changed about the screen | `binnacle:packages/binnacle/src/ui/state.ts#UiState`, and what an action does to it in `binnacle:packages/binnacle/src/ui/state.ts#act` | `test/ui/state.test.ts` |
 | place a screen of a feature's own | a registration through the author API (`binnacle:packages/binnacle/src/api.ts#PlacedScreen`), drawn by `binnacle:packages/binnacle/src/panes/screen.ts#ScreenPane` in the transcript's place on the alternate screen, opened by the host | `test/host/registrations.test.ts`, `test/panes/screen.test.ts`, `test/host/index.test.ts` |
 | place a line around the composer, or take the composer's place | a placement through the author API (`binnacle:packages/binnacle/src/api.ts#Placement`), laid out by the host with what is placed | `test/host/index.test.ts` |
-| add a built-in feature | a folder in `src/plugins/`, applied by the host, with a page in [the feature map](../../../docs/features.md) | `test/plugins/<feature>/` |
+| add a built-in feature | a folder in `src/plugins/` whose `index.ts` is the plugin (`name`, `inject`, `apply`); its subpath in `package.json`'s `exports`; a row in [the patch](../cordis.patch.yml), `binnacle-<feature>`, which the host test's `mount` applies too — or, bound to the session's agent, applied by the host on its scope; and a page in [the feature map](../../../docs/features.md) | `test/plugins/<feature>/`, `test/artifact.test.ts` |
 | reach the terminal, the process or dsh's runtime | the host; a plugin reaches a dsh service by naming it in `inject` | `test/host/index.test.ts` |
 | share something between two features | move it down into a layer; what a plugin needs from it at run time joins the author API, by decision ([ADR 5](../../../docs/adr/0005-a-built-in-feature-is-a-plugin-that-holds-only-what-an-author-holds.md)) | the layer's tests |
 

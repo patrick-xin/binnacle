@@ -1,6 +1,6 @@
 # The binnacle bundle
 
-The package dsh loads: a Cordis plugin that [its patch](cordis.patch.yml) inserts into the profile, which takes the terminal and draws a dsh session with pi-tui. This page tells a person how a session and a gesture pass through its layers.
+The package dsh loads: the Cordis plugins that [its patch](cordis.patch.yml) inserts into the profile — binnacle's own, which takes the terminal and draws a dsh session with pi-tui, and a row for each built-in feature it draws with, which a person's profile can disable by its id. This page tells a person how a session and a gesture pass through its layers.
 
 What each file is for, what each folder owns and where a change goes is written for agents, in the `AGENTS.md` of each folder under [`src/`](src/AGENTS.md); `pnpm map <folder>` derives what each file exports and who imports it. What binds is [`AGENTS.md`](../../AGENTS.md). What each layer may import is [`layers.json`](layers.json), held by `check:layers`, whose error says what to change. Why the code is shaped this way is [the architecture](../../docs/architecture.md).
 
