@@ -195,7 +195,7 @@ function replaced(event: SessionEvent): Fact {
   return { kind: 'quiet', seq: event.seq, time: event.time, type: event.type, record: event }
 }
 
-function blockOf(block: ContentBlock): Block {
+export function blockOf(block: ContentBlock): Block {
   if (block.type === 'text') return { kind: 'text', text: block.text }
   if (block.type === 'reasoning') return { kind: 'reasoning', text: block.text }
   return { kind: 'unread', type: block.type }

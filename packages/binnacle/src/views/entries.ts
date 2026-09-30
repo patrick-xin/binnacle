@@ -27,7 +27,7 @@ function textOf(blocks: readonly Block[]): string {
   return blocks.map(block => block.kind === 'unread' ? `[${block.type}]` : block.text).join('\n')
 }
 
-function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
+function drawAnswer(fact: { readonly blocks: readonly Block[], readonly interrupted?: boolean }): Node {
   let reasoning = 0
   const children = fact.blocks.flatMap((block): Node[] => block.kind === 'unread' && block.type === 'tool-call'
     ? []
@@ -42,7 +42,7 @@ function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
       : block.kind === 'text'
         ? [{ kind: 'markdown', text: block.text }]
         : [{ kind: 'text', text: textOf([block]) }])
-  return { kind: 'stack', children: fact.interrupted ? [...children, { kind: 'text', text: '(interrupted)', tone: 'dim' }] : children }
+  return { kind: 'stack', children: fact.interrupted === true ? [...children, { kind: 'text', text: '(interrupted)', tone: 'dim' }] : children }
 }
 
 function drawApproval(asked: Extract<Fact, { readonly kind: 'asked' }>, decided: Extract<Fact, { readonly kind: 'decided' }> | undefined): Node {
@@ -98,7 +98,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   return { kind: 'show', title, child: { kind: 'stack', children: [...reason, output] } }
 }
 
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true }
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true }
 
 /**
  * Draw one entry.
@@ -143,6 +143,8 @@ function builtIn(entry: Entry, problem?: string): Node {
       return noted(folded('context', [{ mark: 'context' } as const, ` added by ${entry.fact.source}`], { kind: 'text', text: textOf(entry.fact.blocks) }), problem)
     case 'answer':
       return noted(drawAnswer(entry.fact), problem)
+    case 'streaming':
+      return noted(drawAnswer(entry.answer), problem)
     case 'tool':
       return noted(drawTool(entry.call, entry.result, entry.left), problem)
     case 'approval':

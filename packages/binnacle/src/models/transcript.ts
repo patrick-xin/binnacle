@@ -1,4 +1,5 @@
 import type { Fact } from '../facts/adapt.ts'
+import type { Streamed } from '../facts/stream.ts'
 
 /** A fact of one kind. */
 type FactOf<K extends Fact['kind']> = Extract<Fact, { readonly kind: K }>
@@ -26,7 +27,9 @@ type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | '
  * `compaction` entry is one compaction of the context — where the model
  * stopped seeing earlier history — opened where it started and holding its
  * summary and its end once each has arrived; a `summary` or `end` entry is
- * one whose compaction is not in its turn, kept rather than dropped.
+ * one whose compaction is not in its turn, kept rather than dropped. A
+ * `streaming` entry is the answer the model is still writing, at the end of
+ * its turn until the log holds it.
  */
 export type Entry =
   | Single<Exclude<Alone, 'prompt'>>
@@ -35,6 +38,7 @@ export type Entry =
   | { readonly kind: 'approval', readonly asked: FactOf<'asked'>, readonly decided?: FactOf<'decided'> }
   | { readonly kind: 'command', readonly run: FactOf<'run'>, readonly done?: FactOf<'done'> }
   | { readonly kind: 'compaction', readonly start: FactOf<'start'>, readonly summary?: FactOf<'summary'>, readonly end?: FactOf<'end'> }
+  | { readonly kind: 'streaming', readonly answer: Streamed }
 
 /** What a person sent and everything the agent did about it. */
 export interface Turn {
@@ -105,14 +109,14 @@ export function fold(model: Transcript, fact: Fact): Transcript {
 }
 
 /**
- * How many entries can no longer change: all before the last turn's first running command or compaction, or,
- * while that turn runs, its first call or approval still waiting. dsh can log a command or compaction outside a turn.
+ * How many entries can no longer change: all before the last turn's answer streaming, first running command or compaction,
+ * or, while that turn runs, its first call or approval still waiting. dsh can log a command or compaction outside a turn.
  */
 export function settled(model: Transcript): number {
   const last = model.turns.at(-1)
   const before = model.turns.slice(0, -1).reduce((count, turn) => count + turn.entries.length, 0)
   if (last === undefined) return 0
-  const waiting = last.entries.findIndex(entry => (entry.kind === 'command' && entry.done === undefined)
+  const waiting = last.entries.findIndex(entry => entry.kind === 'streaming' || (entry.kind === 'command' && entry.done === undefined)
     || (entry.kind === 'compaction' && entry.end === undefined)
     || (last.ending === undefined && ((entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined))))
   return before + (waiting === -1 ? last.entries.length : waiting)
@@ -120,4 +124,12 @@ export function settled(model: Transcript): number {
 
 export function transcript(facts: readonly Fact[]): Transcript {
   return facts.reduce(fold, empty)
+}
+
+/** A transcript with the answer streaming now at the end of its last turn. */
+export function answering(model: Transcript, answer: Streamed | undefined): Transcript {
+  if (answer === undefined) return model
+  const last = model.turns.at(-1) ?? { turn: null, entries: [] }
+  if (last.entries.some(entry => entry.kind === 'answer' && entry.fact.turn === answer.turn && entry.fact.step === answer.step)) return model
+  return { turns: [...model.turns.slice(0, -1), { ...last, entries: [...last.entries, Object.freeze({ kind: 'streaming', answer })] }] }
 }

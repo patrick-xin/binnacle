@@ -47,6 +47,7 @@ function foldsIn(node: Node): string[] {
 }
 
 function scopeOf(entry: Entry): string {
+  if (entry.kind === 'streaming') return `streaming-${entry.answer.turn}-${entry.answer.step}`
   return String(entry.kind === 'tool' ? entry.call.seq : entry.kind === 'approval' ? entry.asked.seq : entry.kind === 'command' ? entry.run.seq : entry.kind === 'compaction' ? entry.start.seq : entry.fact.seq)
 }
 

@@ -92,6 +92,13 @@ test('an answer shows its text, folds its reasoning to one line, and says when i
   assert.deepEqual(seen(answer), ['∴ thinking · 1 line', 'The build', '(interrupted)'])
 })
 
+const streamingAnswer: Entry = { kind: 'streaming', answer: { turn: 1, step: 1, blocks: [{ kind: 'reasoning', text: 'the build fails in tsc' }, { kind: 'text', text: 'The build' }] } }
+
+test('an answer streaming is drawn as the answer it will be, its thinking folded and opened by its own region', () => {
+  assert.deepEqual(seen(streamingAnswer), ['∴ thinking · 1 line', 'The build'])
+  assert.deepEqual(seen(streamingAnswer, ['streaming-1-1/reasoning-0']), ['∴ thinking · show less', 'the build fails in tsc', 'The build'])
+})
+
 test('expanding the reasoning shows it, the line saying it can be folded', () => {
   assert.deepEqual(seen(answer, ['8/reasoning-0']), ['∴ thinking · show less', 'the build fails in tsc', 'The build', '(interrupted)'])
 })
