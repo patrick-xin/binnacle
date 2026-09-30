@@ -1,7 +1,6 @@
 import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
 
-/** Leave text as it is. */
 const plain = (text: string): string => text
 
 /**
@@ -54,7 +53,6 @@ export const marks = {
 /** A mark of the theme's, named by what it stands for: binnacle's own, or one an author's theme adds. */
 export type Mark = keyof typeof marks | (string & {})
 
-/** The word for a count of lines. */
 const lineWord = (count: number): string => count === 1 ? 'line' : 'lines'
 
 /**
@@ -92,7 +90,6 @@ export const words = {
 /** The words that say no count: each is said as it is, where the rest are templates of a count. */
 const plainWords = ['less', 'away', 'select', 'next', 'offer.expand', 'offer.choose', 'offer.open', 'offer.copy', 'offer.answer', 'offer.grant', 'offer.dismiss'] as const
 
-/** A word that says no count. */
 type PlainWord = typeof plainWords[number]
 
 /**
@@ -135,11 +132,7 @@ const attributes = {
  */
 export const markdownTheme: MarkdownTheme = markdownIn(tones)
 
-/**
- * The markdown theme in a theme's tones, so a document follows a tone an author recolours.
- * @param toned - the tones.
- * @returns the markdown theme.
- */
+/** The markdown theme in a theme's tones, so a document follows a tone an author recolours. */
 function markdownIn(toned: Theme['tones']): MarkdownTheme {
   return {
     heading: attributes.bold,
@@ -238,11 +231,7 @@ export interface Style {
   readonly underline?: boolean
 }
 
-/**
- * What a style draws with: each attribute closed by the parameter that ends it alone, inside the colour, closed by the default foreground.
- * @param style - the style.
- * @returns text drawn in it.
- */
+/** What a style draws with: each attribute closed by the parameter that ends it alone, inside the colour, closed by the default foreground. */
 function styled(style: Style): (text: string) => string {
   const wraps: ((text: string) => string)[] = []
   if (style.bold === true) wraps.push(attributes.bold)
@@ -258,32 +247,18 @@ function styled(style: Style): (text: string) => string {
   return text => wraps.reduce((inner, wrap) => wrap(inner), text)
 }
 
-/**
- * A word's template as a function of a count, as every word of the theme's is, those that count nothing ignoring it.
- * @param template - the template, `{n}` and `{lines}` in it.
- * @returns what it says of a count.
- */
+/** A word's template as a function of a count, as every word of the theme's is, those that count nothing ignoring it. */
 function counting(template: string): (count: number) => string {
   return count => template.replaceAll('{n}', String(count)).replaceAll('{lines}', lineWord(count))
 }
 
-/**
- * What a background fills with: the colour's background code, closed by the default background.
- * @param colour - the colour.
- * @returns text filled with it.
- */
 function filling(colour: Colour): (text: string) => string {
   const index = colours.indexOf(colour)
   const code = index < 8 ? 40 + index : 100 + index - 8
   return text => `\x1b[${code}m${text}\x1b[49m`
 }
 
-/**
- * A theme with changes laid over it, oldest first, each over what the ones before it left.
- * @param base - the theme beneath them.
- * @param changes - each registration's changes, oldest first.
- * @returns a new theme, even when nothing changed, so what was kept against the old one is stale.
- */
+/** A theme with changes laid over it, oldest first, each over what the ones before it left. A new theme even when nothing changed, so what was kept against the old one is stale. */
 export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
   const marked: Record<string, { readonly glyph: string, readonly tone: Tone } | undefined> = { ...base.marks }
   for (const change of changes) {

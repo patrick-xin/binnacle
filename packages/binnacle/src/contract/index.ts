@@ -54,9 +54,8 @@ export type Action =
   | { readonly kind: 'unfocus' }
 
 /**
- * A thrown or foreign value as a person reads it: an error's message, or the value's string form.
- * @param value - what was thrown, or what an author's code returned.
- * @returns its text; `a value binnacle cannot show` when even reading that throws.
+ * A thrown or foreign value as a person reads it: an error's message, or the
+ * value's string form; `a value binnacle cannot show` when even reading that throws.
  */
 export function describe(value: unknown): string {
   try {

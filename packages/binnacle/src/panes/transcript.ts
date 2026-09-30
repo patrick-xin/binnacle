@@ -15,13 +15,10 @@ import type { Views } from '../views/entries.ts'
 import { screens } from '../views/screen.ts'
 import type { DrawScreen, Screen } from '../views/screen.ts'
 
-/** What the pane has printed on the main screen. */
 interface Printed {
-  /** The width it was laid out at. */
   readonly width: number
   /** How many entries it holds, oldest first. */
   readonly entries: number
-  /** The rows, as printed. */
   readonly lines: readonly string[]
 }
 
@@ -33,7 +30,6 @@ export interface PaneReports {
   readonly fullscreen?: (top: number, height: number) => void
 }
 
-/** The screen, as a component pi-tui lays out and scrolls. */
 export class TranscriptPane implements Component {
   #transcript: Transcript = empty
   readonly #changed: () => void
@@ -54,9 +50,8 @@ export class TranscriptPane implements Component {
 
   /**
    * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
-   * @param views - authors' views as they stand, read at every frame; an entry is drawn again when the views of its key change.
-   * @param reports - what the pane reports about the screen it drew; each is optional, and nothing is reported without it.
-   * @param theme - the theme as it stands, read at every frame; every entry is laid out again when it changes.
+   * @param views - read at every frame; an entry is drawn again when the views of its key change.
+   * @param theme - read at every frame; every entry is laid out again when it changes.
    * @param now - the time, in milliseconds since the epoch, as the host hands it at every frame: what an entry that draws the time since a moment is laid out at. The pane reads no clock of its own.
    * @param keys - the keys the one key table binds to each meaning, for an ask to name what answers it; read as an entry is laid out, which the host has the pane do again when a person rebinds a key.
    */
@@ -71,10 +66,6 @@ export class TranscriptPane implements Component {
     this.#fullscreen = reports.fullscreen ?? (() => {})
   }
 
-  /**
-   * Add the next fact of the session.
-   * @param fact - the fact, in log order.
-   */
   push(fact: Fact): void {
     this.#transcript = fold(this.#transcript, fact)
     this.#changed()
@@ -82,7 +73,6 @@ export class TranscriptPane implements Component {
 
   /**
    * Replace every fact, as when the adapters have changed, and draw every entry again, on the main screen what it printed included.
-   * @param facts - the whole log, adapted again, in log order.
    */
   reset(facts: readonly Fact[]): void {
     this.#transcript = transcript(facts)
@@ -119,18 +109,14 @@ export class TranscriptPane implements Component {
     if (placed !== undefined && placed.top < this.#printedThrough(drawn.width, drawn.screen)) this.#park(drawn.screen)
   }
 
-  /**
-   * Drop focus the main screen cannot draw, keeping where it was for the fullscreen.
-   * @param screen - the screen as drawn now, which bounds the action.
-   */
+  // Drops focus the main screen cannot draw, keeping where it was for the fullscreen.
+
   #park(screen: Screen): void {
     this.#parked = this.#state.focus
     this.#state = act(this.#state, { kind: 'unfocus' }, screen)
   }
 
   /**
-   * Draw the screen.
-   * @param width - the columns pi-tui gives it.
    * @returns on the alternate screen, every line of the transcript as it now draws; on the main screen, what it printed, then what has not settled as it now draws. A new width prints everything again.
    */
   render(width: number): string[] {
@@ -176,8 +162,6 @@ export class TranscriptPane implements Component {
   }
 
   /**
-   * Answer the pointer through the gesture table.
-   * @param event - pi-tui's event, its row one of this view's lines.
    * @returns handled when the gesture changed the screen; undefined leaves it to pi-tui, which scrolls on the wheel and selects on a drag.
    */
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
@@ -191,11 +175,9 @@ export class TranscriptPane implements Component {
   }
 
   /**
-   * Answer a key gesture through the gesture table, on the screen last drawn:
-   * a key lands on the focused region. Any key forgets focus the main screen
+   * A key lands on the focused region. Any key forgets focus the main screen
    * parked, so the fullscreen gives it back only to a person who did nothing
    * else in between.
-   * @param gesture - the gesture a resolved key became.
    * @returns whether the pane answered it, so the key is consumed; false leaves it to the composer.
    */
   handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>): boolean {
@@ -232,7 +214,6 @@ export class TranscriptPane implements Component {
     return printed.entries === 0 ? 0 : screen.ends[printed.entries - 1] ?? screen.lines.length
   }
 
-  /** Draw every entry again, as pi-tui asks when the theme changes, on the main screen what it printed included. */
   invalidate(): void {
     this.#draw = screens(this.#keys)
     this.#printed = undefined

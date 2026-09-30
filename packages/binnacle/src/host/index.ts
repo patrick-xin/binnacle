@@ -20,10 +20,8 @@ import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 
-/** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, and its commands. Each is a key dsh declares on `Context`. */
 export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
@@ -52,17 +50,14 @@ export const internals: {
   },
 }
 
-/** The page as placed, read from the placements as they stand. */
 interface Page {
-  /** Whether binnacle's transcript is in the transcript's place. */
   readonly transcript: boolean
-  /** The lines placed above the composer, oldest first. */
+  /** Oldest first. */
   readonly above: readonly Component[]
-  /** What is in the composer's place: binnacle's composer, lines, or nothing. */
   readonly composer: Component | undefined
-  /** The lines placed below the composer, oldest first. */
+  /** Oldest first. */
   readonly below: readonly Component[]
-  /** The newest lines placed in the dialog, drawn over the page. */
+  /** The newest lines placed in the dialog. */
   readonly dialog: ScreenPane | undefined
 }
 
@@ -75,15 +70,12 @@ const problemWindow = 5_000
 /** What the alternate screen's reading place holds when neither the transcript nor a screen is placed there: nothing, growing. */
 const nothing: Component = { render: () => [], invalidate: () => {} }
 
-/** What this invocation asked for: a check, or the terminal on a screen, in pi's words for them. */
 type Mode = 'check' | TuiMode
 
 /**
- * The keys as `--help` names them: each of binnacle's bindings and each affordance's, with its keys and what it does,
- * read from the one table, never restated. dsh parses the command line as the row applies
+ * Read from the one table, never restated. dsh parses the command line as the row applies
  * (`dsh:packages/boot/cmdline/src/index.ts#parseCmdline`), before any plugin has registered, so what plugins offer or
  * rebind is not here.
- * @returns the help text under its heading.
  */
 function keysHelp(): string {
   const { manager } = keyTable()
@@ -94,11 +86,7 @@ function keysHelp(): string {
   return `Keys:\n${named.join('\n')}`
 }
 
-/**
- * This surface's command: its flags and help.
- * @param chosen - receives the mode when the invocation parses.
- * @returns a fresh program, so one process can parse more than once.
- */
+/** A fresh program each call, so one process can parse more than once. */
 function surfaceCommand(chosen: (mode: Mode) => void): Command {
   return new Command()
     .name('dsh --profile binnacle')
@@ -113,8 +101,6 @@ function surfaceCommand(chosen: (mode: Mode) => void): Command {
 /**
  * A pi-tui object that reaches whichever is live, for a component built with
  * one, as pi's are (`pi:packages/coding-agent/src/modes/interactive/tui-renderer.ts#createInteractiveTuiReference`).
- * @param live - the one live now.
- * @returns the reference.
  */
 function reaching(live: () => TUI): TUI {
   return new Proxy({} as TUI, {
@@ -127,8 +113,6 @@ function reaching(live: () => TUI): TUI {
 }
 
 /**
- * Draw a session on the terminal until the person quits, on either screen.
- *
  * A switch stops the live pi-tui object and builds the other over the same
  * terminal, as pi does (`pi:packages/coding-agent/src/modes/interactive/interactive-mode.ts`).
  * What the old one held is carried to the new: the pane and the composer,
@@ -136,13 +120,7 @@ function reaching(live: () => TUI): TUI {
  * its scroll. A placed screen does not carry: it lives in the alternate
  * screen's scroll view, and leaving that screen closes it. Where the main
  * screen left off is kept for its next turn, as the terminal keeps what it
- * printed.
- * @param session - the open session.
- * @param registrations - what authors registered: their adapters and views.
- * @param quit - called once, when the person asks to quit.
- * @param first - the screen to start on.
- * @returns a disposer that gives the terminal back, the session left printed on the main screen.
- * @throws what starting the terminal threw, having given back what it took.
+ * printed. `quit` is called once, when the person asks to quit. Returns a disposer that gives the terminal back, the session left printed on the main screen; throws what starting the terminal threw, having given back what it took.
  */
 function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void, first: TuiMode): () => void {
   const terminal = internals.terminal()
@@ -171,7 +149,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const screenViews = new Map<string, ScrollView>()
   let followed: ScrollView | undefined
   let open: { readonly name: string, readonly pane: ScreenPane, readonly on: TuiMode } | undefined
-  /** The transcript's scroll view, kept for as long as the terminal is taken, so its scroll survives a placed screen and a switch. */
+  /** Kept for as long as the terminal is taken, so its scroll survives a placed screen and a switch. */
   function transcriptView(): ScrollView {
     if (followed === undefined) {
       followed = new ScrollView(transcript, { follow: 'end', primary: true })
@@ -179,15 +157,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     }
     return followed
   }
-  /**
-   * The alternate screen's layout: what the person is reading in the primary scroll view, growing to fill what the
-   * rest leave, then what is placed above the composer, the composer, and what is placed below it, each at its height.
-   */
   const readBelowComposer = (reading: ScrollView | undefined): VStack => new VStack([
     { component: reading ?? nothing, basis: 0, grow: 1, shrink: 1, minSize: reading === undefined ? 0 : 1 },
     ...around().map((component): StackChild => ({ component, basis: 'auto', grow: 0, shrink: 1, minSize: component === composer ? 3 : 0 })),
   ])
-  /** Lay out the alternate screen: a placed screen that is open in the transcript's place, or the transcript if it is placed. */
   function readOn(alternate: TuiAltScreen): void {
     const reading = open === undefined
       ? (page.transcript ? transcriptView() : undefined)
@@ -202,11 +175,6 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // while it stands there, so one placement in two slots is named by each slot when it goes wrong.
   const linesPanes = new Map<Slot, Map<Placement, ScreenPane>>()
   let dialog: OverlayHandle | undefined
-  /**
-   * The pane that draws a lines placement in its slot, kept for as long as the placement stands there.
-   * @param slot - where it is placed, to name it by.
-   * @param placement - the lines.
-   */
   const linesPane = (slot: Slot, placement: Extract<Placement, { readonly kind: 'lines' }>): ScreenPane => {
     const inSlot = linesPanes.get(slot) ?? new Map<Placement, ScreenPane>()
     linesPanes.set(slot, inSlot)
@@ -224,7 +192,6 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     inSlot.set(placement, pane)
     return pane
   }
-  /** Read the page from the placements as they stand, forgetting the panes of lines no longer placed. */
   function arrange(): Page {
     const lines = (slot: Slot): readonly ScreenPane[] => registrations.placed(slot).flatMap(placement => placement.kind === 'lines' ? [linesPane(slot, placement)] : [])
     const inComposer = registrations.placed('composer').at(-1)
@@ -243,29 +210,22 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     }
     return arranged
   }
-  /** What sits under the transcript's place, top to bottom: the lines above the composer, the composer's place, the lines below it. */
   const around = (): readonly Component[] => [...page.above, ...(page.composer === undefined ? [] : [page.composer]), ...page.below]
-  /**
-   * Stack the page on a screen: on the main screen, the order it is printed in; on the alternate one, what its layout reads.
-   * @param on - the screen.
-   */
   function stack(on: TuiMainScreen | TuiAltScreen): void {
     unshowDialog()
     on.clear()
     if (page.transcript) on.addChild(transcript)
     for (const component of around()) on.addChild(component)
     if (on instanceof TuiAltScreen) readOn(on)
-    // Typing reaches binnacle's composer where it is placed, and nothing where it is not.
     on.setFocus(page.composer === composer ? composer : null)
     // The dialog takes no focus of pi-tui's: the host hands it keys, ahead of the composer's seat, as it hands the seat.
     if (page.dialog !== undefined) dialog = on.showOverlay(page.dialog, { anchor: 'center', width: '80%', maxHeight: '80%', nonCapturing: true })
   }
-  /** Take the dialog off the screen it is shown on; clearing a screen leaves its overlays standing. */
+  /** Clearing a screen leaves its overlays standing. */
   function unshowDialog(): void {
     dialog?.hide()
     dialog = undefined
   }
-  /** Close the placed screen that is open: the transcript returns to its place, and one opened from the main screen returns there. */
   function closeScreen(): void {
     if (open === undefined) return
     const back = open.on
@@ -278,7 +238,6 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   function openScreen(id: string): void {
     const placed = registrations.screens.get(id)
     if (placed === undefined) return
-    // Another screen takes the place of one that is open, relaid out below or by the switch.
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
@@ -382,11 +341,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
   // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()
-  // What a person bound through the registrations, over the defaults, installed wherever keys are read.
   table.bind(registrations.bindings)
   setKeybindings(table.manager)
   const offered = new Map<string, () => void>()
-  /** Take back every key the placed screens offer and offer what they offer now, forgetting panes whose registration went, closing one such, and installing the manager the offers rebuilt. */
   function offerScreens(): void {
     for (const withdraw of offered.values()) withdraw()
     offered.clear()
@@ -538,11 +495,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   return release
 }
 
-/**
- * Parse the invocation and, once startup commits, open a session and check or draw it. A failure it cannot recover
- * from gives back what it took, a terminal half-started included, says what failed, and asks the launcher to exit 1.
- * @param ctx - the row's context, carrying the launcher's command line, exit request and readiness, and dsh's agents and default model.
- */
+/** A failure it cannot recover from gives back what it took, a terminal half-started included, says what failed, and asks the launcher to exit 1. */
 export function apply(ctx: Context): void {
   const registrations = new RegistrationService(ctx)
   let parsed: Mode | undefined

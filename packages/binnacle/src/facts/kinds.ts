@@ -9,10 +9,6 @@
 export type Treatment = 'read' | 'quiet' | 'unread'
 
 /**
- * Every kind of event dsh knows, and how binnacle treats it. A kind named
- * `read` is read by the adapter for it in `adapt.ts`; a kind named `quiet`
- * becomes a quiet fact there; a kind named `unread` becomes an `unknown` one.
- *
  * The census of `dsh:packages/core/session/src/known-event-types.ts#KNOWN_SESSION_EVENT_TYPES`,
  * restated so a pin that adds a kind fails a test naming it rather than
  * slipping unannounced onto the screen. What is quiet is what dsh web's Chat

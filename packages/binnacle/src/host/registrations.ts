@@ -8,35 +8,19 @@ import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
 import type { Theme } from '../ui/theme.ts'
 
-/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, the theme, the keys, or what a plugin's drawings read, which it asked to draw again. */
+/** `drawn` is what a plugin's drawings read, which it asked to draw again. */
 export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys' | 'drawn'
 
-/** What the host performs the grants with, on the session it opened. */
 export interface GrantedSession {
-  /**
-   * Send a line from the person, steering the agent.
-   * @param text - the line.
-   */
   send(text: string): void
-  /**
-   * Run a line as a command.
-   * @param line - the line.
-   * @returns whether a command ran.
-   */
+  /** Resolves whether a command ran. */
   command(line: string): Promise<boolean>
-  /** The agent whose session is on screen, as dsh holds it. */
   readonly agent: Agent
 }
 
-/** The slots of the page, top to bottom. */
 const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer', 'dialog'] satisfies readonly Slot[]
 
-/**
- * Why a placement cannot go in a slot, as what to change.
- * @param slot - where it was placed.
- * @param placement - what was placed.
- * @returns the reason, or undefined when it may go there.
- */
+/** Why a placement cannot go in a slot, as what to change; undefined when it may. */
 function misplaced(slot: Slot, placement: Placement): string | undefined {
   // An author's code may be untyped, so what the types say is checked here, where it enters.
   if (!slots.includes(slot)) return 'no such slot; the slots are transcript, above-composer, composer, below-composer and dialog'
@@ -53,16 +37,13 @@ function misplaced(slot: Slot, placement: Placement): string | undefined {
 /**
  * The own entries of each source laid one over the next, latest wins, defined as own properties: `Object.assign` sets,
  * so an id only an own property carries — `__proto__`, as JSON.parse makes it — reaches the prototype's setter and is
- * dropped, before it can be refused or layered.
- * @param sources - the records to lay, oldest first.
- * @returns their own entries as one record, each id's newest.
+ * dropped, before it can be refused or layered. Sources are oldest first.
  */
 function overlaid(...sources: readonly Readonly<Record<string, KeyId | readonly KeyId[] | undefined>>[]): KeybindingsConfig {
   return Object.fromEntries(sources.flatMap(source => Object.entries(source))) as KeybindingsConfig
 }
 
 /**
- * The `binnacle` service, and what the host reads of it: the registrations as they stand, and when they change.
  * Each registration is an effect bound to the plugin that made it, through the context Cordis traces to the caller,
  * so disposing that plugin takes back what it registered.
  */
@@ -82,24 +63,20 @@ export class RegistrationService extends Service implements Registrations {
   private drawnIn: Theme = binnacleTheme
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
 
-  /**
-   * @param ctx - the context the service is provided in; its fiber's disposal removes it.
-   */
   constructor(ctx: Context) {
     super(ctx, 'binnacle')
   }
 
-  /** The adapter that reads each dsh event type: the newest registered for it. */
+  /** The newest adapter registered for each dsh event type. */
   get adapters(): ReadonlyMap<string, AuthorAdapter> {
     return this.newestAdapters
   }
 
-  /** Authors' views, by entry kind or authored fact name, each key's oldest first. */
+  /** By entry kind or authored fact name, each key's oldest first. */
   get views(): Views {
     return this.viewTable
   }
 
-  /** The screens plugins placed, by name: the newest registration of each. */
   get screens(): ReadonlyMap<string, PlacedScreen> {
     return this.newestScreens
   }
@@ -114,7 +91,7 @@ export class RegistrationService extends Service implements Registrations {
     return this.register(this.viewTable, key, view, `binnacle.view(${key})`, 'views')
   }
 
-  /** The theme drawn in: binnacle's, with each theme registration laid over it, oldest first. */
+  /** Binnacle's theme, with each theme registration laid over it, oldest first. */
   get currentTheme(): Theme {
     return this.drawnIn
   }
@@ -145,7 +122,7 @@ export class RegistrationService extends Service implements Registrations {
     return this.register(this.bindingTable, 'keys', given, 'binnacle.keys', 'keys')
   }
 
-  /** What the registrations bind, by binding id: each id's newest. */
+  /** Each id's newest binding. */
   get bindings(): KeybindingsConfig {
     return this.bound
   }
@@ -170,11 +147,7 @@ export class RegistrationService extends Service implements Registrations {
     return await session.command(line)
   }
 
-  /**
-   * Open the grants onto a session: what they reach until the returned function closes them.
-   * @param session - what the host performs a grant with.
-   * @returns a function that closes them, as the session closes.
-   */
+  /** Open the grants onto a session; the returned function closes them, as the session closes. */
   open(session: GrantedSession): () => void {
     this.granted = session
     return () => { if (this.granted === session) this.granted = undefined }
@@ -187,11 +160,7 @@ export class RegistrationService extends Service implements Registrations {
     return this.register(this.placementTable, slot, placement, `binnacle.place(${slot})`, 'placements')
   }
 
-  /**
-   * What is placed in a slot, oldest first.
-   * @param slot - the slot.
-   * @returns its placements; the transcript's and the composer's slots draw the last.
-   */
+  /** Oldest first; the transcript's and the composer's slots draw the last. */
   placed(slot: Slot): readonly Placement[] {
     return this.placementTable.get(slot) ?? []
   }
@@ -211,24 +180,13 @@ export class RegistrationService extends Service implements Registrations {
     this.changed('views')
   }
 
-  /**
-   * Hear when a registration comes or goes, or a key is invalidated, so the screen is drawn again.
-   * @param listener - called on each change, with the table it changed: the adapters, which change the facts; the views; or the placed screens.
-   * @returns a function that stops listening.
-   */
+  /** Listeners hear when a registration comes or goes, or a key is invalidated, with the table that changed. */
   onChange(listener: (changed: RegistrationsChanged) => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
 
-  /**
-   * Register one entry as an effect of the calling plugin, above any the key already has.
-   * @param into - the table.
-   * @param value - what is registered.
-   * @param label - the effect's label.
-   * @param table - which table `into` is, for the listeners.
-   * @returns the effect's disposer.
-   */
+  /** The entry goes above any the key already has; `table` is which table `into` is, for the listeners. */
   private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string, table: RegistrationsChanged): () => void {
     return this.ctx.effect(() => {
       into.set(key, [...into.get(key) ?? [], value])
@@ -244,7 +202,6 @@ export class RegistrationService extends Service implements Registrations {
     }, label)
   }
 
-  /** Take the newest adapter of each type, the newest screen of each name and the theme the registrations leave, and tell every listener which table changed. */
   private changed(table: RegistrationsChanged): void {
     this.newestAdapters.clear()
     for (const [type, stack] of this.adapterTable) {
@@ -256,7 +213,6 @@ export class RegistrationService extends Service implements Registrations {
       const newest = stack.at(-1)
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
-    // A new theme object each change, so what was kept against the old one is known stale.
     // Each id bound by the newest registration that binds it, as one config for pi-tui's manager.
     if (table === 'keys') this.bound = overlaid(...this.bindingTable.get('keys') ?? [])
     if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])

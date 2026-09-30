@@ -50,34 +50,19 @@ export interface Frame {
   readonly regions: readonly Placed[]
 }
 
-/**
- * The row a focused region draws under it: the chrome's focus pointer and what Enter will do, in accent.
- * @param label - the primary affordance's label, which says what Enter will do.
- * @param width - the columns it is given.
- * @returns the row, wrapped as text is.
- */
 function focusRow(label: string, width: number, theme: Theme): string[] {
   return new Text(theme.tones.accent(`${theme.chrome.focus} ${label}`), 0, 0).render(width)
 }
 
 /**
  * Text in a tone of the theme's; as it is, in none. A node is read against the theme it is laid out in, so a tone it names is there — or it is plain.
- * @param text - the text.
- * @param tone - the tone, if any.
- * @param theme - the theme.
- * @returns the text, styled for the terminal.
  */
 function inTone(text: string, tone: Tone | undefined, theme: Theme): string {
   const paint = tone === undefined ? undefined : theme.tones[tone]
   return paint === undefined ? text : paint(text)
 }
 
-/**
- * A mark of the theme's; the theme's `unknown` mark for a name it lacks, which a node read against the theme never names.
- * @param name - the mark's name.
- * @param theme - the theme.
- * @returns its glyph and tone.
- */
+/** A mark of the theme's; the theme's `unknown` mark for a name it lacks, which a node read against the theme never names. */
 function markIn(name: Mark, theme: Theme): { readonly glyph: string, readonly tone: Tone } {
   return theme.marks[name] ?? theme.marks.unknown
 }
@@ -87,8 +72,6 @@ function markIn(name: Mark, theme: Theme): { readonly glyph: string, readonly to
  * a bare span in the node's, a mark's glyph in the mark's tone or the span's
  * own — and adjacent runs in one tone drawn as one, so a line all in one tone
  * is the one styled run it always was.
- * @param node - the text node.
- * @returns its line, styled for the terminal.
  */
 function written(node: Extract<Node, { readonly kind: 'text' }>, theme: Theme): string {
   if (typeof node.text === 'string') return inTone(node.text, node.tone, theme)
@@ -107,13 +90,6 @@ function written(node: Extract<Node, { readonly kind: 'text' }>, theme: Theme): 
   return runs.map(run => inTone(run.text, run.tone, theme)).join('')
 }
 
-/**
- * The line a fold's title draws: its spans joined as a text node's line is,
- * a bare span and the fold's marker in the fold's tone.
- * @param spans - the title's spans, and any marker riding them.
- * @param tone - the fold's tone, if it has one.
- * @returns the line, styled for the terminal.
- */
 function titleLine(spans: readonly Span[], tone: Tone | undefined, theme: Theme): string {
   return written(tone === undefined ? { kind: 'text', text: spans } : { kind: 'text', text: spans, tone }, theme)
 }
@@ -121,23 +97,16 @@ function titleLine(spans: readonly Span[], tone: Tone | undefined, theme: Theme)
 /**
  * A fold's title as one plain string: each span's text, a mark's glyph, none
  * of their tones — the title as the accent row a focused fold draws keeps it.
- * @param spans - the title's spans.
- * @returns their text, joined.
  */
 function plainTitle(spans: readonly Span[], theme: Theme): string {
   return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? markIn(span.mark, theme).glyph : 'since' in span ? elapsed(0) : span.text).join('')
 }
 
 /**
- * The row a fold's line becomes while it is focused: the chrome's focus
- * pointer, the fold's title kept on it, and what Enter will do, in accent —
- * so a person tabbing onto the fold reads what it is and what Enter does.
- * The fold's own line is replaced in its place; the row wraps to more rows
- * at a narrow width, as any line does.
- * @param title - the fold's title, as plain text.
- * @param label - what Enter will do.
- * @param width - the columns it is given.
- * @returns the row, wrapped as text is.
+ * The row a fold's line becomes while it is focused: the focus pointer, the
+ * fold's title kept on it, and what Enter will do, in accent — so a person
+ * tabbing onto the fold reads what it is and what Enter does. It replaces the
+ * fold's own line in its place.
  */
 function focusWithTitle(title: string, label: string, width: number, theme: Theme): string[] {
   return new Text(theme.tones.accent(`${theme.chrome.focus} ${title} ${theme.chrome.separator} ${label}`), 0, 0).render(width)
@@ -146,11 +115,6 @@ function focusWithTitle(title: string, label: string, width: number, theme: Them
 /**
  * Lay a node out: every string it carries is treated first, so none of it
  * reaches the terminal as a control.
- * @param node - what to draw.
- * @param width - the columns it is given.
- * @param state - the UI state it is drawn in.
- * @param theme - the theme it is drawn in; binnacle's own unless registrations change it.
- * @returns its lines and regions.
  */
 export function layout(node: Node, width: number, state: LayoutState, theme: Theme = binnacleTheme): Frame {
   return drawn(readable(at(node, state.now)), width, state, theme)
@@ -158,9 +122,7 @@ export function layout(node: Node, width: number, state: LayoutState, theme: The
 
 /**
  * The time from a moment to another, as a person reads it: seconds under a minute, then minutes and seconds, then
- * hours and minutes. A moment later than the other reads as none.
- * @param ms - how long, in milliseconds.
- * @returns it, as written.
+ * hours and minutes. A moment later than the other reads as none. `ms` is how long, in milliseconds.
  */
 export function elapsed(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1_000))
@@ -173,9 +135,7 @@ export function elapsed(ms: number): string {
 /**
  * A node as it reads at a time: each span saying the time since a moment written as the time from it, in its tone.
  * Exhaustive over the node kinds, so a kind added to `Node` fails to compile until its spans are written too.
- * @param node - the node a view drew.
- * @param now - the time, in milliseconds since the epoch; none reads every moment as now.
- * @returns the node, its time written.
+ * `now` is in milliseconds since the epoch; none reads every moment as now.
  */
 function at(node: Node, now: number | undefined): Node {
   const span = (each: Span): Span => {
@@ -202,13 +162,7 @@ function at(node: Node, now: number | undefined): Node {
   }
 }
 
-/**
- * Lay out a node whose carried strings are already treated.
- * @param node - what to draw, already treated.
- * @param width - the columns it is given.
- * @param state - the UI state it is drawn in.
- * @returns its lines and regions.
- */
+/** Lay out a node whose carried strings are already treated. */
 function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Frame {
   switch (node.kind) {
     case 'blank':
@@ -300,9 +254,6 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
 
 /**
  * A line with its fill opened again wherever what it holds ended a fill of its own, so each cell after an inner band is the outer fill's, not the terminal's: a background ends with the default background's code, which also ends the outer one.
- * @param line - the line, styled for the terminal.
- * @param fill - the outer fill, as the theme draws it.
- * @returns the line, the outer fill's opening after each inner fill's end.
  */
 function refilled(line: string, fill: (text: string) => string): string {
   // Every fill is the theme's, drawn from a colour as data, so it opens with one code and closes with the default background's.
@@ -310,12 +261,11 @@ function refilled(line: string, fill: (text: string) => string): string {
   return line.replaceAll(DEFAULT_BACKGROUND, `${DEFAULT_BACKGROUND}${opening}`)
 }
 
-/** The code that ends any background, giving the terminal's own back. */
 const DEFAULT_BACKGROUND = '\x1b[49m'
 
 /**
  * Lay an ask out: what it holds, inside a rounded border drawn in its edge's tone, dim by default, every line filled with its background when it names one.
- * @returns its lines, and what it holds's regions moved inside the border; what it holds alone where the width leaves no column inside.
+ * What it holds alone where the width leaves no column inside.
  */
 function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const inner = width - 2 * ASK_SIDE
@@ -345,8 +295,8 @@ function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state
 
 /**
  * Lay a show out: its title, then what it holds beneath it, each line along the
- * theme's gutter in the dim tone, a column of air after it.
- * @returns the title's lines and what it holds, its regions moved beside the gutter; what it holds without a gutter where the width leaves no column beside one.
+ * theme's gutter in the dim tone, a column of air after it. What it holds
+ * without a gutter where the width leaves no column beside one.
  */
 function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const title = new Text(written({ kind: 'text', text: node.title, ...node.tone === undefined ? {} : { tone: node.tone } }, theme), 0, 0).render(width)
@@ -362,11 +312,8 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
 /**
  * What answers an ask, as its bottom edge names it: the keys that invoke what
  * has focus in it, and, where it holds more than one offer, the keys that move
- * focus on, each followed by what it does in the theme's words.
- * @param frame - what the ask holds, laid out.
- * @param state - the state it is laid out in, holding the keys the table binds.
- * @param theme - the theme, holding the words.
- * @returns the keys and what they do, or undefined where nothing answers it or no keys are handed.
+ * focus on, each followed by what it does in the theme's words. Undefined
+ * where nothing answers it or no keys are handed.
  */
 function answeredBy(frame: Frame, state: LayoutState, theme: Theme): string | undefined {
   const offers = frame.regions.filter(placed => placed.region.affordances.length > 0).length
@@ -384,7 +331,8 @@ function answeredBy(frame: Frame, state: LayoutState, theme: Theme): string | un
  * and below, every line filled with the background it names. pi-tui's `Box`
  * draws the padding and the fill, as `Text` draws a text node's wrapped
  * line; what it holds is laid out here, for its regions are binnacle's.
- * @returns the padded lines, and what it holds's regions moved inside the padding; what it holds alone where the width leaves no column inside it, and nothing at all — not empty padding — when it holds nothing.
+ * What it holds alone where the width leaves no column inside it, and nothing
+ * at all — not empty padding — when it holds nothing.
  */
 function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const inner = width - 2 * BAND_PAD
@@ -399,13 +347,7 @@ function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, sta
   }
 }
 
-/**
- * The regions a point lands on.
- * @param regions - a frame's regions, outermost first.
- * @param row - the point's row, in the frame's lines.
- * @param column - the point's column, from the frame's left edge.
- * @returns the regions covering it, innermost first.
- */
+/** The regions a point lands on, innermost first, given a frame's regions outermost first; `row` is in the frame's lines, `column` from its left edge. */
 export function under(regions: readonly Placed[], row: number, column: number): Region[] {
   return regions
     .filter(placed => row >= placed.top && row < placed.top + placed.height && column >= placed.left && column < placed.left + placed.width)

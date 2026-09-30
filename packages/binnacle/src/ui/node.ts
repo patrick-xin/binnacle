@@ -90,9 +90,7 @@ export type Node =
 
 /**
  * Read a node from code binnacle does not own, copying it into fresh data so nothing of it runs later.
- * @param value - what an author's view returned.
- * @param theme - the theme it will be drawn in, whose tones, marks and backgrounds are the names it may use.
- * @returns the node, as data.
+ * `theme` is the one it will be drawn in, whose tones, marks and backgrounds are the names it may use.
  * @throws an error saying what is wrong with it, or whatever reading it threw.
  */
 export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
@@ -177,13 +175,6 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
   }
 }
 
-/**
- * Read one span of a text node's line.
- * @param value - the span, as returned.
- * @param theme - the theme whose tones and marks it may name.
- * @returns it, as data.
- * @throws when it is neither a bare string, a text with a tone, a mark with a tone, nor the time since a moment; when its mark is no mark, its moment no number or its tone no tone; or when it names a mark and carries text anyway.
- */
 function spanOf(value: unknown, theme: Theme): Span {
   if (typeof value === 'string') return value
   if (typeof value !== 'object' || value === null) throw new Error(`${describe(value)} is no span`)
@@ -210,12 +201,6 @@ function spanOf(value: unknown, theme: Theme): Span {
   return { text, tone: tone as Tone }
 }
 
-/**
- * Read one affordance an author's offer declares.
- * @param value - the affordance, as returned.
- * @returns it, as data.
- * @throws when its kind is not one binnacle knows, or its label is no string.
- */
 function affordanceOf(value: unknown): Affordance {
   const kind: unknown = typeof value === 'object' && value !== null && 'kind' in value ? value.kind : undefined
   const label: unknown = typeof value === 'object' && value !== null && 'label' in value ? value.label : undefined

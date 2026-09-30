@@ -186,7 +186,6 @@ export type Fact =
     readonly problem?: string
   }
 
-/** An adapter for one kind of event. */
 type Adapter<K extends SessionEventType> = (event: SessionEvent<K>) => Fact
 
 /** An author's adapter for one kind of event: it names the fact and says what it holds. The name must not be an entry kind binnacle draws, such as `prompt` or `tool`. */
@@ -197,16 +196,11 @@ export type AuthorAdapter = (event: SessionEvent) => { readonly name: string, re
  * stays model-only (`dsh:packages/core/session/src/surface.ts#isAppendSurfaceEvent`), so it draws as nothing and its
  * record is kept for a view an author registers for its kind. The append-origin events alone are the transcript's
  * source material, so a replacement is never read as a row.
- * @param event - the replacement, as dsh logged it.
- * @returns the quiet fact of it.
  */
 function replaced(event: SessionEvent): Fact {
   return { kind: 'quiet', seq: event.seq, time: event.time, type: event.type, record: event }
 }
 
-/**
- * Read one of dsh's content blocks as binnacle's.
- */
 function blockOf(block: ContentBlock): Block {
   if (block.type === 'text') return { kind: 'text', text: block.text }
   if (block.type === 'reasoning') return { kind: 'reasoning', text: block.text }
@@ -222,7 +216,6 @@ function changesTools(content: readonly ContentBlock[]): boolean {
   return content.some(block => block.type === 'tool-addition' || block.type === 'tool-removal')
 }
 
-/** Every kind binnacle has learned, and how it reads one. */
 const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
   'turn/start': ({ seq, time, data }) => ({ kind: 'turn', seq, time, turn: data.turn, phase: 'start' }),
   'turn/end': ({ seq, time, data }) => ({ kind: 'turn', seq, time, turn: data.turn, phase: 'end', ending: data.reason.kind }),
@@ -307,8 +300,6 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
 
 /**
  * Read an event with an author's adapter, which is code binnacle does not own.
- * @param event - the event.
- * @param author - the adapter registered for its type.
  * @returns the authored fact; an `unknown` one saying why, when the adapter or reading what it returned throws, or it names no fact.
  */
 function authored(event: SessionEvent, author: AuthorAdapter): Fact {
@@ -329,12 +320,9 @@ function authored(event: SessionEvent, author: AuthorAdapter): Fact {
 }
 
 /**
- * Adapt one session event.
- *
  * A kind the kinds table names `unread`, or one dsh does not know at all, becomes an `unknown` fact carrying its raw
  * record, so the fallback view can show it; it is never dropped. dsh has already refused any log whose unknown events
  * are not marked ignorable, so what arrives here unadapted is a kind binnacle has not learned yet.
- * @param event - the event, as dsh logged it.
  * @param authors - authors' adapters by event type; one for a kind binnacle also reads wins.
  * @returns the fact it is; `unknown` when no adapter reads its kind.
  */
@@ -350,11 +338,8 @@ export function adapt(event: SessionEvent, authors: ReadonlyMap<string, AuthorAd
 }
 
 /**
- * Freeze what binnacle made of an event — the fact, its blocks, its failure —
- * so an author's view handed it cannot change what binnacle folds. What a
- * fact carries opaquely, a record, a tool's payload or an author's data, is
- * not binnacle's to freeze.
- * @returns the fact itself.
+ * Freeze what binnacle made of an event, so an author's view handed it cannot change what binnacle folds. What a
+ * fact carries opaquely, a record, a tool's payload or an author's data, is not binnacle's to freeze.
  */
 function settled(fact: Fact): Fact {
   if ('blocks' in fact) {

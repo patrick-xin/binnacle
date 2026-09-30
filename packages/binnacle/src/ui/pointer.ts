@@ -1,11 +1,7 @@
 import type { TuiMouseEvent } from '@earendil-works/pi-tui'
 import type { Gesture } from '../contract/index.ts'
 
-/**
- * The gesture a mouse event is.
- * @param event - pi-tui's event.
- * @returns the gesture, or undefined for an event that is none — a press, a release, a click of any button but the primary.
- */
+/** The gesture a mouse event is; undefined for a press, a release, or a click of any button but the primary. */
 export function gestureOf(event: TuiMouseEvent): Gesture | undefined {
   switch (event.type) {
     case 'click':
