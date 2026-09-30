@@ -114,6 +114,13 @@ test('a card row that throws, or returns no show, is drawn over by the row benea
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s', '✗ binnacle.card(generic) returned no show'])
 })
 
+test('a card row whose returned value throws as it is read is drawn over by the row beneath, saying why', async () => {
+  const { registrations, pane } = await withCards(read)
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  registrations.card('generic', { draw: () => ({ get kind(): string { throw new Error('boom') } }) as never })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s', '✗ binnacle.card(generic) threw: boom'])
+})
+
 test('a returned call\'s head says how long it took, muted, by its result\'s log time less its call\'s', async () => {
   const { pane } = await withCards(read)
   pane.push(callFact(2, 10_000, 'c1', 'read', '{"path":"src/api.ts"}'))

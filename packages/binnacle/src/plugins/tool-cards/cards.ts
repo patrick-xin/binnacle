@@ -10,13 +10,17 @@ export function drawCard(rows: (kind: CardKind) => readonly CardRow[], kind: Car
     const row = stack[height - 1]
     if (row === undefined) return bottom()
     let drawn: unknown
+    let declined: string | undefined
+    let shown: boolean
     try {
       drawn = row.draw(parts)
+      declined = typeof drawn === 'object' && drawn !== null && 'declined' in drawn ? readable(drawn.declined) : undefined
+      shown = typeof drawn === 'object' && drawn !== null && 'kind' in drawn && drawn.kind === 'show'
     } catch (error) {
       return refused(at(height - 1), `binnacle.card(${drawnAs}) threw: ${readable(error)}`)
     }
-    if (typeof drawn === 'object' && drawn !== null && 'declined' in drawn) return refused(at(height - 1), `the ${kind} card could not draw this call: ${readable(drawn.declined)}`)
-    if (typeof drawn !== 'object' || drawn === null || !('kind' in drawn) || drawn.kind !== 'show') return refused(at(height - 1), `binnacle.card(${drawnAs}) returned no show`)
+    if (declined !== undefined) return refused(at(height - 1), `the ${kind} card could not draw this call: ${declined}`)
+    if (!shown) return refused(at(height - 1), `binnacle.card(${drawnAs}) returned no show`)
     return drawn as Node
   }
   return at(stack.length)
