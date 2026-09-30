@@ -185,6 +185,12 @@ test('running is muted, and why a tool failed is error', () => {
   assert.equal(styled({ kind: 'tool', call, result: failed })[1], '\x1b[2m│\x1b[22m \x1b[31mthe command exited 2\x1b[39m')
 })
 
+test('a view of output draws what a tool returned alone, handed the tool and its text, beneath the call binnacle draws', () => {
+  const result = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'built' }], meta: undefined } as const
+  const views = new Map<string, View[]>([['output', [(part => { const { tool, text } = part as unknown as { tool: string, text: string }; return { kind: 'text', text: `${tool} said ${text}` } }) as View]]])
+  assert.deepEqual(drawn({ kind: 'tool', call, result }, views), ['● bash {"command":"pnpm build"}', '│ bash said built'])
+})
+
 test('a finished tool shows its output, folded to three rows', () => {
   const result = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'a\nb\nc\nd\ne' }], meta: undefined } as const
   assert.deepEqual(lines({ kind: 'tool', call, result }), ['● bash {"command":"pnpm build"}', '│ a', '│ b', '│ c', '│ … 2 more lines'])
@@ -408,11 +414,32 @@ test('an author\'s view that throws is drawn over by the built-in one, which say
   assert.deepEqual(drawn(prompt, views), ['', ' › fix the build', '', '✗ binnacle.view(prompt) threw: no blocks'])
 })
 
+test('a view of thinking draws an answer\'s thinking alone, handed its text, and the rest of the answer stays binnacle\'s', () => {
+  const views = new Map<string, View[]>([['thinking', [(part => ({ kind: 'text', text: `thought: ${(part as unknown as { text: string }).text}` })) as View]]])
+  assert.deepEqual(drawn(answer, views), ['thought: the build fails in tsc', 'The build', '(interrupted)'])
+})
+
+test('a view of thinking that throws is drawn over by binnacle\'s thinking, which says whose view failed and why', () => {
+  const views = new Map<string, View[]>([['thinking', [() => { throw new Error('no model') }]]])
+  assert.deepEqual(drawn(answer, views), ['∴ thinking · 1 line', '✗ binnacle.view(thinking) threw: no model', 'The build', '(interrupted)'])
+})
+
 test('an authored fact named as a kind binnacle draws is drawn by the fallback, never by that kind\'s view', () => {
   const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'tool', data: {} } }
   const views = new Map<string, View[]>([['tool', [() => ({ kind: 'text', text: 'a tool card' })]]])
   // Its name is its key, so the theme\'s start for `tool` reaches its fold; the refusal stops views, not fold starts.
   assert.deepEqual(seen(entry, [], views, 80), ['? tool', '{}', '✗ tool is a kind binnacle draws; the adapter must give its fact another name'])
+})
+
+test('an authored fact named as a part binnacle draws is drawn by the fallback, never by that part\'s view', () => {
+  const entry: Entry = { kind: 'authored', fact: { kind: 'authored', seq: 3, time: 11, name: 'thinking', data: {} } }
+  const views = new Map<string, View[]>([['thinking', [() => ({ kind: 'text', text: 'a thought' })]]])
+  assert.deepEqual(seen(entry, [], views, 80), ['? thinking · 1 line', '✗ thinking is a kind binnacle draws; the adapter must give its fact another name'])
+})
+
+test('a view that returns a part binnacle has none of is drawn over by the view beneath, saying which', () => {
+  const views = new Map<string, View[]>([['prompt', [() => ({ kind: 'part', part: { kind: 'diff', text: '+a' }, child: { kind: 'blank' } }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, views), ['', ' › fix the build', '', '✗ binnacle.view(prompt) returned no drawable node: diff is no part'])
 })
 
 test('an unknown fact carrying a problem says it under its one line', () => {

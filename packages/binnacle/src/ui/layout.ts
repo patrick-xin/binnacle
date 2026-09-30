@@ -103,6 +103,7 @@ function at(node: Node, now: number | undefined): Node {
       return { ...node, children: node.children.map(child => at(child, now)) }
     case 'offer':
     case 'ask':
+    case 'part':
     case 'band':
       return { ...node, child: at(node.child, now) }
     case 'show':
@@ -143,6 +144,8 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
       return ask(node, width, state, theme)
     case 'show':
       return show(node, width, state, theme)
+    case 'part':
+      return drawn(node.child, width, state, theme)
     case 'band':
       return band(node, width, state, theme)
     case 'fold': {

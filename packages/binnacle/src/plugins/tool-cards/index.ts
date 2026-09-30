@@ -63,7 +63,11 @@ function viewOf(tools: ToolRuntime): View {
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
       // Named as binnacle's own card names its result fold, so a fold a person opened stays open when the plugin is disposed or a presenter throws and the card beneath draws the call.
-      fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
+      fold: (child: Node, rows?: number) => ({
+        kind: 'part',
+        part: { kind: 'output', tool: entry.call.name, text: result === undefined ? '' : textOfBlocks(result.blocks) },
+        child: { kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child },
+      }),
     }
     const kind = shown?.card ?? call.card
     const drawn = rowFor(kind).draw(parts)

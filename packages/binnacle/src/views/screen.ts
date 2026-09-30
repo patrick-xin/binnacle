@@ -7,7 +7,7 @@ import type { Node, Span } from '../ui/node.ts'
 import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
 import type { UiState } from '../ui/state.ts'
-import { drawEntry, keyOf } from './entries.ts'
+import { drawEntry, keyOf, partKinds } from './entries.ts'
 import type { View, Views } from './entries.ts'
 
 export interface Screen extends Frame {
@@ -19,7 +19,7 @@ export interface Screen extends Frame {
 export type DrawScreen = (model: Transcript, state: UiState, width: number, views?: Views, theme?: Theme, now?: number) => Screen
 
 interface Drawing {
-  readonly by: readonly View[] | undefined
+  readonly by: readonly (readonly View[] | undefined)[]
   readonly theme: Theme
   readonly node: Node
   readonly folds: readonly string[]
@@ -39,6 +39,7 @@ function foldsIn(node: Node): string[] {
     case 'offer':
     case 'ask':
     case 'show':
+    case 'part':
     case 'band':
       return foldsIn(node.child)
     case 'fold':
@@ -64,6 +65,7 @@ function scopedWithin(node: Node, scope: string): Node {
       return { ...node, id: `${scope}/${node.id}`, child: scopedWithin(node.child, scope) }
     case 'ask':
     case 'show':
+    case 'part':
     case 'band':
       return { ...node, child: scopedWithin(node.child, scope) }
   }
@@ -82,6 +84,7 @@ function regionsIn(node: Node): string[] {
       return [node.id, ...regionsIn(node.child)]
     case 'ask':
     case 'show':
+    case 'part':
     case 'band':
       return regionsIn(node.child)
   }
@@ -91,9 +94,9 @@ function regionsIn(node: Node): string[] {
 export function screens(keys: () => LayoutState['keys'] = () => undefined): DrawScreen {
   const drawings = new WeakMap<Entry, Drawing>()
   const frameOf = (entry: Entry, state: UiState, width: number, views: Views, theme: Theme, now: number | undefined): Frame => {
-    const by = views.get(keyOf(entry))
+    const by = [keyOf(entry), ...partKinds].map(key => views.get(key))
     let drawing = drawings.get(entry)
-    if (drawing === undefined || drawing.by !== by || drawing.theme !== theme) {
+    if (drawing === undefined || drawing.by.some((stack, index) => stack !== by[index]) || drawing.theme !== theme) {
       const node = scopedWithin(drawEntry(entry, views, theme), scopeOf(entry))
       drawing = { by, theme, node, folds: foldsIn(node), regions: regionsIn(node), timed: timedIn(node) }
     }
@@ -144,6 +147,7 @@ export function timedIn(node: Node): boolean {
       return node.children.some(timedIn)
     case 'offer':
     case 'ask':
+    case 'part':
     case 'band':
       return timedIn(node.child)
     case 'show':

@@ -23,6 +23,7 @@ export function readable(node: Node): Node {
     }
     case 'show':
       return { ...node, title: node.title.map(readableSpan), child: readable(node.child) }
+    case 'part':
     case 'band':
       return { ...node, child: readable(node.child) }
     case 'fold':

@@ -87,6 +87,28 @@ export type Node =
     /** The content. */
     readonly child: Node
   }
+  | {
+    readonly kind: 'part'
+    /** Which part it is, and what it draws from: drawn by the views of its kind, the newest first, each handed it and what the one beneath draws. */
+    readonly part: Part
+    /** How binnacle draws it, beneath every view of its kind. */
+    readonly child: Node
+  }
+
+/** A part of an entry a person names, and what it draws from: the answer's thinking, or what a tool returned. */
+export type Part =
+  | {
+    readonly kind: 'thinking'
+    /** The reasoning, as the model wrote it. */
+    readonly text: string
+  }
+  | {
+    readonly kind: 'output'
+    /** The tool that returned it. */
+    readonly tool: string
+    /** What it returned, as text. */
+    readonly text: string
+  }
 
 export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
   if (typeof value !== 'object' || value === null) throw new Error(`it is ${value === null ? 'null' : typeof value}`)
@@ -165,9 +187,25 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
       if (tone !== undefined) fold.tone = tone as Tone
       return fold
     }
+    case 'part':
+      return { kind: 'part', part: partOf(field('part')), child: parseNode(field('child'), theme) }
     default:
       throw new Error(`${describe(kind)} is no kind of node`)
   }
+}
+
+function partOf(value: unknown): Part {
+  if (typeof value !== 'object' || value === null) throw new Error(`${describe(value)} is no part`)
+  const field = (name: string): unknown => (value as Record<string, unknown>)[name]
+  const text = field('text')
+  if (typeof text !== 'string') throw new Error(`a part's text is ${describe(text)}`)
+  if (field('kind') === 'thinking') return { kind: 'thinking', text }
+  const tool = field('tool')
+  if (field('kind') === 'output') {
+    if (typeof tool !== 'string') throw new Error(`an output part's tool is ${describe(tool)}`)
+    return { kind: 'output', tool, text }
+  }
+  throw new Error(`${describe(field('kind'))} is no part`)
 }
 
 function spanOf(value: unknown, theme: Theme): Span {

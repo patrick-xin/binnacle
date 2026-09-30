@@ -87,6 +87,14 @@ test('once it returns, what it returned is folded beneath it along the dim gutte
   assert.equal(pane.render(60)[1]?.trimEnd(), '\x1b[2m│\x1b[22m a')
 })
 
+test('a view of output draws what a card holds, handed the tool and what it returned, and the card around it stays the tool\'s', async () => {
+  const { registrations, pane } = await withCards(read)
+  registrations.view('output', part => ({ kind: 'text', text: `${part.tool}: ${part.text}` }))
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  pane.push(returned('the file'))
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ read: the file'])
+})
+
 test('a completed call reads as the title its result presents, when it presents one', async () => {
   const build = defineTool({
     name: 'build',
