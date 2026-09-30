@@ -5,6 +5,7 @@ import type { KeyId } from './ui/keys.ts'
 import type { Node, Part } from './ui/node.ts'
 import type { ThemeChanges } from './ui/theme.ts'
 import type { PartView, View } from './views/entries.ts'
+import type { CardKind, CardRow } from './views/cards.ts'
 
 export type { AffordanceKind } from './contract/index.ts'
 export type { AuthorAdapter, Fact } from './facts/adapt.ts'
@@ -14,6 +15,7 @@ export type { Mark } from './ui/theme.ts'
 export type { Background, ThemeChanges } from './ui/theme.ts'
 export type { Node, Part } from './ui/node.ts'
 export type { PartView, View, Views } from './views/entries.ts'
+export type { CardKind, CardParts, CardRow, PresentedCall, PresentedResult, Shown } from './views/cards.ts'
 
 /** A screen a plugin places in the transcript's place: the key its plugin offers, and how it draws. */
 export interface PlacedScreen {
@@ -124,6 +126,24 @@ export interface Registrations {
    * @returns a disposer, for taking it back before the plugin is disposed.
    */
   view(key: string, view: View): () => void
+  /**
+   * Draw one of dsh's card kinds — the card a tool's presenter declares for a
+   * call — from the parts the tool cards hand it. The newest row of a kind
+   * draws; one that throws, returns no show, or declines is drawn over by the
+   * row beneath, saying why, and beneath the last is binnacle's own card. A
+   * kind with no row draws as `generic` does. Disposing one gives its place
+   * back, and every card is drawn again.
+   * @param kind - the card kind.
+   * @param row - how it is drawn.
+   * @returns a disposer, for taking it back before the plugin is disposed.
+   */
+  card(kind: CardKind, row: CardRow): () => void
+  /**
+   * The rows registered for a card kind, oldest first, as `card` stacks them.
+   * @param kind - the card kind.
+   * @returns the rows; none when nothing registered one.
+   */
+  cards(kind: CardKind): readonly CardRow[]
   /**
    * Draw again, at the next frame, every entry the views of a key draw. An
    * entry is drawn once and kept, so a view that reads anything besides its

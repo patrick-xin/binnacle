@@ -16,8 +16,8 @@ import { TranscriptPane } from '../../../src/panes/transcript.ts'
 import { drawText } from '../../support/draw.ts'
 import { layout } from '../../../src/ui/layout.ts'
 import type { Node } from '../../../src/api.ts'
-import type { CardParts, CardRow } from '../../../src/plugins/tool-cards/cards.ts'
-import { rowFor } from '../../../src/plugins/tool-cards/cards.ts'
+import type { CardParts, CardRow } from '../../../src/api.ts'
+import { drawCard } from '../../../src/plugins/tool-cards/cards.ts'
 import * as toolCards from '../../../src/plugins/tool-cards/index.ts'
 import { call as callFact, returned as returnedFact } from '../../support/facts.ts'
 import { pointer } from '../../support/pointer.ts'
@@ -93,6 +93,35 @@ test('a view of output draws what a card holds, handed the tool and what it retu
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('the file'))
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ read: the file'])
+})
+
+test('a card row an author registers draws its kind\'s cards, the newest over the tool cards\' own, until it is taken back', async () => {
+  const { registrations, pane } = await withCards(read)
+  const takeBack = registrations.card('generic', { draw: parts => ({ kind: 'show', title: [parts.mark, ` mine: ${parts.call.title}`], child: { kind: 'blank' } }) })
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  assert.deepEqual(drawText(pane, 60), ['● mine: Read src/api.ts', '│'])
+  takeBack()
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s'])
+})
+
+test('a card row that throws, or returns no show, is drawn over by the row beneath, which says whose row failed and why', async () => {
+  const { registrations, pane } = await withCards(read)
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  const takeBack = registrations.card('generic', { draw: () => { throw new Error('no theme') } })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s', '✗ binnacle.card(generic) threw: no theme'])
+  takeBack()
+  registrations.card('generic', { draw: () => ({ kind: 'stack', children: [] }) as never })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s', '✗ binnacle.card(generic) returned no show'])
+})
+
+test('a returned call\'s head says how long it took, muted, by its result\'s log time less its call\'s', async () => {
+  const { pane } = await withCards(read)
+  pane.push(callFact(2, 10_000, 'c1', 'read', '{"path":"src/api.ts"}'))
+  pane.push(returnedFact(3, 11_400, 'c1', 'the file'))
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts · took 1.4s', '│ the file'])
+  pane.push(callFact(4, 20_000, 'c2', 'read', '{"path":"a"}'))
+  pane.push(returnedFact(5, 85_000, 'c2', 'a'))
+  assert.equal(drawText(pane, 60)[3], '● Read a · took 1m 05s')
 })
 
 test('a completed call reads as the title its result presents, when it presents one', async () => {
@@ -311,8 +340,10 @@ test('every other card kind is drawn by its title alone in this slice', async ()
 })
 
 test('a kind with no row of its own draws through generic\'s', () => {
-  assert.equal(rowFor('terminal'), rowFor('generic'))
-  assert.equal(rowFor('web'), rowFor('generic'))
+  const generic: CardRow = { draw: parts => ({ kind: 'show', title: [` generic: ${parts.call.title}`], child: { kind: 'blank' } }) }
+  const rows = (kind: string): readonly CardRow[] => kind === 'generic' ? [generic] : []
+  const parts = { call: { card: 'terminal', title: 'pnpm test', returned: {} } } as unknown as CardParts
+  for (const kind of ['terminal', 'web'] as const) assert.deepEqual(lines(drawCard(rows, kind, parts, () => ({ kind: 'blank' }))), [' generic: pnpm test', '│'])
 })
 
 test('a row draws a head of its own as its show\'s title, and a line under it along the gutter', () => {
@@ -332,6 +363,7 @@ test('a row draws a head of its own as its show\'s title, and a line under it al
     waiting: { kind: 'text', text: 'running 0s', tone: 'muted' },
     reason: undefined,
     resultText: '',
+    took: undefined,
     fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
   }
   assert.deepEqual(drawn(running), ['$ pnpm test', '│ running 0s'])
@@ -361,6 +393,7 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
     waiting: undefined,
     reason: undefined,
     resultText: 'tsc: 1 error',
+    took: undefined,
     fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
   }
   const exit: CardRow = {
