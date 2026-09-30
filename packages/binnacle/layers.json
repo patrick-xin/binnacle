@@ -90,6 +90,7 @@
       "host"
     ],
     "@deepseek-ai/dsh-tools": [
+      "facts",
       "plugins"
     ],
     "@earendil-works/pi-tui": [

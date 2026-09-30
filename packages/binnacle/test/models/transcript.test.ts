@@ -361,3 +361,13 @@ test('a workflow run that outlives its turn keeps its members and its stop in th
   assert.deepEqual(turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: { ...lint, seq: 9 }, end: { ...linted, seq: 10 } }], end: { ...stopped, seq: 11 } })
   assert.deepEqual(turns[1]?.entries, [])
 })
+
+test('the calls a run_code program made are held by the call that ran it, each with its settling, never entries of their own', () => {
+  const opened: Fact = { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }
+  const code = callFact(3, 3, 'c1', 'run_code', '{}')
+  const sub = { kind: 'sub-call', seq: 4, time: 4, rootCallId: 'c1', subCallId: 'c1:ptc:0', name: 'read', arguments: '{"path":"a.ts"}' } as const
+  const subbed = { kind: 'sub-result', seq: 5, time: 5, rootCallId: 'c1', subCallId: 'c1:ptc:0', failed: false, blocks: [{ kind: 'text', text: 'a' }] } as const
+  assert.deepEqual(transcript([opened, prompt, code, sub, subbed]).turns[0]?.entries, [{ kind: 'prompt', fact: prompt }, { kind: 'tool', call: code, subCalls: [{ call: sub, result: subbed }] }])
+  const done = returnedFact(6, 6, 'c1', 'ok')
+  assert.deepEqual(transcript([opened, prompt, code, sub, subbed, done]).turns[0]?.entries.at(-1), { kind: 'tool', call: code, result: done, subCalls: [{ call: sub, result: subbed }] })
+})

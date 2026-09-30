@@ -131,6 +131,13 @@ test('a returned call\'s head says how long it took, muted, by its result\'s log
   assert.equal(drawText(pane, 60)[3], '● Read a · took 1m 05s')
 })
 
+test('a presented call draws each call its run_code program made beneath its head, marked as a call is', async () => {
+  const { pane } = await withCards(read)
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  pane.push({ kind: 'sub-call', seq: 4, time: 4, rootCallId: 'c1', subCallId: 'c1:ptc:0', name: 'grep', arguments: '{}' })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ ● grep {}', '│ running 0s'])
+})
+
 test('a completed call reads as the title its result presents, when it presents one', async () => {
   const build = defineTool({
     name: 'build',
@@ -371,6 +378,7 @@ test('a row draws a head of its own as its show\'s title, and a line under it al
     reason: undefined,
     resultText: '',
     took: undefined,
+    made: [],
     fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
   }
   assert.deepEqual(drawn(running), ['$ pnpm test', '│ running 0s'])
@@ -401,6 +409,7 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
     reason: undefined,
     resultText: 'tsc: 1 error',
     took: undefined,
+    made: [],
     fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
   }
   const exit: CardRow = {

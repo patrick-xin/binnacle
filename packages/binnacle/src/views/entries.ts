@@ -114,24 +114,33 @@ function drawCompaction(summary: Extract<Fact, { readonly kind: 'summary' }> | u
   return folded('summary', [{ mark: 'compaction' } as const, ` context compacted · ${summary.items} items (~${compact(summary.tokens)} tokens)`], { kind: 'markdown', text: textOf(summary.blocks) })
 }
 
-function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined, left: string | undefined): Node {
+/** Each call a `run_code` program made, a line marked as a call is. */
+function drawnSubCalls(subCalls: Extract<Entry, { readonly kind: 'tool' }>['subCalls']): Node[] {
+  return (subCalls ?? []).map(({ call, result }) => ({
+    kind: 'text',
+    text: [result === undefined ? { mark: 'running' } : result.failed ? { mark: 'failed' } : { mark: 'done' }, ` ${call.name} ${call.arguments}`],
+  }))
+}
+
+function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extract<Fact, { readonly kind: 'result' }> | undefined, left: string | undefined, subCalls?: Extract<Entry, { readonly kind: 'tool' }>['subCalls']): Node {
   const mark: Span = result === undefined
     ? { mark: 'running' }
     : result.failed === true ? { mark: 'failed' } : { mark: 'done' }
   const title: readonly Span[] = [mark, ` ${call.name} ${call.arguments}`]
+  const made = drawnSubCalls(subCalls)
   if (result === undefined) {
     const waiting: Node = left === undefined
       ? { kind: 'text', text: ['running ', { since: call.time }], tone: 'muted' }
       : { kind: 'text', text: `the turn ended without it: ${left}`, tone: 'muted' }
-    return { kind: 'show', title, child: waiting }
+    return { kind: 'show', title, child: made.length === 0 ? waiting : { kind: 'stack', children: [...made, waiting] } }
   }
   const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: result.failure.reason, tone: 'error' }]
   const text = textOf(result.blocks)
   const output: Node = { kind: 'part', part: { kind: 'output', tool: call.name, text }, child: { kind: 'fold', id: 'output', child: { kind: 'text', text } } }
-  return { kind: 'show', title, child: { kind: 'stack', children: [...reason, output] } }
+  return { kind: 'show', title, child: { kind: 'stack', children: [...made, ...reason, output] } }
 }
 
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true, retry: true, retried: true, presented: true, workflow: true, member: true, 'member-end': true, 'workflow-end': true }
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true, retry: true, retried: true, presented: true, workflow: true, member: true, 'member-end': true, 'workflow-end': true, 'sub-call': true, 'sub-result': true }
 
 /**
  * Draw one entry.
@@ -205,7 +214,7 @@ function builtIn(entry: Entry, problem?: string): Node {
     case 'streaming':
       return noted(drawAnswer(entry.answer), problem)
     case 'tool':
-      return noted(drawTool(entry.call, entry.result, entry.left), problem)
+      return noted(drawTool(entry.call, entry.result, entry.left, entry.subCalls), problem)
     case 'approval':
       return noted(drawApproval(entry.asked, entry.decided), problem)
     case 'command':
@@ -230,6 +239,11 @@ function builtIn(entry: Entry, problem?: string): Node {
     }
     case 'workflow':
       return noted(drawWorkflow(entry), problem)
+    case 'sub-call':
+    case 'sub-result': {
+      const title: Node = { kind: 'text', text: [{ mark: 'unknown' } as const, ` ${entry.fact.kind === 'sub-call' ? `call ${entry.fact.name}` : 'settling'} made by ${entry.fact.rootCallId}, whose call is not in its turn`], tone: 'muted' }
+      return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
+    }
     case 'member':
     case 'member-end':
     case 'workflow-end': {

@@ -64,6 +64,10 @@ function viewOf(tools: ToolRuntime, rowsOf: (kind: CardKind) => readonly CardRow
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
       took: result === undefined ? undefined : result.time - entry.call.time,
+      made: (entry.subCalls ?? []).map(({ call: sub, result: settled }) => ({
+        kind: 'text',
+        text: [settled === undefined ? { mark: 'running' } : settled.failed ? { mark: 'failed' } : { mark: 'done' }, ` ${sub.name} ${sub.arguments}`],
+      })),
       // Named as binnacle's own card names its result fold, so a fold a person opened stays open when the plugin is disposed or a presenter throws and the card beneath draws the call.
       fold: (child: Node, rows?: number) => ({
         kind: 'part',

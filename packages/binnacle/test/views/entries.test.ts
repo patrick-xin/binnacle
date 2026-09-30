@@ -224,6 +224,16 @@ test('a view of output draws what a tool returned alone, handed the tool and its
   assert.deepEqual(drawn({ kind: 'tool', call, result }, views), ['● bash {"command":"pnpm build"}', '│ bash said built'])
 })
 
+test('a run_code call draws each call its program made beneath it, marked as a call is, before what it returned', () => {
+  const code = callFact(3, 3, 'c1', 'run_code', '{}')
+  const read = { kind: 'sub-call', seq: 4, time: 4, rootCallId: 'c1', subCallId: 'c1:ptc:0', name: 'read', arguments: '{"path":"a.ts"}' } as const
+  const grep = { kind: 'sub-call', seq: 5, time: 5, rootCallId: 'c1', subCallId: 'c1:ptc:1', name: 'grep', arguments: '{}' } as const
+  const failed = { kind: 'sub-result', seq: 6, time: 6, rootCallId: 'c1', subCallId: 'c1:ptc:0', failed: true, blocks: [] } as const
+  const result = { kind: 'result', seq: 7, time: 7, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'done' }], meta: undefined } as const
+  assert.deepEqual(lines({ kind: 'tool', call: code, subCalls: [{ call: read, result: failed }, { call: grep }] }), ['● run_code {}', '│ ✗ read {"path":"a.ts"}', '│ ● grep {}', '│ running 0s'])
+  assert.deepEqual(lines({ kind: 'tool', call: code, result, subCalls: [{ call: read, result: failed }] }), ['● run_code {}', '│ ✗ read {"path":"a.ts"}', '│ done'])
+})
+
 test('a finished tool shows its output, folded to three rows', () => {
   const result = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'a\nb\nc\nd\ne' }], meta: undefined } as const
   assert.deepEqual(lines({ kind: 'tool', call, result }), ['● bash {"command":"pnpm build"}', '│ a', '│ b', '│ c', '│ … 2 more lines'])

@@ -64,6 +64,15 @@ test('a workflow run is read as it opens, as each member starts and settles, and
   ])
 })
 
+test('a call a run_code program made is read as it starts and as it settles, naming the call that ran the program', () => {
+  const root = ToolCallId('c1')
+  const sub = ToolCallId('c1:ptc:0')
+  const started: SessionEvent<'tool/ptc-dispatch-start'> = { type: 'tool/ptc-dispatch-start', seq: SessionSeq(30), time: 1, data: { rootCallId: root, parentCallId: root, subCallId: sub, name: 'read', arguments: { path: 'a.ts' } } }
+  const settled: SessionEvent<'tool/ptc-dispatch'> = { type: 'tool/ptc-dispatch', seq: SessionSeq(31), time: 2, data: { rootCallId: root, parentCallId: root, subCallId: sub, name: 'read', arguments: { path: 'a.ts' }, isError: true, content: [{ type: 'text', text: 'no such file' }], error: { name: 'ENOENT', code: 'enoent', reason: 'a.ts is missing' } } }
+  assert.deepEqual(adapt(started), { kind: 'sub-call', seq: 30, time: 1, rootCallId: 'c1', subCallId: 'c1:ptc:0', name: 'read', arguments: '{"path":"a.ts"}' })
+  assert.deepEqual(adapt(settled), { kind: 'sub-result', seq: 31, time: 2, rootCallId: 'c1', subCallId: 'c1:ptc:0', failed: true, reason: 'a.ts is missing', blocks: [{ kind: 'text', text: 'no such file' }] })
+})
+
 test('a retry dsh scheduled is a retry fact: which chain, which attempt of how many, when it starts, and what failed as a person reads it', () => {
   const event: SessionEvent<'llm/retry'> = {
     type: 'llm/retry', seq: SessionSeq(7), time: 1_500,
