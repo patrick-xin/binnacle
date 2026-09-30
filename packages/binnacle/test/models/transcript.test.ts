@@ -326,3 +326,8 @@ test('a retry still scheduled when its turn ends is left, saying how the turn en
   assert.deepEqual(ended.turns[0]?.entries.at(-1), { kind: 'retry', retry: retry(3, 1), left: 'aborted' })
   assert.equal(settled(ended), 2)
 })
+
+test('the start of an attempt older than its chain\'s latest changes nothing: the chain stays one entry, its latest still scheduled', () => {
+  const opened: Fact = { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }
+  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retry(4, 2), retried(5, 1)]).turns[0]?.entries, [{ kind: 'prompt', fact: prompt }, { kind: 'retry', retry: retry(4, 2) }])
+})

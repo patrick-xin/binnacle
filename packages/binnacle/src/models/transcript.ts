@@ -96,9 +96,11 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     const at = last.entries.findLastIndex(entry => entry.kind === 'retry' && entry.retry.retryId === fact.retryId)
     entries = at === -1 ? [...last.entries, Object.freeze({ kind: 'retry', retry: fact })] : last.entries.with(at, Object.freeze({ kind: 'retry', retry: fact }))
   } else if (fact.kind === 'retried') {
-    const at = last.entries.findLastIndex(entry => entry.kind === 'retry' && entry.retry.retryId === fact.retryId && entry.retry.attempt === fact.attempt)
+    const at = last.entries.findLastIndex(entry => entry.kind === 'retry' && entry.retry.retryId === fact.retryId)
     const pending = last.entries[at]
-    entries = pending?.kind === 'retry' ? last.entries.with(at, Object.freeze({ kind: 'retry', retry: pending.retry, started: fact })) : [...last.entries, single(fact)]
+    entries = pending?.kind !== 'retry'
+      ? [...last.entries, single(fact)]
+      : pending.retry.attempt === fact.attempt ? last.entries.with(at, Object.freeze({ kind: 'retry', retry: pending.retry, started: fact })) : last.entries
   } else if (fact.kind === 'start') {
     entries = [...last.entries, Object.freeze({ kind: 'compaction', start: fact })]
   } else if (fact.kind === 'summary' || fact.kind === 'end') {
