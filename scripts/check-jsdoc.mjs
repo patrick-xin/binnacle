@@ -80,7 +80,7 @@ function readText(text, declaration) {
  * mentions, what it imports, and what it exports.
  * @param {string} path - the file's path.
  * @param {string} text - the file's text.
- * @returns {{ declared: Map<string, { line: number, documented: boolean, mentions: string[] }[]>, imported: Map<string, { spec: string, name: string }>, exported: string[] }} the module.
+ * @returns {{ declared: Map<string, { line: number, end: number, documented: boolean, mentions: string[] }[]>, imported: Map<string, { spec: string, name: string }>, exported: string[] }} the module.
  */
 function readModule(path, text) {
   const { program, comments } = parseSync(path, text)
@@ -88,9 +88,9 @@ function readModule(path, text) {
   const declared = new Map()
   const imported = new Map()
   const exported = []
-  const declare = (name, outer, mentionedIn) => {
+  const declare = (name, outer, mentionedIn, end = outer.end) => {
     const statements = declared.get(name) ?? []
-    statements.push({ line: lineOf(outer.start), documented: documentedAbove(text, comments, outer), mentions: [...new Set(mentionedIn.match(/[A-Za-z_$][\w$]*/g) ?? [])] })
+    statements.push({ line: lineOf(outer.start), end: lineOf(end), documented: documentedAbove(text, comments, outer), mentions: [...new Set(mentionedIn.match(/[A-Za-z_$][\w$]*/g) ?? [])] })
     declared.set(name, statements)
   }
   for (const node of program.body) {
@@ -120,7 +120,7 @@ function readModule(path, text) {
     const declaration = exporting ? node.declaration : node
     const names = declaration.id?.name ? [declaration.id.name] : declaration.declarations ? declaration.declarations.map(item => item.id?.name).filter(Boolean) : []
     for (const name of names) {
-      declare(name, node, readText(text, declaration))
+      declare(name, node, readText(text, declaration), declaration.body?.type === 'BlockStatement' ? declaration.body.start : node.end)
       if (exporting) exported.push(name)
     }
   }
@@ -128,19 +128,19 @@ function readModule(path, text) {
 }
 
 /**
- * Find what an author reads undocumented: every name the entry exports, and every declaration those mention, followed
+ * Every declaration an author reads: each name the entry exports, and every declaration those mention, followed
  * through the files it is imported from, as the author API's surface test follows it; a package's name is not followed.
  * @param {string} entry - the author API's path.
  * @param {(path: string) => string} read - the text of a path.
- * @returns {string[]} one line per undocumented declaration, with its 1-based line, by file then line.
+ * @returns {{ path: string, line: number, end: number, name: string, documented: boolean }[]} each declaration, from its first line to the last an author reads, by file then line.
  */
-export function undocumentedSurface(entry, read) {
+export function authorSurface(entry, read) {
   const modules = new Map()
   const moduleOf = (path) => {
     if (!modules.has(path)) modules.set(path, readModule(path, read(path)))
     return modules.get(path)
   }
-  const problems = []
+  const surface = []
   const seen = new Set()
   const visit = (path, name) => {
     if (seen.has(`${path}#${name}`)) return
@@ -149,7 +149,7 @@ export function undocumentedSurface(entry, read) {
     const statements = module.declared.get(name)
     if (statements !== undefined) {
       for (const statement of statements) {
-        if (!statement.documented) problems.push({ path, line: statement.line, name })
+        surface.push({ path, line: statement.line, end: statement.end, name, documented: statement.documented })
         for (const mentioned of statement.mentions) if (mentioned !== name && (module.declared.has(mentioned) || module.imported.has(mentioned))) visit(path, mentioned)
       }
       return
@@ -158,8 +158,18 @@ export function undocumentedSurface(entry, read) {
     if (from !== undefined && from.spec.startsWith('.')) visit(posix.join(posix.dirname(path), from.spec), from.name)
   }
   for (const name of moduleOf(entry).exported) visit(entry, name)
-  return problems
-    .toSorted((a, b) => a.path.localeCompare(b.path) || a.line - b.line)
+  return surface.toSorted((a, b) => a.path.localeCompare(b.path) || a.line - b.line)
+}
+
+/**
+ * Find what an author reads undocumented.
+ * @param {string} entry - the author API's path.
+ * @param {(path: string) => string} read - the text of a path.
+ * @returns {string[]} one line per undocumented declaration, with its 1-based line, by file then line.
+ */
+export function undocumentedSurface(entry, read) {
+  return authorSurface(entry, read)
+    .filter(({ documented }) => !documented)
     .map(({ path, line, name }) => `${path}:${line}: ${name}`)
 }
 

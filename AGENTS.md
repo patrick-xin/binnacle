@@ -27,7 +27,7 @@ Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.t
 ## One root
 
 - **Everything you read is under this checkout.** `pnpm refs` fetches each repository in [`references.json`](references.json) into `.refs/<name>` at its pin. **Never write under `.refs/`.**
-- **Cite another repository as `` `name:path` ``** (`` `pi:packages/tui/src/tui.ts` ``, optionally `#symbol`), never as a path on a machine, and never in a decision record (below). `pnpm test` resolves every citation at its pin and refuses a home directory, or a privacy tool's placeholder, in any file.
+- **Cite another repository as `` `name:path` ``** (`` `pi:packages/tui/src/tui.ts` ``, optionally `#symbol`), never as a path on a machine, never in code under `src/`, and never in a decision record (below). `pnpm test` resolves every citation at its pin and refuses a home directory, or a privacy tool's placeholder, in any file.
 - **Cite this repository's code the same way, by the name `binnacle`** (`` `binnacle:packages/binnacle/src/api.ts#Registrations` ``), wherever prose outside a decision record points at it. A symbol in code must be one its module exports, so a rename fails the gate instead of leaving the prose stale.
 - **The source is the authority.** `dsh` on the harness contract; `pi` for pi-tui's API and for what pi composes from it; `codex` and `eve` for what a terminal can do. A limitation is a reading: name the reference it was read in.
 - **A reference only one machine has** is declared in its `references.local.json`, never in a tracked file, and never cited from one.
@@ -39,7 +39,7 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 - **Reach dsh only through a named seam.** A dsh package is a line in `layers.json`; a service is a key in `inject`, typed against `Context`; a row is an id in the patch. Widen a seam by naming more, never by reaching further through one already named.
 - **Take what upstream exports; never derive it again.** A component, layout, key table, text measure, schema or patch semantics that ships upstream is imported, never restated. A shape that must be restated names upstream's type and is held to it by a type-level test.
 - **Follow an upstream rename wholesale** — no shim, no fallback branch.
-- **Moving a pin is `pnpm pin <name> <tag>`, then `pnpm test` and `pnpm check:boot`**, and every citation is re-read against it.
+- **Moving a pin is `pnpm pin <name> <tag>`, then `pnpm test` and `pnpm check:boot`.** Its pull request reads what upstream changed in the packages binnacle imports, a behaviour behind a switch the tests never turn on included, and re-reads every citation to a file that changed.
 - **An `upstream/<reference>/<version>` branch is mail** from the upstream job: a release past a pin, carried with the canary's verdict, and on red the log of where it stopped, the pin's own move included. Read its commit, then read upstream at the new pin; merging it is the upgrade.
 
 ## Code
@@ -56,8 +56,8 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 - **A type lives with the layer that owns its meaning.** `contract` holds what otherwise-independent layers share; who may import it is `layers.json`'s.
 - **An error names what to change.** A seam that cannot hold throws where it is crossed, never degrades quietly. Author code is fenced: what an author's adapter or view does wrong is drawn, naming the registration and why, and never takes the surface down — a dsh rename that breaks what an author reads from dsh included, for the gates hold binnacle's code, not an author's.
 - **Names say what a thing is:** files kebab-case, one job each; named exports only; service names camelCase, dotted when grouped; an event is `binnacle/<name>`. A file is split when a part earns its own behaviour, dependencies or tests.
-- **A file says what it is for in a line of its folder's `AGENTS.md`, never in a block of its own. A comment says only what the code, its tests and that note cannot:** an upstream fact no test pins, and where it was read; a restated upstream rule or shape, in a line naming upstream's; ownership that is not the file's own; a constraint a plausible simplification would break, where no test can be named for it. A reason a test can observe is a test named for the reason, not a comment. Never describe what the code plainly does, and never repeat a name or a type in prose: a `@param` or `@returns` that says nothing its name and type do not goes. An empty `catch` names what it swallows.
-- **What an author reads carries JSDoc: every declaration an author reaches from `src/api.ts`**, where it is declared, stating its contract — units, ordering, ownership, lifecycle, failure, a return that is not obvious. It is what an author's agent reads, and `check:jsdoc` holds it.
+- **A file says what it is for in a line of its folder's `AGENTS.md`. A comment is rare: a line or two saying why, where the code cannot.** What upstream does is held by a test against the real package, never described in a comment; read upstream where it is installed, or in `.refs/`, and put the reading on its issue. Code under `src/` cites no repository. Never describe what the code does, or repeat a name or a type. An empty `catch` names what it swallows. `check:comments` holds this against a baseline that only goes down.
+- **What an author reads carries JSDoc: every declaration an author reaches from `src/api.ts`**, where it is declared, stating its contract briefly — units, ordering, ownership, lifecycle, failure, a return that is not obvious. It is what an author's agent reads, and `check:jsdoc` holds it.
 - **Markers by urgency:** `FIXME` blocks a release, `TODO` is soon, `XXX` is someday.
 
 ## Tests

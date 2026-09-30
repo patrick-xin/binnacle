@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { undocumented, undocumentedSurface } from './check-jsdoc.mjs'
+import { authorSurface, undocumented, undocumentedSurface } from './check-jsdoc.mjs'
 
 test('a module whose exports are all documented passes', () => {
   const text = `/** A thing. */\nexport const a = 1\n\n/**\n * Another.\n */\nexport function b(): void {}\n`
@@ -44,4 +44,16 @@ test('a declaration an author reaches through another is held too, through the f
 test('a module augmentation an author reaches is held: ctx.binnacle is what every author reads', () => {
   const files = { 'src/api.ts': `/** Doc. */\nexport interface Registrations {}\ndeclare module '@deepseek-ai/cordis' {\n  interface Context { binnacle: Registrations }\n}\n` }
   assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ["src/api.ts:3: declare module '@deepseek-ai/cordis'"])
+})
+
+test('the author surface is every declaration an author reads, documented or not, by file then line', () => {
+  const files = {
+    'src/api.ts': `export type { Kept, run } from './ui/node.ts'\n/** Doc. */\nexport interface Own {\n  a: string\n}\n`,
+    'src/ui/node.ts': `export type Unread = number\nexport type Kept = string\nexport function run(\n  a: string,\n): void {\n  // body\n}\n`,
+  }
+  assert.deepEqual(authorSurface('src/api.ts', path => files[path]), [
+    { path: 'src/api.ts', line: 3, end: 5, name: 'Own', documented: true },
+    { path: 'src/ui/node.ts', line: 2, end: 2, name: 'Kept', documented: false },
+    { path: 'src/ui/node.ts', line: 3, end: 5, name: 'run', documented: false },
+  ])
 })
