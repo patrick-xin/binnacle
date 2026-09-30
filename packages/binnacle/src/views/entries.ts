@@ -57,6 +57,16 @@ function drawAnswer(fact: { readonly blocks: readonly Block[], readonly interrup
   return { kind: 'stack', children: fact.interrupted === true ? [...children, { kind: 'text', text: '(interrupted)', tone: 'dim' }] : children }
 }
 
+function drawRetry(retry: Extract<Fact, { readonly kind: 'retry' }>, started: Extract<Fact, { readonly kind: 'retried' }> | undefined, left: string | undefined): Node {
+  const attempt = `attempt ${retry.attempt}${retry.of === undefined ? '' : ` of ${retry.of}`}`
+  const title: readonly Span[] = started !== undefined
+    ? [{ mark: 'retry' }, ` retried · ${attempt}`]
+    : left !== undefined
+      ? [{ mark: 'retry' }, ` retry ${retry.attempt} not started: ${left}`]
+      : [{ mark: 'retry' }, ` retrying · ${attempt} · in `, { until: retry.at }]
+  return { kind: 'fold', id: 'failure', title, tone: 'muted', child: { kind: 'text', text: retry.failure } }
+}
+
 function drawApproval(asked: Extract<Fact, { readonly kind: 'asked' }>, decided: Extract<Fact, { readonly kind: 'decided' }> | undefined): Node {
   const head: Node = { kind: 'text', text: [{ mark: 'approval' } as const, ` ${asked.toolName} asks${asked.reason === undefined ? '' : `: ${asked.reason}`}`] }
   if (decided === undefined) return { kind: 'stack', children: [head, { kind: 'text', text: '  waiting…', tone: 'muted' }] }
@@ -111,7 +121,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   return { kind: 'show', title, child: { kind: 'stack', children: [...reason, output] } }
 }
 
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true }
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true, retry: true, retried: true, presented: true }
 
 /**
  * Draw one entry.
@@ -206,6 +216,17 @@ function builtIn(entry: Entry, problem?: string): Node {
     }
     case 'done': {
       const title: Node = { kind: 'text', text: `done of command ${entry.fact.commandId}: ${entry.fact.outcome}`, tone: 'muted' }
+      return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
+    }
+    case 'presented': {
+      const files = entry.fact.files
+      const lines: Node[] = files.map(file => ({ kind: 'text', text: file.description === undefined ? file.path : [file.path, { text: `  ${file.description}`, tone: 'muted' } as const] }))
+      return noted({ kind: 'show', title: [{ mark: 'presented' }, ` presented ${files.length} ${files.length === 1 ? 'file' : 'files'}`], child: { kind: 'stack', children: lines } }, problem)
+    }
+    case 'retry':
+      return noted(drawRetry(entry.retry, entry.started, entry.left), problem)
+    case 'retried': {
+      const title: Node = { kind: 'text', text: [{ mark: 'retry' } as const, ` retry ${entry.fact.attempt} of chain ${entry.fact.retryId} started`], tone: 'muted' }
       return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
     }
     case 'decided': {

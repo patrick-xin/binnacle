@@ -7,6 +7,8 @@ import type { CommandId } from '@deepseek-ai/dsh-commands'
 import type { SessionEvent, SessionEventType, SessionSeq } from '@deepseek-ai/dsh-session'
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
+import type { RetryId } from '@deepseek-ai/dsh-llm-retry'
+import type { PresentedFile } from '@deepseek-ai/dsh-tool-present/types'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
 export type Block =
@@ -147,6 +149,34 @@ export type Fact =
     readonly outcome: ApprovalOutcome
   }
   | Logged & {
+    readonly kind: 'presented'
+    /** The files the agent handed the person, each where it lies and what the model said of it. */
+    readonly files: readonly Readonly<PresentedFile>[]
+  }
+  | Logged & {
+    readonly kind: 'retry'
+    /** dsh's id of the chain of retries this attempt belongs to, which joins them as one entry (dsh's `RetryId`). */
+    readonly retryId: RetryId
+    /** The turn and step whose model request it retries. */
+    readonly turn: number
+    readonly step: number
+    /** Which retry this is, counting from 1. */
+    readonly attempt: number
+    /** How many retries the chain may take; none when dsh retries until it succeeds. */
+    readonly of?: number
+    /** When it is scheduled to start, in Unix epoch milliseconds: its log time and dsh's delay. */
+    readonly at: number
+    /** What failed, as dsh says it to a person. */
+    readonly failure: string
+  }
+  | Logged & {
+    readonly kind: 'retried'
+    /** dsh's id of the chain, the retry fact's `retryId`. */
+    readonly retryId: RetryId
+    /** Which retry started. */
+    readonly attempt: number
+  }
+  | Logged & {
     readonly kind: 'start'
     /** dsh's id of the compaction, which joins its summary and its end as one entry (dsh's `CompactionId`). */
     readonly compactionId: CompactionId
@@ -260,6 +290,16 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
     ...data.text === undefined ? {} : { text: data.text },
     ...data.sourceEventSeq === undefined ? {} : { sourceEventSeq: data.sourceEventSeq },
   }),
+  'deliverables/presented': ({ seq, time, data }) => ({
+    kind: 'presented', seq, time,
+    files: data.files.map(file => file.description === undefined ? { path: file.path } : { path: file.path, description: file.description }),
+  }),
+  'llm/retry': ({ seq, time, data }) => ({
+    kind: 'retry', seq, time, retryId: data.retryId, turn: data.turn, step: data.step, attempt: data.retry,
+    ...data.mode === 'normal' ? { of: data.maxRetries } : {},
+    at: time + data.delayMs, failure: data.failure.message,
+  }),
+  'llm/retry-started': ({ seq, time, data }) => ({ kind: 'retried', seq, time, retryId: data.retryId, attempt: data.retry }),
   'compaction/start': ({ seq, time, data }) => ({ kind: 'start', seq, time, compactionId: data.compactionId }),
   'compaction/summary': ({ seq, time, data }) => ({
     kind: 'summary', seq, time, compactionId: data.compactionId,

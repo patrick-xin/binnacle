@@ -110,6 +110,12 @@
     "@deepseek-ai/dsh-compaction": [
       "facts"
     ],
+    "@deepseek-ai/dsh-llm-retry": [
+      "facts"
+    ],
+    "@deepseek-ai/dsh-tool-present": [
+      "facts"
+    ],
     "@deepseek-ai/dsh-skill": [
       "host"
     ],

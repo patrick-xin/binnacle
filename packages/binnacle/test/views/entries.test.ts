@@ -146,6 +146,28 @@ const command = runFact(9, 21, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2')
 const doneAs = (outcome: 'success' | 'error', text: string): Entry =>
   ({ kind: 'command', run: command, done: doneFact(10, 23, 'cmd-1a2b3c4d-1', outcome, text) })
 
+test('the files the agent presented are shown under one line, each path and what the model said of it', () => {
+  const entry = { kind: 'presented', fact: { kind: 'presented', seq: 12, time: 3_000, files: [{ path: 'dist/report.pdf', description: 'the audit' }, { path: 'notes.md' }] } } as unknown as Entry
+  assert.deepEqual(seen(entry), ['▤ presented 2 files', '│ dist/report.pdf  the audit', '│ notes.md'])
+})
+
+const scheduled = { kind: 'retry', seq: 9, time: 1_000, retryId: 'r1', turn: 1, step: 1, attempt: 2, of: 3, at: 5_000, failure: 'rate limited' } as const
+
+/**
+ * An entry's lines at width 60, laid out at a time.
+ * @param entry - the entry.
+ * @param now - the time, in Unix epoch milliseconds.
+ * @returns its lines, plain.
+ */
+const at = (entry: Entry, now: number): string[] => [...screens()(alone(entry), { toggled: new Set() }, 60, new Map(), undefined, now).lines].map(line => stripTerminalSequences(line).trimEnd())
+
+test('a retry scheduled counts down to its start, muted, the failure folded on its line; once it starts, or its turn leaves it, it says so', () => {
+  assert.deepEqual(at({ kind: 'retry', retry: scheduled as never }, 1_000), ['↻ retrying · attempt 2 of 3 · in 4s · 1 line'])
+  assert.deepEqual(at({ kind: 'retry', retry: scheduled as never, started: { kind: 'retried', seq: 10, time: 5_000, retryId: 'r1' as never, attempt: 2 } }, 6_000), ['↻ retried · attempt 2 of 3 · 1 line'])
+  assert.deepEqual(at({ kind: 'retry', retry: { ...scheduled, of: undefined } as never, left: 'aborted' }, 6_000), ['↻ retry 2 not started: aborted · 1 line'])
+  assert.deepEqual(seen({ kind: 'retry', retry: scheduled as never, started: { kind: 'retried', seq: 10, time: 5_000, retryId: 'r1' as never, attempt: 2 } }, ['9/failure']), ['↻ retried · attempt 2 of 3 · show less', 'rate limited'])
+})
+
 test('a command drawn as /name args, muted, with what it returned beneath: plain on success, in the error tone on failure', () => {
   assert.deepEqual(lines(doneAs('success', 'compacted: 12 messages folded to a summary')), ['/compact --keep 2', '  compacted: 12 messages folded to a', 'summary'])
   assert.deepEqual(lines(doneAs('error', 'no such skill')), ['/compact --keep 2', '  no such skill'])

@@ -376,3 +376,16 @@ test('an offer that names no label says what it does in the theme\'s words for i
   const renamed = themed(binnacleTheme, [{ words: { 'offer.grant': 'yes' } }])
   assert.deepEqual(plain(layout(unlabelled, 30, { toggled: new Set(), focus: 'allow' }, renamed)).lines, ['allow once', '▸ yes'])
 })
+
+/**
+ * A line saying the time until a moment ten seconds in, laid out at a time.
+ * @param now - the time, in Unix epoch milliseconds.
+ * @returns the line, plain.
+ */
+const until = (now: number): string => stripTerminalSequences(layout({ kind: 'text', text: ['in ', { until: 10_000 }] }, 40, { toggled: new Set(), now }).lines[0] ?? '').trimEnd()
+
+test('a span that says the time until a moment counts down to it at the time it is given, and stays at none once it has passed', () => {
+  assert.equal(until(6_000), 'in 4s')
+  assert.equal(until(9_500), 'in 0s')
+  assert.equal(until(12_000), 'in 0s')
+})

@@ -104,6 +104,22 @@ export type Fact = (Logged & {
     readonly id: ApprovalRequestId;
     readonly outcome: ApprovalOutcome;
 }) | (Logged & {
+    readonly kind: 'presented';
+    readonly files: readonly Readonly<PresentedFile>[];
+}) | (Logged & {
+    readonly kind: 'retry';
+    readonly retryId: RetryId;
+    readonly turn: number;
+    readonly step: number;
+    readonly attempt: number;
+    readonly of?: number;
+    readonly at: number;
+    readonly failure: string;
+}) | (Logged & {
+    readonly kind: 'retried';
+    readonly retryId: RetryId;
+    readonly attempt: number;
+}) | (Logged & {
     readonly kind: 'start';
     readonly compactionId: CompactionId;
 }) | (Logged & {
@@ -147,6 +163,8 @@ export type Block = {
 // ApprovalRequestId ← @deepseek-ai/dsh-user-approval
 // ToolCallId ← @deepseek-ai/dsh-llm
 // ApprovalOutcome ← @deepseek-ai/dsh-user-approval
+// PresentedFile ← @deepseek-ai/dsh-tool-present/types
+// RetryId ← @deepseek-ai/dsh-llm-retry
 // CompactionId ← @deepseek-ai/dsh-compaction
 // models/transcript.d.ts
 export type Entry = Single<Exclude<Alone, 'prompt'>> | {
@@ -172,6 +190,11 @@ export type Entry = Single<Exclude<Alone, 'prompt'>> | {
     readonly summary?: FactOf<'summary'>;
     readonly end?: FactOf<'end'>;
 } | {
+    readonly kind: 'retry';
+    readonly retry: FactOf<'retry'>;
+    readonly started?: FactOf<'retried'>;
+    readonly left?: string;
+} | {
     readonly kind: 'streaming';
     readonly answer: Streamed;
 };
@@ -185,7 +208,7 @@ type FactOf<K extends Fact['kind']> = Extract<Fact, {
     readonly kind: K;
 }>;
 // models/transcript.d.ts
-type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'authored' | 'unknown' | 'quiet';
+type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'authored' | 'unknown' | 'quiet';
 // facts/stream.d.ts
 export interface Streamed {
     readonly turn: number;
@@ -239,6 +262,14 @@ export declare const marks: {
     };
     readonly compaction: {
         readonly glyph: '≡';
+        readonly tone: 'muted';
+    };
+    readonly presented: {
+        readonly glyph: '▤';
+        readonly tone: 'accent';
+    };
+    readonly retry: {
+        readonly glyph: '↻';
         readonly tone: 'muted';
     };
 };
@@ -396,6 +427,10 @@ export type Span = string | {
 }
  | {
     readonly since: number;
+    readonly tone?: Tone;
+}
+ | {
+    readonly until: number;
     readonly tone?: Tone;
 };
 // contract/index.d.ts

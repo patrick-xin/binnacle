@@ -59,6 +59,12 @@ function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly wor
       return { words: [` decision ${fact.outcome}`], mark: 'approval', tone: 'muted' }
     case 'run':
       return { words: [`/${fact.name}${fact.args === undefined ? '' : fact.args}`] }
+    case 'presented':
+      return { words: [` presented ${fact.files.length} files`], mark: 'presented' }
+    case 'retry':
+      return { words: [` retry ${fact.attempt} scheduled`], mark: 'retry', tone: 'muted' }
+    case 'retried':
+      return { words: [` retry ${fact.attempt} started`], mark: 'retry', tone: 'muted' }
     case 'done':
       return { words: [`done ${fact.outcome}`], tone: 'muted' }
     case 'start':

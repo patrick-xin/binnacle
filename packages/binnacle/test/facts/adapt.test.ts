@@ -6,6 +6,7 @@ import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
+import { RetryId } from '@deepseek-ai/dsh-llm-retry'
 import { adapt } from '../../src/facts/adapt.ts'
 import { kinds } from '../../src/facts/kinds.ts'
 import { seed as seedEvent } from '../support/events.ts'
@@ -33,10 +34,36 @@ test('a kind no adapter knows is an unknown fact, carrying its type and the raw 
   assert.deepEqual(adapt(event), { kind: 'unknown', seq: 2, time: 900, type: 'test/marker', record: event })
 })
 
-test('a kind named unread is left to the fallback on purpose: an unknown fact, as a kind dsh does not know is', () => {
-  // `llm/retry`'s declaration lives in a dsh package binnacle does not name, so it is not on the union the adapter is typed against — though the run-time set of dsh's kinds counts it, which is what the table is held to.
-  const event = { type: 'llm/retry' as string, seq: SessionSeq(7), time: 1_500, data: {} } as SessionEvent
-  assert.deepEqual(adapt(event), { kind: 'unknown', seq: 7, time: 1_500, type: 'llm/retry', record: event })
+test('the files the agent presented are a presented fact: each path, and what the model said of it', () => {
+  const event: SessionEvent<'deliverables/presented'> = {
+    type: 'deliverables/presented', seq: SessionSeq(12), time: 3_000,
+    data: { turn: 2, callId: ToolCallId('c9'), files: [{ path: 'dist/report.pdf', description: 'the audit' }, { path: 'notes.md' }] },
+  }
+  assert.deepEqual(adapt(event), { kind: 'presented', seq: 12, time: 3_000, files: [{ path: 'dist/report.pdf', description: 'the audit' }, { path: 'notes.md' }] })
+})
+
+test('what dsh says of the workspace changing is quiet: its home is a service of the host, and a feature that shows changed files will name it', () => {
+  // `workspace/changes` is declared in a dsh package binnacle does not name: a kind it keeps quiet needs no reading.
+  const event = { type: 'workspace/changes' as string, seq: SessionSeq(13), time: 3_100, data: { turn: 2 } } as SessionEvent
+  assert.equal(adapt(event).kind, 'quiet')
+})
+
+test('a retry dsh scheduled is a retry fact: which chain, which attempt of how many, when it starts, and what failed as a person reads it', () => {
+  const event: SessionEvent<'llm/retry'> = {
+    type: 'llm/retry', seq: SessionSeq(7), time: 1_500,
+    data: { retryId: RetryId('r1'), turn: 1, step: 2, provider: 'deepseek', mode: 'normal', policyKey: 'default', retry: 2, maxRetries: 5, delayMs: 4_000, failure: { message: 'rate limited', code: 'RATE_LIMIT', status: 429 } },
+  }
+  assert.deepEqual(adapt(event), { kind: 'retry', seq: 7, time: 1_500, retryId: 'r1', turn: 1, step: 2, attempt: 2, of: 5, at: 5_500, failure: 'rate limited' })
+})
+
+test('a retry dsh schedules without end says no count, and its start is a retried fact naming the chain and the attempt', () => {
+  const always: SessionEvent<'llm/retry'> = {
+    type: 'llm/retry', seq: SessionSeq(7), time: 1_500,
+    data: { retryId: RetryId('r1'), turn: 1, step: 2, provider: 'deepseek', mode: 'always', policyKey: 'default', retry: 9, delayMs: 1_000, failure: { message: 'overloaded', code: 'OVERLOADED' } },
+  }
+  assert.deepEqual(adapt(always), { kind: 'retry', seq: 7, time: 1_500, retryId: 'r1', turn: 1, step: 2, attempt: 9, at: 2_500, failure: 'overloaded' })
+  const started: SessionEvent<'llm/retry-started'> = { type: 'llm/retry-started', seq: SessionSeq(8), time: 2_500, data: { retryId: RetryId('r1'), turn: 1, step: 2, retry: 9 } }
+  assert.deepEqual(adapt(started), { kind: 'retried', seq: 8, time: 2_500, retryId: 'r1', attempt: 9 })
 })
 
 test('an event of a quiet kind is a quiet fact, carrying its type and the event for a view an author registers for the kind', () => {

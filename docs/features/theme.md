@@ -12,7 +12,9 @@ An ask's frame is drawn in `dim`, and so is a show's gutter, the glyph that runs
 
 How a fold starts is the theme's, by the kind of entry it is drawn in (`binnacle:packages/binnacle/src/ui/theme.ts#binnacleTheme`): read by the key its views are registered under — an entry kind, a quiet kind's dsh type, an authored fact's name — falling back to its kind when no start is given for its key. A fold that names its own rows keeps them, whatever the theme says; one that leaves them out takes its kind's start, or three rows. `open` starts a kind's folds open, and a person's toggle folds one back, as it opens one that starts folded. A placed screen has no entry kind, so its folds name their rows themselves: the [Trajectory](trajectory.md)'s do.
 
-binnacle's own starts, a person's to change: the thinking fold, context, the fallback, authored facts and a compaction's summary folded to nothing; a tool's and a result's output to three rows.
+The files the agent presented are drawn under the `presented` mark in accent. A retry is drawn with the `retry` mark in muted, one line, the failure that caused it folded to nothing beneath ([Transcript](transcript.md)).
+
+binnacle's own starts, a person's to change: the thinking fold, context, the fallback, authored facts, a compaction's summary and a retry's failure folded to nothing; a tool's and a result's output to three rows.
 
 ## Choices
 

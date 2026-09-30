@@ -54,7 +54,7 @@ function written(node: Extract<Node, { readonly kind: 'text' }>, theme: Theme): 
       : 'mark' in span
         ? { text: markIn(span.mark, theme).glyph, tone: span.tone ?? markIn(span.mark, theme).tone }
         // `at` writes the time since a moment before anything is drawn; one reaching here reads as none.
-        : 'since' in span ? { text: elapsed(0), tone: span.tone ?? node.tone } : { text: span.text, tone: span.tone }
+        : 'since' in span || 'until' in span ? { text: elapsed(0), tone: span.tone ?? node.tone } : { text: span.text, tone: span.tone }
     const last = runs.at(-1)
     if (last !== undefined && last.tone === run.tone) last.text += run.text
     else runs.push(run)
@@ -67,7 +67,7 @@ function titleLine(spans: readonly Span[], tone: Tone | undefined, theme: Theme)
 }
 
 function plainTitle(spans: readonly Span[], theme: Theme): string {
-  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? markIn(span.mark, theme).glyph : 'since' in span ? elapsed(0) : span.text).join('')
+  return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? markIn(span.mark, theme).glyph : 'since' in span || 'until' in span ? elapsed(0) : span.text).join('')
 }
 
 function focusWithTitle(title: string, label: string, width: number, theme: Theme): string[] {
@@ -89,8 +89,8 @@ export function elapsed(ms: number): string {
 // Exhaustive over node kinds; a kind added to Node fails to compile until handled.
 function at(node: Node, now: number | undefined): Node {
   const span = (each: Span): Span => {
-    if (typeof each === 'string' || !('since' in each)) return each
-    const text = elapsed((now ?? each.since) - each.since)
+    if (typeof each === 'string' || !('since' in each || 'until' in each)) return each
+    const text = 'since' in each ? elapsed((now ?? each.since) - each.since) : elapsed(Math.max(0, each.until - (now ?? each.until)))
     return each.tone === undefined ? text : { text, tone: each.tone }
   }
   switch (node.kind) {
