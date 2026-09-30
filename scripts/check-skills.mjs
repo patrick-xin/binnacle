@@ -33,7 +33,11 @@ export function findProblems(root) {
   const problems = []
   const skills = join(root, '.agents', 'skills')
   const links = join(root, '.claude', 'skills')
-  const named = at(skills) === undefined ? [] : readdirSync(skills).filter(name => at(join(skills, name)).isDirectory()).toSorted()
+  const entries = at(skills) === undefined ? [] : readdirSync(skills).toSorted()
+  for (const name of entries.filter(entry => at(join(skills, entry)).isSymbolicLink())) {
+    problems.push({ path: `.agents/skills/${name}`, problem: `is a link to ${readlinkSync(join(skills, name))}; .agents/skills holds the skill itself, so move it here` })
+  }
+  const named = entries.filter(name => at(join(skills, name)).isDirectory())
   for (const name of named) {
     const file = join(skills, name, 'SKILL.md')
     if (at(file) === undefined) problems.push({ path: `.agents/skills/${name}`, problem: 'has no SKILL.md' })
@@ -44,7 +48,7 @@ export function findProblems(root) {
         called = front === undefined ? undefined : load(front)?.name
       } catch (error) {
         if (!(error instanceof YAMLException)) throw error
-        problems.push({ path: `.agents/skills/${name}/SKILL.md`, problem: `has frontmatter that is not YAML (${error.reason} at ${error.mark.line + 2}:${error.mark.column + 1}); quote the value` })
+        problems.push({ path: `.agents/skills/${name}/SKILL.md`, problem: `has frontmatter that is not YAML: ${error.reason} at ${error.mark.line + 2}:${error.mark.column + 1}; make that line YAML` })
         continue
       }
       if (called !== name) problems.push({ path: `.agents/skills/${name}/SKILL.md`, problem: `is named ${called ?? 'nothing'}; name it ${name}, as its folder is` })

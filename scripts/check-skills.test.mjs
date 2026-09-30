@@ -67,6 +67,26 @@ test('a SKILL.md whose frontmatter is not YAML is refused, saying where it break
   skill(root, 'triage', '---\nname: triage\ndescription: Show what needs attention: and move issues.\n---\n')
   linked(root, 'triage')
   assert.deepEqual(findProblems(root), [
-    { path: '.agents/skills/triage/SKILL.md', problem: 'has frontmatter that is not YAML (bad indentation of a mapping entry at 3:39); quote the value' },
+    { path: '.agents/skills/triage/SKILL.md', problem: 'has frontmatter that is not YAML: bad indentation of a mapping entry at 3:39; make that line YAML' },
+  ])
+})
+
+test('a skill under .agents/skills that is itself a link is refused, since .agents/skills holds the one copy', () => {
+  const root = repository()
+  mkdirSync(join(root, 'elsewhere', 'tdd'), { recursive: true })
+  writeFileSync(join(root, 'elsewhere', 'tdd', 'SKILL.md'), '---\nname: tdd\n---\n')
+  mkdirSync(join(root, '.agents', 'skills'), { recursive: true })
+  symlinkSync(join('..', '..', 'elsewhere', 'tdd'), join(root, '.agents', 'skills', 'tdd'))
+  assert.deepEqual(findProblems(root), [
+    { path: '.agents/skills/tdd', problem: 'is a link to ../../elsewhere/tdd; .agents/skills holds the skill itself, so move it here' },
+  ])
+})
+
+test('frontmatter with a key twice is refused at the second, without being told to quote it', () => {
+  const root = repository()
+  skill(root, 'tdd', '---\nname: tdd\nname: tdd\ndescription: What it is for.\n---\n')
+  linked(root, 'tdd')
+  assert.deepEqual(findProblems(root), [
+    { path: '.agents/skills/tdd/SKILL.md', problem: 'has frontmatter that is not YAML: duplicated mapping key at 3:1; make that line YAML' },
   ])
 })
