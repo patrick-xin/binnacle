@@ -11,6 +11,8 @@ export type Span =
   | { readonly mark: Mark, readonly tone?: Tone }
   /** The time since a moment, in milliseconds since the epoch, as dsh logs a fact's time: `4s`, `1m 05s`, `1h 02m`, laid out at the time the host hands layout, so a view drawing it stays a function of its entry. */
   | { readonly since: number, readonly tone?: Tone }
+  /** The time left until a moment, in milliseconds since the epoch, written as `since` is and none once the moment has passed. */
+  | { readonly until: number, readonly tone?: Tone }
 
 /**
  * Something a view draws: data, never a render callback. The ui lays it out
@@ -220,6 +222,13 @@ function spanOf(value: unknown, theme: Theme): Span {
     if (toned) throw new Error(`${describe(tone)} is no tone`)
     if ('text' in record || 'mark' in record) throw new Error('a span that says the time since a moment carries no text and no mark')
     return tone === undefined ? { since } : { since, tone: tone as Tone }
+  }
+  if ('until' in record) {
+    const until = record.until
+    if (typeof until !== 'number' || !Number.isFinite(until)) throw new Error(`${describe(until)} is no moment`)
+    if (toned) throw new Error(`${describe(tone)} is no tone`)
+    if ('text' in record || 'mark' in record || 'since' in record) throw new Error('a span that says the time until a moment carries no text, no mark and no since')
+    return tone === undefined ? { until } : { until, tone: tone as Tone }
   }
   if ('mark' in record) {
     const mark = record.mark

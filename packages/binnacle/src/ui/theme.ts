@@ -45,6 +45,8 @@ export const marks = {
   approval: { glyph: '⚑', tone: 'warning' }, // an approval the agent asked a person to decide
   unknown: { glyph: '?', tone: 'muted' }, // a kind binnacle has no view for, an author's fact included
   compaction: { glyph: '≡', tone: 'muted' }, // where the model stopped seeing earlier history: one compaction's marker
+  presented: { glyph: '▤', tone: 'accent' }, // files the agent handed the person
+  retry: { glyph: '↻', tone: 'muted' }, // a model request dsh tries again after it failed
 } as const satisfies Record<string, { readonly glyph: string, readonly tone: Tone }>
 
 /** A mark of the theme's, named by what it stands for: binnacle's own, or one an author's theme adds. */
@@ -167,7 +169,7 @@ export interface FoldStart {
 }
 
 /** binnacle's own theme, which registrations change. */
-export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: { answer: { rows: 0 }, streaming: { rows: 0 }, context: { rows: 0 }, unknown: { rows: 0 }, authored: { rows: 0 }, compaction: { rows: 0 }, tool: { rows: 3 }, result: { rows: 3 } } }
+export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: { answer: { rows: 0 }, streaming: { rows: 0 }, context: { rows: 0 }, unknown: { rows: 0 }, authored: { rows: 0 }, compaction: { rows: 0 }, retry: { rows: 0 }, tool: { rows: 3 }, result: { rows: 3 } } }
 
 /**
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.

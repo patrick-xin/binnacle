@@ -266,6 +266,7 @@ test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s i
       else if (entry.kind === 'approval') drawn.push(entry.asked, ...entry.decided === undefined ? [] : [entry.decided])
       else if (entry.kind === 'command') drawn.push(entry.run, ...entry.done === undefined ? [] : [entry.done])
       else if (entry.kind === 'compaction') drawn.push(entry.start, ...entry.summary === undefined ? [] : [entry.summary], ...entry.end === undefined ? [] : [entry.end])
+      else if (entry.kind === 'retry') drawn.push(entry.retry, ...entry.started === undefined ? [] : [entry.started])
       else if (entry.kind !== 'streaming') drawn.push(entry.fact)
     }
   }
@@ -306,4 +307,22 @@ test('once the log holds the answer of its turn and step, the answer streamed is
 test('an answer streaming is not settled: the log has yet to hold it', () => {
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, prompt]
   assert.equal(settled(answering(transcript(facts), streamed)), 1)
+})
+
+const retry = (seq: number, attempt: number): Extract<Fact, { readonly kind: 'retry' }> => ({ kind: 'retry', seq, time: seq, retryId: 'r1' as never, turn: 1, step: 1, attempt, of: 3, at: seq + 1_000, failure: 'rate limited' })
+const retried = (seq: number, attempt: number): Extract<Fact, { readonly kind: 'retried' }> => ({ kind: 'retried', seq, time: seq, retryId: 'r1' as never, attempt })
+
+test('a chain of retries is one entry where its first was scheduled, holding its latest attempt and whether that one started', () => {
+  const opened: Fact = { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }
+  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retried(4, 1), retry(5, 2)]).turns[0]?.entries, [{ kind: 'prompt', fact: prompt }, { kind: 'retry', retry: retry(5, 2) }])
+  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retried(4, 1), retry(5, 2), retried(6, 2)]).turns[0]?.entries.at(-1), { kind: 'retry', retry: retry(5, 2), started: retried(6, 2) })
+})
+
+test('a retry still scheduled when its turn ends is left, saying how the turn ended, and waits to settle only while the turn runs', () => {
+  const opened: Fact = { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }
+  const running = transcript([opened, prompt, retry(3, 1)])
+  assert.equal(settled(running), 1)
+  const ended = transcript([opened, prompt, retry(3, 1), { kind: 'turn', seq: 4, time: 9, turn: 1, phase: 'end', ending: 'aborted' }])
+  assert.deepEqual(ended.turns[0]?.entries.at(-1), { kind: 'retry', retry: retry(3, 1), left: 'aborted' })
+  assert.equal(settled(ended), 2)
 })
