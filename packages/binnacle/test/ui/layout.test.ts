@@ -400,3 +400,9 @@ test('a show that opens a fold it holds answers on its head for that fold, folde
     assert.deepEqual(extent(frame.regions, 'output'), { top: 0, height: frame.lines.length }, 'focus brings the fold into view with its head')
   }
 })
+
+test('whatever a show opens answers only on its head, however many folds its content names alike', () => {
+  const fold: Node = { kind: 'fold', id: 'output', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } }
+  const frame = layout({ kind: 'show', title: ['● twice'], opens: 'output', child: { kind: 'stack', children: [fold, fold] } }, 40, { toggled: new Set() })
+  for (let row = 1; row < frame.lines.length; row++) assert.deepEqual(under(frame.regions, row, 3).filter(region => region.affordances.length > 0), [], `row ${row}`)
+})

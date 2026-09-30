@@ -234,7 +234,7 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
   const opened = frame.regions.find(placed => placed.region.id === node.opens)
   const head = opened === undefined ? [] : [{ region: opened.region, top: 0, height: title.length, left: 0, width }]
   // The fold keeps its rows, offering nothing there, so what focus brings into view is all of it.
-  const held = frame.regions.map(placed => placed === opened ? { ...placed, region: { ...placed.region, affordances: [] } } : placed)
+  const held = frame.regions.map(placed => placed.region.id === node.opens ? { ...placed, region: { ...placed.region, affordances: [] } } : placed)
   return {
     lines: [...title, ...inner < 1 ? frame.lines : frame.lines.map(row => `${gutter} ${row}`)],
     regions: [...head, ...held.map(placed => ({ ...placed, top: placed.top + title.length, left: placed.left + (inner < 1 ? 0 : SHOW_GUTTER) }))],
