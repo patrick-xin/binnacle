@@ -88,11 +88,6 @@ export type Node =
     readonly child: Node
   }
 
-/**
- * Read a node from code binnacle does not own, copying it into fresh data so nothing of it runs later.
- * `theme` is the one it will be drawn in, whose tones, marks and backgrounds are the names it may use.
- * @throws an error saying what is wrong with it, or whatever reading it threw.
- */
 export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
   if (typeof value !== 'object' || value === null) throw new Error(`it is ${value === null ? 'null' : typeof value}`)
   const kind = 'kind' in value ? value.kind : undefined

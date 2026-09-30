@@ -3,22 +3,12 @@ import { meaning } from './gestures.ts'
 import { act } from './state.ts'
 import type { Bounds, UiState } from './state.ts'
 
-/** What answering a gesture did to the screen. */
 export interface Answer {
-  /** The screen after it; the state itself when the gesture changed nothing. */
   readonly state: UiState
-  /** The region focus moved to, when it moved. */
   readonly focus?: string
-  /** An offer the gesture invoked that UI state does not answer — any but `expand` — for whoever drew it to act on. */
   readonly invoked?: { readonly region: string, readonly affordance: AffordanceKind }
 }
 
-/**
- * Answer a gesture that has landed, through the gesture table. `landing` is
- * the regions it lands on, innermost first: those under the pointer, or for a
- * key the focused one, then those beyond it the pane reaches. Undefined when
- * the gesture means nothing where it landed, which no pane answers.
- */
 export function answer(state: UiState, gesture: Gesture, landing: readonly Region[], bounds: Bounds): Answer | undefined {
   const action = meaning(gesture, landing)
   if (action === undefined) return undefined

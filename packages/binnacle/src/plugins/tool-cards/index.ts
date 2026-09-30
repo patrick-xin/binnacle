@@ -14,11 +14,7 @@ export function apply(ctx: Context): void {
   ctx.binnacle.view('tool', viewOf(ctx.tools))
 }
 
-/**
- * Where it cannot draw from a presentation it leaves the entry to the view
- * beneath it, binnacle's own card; what a presenter does wrong is said beneath
- * that card, naming the tool, the presenter and why, so the seam never degrades quietly.
- */
+/** Without a presentation it leaves the entry to binnacle's card, beneath which a presenter's failure is named. */
 function viewOf(tools: ToolRuntime): View {
   return (entry, next) => {
     if (entry.kind !== 'tool') return next()

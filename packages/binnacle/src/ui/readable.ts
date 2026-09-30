@@ -1,12 +1,6 @@
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import type { Node, Span } from './node.ts'
 
-/**
- * A node with the strings it carries treated, so the layout can draw what it
- * holds as it is. Every kind of node is named here and none is skipped, so a
- * kind added to `Node` fails to compile until its carried strings are treated
- * too.
- */
 export function readable(node: Node): Node {
   switch (node.kind) {
     case 'blank':
@@ -38,23 +32,12 @@ export function readable(node: Node): Node {
   }
 }
 
-/**
- * A text span's text treated, its tone as it was; a mark span left as it is, for the theme's glyph is not a string a view carried.
- */
 function readableSpan(span: Span): Span {
   if (typeof span === 'string') return treated(span)
   if ('mark' in span || 'since' in span) return span
   return { ...span, text: treated(span.text) }
 }
 
-/**
- * A string as a person reads it: pi-tui's own strip removes ANSI, OSC and
- * APC sequences keeping the visible text
- * (`pi:packages/tui/src/utils.ts#stripTerminalSequences`), and every control
- * character left but tab and newline is drawn visibly — a C0 control or DEL
- * as its control picture, a C1 control as `�` — except a carriage return
- * before a newline, which is the line ending and is dropped.
- */
 function treated(text: string): string {
   const stripped = stripTerminalSequences(text)
   let read = ''

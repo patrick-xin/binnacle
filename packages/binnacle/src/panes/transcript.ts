@@ -17,16 +17,12 @@ import type { DrawScreen, Screen } from '../views/screen.ts'
 
 interface Printed {
   readonly width: number
-  /** How many entries it holds, oldest first. */
   readonly entries: number
   readonly lines: readonly string[]
 }
 
-/** What the pane reports about the screen it drew, for the host to act on beyond drawing. */
 export interface PaneReports {
-  /** Something to bring into view: the rows a focused thing covers, on the screen as now drawn. */
   readonly inView?: (top: number, height: number) => void
-  /** A printed entry focus reached on the main screen, asking for the fullscreen, with the rows to bring into view there. */
   readonly fullscreen?: (top: number, height: number) => void
 }
 
@@ -45,16 +41,8 @@ export class TranscriptPane implements Component {
   #on: TuiMode = 'fullscreen'
   // On the main screen the pane never changes a row it has printed.
   #printed: Printed | undefined
-  /** Focus the main screen dropped from a printed entry, given back when the fullscreen is. */
   #parked: string | undefined
 
-  /**
-   * @param changed - called when what the pane draws has changed, so the renderer draws a frame.
-   * @param views - read at every frame; an entry is drawn again when the views of its key change.
-   * @param theme - read at every frame; every entry is laid out again when it changes.
-   * @param now - the time, in milliseconds since the epoch, as the host hands it at every frame: what an entry that draws the time since a moment is laid out at. The pane reads no clock of its own.
-   * @param keys - the keys the one key table binds to each meaning, for an ask to name what answers it; read as an entry is laid out, which the host has the pane do again when a person rebinds a key.
-   */
   constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined, keys: () => LayoutState['keys'] = () => undefined) {
     this.#changed = changed
     this.#keys = keys
@@ -71,9 +59,6 @@ export class TranscriptPane implements Component {
     this.#changed()
   }
 
-  /**
-   * Replace every fact, as when the adapters have changed, and draw every entry again, on the main screen what it printed included.
-   */
   reset(facts: readonly Fact[]): void {
     this.#transcript = transcript(facts)
     this.#draw = screens(this.#keys)
@@ -81,13 +66,6 @@ export class TranscriptPane implements Component {
     this.#changed()
   }
 
-  /**
-   * Draw for one of pi-tui's screens from the next frame on. What it printed
-   * on the main screen is kept while it draws on the alternate one, as the
-   * terminal keeps the main screen, and so is where focus was: focus the main
-   * screen dropped from a printed entry comes back with the fullscreen.
-   * @param mode - `regular` for the main screen, `fullscreen` for the alternate one; `fullscreen` until told.
-   */
   drawOn(mode: TuiMode): void {
     this.#on = mode
     if (mode === 'regular') this.#dropPrintedFocus()
@@ -97,10 +75,6 @@ export class TranscriptPane implements Component {
     }
   }
 
-  /**
-   * Drop focus that sits within the rows printed on the main screen, which a switch to it finds: its row
-   * could not be drawn there without changing a row already printed.
-   */
   #dropPrintedFocus(): void {
     const focus = this.#state.focus
     const drawn = this.#drawn
@@ -109,21 +83,16 @@ export class TranscriptPane implements Component {
     if (placed !== undefined && placed.top < this.#printedThrough(drawn.width, drawn.screen)) this.#park(drawn.screen)
   }
 
-  // Drops focus the main screen cannot draw, keeping where it was for the fullscreen.
-
   #park(screen: Screen): void {
     this.#parked = this.#state.focus
     this.#state = act(this.#state, { kind: 'unfocus' }, screen)
   }
 
-  /**
-   * @returns on the alternate screen, every line of the transcript as it now draws; on the main screen, what it printed, then what has not settled as it now draws. A new width prints everything again.
-   */
   render(width: number): string[] {
     const now = settled(this.#transcript)
     let screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme(), this.#now())
     if (this.#on === 'regular' && this.#state.focus !== undefined) {
-      // Focus never sits within the rows this render prints: its own row could not be drawn without changing a row already printed.
+      // Avoid changing already-printed rows.
       const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
       const placed = screen.regions.find(candidate => candidate.region.id === this.#state.focus)
       if (placed !== undefined && placed.top < through(now)) {
@@ -142,7 +111,6 @@ export class TranscriptPane implements Component {
     return [...printed.lines, ...screen.lines.slice(through(printed.entries))]
   }
 
-  /** Report the rows focus sits on, to be brought into view, as when the fullscreen gives it back; nothing when nothing has focus. */
   reveal(): void {
     const drawn = this.#drawn
     const focus = this.#state.focus
@@ -151,19 +119,14 @@ export class TranscriptPane implements Component {
     if (placed !== undefined) this.#inView(placed.top, placed.height)
   }
 
-  /** Whether what it last drew holds the time since a moment, so a later time draws it again: the host's to tick. */
   get ticking(): boolean {
     return this.#drawn?.screen.timed === true
   }
 
-  /** Whether something on screen has focus. */
   get focused(): boolean {
     return this.#state.focus !== undefined
   }
 
-  /**
-   * @returns handled when the gesture changed the screen; undefined leaves it to pi-tui, which scrolls on the wheel and selects on a drag.
-   */
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
@@ -174,12 +137,6 @@ export class TranscriptPane implements Component {
     return { handled: true }
   }
 
-  /**
-   * A key lands on the focused region. Any key forgets focus the main screen
-   * parked, so the fullscreen gives it back only to a person who did nothing
-   * else in between.
-   * @returns whether the pane answered it, so the key is consumed; false leaves it to the composer.
-   */
   handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>): boolean {
     this.#parked = undefined
     const drawn = this.#drawn
@@ -194,7 +151,7 @@ export class TranscriptPane implements Component {
         const screen = this.#draw(this.#transcript, next.state, drawn.width, this.#views(), this.#theme(), this.#now())
         const placed = screen.regions.find(candidate => candidate.region.id === next.focus)
         if (placed !== undefined) {
-          // On the fullscreen the focused thing is brought into view; on the main screen, focus that reaches a printed entry asks for the fullscreen.
+          // Main screen can't repaint printed rows, so ask for fullscreen when focus moves there.
           if (this.#on === 'fullscreen') this.#inView(placed.top, placed.height)
           else if (placed.top < this.#printedThrough(drawn.width, screen)) this.#fullscreen(placed.top, placed.height)
         }
@@ -204,10 +161,6 @@ export class TranscriptPane implements Component {
     return true
   }
 
-  /**
-   * The rows printed on the main screen, among the rows of the screen given; 0 when nothing was printed at its width,
-   * as after a resize, when the next render prints everything again.
-   */
   #printedThrough(width: number, screen: Screen): number {
     const printed = this.#printed
     if (printed === undefined || printed.width !== width) return 0

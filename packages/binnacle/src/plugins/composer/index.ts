@@ -13,8 +13,6 @@ export function apply(ctx: Context): void {
         ctx.binnacle.send(text)
         return
       }
-      // A line naming one of dsh's commands runs it; one naming none is prose, sent as any other line. The command
-      // settles after this submit has returned, and the session may be gone by then, so each step keeps what it throws.
       ctx.binnacle.command(text).then((ran) => {
         if (ran) return
         try {
@@ -23,8 +21,7 @@ export function apply(ctx: Context): void {
           // The session closed under the line: there is nothing left to send it to.
         }
       }, () => {
-        // The session closed under the line: there is nothing left to run the command on — a command that failed
-        // still ran, its failure logged as its done, so the grant resolves rather than rejecting.
+        // The grant rejects only when no session is open: there is nothing to run the line in.
       })
     },
   })

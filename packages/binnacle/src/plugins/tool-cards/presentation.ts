@@ -78,11 +78,7 @@ export function resultViewOf(value: unknown): Read<PresentedResult> | undefined 
   }
 }
 
-/**
- * The object itself is the tool's, which may cache or reuse it, and binnacle
- * never freezes what it does not own — as the facts layer freezes the fact it
- * made, never the record it read (`binnacle:packages/binnacle/src/facts/adapt.ts`).
- */
+/** Not frozen: the object is the tool's, which may cache or reuse it. */
 function frozenCopy(value: object): Readonly<Record<string, unknown>> {
   return Object.freeze({ ...(value as Record<string, unknown>) })
 }

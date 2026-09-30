@@ -5,48 +5,30 @@ import { readable } from './readable.ts'
 import { binnacleTheme } from './theme.ts'
 import type { FoldStart, Mark, Theme, Tone } from './theme.ts'
 
-/** UI state layout reads: which collapsible regions are open, and which region has focus. */
 export interface LayoutState {
-  /** The ids of the folds a person toggled from how they start — open where they start folded, folded where they start open — each scoped to the entry that drew it. */
   readonly toggled: ReadonlySet<string>
-  /** The id of the focused region, if any. */
   readonly focus?: string
-  /** How the folds of what is laid out start, when a fold does not say: the theme's for the kind of entry it is drawn in. */
   readonly folds?: FoldStart
-  /** The time a span saying the time since a moment is laid out at, in milliseconds since the epoch: the host's to hand, for nothing below it reads the clock. */
   readonly now?: number
-  /** The keys the one key table binds to a binding, as pi-tui names them: the host's to hand, so an ask names the keys that answer it; none are named without it. */
   readonly keys?: (binding: KeyBinding) => readonly string[]
 }
 
-/** A region, and the rows and columns it covers. */
 export interface Placed {
-  /** The region. */
   readonly region: Region
-  /** Its first row. */
   readonly top: number
-  /** How many rows it covers. */
   readonly height: number
-  /** Its first column. */
   readonly left: number
-  /** How many columns it covers. */
   readonly width: number
 }
 
-/** Columns a show's gutter spends: its glyph, and a column of air after it. */
 const SHOW_GUTTER = 2
 
-/** Columns an ask spends on each side: its border, and a column of air inside it. */
 const ASK_SIDE = 2
 
-/** What a band pads around what it holds, in columns each side and lines above and below: as pi pads a person's message (`pi:packages/coding-agent/src/modes/interactive/components/user-message.ts#UserMessageComponent`). */
 const BAND_PAD = 1
 
-/** What a node draws: its lines, and every region on them, outermost first. */
 export interface Frame {
-  /** Each line, styled for the terminal. */
   readonly lines: readonly string[]
-  /** Every region, outermost first. */
   readonly regions: readonly Placed[]
 }
 
@@ -54,25 +36,15 @@ function focusRow(label: string, width: number, theme: Theme): string[] {
   return new Text(theme.tones.accent(`${theme.chrome.focus} ${label}`), 0, 0).render(width)
 }
 
-/**
- * Text in a tone of the theme's; as it is, in none. A node is read against the theme it is laid out in, so a tone it names is there — or it is plain.
- */
 function inTone(text: string, tone: Tone | undefined, theme: Theme): string {
   const paint = tone === undefined ? undefined : theme.tones[tone]
   return paint === undefined ? text : paint(text)
 }
 
-/** A mark of the theme's; the theme's `unknown` mark for a name it lacks, which a node read against the theme never names. */
 function markIn(name: Mark, theme: Theme): { readonly glyph: string, readonly tone: Tone } {
   return theme.marks[name] ?? theme.marks.unknown
 }
 
-/**
- * What a text node's spans draw: joined into one line, each span in its tone,
- * a bare span in the node's, a mark's glyph in the mark's tone or the span's
- * own — and adjacent runs in one tone drawn as one, so a line all in one tone
- * is the one styled run it always was.
- */
 function written(node: Extract<Node, { readonly kind: 'text' }>, theme: Theme): string {
   if (typeof node.text === 'string') return inTone(node.text, node.tone, theme)
   const runs: { text: string, tone: Tone | undefined }[] = []
@@ -94,36 +66,18 @@ function titleLine(spans: readonly Span[], tone: Tone | undefined, theme: Theme)
   return written(tone === undefined ? { kind: 'text', text: spans } : { kind: 'text', text: spans, tone }, theme)
 }
 
-/**
- * A fold's title as one plain string: each span's text, a mark's glyph, none
- * of their tones — the title as the accent row a focused fold draws keeps it.
- */
 function plainTitle(spans: readonly Span[], theme: Theme): string {
   return spans.map(span => typeof span === 'string' ? span : 'mark' in span ? markIn(span.mark, theme).glyph : 'since' in span ? elapsed(0) : span.text).join('')
 }
 
-/**
- * The row a fold's line becomes while it is focused: the focus pointer, the
- * fold's title kept on it, and what Enter will do, in accent — so a person
- * tabbing onto the fold reads what it is and what Enter does. It replaces the
- * fold's own line in its place.
- */
 function focusWithTitle(title: string, label: string, width: number, theme: Theme): string[] {
   return new Text(theme.tones.accent(`${theme.chrome.focus} ${title} ${theme.chrome.separator} ${label}`), 0, 0).render(width)
 }
 
-/**
- * Lay a node out: every string it carries is treated first, so none of it
- * reaches the terminal as a control.
- */
 export function layout(node: Node, width: number, state: LayoutState, theme: Theme = binnacleTheme): Frame {
   return drawn(readable(at(node, state.now)), width, state, theme)
 }
 
-/**
- * The time from a moment to another, as a person reads it: seconds under a minute, then minutes and seconds, then
- * hours and minutes. A moment later than the other reads as none. `ms` is how long, in milliseconds.
- */
 export function elapsed(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1_000))
   if (seconds < 60) return `${seconds}s`
@@ -132,11 +86,7 @@ export function elapsed(ms: number): string {
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
 }
 
-/**
- * A node as it reads at a time: each span saying the time since a moment written as the time from it, in its tone.
- * Exhaustive over the node kinds, so a kind added to `Node` fails to compile until its spans are written too.
- * `now` is in milliseconds since the epoch; none reads every moment as now.
- */
+// Exhaustive over node kinds; a kind added to Node fails to compile until handled.
 function at(node: Node, now: number | undefined): Node {
   const span = (each: Span): Span => {
     if (typeof each === 'string' || !('since' in each)) return each
@@ -162,16 +112,13 @@ function at(node: Node, now: number | undefined): Node {
   }
 }
 
-/** Lay out a node whose carried strings are already treated. */
 function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Frame {
   switch (node.kind) {
     case 'blank':
       return { lines: [''], regions: [] }
     case 'text':
-      // pi-tui wraps styled text, opening each line it wraps to in the style the line before ended in.
       return { lines: new Text(written(node, theme), 0, 0).render(width), regions: [] }
     case 'markdown':
-      // pi-tui lays a document out, in the theme's markdown styles; it offers nothing.
       return { lines: new Markdown(node.text, 0, 0, theme.markdown).render(width), regions: [] }
     case 'stack': {
       const lines: string[] = []
@@ -200,12 +147,10 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
       return band(node, width, state, theme)
     case 'fold': {
       const frame = drawn(node.child, width, state, theme)
-      // What the fold says wins; then how its kind's folds start; then three rows, folded.
+      // Node rows override fold start rows.
       const rows = node.rows ?? state.folds?.rows ?? 3
       const opened = state.toggled.has(node.id) !== (state.folds?.open ?? false)
       const cut = frame.lines.length - rows
-      // The line the fold names to fold under, laid out as a text node's line in the fold's tone; a fold of no
-      // rows answers on it alone, and its marker rides it — what it holds while closed, that it can be folded open.
       const foldsUnder = rows === 0 ? node.title : undefined
       const title = node.title === undefined ? [] : new Text(titleLine(node.title, node.tone, theme), 0, 0).render(width)
       const below = frame.regions.map(placed => ({ ...placed, top: placed.top + title.length }))
@@ -215,15 +160,12 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
       if (opened) {
         const away = rows === 0 ? theme.words.away : theme.words.to(rows)
         const open = { id: node.id, affordances: [{ kind: 'expand' as const, label: away }], overflows: false }
-        // The heading a fold of no rows answers on: its title saying it can be folded — or, focused, the accent
-        // row saying what Enter will do, the title kept on it, so the row a person reads never sits below content
-        // that may run long.
+        // For a fold of no rows, put title on top so it doesn't sit below content that may run long.
         const heading = foldsUnder === undefined
           ? title
           : state.focus === node.id
             ? focusWithTitle(plainTitle(foldsUnder, theme), away, width, theme)
             : new Text(titleLine([...foldsUnder, ` ${theme.chrome.separator} ${theme.words.less}`], node.tone, theme), 0, 0).render(width)
-        // What it holds sits beneath the heading as drawn, which wraps to more rows than the title alone.
         const underHeading = frame.regions.map(placed => ({ ...placed, top: placed.top + heading.length }))
         const lines = [...heading, ...frame.lines]
         const placed = { region: open, top: 0, height: foldsUnder === undefined ? lines.length : heading.length, left: 0, width }
@@ -232,16 +174,13 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
         return { lines: [...lines, ...row], regions: [{ ...placed, height: lines.length + row.length }, ...underHeading] }
       }
       if (foldsUnder !== undefined) {
-        // Folded to nothing under its title, the marker rides the title's line, so the fold costs one line; focused,
-        // that line is the accent row saying what Enter will do, the title kept on it — the same line replaced in its
-        // place, wrapping to more rows at a narrow width as any line does.
         const marker = state.focus === node.id
           ? focusWithTitle(plainTitle(foldsUnder, theme), label, width, theme)
           : new Text(titleLine([...foldsUnder, ` ${theme.chrome.separator} ${theme.words.holds(cut)}`], node.tone, theme), 0, 0).render(width)
         return { lines: marker, regions: [{ region, top: 0, height: marker.length, left: 0, width }] }
       }
       const shown = frame.lines.slice(0, rows)
-      // The marker row a focused cut fold draws is the accent row saying what Enter will do, so focusing it moves nothing.
+      // Focused marker is same row, so focusing doesn't move.
       const marker = new Text(state.focus === node.id ? theme.tones.accent(`${theme.chrome.focus} ${label}`) : `${theme.chrome.cut} ${theme.words.cut(cut)}`, 0, 0).render(width)
       const lines = [...title, ...shown, ...marker]
       const inside = frame.regions
@@ -252,21 +191,13 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
   }
 }
 
-/**
- * A line with its fill opened again wherever what it holds ended a fill of its own, so each cell after an inner band is the outer fill's, not the terminal's: a background ends with the default background's code, which also ends the outer one.
- */
 function refilled(line: string, fill: (text: string) => string): string {
-  // Every fill is the theme's, drawn from a colour as data, so it opens with one code and closes with the default background's.
   const opening = fill('').slice(0, -DEFAULT_BACKGROUND.length)
   return line.replaceAll(DEFAULT_BACKGROUND, `${DEFAULT_BACKGROUND}${opening}`)
 }
 
 const DEFAULT_BACKGROUND = '\x1b[49m'
 
-/**
- * Lay an ask out: what it holds, inside a rounded border drawn in its edge's tone, dim by default, every line filled with its background when it names one.
- * What it holds alone where the width leaves no column inside.
- */
 function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const inner = width - 2 * ASK_SIDE
   if (inner < 1) return drawn(node.child, width, state, theme)
@@ -274,13 +205,12 @@ function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state
   const edge = (text: string): string => inTone(text, node.edge ?? 'dim', theme)
   const fill = node.background === undefined ? undefined : theme.backgrounds[node.background]
   const border = theme.chrome.border
-  // A title is left off whole, never cut, where it would leave no rule beside it: a cut title reads as another one.
+  // Don't cut title; a cut one reads as another one.
   const title = node.title !== undefined && visibleWidth(node.title) <= width - 6 ? node.title : undefined
   const top = title === undefined
     ? edge(`${border.topLeft}${border.horizontal.repeat(width - 2)}${border.topRight}`)
     : `${edge(`${border.topLeft}${border.horizontal} `)}${title}${edge(` ${border.horizontal.repeat(width - 5 - visibleWidth(title))}${border.topRight}`)}`
   const body = frame.lines.map(row => `${edge(border.side)} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge(border.side)}`)
-  // The keys that answer what it holds, named on the bottom edge as a title is on the top: left off whole where they would leave no rule beside them.
   const hint = answeredBy(frame, state, theme)
   const named = hint !== undefined && visibleWidth(hint) <= width - 6 ? hint : undefined
   const bottom = named === undefined
@@ -293,11 +223,6 @@ function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state
   }
 }
 
-/**
- * Lay a show out: its title, then what it holds beneath it, each line along the
- * theme's gutter in the dim tone, a column of air after it. What it holds
- * without a gutter where the width leaves no column beside one.
- */
 function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const title = new Text(written({ kind: 'text', text: node.title, ...node.tone === undefined ? {} : { tone: node.tone } }, theme), 0, 0).render(width)
   const inner = width - SHOW_GUTTER
@@ -309,12 +234,6 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
   }
 }
 
-/**
- * What answers an ask, as its bottom edge names it: the keys that invoke what
- * has focus in it, and, where it holds more than one offer, the keys that move
- * focus on, each followed by what it does in the theme's words. Undefined
- * where nothing answers it or no keys are handed.
- */
 function answeredBy(frame: Frame, state: LayoutState, theme: Theme): string | undefined {
   const offers = frame.regions.filter(placed => placed.region.affordances.length > 0).length
   if (state.keys === undefined || offers === 0) return undefined
@@ -326,20 +245,12 @@ function answeredBy(frame: Frame, state: LayoutState, theme: Theme): string | un
   return hints.length === 0 ? undefined : hints.join(` ${theme.chrome.separator} `)
 }
 
-/**
- * Lay a band out: what it holds, padded a column each side and a line above
- * and below, every line filled with the background it names. pi-tui's `Box`
- * draws the padding and the fill, as `Text` draws a text node's wrapped
- * line; what it holds is laid out here, for its regions are binnacle's.
- * What it holds alone where the width leaves no column inside it, and nothing
- * at all — not empty padding — when it holds nothing.
- */
 function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, state: LayoutState, theme: Theme): Frame {
   const inner = width - 2 * BAND_PAD
   if (inner < 1) return drawn(node.child, width, state, theme)
   const frame = drawn(node.child, inner, state, theme)
   const box = new Box(BAND_PAD, BAND_PAD, theme.backgrounds[node.background])
-  // What it holds is laid out already, at exactly the width Box asks of it, so its render hands the lines back as they are; nothing is cached, for a band is laid out anew whenever the node it holds is.
+  // Box renders the frame's lines directly; nothing is cached since bands are laid out anew each time.
   box.addChild({ render: () => [...frame.lines], invalidate: () => {} })
   return {
     lines: box.render(width),
@@ -347,7 +258,6 @@ function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, sta
   }
 }
 
-/** The regions a point lands on, innermost first, given a frame's regions outermost first; `row` is in the frame's lines, `column` from its left edge. */
 export function under(regions: readonly Placed[], row: number, column: number): Region[] {
   return regions
     .filter(placed => row >= placed.top && row < placed.top + placed.height && column >= placed.left && column < placed.left + placed.width)

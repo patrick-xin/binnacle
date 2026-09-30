@@ -8,19 +8,16 @@ import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
 import type { Theme } from '../ui/theme.ts'
 
-/** `drawn` is what a plugin's drawings read, which it asked to draw again. */
 export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys' | 'drawn'
 
 export interface GrantedSession {
   send(text: string): void
-  /** Resolves whether a command ran. */
   command(line: string): Promise<boolean>
   readonly agent: Agent
 }
 
 const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer', 'dialog'] satisfies readonly Slot[]
 
-/** Why a placement cannot go in a slot, as what to change; undefined when it may. */
 function misplaced(slot: Slot, placement: Placement): string | undefined {
   // An author's code may be untyped, so what the types say is checked here, where it enters.
   if (!slots.includes(slot)) return 'no such slot; the slots are transcript, above-composer, composer, below-composer and dialog'
@@ -34,22 +31,13 @@ function misplaced(slot: Slot, placement: Placement): string | undefined {
   return undefined
 }
 
-/**
- * The own entries of each source laid one over the next, latest wins, defined as own properties: `Object.assign` sets,
- * so an id only an own property carries — `__proto__`, as JSON.parse makes it — reaches the prototype's setter and is
- * dropped, before it can be refused or layered. Sources are oldest first.
- */
+// Using own properties prevents `__proto__` from reaching the prototype's setter.
 function overlaid(...sources: readonly Readonly<Record<string, KeyId | readonly KeyId[] | undefined>>[]): KeybindingsConfig {
   return Object.fromEntries(sources.flatMap(source => Object.entries(source))) as KeybindingsConfig
 }
 
-/**
- * Each registration is an effect bound to the plugin that made it, through the context Cordis traces to the caller,
- * so disposing that plugin takes back what it registered.
- */
 export class RegistrationService extends Service implements Registrations {
-  // State is in TypeScript-private members, not `#private` ones: Cordis hands each caller a traced copy of the service,
-  // which a `#private` field refuses as its receiver.
+  // Uses TypeScript private, not #private, so Cordis traced copies can access state.
   private readonly adapterTable = new Map<string, readonly AuthorAdapter[]>()
   private readonly newestAdapters = new Map<string, AuthorAdapter>()
   private readonly viewTable = new Map<string, readonly View[]>()
@@ -67,12 +55,10 @@ export class RegistrationService extends Service implements Registrations {
     super(ctx, 'binnacle')
   }
 
-  /** The newest adapter registered for each dsh event type. */
   get adapters(): ReadonlyMap<string, AuthorAdapter> {
     return this.newestAdapters
   }
 
-  /** By entry kind or authored fact name, each key's oldest first. */
   get views(): Views {
     return this.viewTable
   }
@@ -91,7 +77,6 @@ export class RegistrationService extends Service implements Registrations {
     return this.register(this.viewTable, key, view, `binnacle.view(${key})`, 'views')
   }
 
-  /** Binnacle's theme, with each theme registration laid over it, oldest first. */
   get currentTheme(): Theme {
     return this.drawnIn
   }
@@ -111,18 +96,15 @@ export class RegistrationService extends Service implements Registrations {
 
   /** @inheritDoc */
   keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void {
-    // An author's code may be untyped, so what the types say is checked here, where it enters.
+    // Types checked at entry since author code may be untyped.
     if (typeof bindings !== 'object' || bindings === null || Array.isArray(bindings)) throw new Error(`binnacle.keys: bindings is ${String(bindings)}; bind a record from binding ids to keys, such as { 'binnacle.quit': 'ctrl+q' }`)
-    // An author's code may change the object after handing it over, so what is registered is what stood at entry: the
-    // record copied, and each array in it. Each registration its own object also lets its disposal find its own layer.
+    // Copy to prevent changes after handing over; each registration its own object.
     const given = Object.fromEntries(Object.entries(bindings).map(([id, keys]) => [id, Array.isArray(keys) ? [...keys] : keys]))
-    // What the registrations would bind together with this one, checked before it joins them.
     const refused = refusedBindings(overlaid(this.bound, given))
     if (refused !== undefined) throw new Error(`binnacle.keys: ${refused}`)
     return this.register(this.bindingTable, 'keys', given, 'binnacle.keys', 'keys')
   }
 
-  /** Each id's newest binding. */
   get bindings(): KeybindingsConfig {
     return this.bound
   }
@@ -147,7 +129,6 @@ export class RegistrationService extends Service implements Registrations {
     return await session.command(line)
   }
 
-  /** Open the grants onto a session; the returned function closes them, as the session closes. */
   open(session: GrantedSession): () => void {
     this.granted = session
     return () => { if (this.granted === session) this.granted = undefined }
@@ -160,15 +141,11 @@ export class RegistrationService extends Service implements Registrations {
     return this.register(this.placementTable, slot, placement, `binnacle.place(${slot})`, 'placements')
   }
 
-  /** Oldest first; the transcript's and the composer's slots draw the last. */
   placed(slot: Slot): readonly Placement[] {
     return this.placementTable.get(slot) ?? []
   }
 
-  /**
-   * @inheritDoc
-   * The key's views are put back as a new stack, which is how a drawing knows it is stale.
-   */
+  /** @inheritDoc */
   redraw(): void {
     this.changed('drawn')
   }
@@ -180,20 +157,18 @@ export class RegistrationService extends Service implements Registrations {
     this.changed('views')
   }
 
-  /** Listeners hear when a registration comes or goes, or a key is invalidated, with the table that changed. */
   onChange(listener: (changed: RegistrationsChanged) => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
 
-  /** The entry goes above any the key already has; `table` is which table `into` is, for the listeners. */
   private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string, table: RegistrationsChanged): () => void {
     return this.ctx.effect(() => {
       into.set(key, [...into.get(key) ?? [], value])
       this.changed(table)
       return () => {
         const rest = [...into.get(key) ?? []]
-        // Any one of equal values: the same function registered twice leaves the same table whichever goes.
+        // Find by reference, so duplicate registrations only remove the first.
         rest.splice(rest.indexOf(value), 1)
         if (rest.length === 0) into.delete(key)
         else into.set(key, rest)
@@ -213,7 +188,6 @@ export class RegistrationService extends Service implements Registrations {
       const newest = stack.at(-1)
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
-    // Each id bound by the newest registration that binds it, as one config for pi-tui's manager.
     if (table === 'keys') this.bound = overlaid(...this.bindingTable.get('keys') ?? [])
     if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
     for (const listener of this.listeners) listener(table)

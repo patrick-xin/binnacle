@@ -3,13 +3,10 @@ import type { KeyId, Keybinding, KeybindingDefinition, KeybindingDefinitions, Ke
 import { affordances } from '../contract/index.ts'
 import type { AffordanceKind, KeyBinding } from '../contract/index.ts'
 
-/** A key as pi-tui names it, re-exported for the author API: what a plugin offers to open a screen with. */
 export type { KeyId } from '@earendil-works/pi-tui'
 
-/** A binding for each affordance kind, by the kind's name: what a key bound to it invokes on the focused region. */
 type AffordanceKeybindings = { readonly [Kind in AffordanceKind as `binnacle.${Kind}`]: true }
 
-/** binnacle's bindings, merged into pi-tui's table so one manager holds them all. */
 export interface BinnacleKeybindings extends AffordanceKeybindings {
   'binnacle.quit': true
   'binnacle.switchScreens': true
@@ -25,7 +22,6 @@ declare module '@earendil-works/pi-tui' {
   interface Keybindings extends BinnacleKeybindings {}
 }
 
-/** binnacle's own bindings alone, in the order a person reads them in help. */
 export const BINNACLE_BINDINGS = {
   'binnacle.stepIn': { defaultKeys: 'shift+tab', description: 'step in: focus the nearest thing that offers something' },
   'binnacle.focusNext': { defaultKeys: ['tab', 'down'], description: 'focus the next thing that offers something' },
@@ -37,10 +33,6 @@ export const BINNACLE_BINDINGS = {
   'binnacle.interrupt': { defaultKeys: 'escape', description: 'interrupt the running turn, while nothing has focus' },
 } as const satisfies KeybindingDefinitions
 
-/**
- * A binding for each affordance kind, unbound until a person binds it: a key bound to one invokes that affordance on
- * the focused region where it is offered (ADR 1). Every kind the contract has must be here, or this does not compile.
- */
 export const AFFORDANCE_BINDINGS: { readonly [Kind in AffordanceKind as `binnacle.${Kind}`]: KeybindingDefinition } = {
   'binnacle.expand': { defaultKeys: [], description: 'open or fold the focused thing' },
   'binnacle.choose': { defaultKeys: [], description: 'choose the focused option' },
@@ -51,14 +43,12 @@ export const AFFORDANCE_BINDINGS: { readonly [Kind in AffordanceKind as `binnacl
   'binnacle.dismiss': { defaultKeys: [], description: 'dismiss the focused thing' },
 }
 
-/** Every binding the table holds: pi-tui's own, then binnacle's, then one for each affordance kind. */
 export const KEYBINDINGS = {
   ...TUI_KEYBINDINGS,
   ...BINNACLE_BINDINGS,
   ...AFFORDANCE_BINDINGS,
 } as const satisfies KeybindingDefinitions
 
-/** What the table resolves a key to: a key gesture's binding, one of the host's own, or a placed screen's. */
 export type ResolvedKey =
   | { readonly kind: 'gesture', readonly binding: KeyBinding }
   | { readonly kind: 'quit' }
@@ -67,7 +57,6 @@ export type ResolvedKey =
   | { readonly kind: 'screen', readonly name: string }
   | { readonly kind: 'screen-close' }
 
-/** The binding id of each meaning a key gives a gesture that is not an affordance kind's; an affordance kind's is `binnacle.<kind>`. */
 const bindingIds: Readonly<Partial<Record<KeyBinding, Keybinding>>> = {
   'focus.next': 'binnacle.focusNext',
   'focus.previous': 'binnacle.focusPrevious',
@@ -75,41 +64,13 @@ const bindingIds: Readonly<Partial<Record<KeyBinding, Keybinding>>> = {
   'primary': 'binnacle.primary',
 }
 
-/** The binding id a placed screen's key is offered under: the one table's, named for the screen. */
 const offeredBinding = (name: string): string => `binnacle.screen.${name}`
 
-/**
- * The one key table: binnacle's bindings held in one `KeybindingsManager`
- * together with pi-tui's own, so the composer and the alternate screen read
- * the same table.
- */
 export interface KeyTable {
-  /** The manager holding every binding, for the host to install with pi-tui's `setKeybindings`. */
   readonly manager: KeybindingsManager
-  /**
-   * What a key resolves to. The bindings live in the context in a fixed order, and within it a binding the person
-   * set resolves before one that only defaults to the same key, so an explicit binding is never defeated by a
-   * default that shares its key. It answers a press only, once: a repeat or a release, which a kitty-protocol
-   * terminal also reports, is answered by nothing binnacle binds. `focused` is whether something on the screen
-   * being read — the transcript, or a placed screen that is open — has focus, which decides which bindings are
-   * live; `open` is whether a placed screen is open, which takes the keys the transcript would answer.
-   */
   readonly resolve: (data: string, focused: boolean, open?: boolean) => ResolvedKey | undefined
-  /**
-   * The keys that give a gesture a meaning, as they stand: the defaults, and over them what a person bound, in
-   * the order they are bound; none where nothing is bound to it, as an affordance kind is until a person binds it.
-   */
   readonly keysOf: (binding: KeyBinding) => readonly KeyId[]
-  /**
-   * Offer the key that opens a placed screen, as a binding in this table, so a person can rebind it. The manager is
-   * rebuilt with the offer; installing it is the host's, which reads `manager` as it now stands. Returns a
-   * function that withdraws the offer.
-   */
   readonly offer: (name: string, definition: KeybindingDefinition) => () => void
-  /**
-   * Bind keys as a person asked, over the defaults, by binding id; what an earlier call bound and this one leaves out
-   * returns to its default. The manager is rebuilt with them; installing it is the host's.
-   */
   readonly bind: (bindings: KeybindingsConfig) => void
 }
 
@@ -117,7 +78,6 @@ export function keyTable(): KeyTable {
   const offered = new Map<string, KeybindingDefinition>()
   let manager = new KeybindingsManager(KEYBINDINGS)
   let set: KeybindingsConfig = {}
-  // A new manager is the only way a binding joins the table.
   const rebuild = (bindings: KeybindingsConfig = manager.getUserBindings()): void => {
     manager = new KeybindingsManager({ ...KEYBINDINGS, ...Object.fromEntries(offered) }, bindings)
     set = manager.getUserBindings()
@@ -139,13 +99,8 @@ export function keyTable(): KeyTable {
     keysOf: (binding: KeyBinding): readonly KeyId[] => manager.getKeys(bindingIds[binding] ?? `binnacle.${binding}` as Keybinding),
     resolve: (data: string, focused: boolean, open = false): ResolvedKey | undefined => {
       if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
-      // The bindings live in this context, in the order the table resolves them: the host's own everywhere, then a
-      // placed screen's key, its closing while one is open, step in, and — while something has focus — moving focus,
-      // the primary and step out, then one binding per affordance kind; while nothing has focus, interrupting instead. A placed screen takes the keys the transcript
-      // would answer, on itself rather than the transcript beneath; only Esc differs, returning to the transcript,
-      // and it is resolved before the gestures both screens share, which the rest of the order gives. Scrolling,
-      // search and selection are the alternate screen's own, over the scroll view the screen sits in; the composer
-      // below it stays live, and focus does not move on the transcript beneath.
+      // Bindings are checked in order: quit and screen switching, then screen keys if open,
+      // step in, then focus moves/primary/step-out if focused, then affordances, else interrupt.
       const live: { readonly id: Keybinding, readonly to: ResolvedKey }[] = [
         { id: 'binnacle.quit', to: { kind: 'quit' } },
         { id: 'binnacle.switchScreens', to: { kind: 'switch-screens' } },
@@ -162,22 +117,13 @@ export function keyTable(): KeyTable {
         )
         for (const kind of Object.keys(affordances) as AffordanceKind[]) live.push({ id: `binnacle.${kind}` as Keybinding, to: { kind: 'gesture', binding: kind } })
       } else live.push({ id: 'binnacle.interrupt', to: { kind: 'interrupt' } })
-      // What the person set resolves before what only defaults to the same key, within that order; two ids the
-      // registrations leave on one key keep the order, whichever the person set.
+      // Explicit bindings take precedence over defaults.
       const explicit = live.filter(({ id }) => Object.hasOwn(set, id) && set[id] !== undefined)
       return (explicit.find(({ id }) => manager.matches(data, id)) ?? live.find(({ id }) => manager.matches(data, id)))?.to
     },
   }
 }
 
-/**
- * Why a person's bindings cannot stand, as what to change: an id no binding of binnacle's or pi-tui's own has — a name
- * only the prototype chain gives is no binding — a key that is no string, or two ids come to share one key. A placed
- * screen's id stands whether or not its screen is placed yet. Two ids sharing a key is what pi-tui's manager reports
- * as a conflict among a person's bindings, taken from it rather than found again; whether a string names a key is
- * pi-tui's to say, and it exports nothing that says it, so only a key that is no string is refused here.
- * Undefined when they stand.
- */
 export function refusedBindings(bindings: KeybindingsConfig): string | undefined {
   const screens: Record<string, KeybindingDefinition> = {}
   for (const [id, keys] of Object.entries(bindings)) {

@@ -35,10 +35,7 @@ function measured(ctx: Context): readonly string[] {
 
 const count = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
 
-/**
- * The tokens used, from the token meter's `tokenUsage` projection (`dsh:packages/llm/token-meter/src/projection.ts#TokenUsageProjection`): sent, received and read from the cache.
- * A field that holds no count leaves the measure out, never guessed: undefined until each is counted.
- */
+/** Undefined until every field holds a count: a measure is left out, never guessed. */
 function tokensOf(value: TokenUsageProjection | undefined): number | undefined {
   if (value === undefined) return undefined
   const input = count(value.uncachedInputTokens)
@@ -47,12 +44,7 @@ function tokensOf(value: TokenUsageProjection | undefined): number | undefined {
   return input === undefined || output === undefined || cacheRead === undefined ? undefined : input + output + cacheRead
 }
 
-/**
- * The context the session fills, from the token meter's `contextPressure` projection
- * (`dsh:packages/llm/token-meter/src/projection.ts#ContextPressureProjection`): what the next request would cost, or
- * the last one's size, out of the window the latest request context named.
- * A field that holds no count leaves the measure out, never guessed: undefined until both are known.
- */
+/** What the next request would cost, else the last one's size, out of the window; undefined until both are known. */
 function contextOf(value: ContextPressureProjection | undefined): { readonly used: number, readonly window: number } | undefined {
   if (value === undefined) return undefined
   const used = count(value.projectedTokens) ?? count(value.pressureTokens)
@@ -60,20 +52,11 @@ function contextOf(value: ContextPressureProjection | undefined): { readonly use
   return used === undefined || window === undefined || window === 0 ? undefined : { used, window }
 }
 
-/**
- * A count scaled down from a unit, as a person reads it: rounded to a whole once a hundred, one decimal beneath
- * that — dsh web's compact count's own rule (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`).
- */
 function scaled(over: number): string {
   return over >= 100 ? `${Math.round(over)}` : `${Math.round(over * 10) / 10}`
 }
 
-/**
- * A count of tokens as a person reads it: `517`, `12.4k`, `517k`, `1.2m` — dsh web's compact count
- * (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`), restated lowercase and without its
- * locale seat, as #42's worked example writes it. Where a count rounds to a thousand thousands it is written in
- * millions, where dsh web writes `1000K`.
- */
+/** dsh web's compact count, lowercase; where it would write `1000K` this writes `1m`. */
 function compact(value: number): string {
   if (value < 1_000) return `${value}`
   const thousands = scaled(value / 1_000)
@@ -81,11 +64,6 @@ function compact(value: number): string {
   return `${scaled(value / 1_000_000)}m`
 }
 
-/**
- * The share of the context the session fills, rounded as dsh web's occupancy meter rounds it
- * (`dsh:packages/client/ui-conversation/src/client/context-occupancy.ts#contextOccupancy`): to a whole, never past
- * full.
- */
 function share(used: number, window: number): string {
   return `${Math.min(100, Math.round(used / window * 100))}%`
 }

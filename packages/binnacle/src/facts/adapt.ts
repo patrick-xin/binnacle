@@ -101,13 +101,13 @@ export type Fact =
   }
   | Logged & {
     readonly kind: 'run'
-    /** dsh's id of the run, which pairs it with the done that settles it (`dsh:packages/interaction/commands/src/brand.ts#CommandId`). */
+    /** dsh's id of the run, which pairs it with the done that settles it (dsh's `CommandId`). */
     readonly commandId: CommandId
     /** The command's name, dsh's own split of the line: lowercase, with no slash. */
     readonly name: string
     /** The text that followed the name, exactly as the person typed it, separator whitespace included; absent when the command's own domain event owns the input's payload. */
     readonly args?: string
-    /** Who issued the line, a dsh source kind; `user` today (`dsh:packages/interaction/commands/src/types.ts#CommandSource`). */
+    /** Who issued the line, a dsh source kind; `user` today (dsh's `CommandSource`). */
     readonly source: string
   }
   | Logged & {
@@ -118,7 +118,7 @@ export type Fact =
     readonly outcome: 'success' | 'error'
     /** What the command returned, as a person reads it; a failure always has one. */
     readonly text?: string
-    /** An earlier authoritative event that owns what the command did, when one does (`dsh:packages/interaction/commands/src/types.ts#CommandResult`); present only on a success that named one. */
+    /** An earlier authoritative event that owns what the command did, when one does (dsh's `CommandResult`); present only on a success that named one. */
     readonly sourceEventSeq?: SessionSeq
   }
   | Logged & {
@@ -130,7 +130,7 @@ export type Fact =
   }
   | Logged & {
     readonly kind: 'asked'
-    /** dsh's id of the request, which pairs the ask with the decision that answers it (`dsh:packages/interaction/user-approval/src/types.ts#ApprovalRequestId`). */
+    /** dsh's id of the request, which pairs the ask with the decision that answers it (dsh's `ApprovalRequestId`). */
     readonly id: ApprovalRequestId
     /** The tool the question is about. */
     readonly toolName: string
@@ -143,19 +143,19 @@ export type Fact =
     readonly kind: 'decided'
     /** dsh's id of the ask this answers, the asked fact's `id`. */
     readonly id: ApprovalRequestId
-    /** What was decided, in dsh's words (`allowed-once`, `rejected`, `cancelled`, `unavailable`; `dsh:packages/interaction/user-approval/src/types.ts#ApprovalOutcome`). */
+    /** What was decided, in dsh's words (`allowed-once`, `rejected`, `cancelled`, `unavailable`; dsh's `ApprovalOutcome`). */
     readonly outcome: ApprovalOutcome
   }
   | Logged & {
     readonly kind: 'start'
-    /** dsh's id of the compaction, which joins its summary and its end as one entry (`dsh:packages/compaction/compaction/src/brand.ts#CompactionId`). */
+    /** dsh's id of the compaction, which joins its summary and its end as one entry (dsh's `CompactionId`). */
     readonly compactionId: CompactionId
   }
   | Logged & {
     readonly kind: 'summary'
     /** dsh's id of the compaction whose summary it is, the start fact's `compactionId`. */
     readonly compactionId: CompactionId
-    /** How many items the compaction shadowed: dsh's `shadowedSeqs` counted (`dsh:packages/compaction/compaction/src/types.ts`, the `compaction/summary` member). */
+    /** How many items the compaction shadowed: dsh's `shadowedSeqs` on `compaction/summary`, counted. */
     readonly items: number
     /** About how many tokens they held: dsh's `shadowedTokenCount`, an estimate, read as dsh writes it. */
     readonly tokens: number
@@ -166,7 +166,7 @@ export type Fact =
     readonly kind: 'end'
     /** dsh's id of the compaction it ends, the start fact's `compactionId`. */
     readonly compactionId: CompactionId
-    /** Why the compaction failed, in dsh's words; absent when it compacted (`dsh:packages/compaction/compaction/src/types.ts`, the `compaction/end` member). */
+    /** Why the compaction failed, in dsh's words on `compaction/end`; absent when it compacted. */
     readonly error?: string
   }
   | Logged & {
@@ -191,12 +191,6 @@ type Adapter<K extends SessionEventType> = (event: SessionEvent<K>) => Fact
 /** An author's adapter for one kind of event: it names the fact and says what it holds. The name must not be an entry kind binnacle draws, such as `prompt` or `tool`. */
 export type AuthorAdapter = (event: SessionEvent) => { readonly name: string, readonly data: unknown }
 
-/**
- * A replacement as a quiet fact: a surface event that shadowed a range instead of appending to the tail, whose copy
- * stays model-only (`dsh:packages/core/session/src/surface.ts#isAppendSurfaceEvent`), so it draws as nothing and its
- * record is kept for a view an author registers for its kind. The append-origin events alone are the transcript's
- * source material, so a replacement is never read as a row.
- */
 function replaced(event: SessionEvent): Fact {
   return { kind: 'quiet', seq: event.seq, time: event.time, type: event.type, record: event }
 }
@@ -207,11 +201,6 @@ function blockOf(block: ContentBlock): Block {
   return { kind: 'unread', type: block.type }
 }
 
-/**
- * Whether a message's content adds or removes tools: the one context dsh
- * web's Chat keeps a row for (`dsh:packages/client/ui-chat/src/client/contract/chat-visibility.ts#isVisibleChatNode`),
- * so the one binnacle draws.
- */
 function changesTools(content: readonly ContentBlock[]): boolean {
   return content.some(block => block.type === 'tool-addition' || block.type === 'tool-removal')
 }
@@ -320,9 +309,6 @@ function authored(event: SessionEvent, author: AuthorAdapter): Fact {
 }
 
 /**
- * A kind the kinds table names `unread`, or one dsh does not know at all, becomes an `unknown` fact carrying its raw
- * record, so the fallback view can show it; it is never dropped. dsh has already refused any log whose unknown events
- * are not marked ignorable, so what arrives here unadapted is a kind binnacle has not learned yet.
  * @param authors - authors' adapters by event type; one for a kind binnacle also reads wins.
  * @returns the fact it is; `unknown` when no adapter reads its kind.
  */

@@ -78,11 +78,7 @@ function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly wor
   }
 }
 
-/**
- * One line per event, grouped by turn. It reads only the facts it is handed,
- * never the events: a read fact's line opens to the fact binnacle read, and a
- * quiet or unknown one to the event as logged, as the fallback view shows it.
- */
+/** Reads only the facts it is handed: a quiet or unknown fact opens to the event as logged. */
 export function drawTrajectory(facts: readonly Fact[]): Node {
   const tools = new Map<string, string>()
   for (const fact of facts) if (fact.kind === 'call') tools.set(fact.callId, fact.name)

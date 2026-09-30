@@ -2,7 +2,6 @@ import type { Context, Events } from '@deepseek-ai/cordis'
 import type { AskUserQuestionAnswer, AskUserQuestionAnswerItem, AskUserQuestionItem, AskUserQuestionOption } from '@deepseek-ai/dsh-user-questions'
 import type { Node, Placement } from '../../api.ts'
 
-/** What the waterfall hands an answerer, as dsh declares it on its event map; the package does not export it by name. */
 type Asked = Parameters<Events['user-questions/request']>[0]
 
 type AnswerNext = Parameters<Events['user-questions/request']>[1]
@@ -12,9 +11,6 @@ const SKIP = 'skip'
 const CANCEL = 'cancel'
 const DONE = 'done'
 
-/**
- * A rejection dsh's user-questions service reads back as its own: the shape its web client sends — an error named `UserQuestionError`, carrying dsh's code — for the class itself does not cross the wire (`dsh:packages/client/ui-user-questions/src/client/contract/slots.ts`, whose `questionError` is private).
- */
 function refused(code: 'ASK_ABORTED' | 'ASK_CANCELLED', message: string): Error {
   const error = new Error(message) as Error & { code: string }
   error.name = 'UserQuestionError'
@@ -33,7 +29,6 @@ function optionLine(option: AskUserQuestionOption, multi: boolean, marked: boole
   }
 }
 
-/** A plan-review question offers its approve option first, so it is the card's primary — what Enter does (`dsh:packages/interaction/user-questions/src/types.ts#AskUserQuestionIntent`). */
 function offered(question: AskUserQuestionItem): readonly AskUserQuestionOption[] {
   const options = question.options ?? []
   const approve = question.intent?.kind === 'plan-review' ? options.findIndex(option => option.label === question.intent?.approve) : -1
@@ -47,7 +42,6 @@ function asked(question: AskUserQuestionItem): readonly Node[] {
   ]
 }
 
-/** `marked` is the labels marked on its options, in the order they were marked. */
 function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
   const multi = question.multiSelect === true
   return {
@@ -89,10 +83,6 @@ class Ask {
   private unsit: (() => void) | undefined
   private unshow: (() => void) | undefined
 
-  /**
-   * @param next - the rest of the waterfall's chain, to hand the request to when the plugin is disposed with it standing.
-   * @param leave - takes the ask out of what the plugin holds standing, reporting whether it stood; finishing is once, and this is what makes it so.
-   */
   constructor(ctx: Context, req: Asked, next: AnswerNext, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void, leave: () => boolean) {
     this.ctx = ctx
     this.req = req
@@ -103,12 +93,10 @@ class Ask {
     req.signal?.addEventListener('abort', this.withdrawn, { once: true })
   }
 
-  /** As dsh's web client rejects when the host aborts under it. */
   private readonly withdrawn = (): void => {
     this.finish(() => { this.refuse(refused('ASK_ABORTED', 'ask_user_question was aborted before the user answered')) })
   }
 
-  /** What the plugin leaves standing when it is disposed goes to the next answerer, as dsh asks when nothing answers. */
   handOver(): void {
     this.finish(() => { this.next().then(this.settle, this.refuse) })
   }
@@ -120,7 +108,6 @@ class Ask {
     return question
   }
 
-  /** The newest placement in the composer's slot, so it takes the keyboard until the question is answered. */
   seat(): void {
     // A signal already aborted never fires the listener, so it is answered here, as dsh's own client answers it at construction.
     if (this.req.signal?.aborted === true) {
@@ -147,7 +134,7 @@ class Ask {
     this.unseat = this.ctx.binnacle.place('composer', seated)
   }
 
-  /** Placed again as it stands, while the copy before it still holds the seat, and the older copy then taken back, so the pane that draws the card, and the focus on it, are kept. */
+
   private redraw(): void {
     const seated = this.seated
     if (seated === undefined) return
@@ -156,7 +143,7 @@ class Ask {
     this.unseat = unseat
   }
 
-  /** The question is placed above the composer, without its offers, so they are not typing blind. A blank line takes both back and gives the card the seat again. */
+
   private typeAnswer(): void {
     this.unsit?.()
     this.unsit = this.ctx.binnacle.place('composer', {
@@ -188,7 +175,7 @@ class Ask {
     })
   }
 
-  /** On a multi-select question it toggles the option's mark, leaving the question open. */
+
   private choose(index: number): void {
     const option = offered(this.question)[index]
     if (option === undefined) return
@@ -211,7 +198,7 @@ class Ask {
     this.seat()
   }
 
-  /** Once: leaving what stands is what makes it so — the first finish takes the ask out, and the rest find it gone — as Approvals' settle does. */
+  // Once-guard via leave().
   private finish(settled: () => void): void {
     if (!this.leave()) return
     this.close()
@@ -230,21 +217,16 @@ class Ask {
   }
 }
 
-/**
- * Answers dsh's `user-questions/request` waterfall for the session's agent
- * (`dsh:packages/interaction/user-questions/src/index.ts#UserQuestionService`).
- */
 export const questions = {
   name: 'questions',
   inject: ['binnacle'] satisfies (keyof Context)[],
   apply(ctx: Context): void {
     const standing = new Set<Ask>()
     ctx.effect(() => () => {
-      // Each finishes once and ignores what follows; a Set's iteration goes on past what it deletes.
+      // Set iteration proceeds past deletions.
       for (const ask of standing) ask.handOver()
     }, 'questions: what still stands, handed to the next answerer')
     ctx.on('user-questions/request', (req, next) => new Promise<AskUserQuestionAnswer>((resolve, reject) => {
-      // Leaving what stands is the ask's own once-guard, read back through `leave` below.
       const ask = new Ask(ctx, req, next, resolve, reject, () => standing.delete(ask))
       standing.add(ask)
       ask.seat()
