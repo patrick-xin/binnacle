@@ -96,14 +96,18 @@ export function fold(model: Transcript, fact: Fact): Transcript {
   } else if (fact.kind === 'workflow') {
     entries = [...last.entries, Object.freeze({ kind: 'workflow', run: fact, members: Object.freeze([]) })]
   } else if (fact.kind === 'member' || fact.kind === 'member-end' || fact.kind === 'workflow-end') {
-    const at = last.entries.findLastIndex(entry => entry.kind === 'workflow' && entry.run.runId === fact.runId)
-    const pending = last.entries[at]
-    if (pending?.kind !== 'workflow') entries = [...last.entries, single(fact)]
+    // A run may outlive the turn that started it, so its entry is looked for in every turn; what arrives shows it went on.
+    const turn = model.turns.findLastIndex(each => each.entries.some(entry => entry.kind === 'workflow' && entry.run.runId === fact.runId))
+    const holding = model.turns[turn]
+    if (holding === undefined) entries = [...last.entries, single(fact)]
     else {
+      const at = holding.entries.findLastIndex(entry => entry.kind === 'workflow' && entry.run.runId === fact.runId)
+      const pending = holding.entries[at] as Extract<Entry, { readonly kind: 'workflow' }>
       const members = fact.kind === 'member'
         ? [...pending.members, Object.freeze({ start: fact })]
         : fact.kind === 'member-end' ? pending.members.map(member => member.start.member === fact.member ? Object.freeze({ ...member, end: fact }) : member) : pending.members
-      entries = last.entries.with(at, Object.freeze({ ...pending, members: Object.freeze(members), ...fact.kind === 'workflow-end' ? { end: fact } : {} }))
+      const { left: _gone, ...going } = pending
+      return { turns: model.turns.with(turn, { ...holding, entries: holding.entries.with(at, Object.freeze({ ...going, members: Object.freeze(members), ...fact.kind === 'workflow-end' ? { end: fact } : {} })) }) }
     }
   } else if (fact.kind === 'retry') {
     const at = last.entries.findLastIndex(entry => entry.kind === 'retry' && entry.retry.retryId === fact.retryId)

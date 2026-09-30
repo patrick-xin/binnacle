@@ -349,3 +349,15 @@ test('a workflow run still going waits to settle while its turn runs, and one it
   const ended = transcript([opened, prompt, run, lint, { kind: 'turn', seq: 9, time: 9, turn: 1, phase: 'end', ending: 'aborted' }])
   assert.deepEqual(ended.turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: lint }], left: 'aborted' })
 })
+
+test('a workflow run that outlives its turn keeps its members and its stop in the one entry, which goes on from where its turn left it', () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }, prompt, run,
+    { kind: 'turn', seq: 7, time: 7, turn: 1, phase: 'end', ending: 'completed' },
+    { kind: 'turn', seq: 8, time: 8, turn: 2, phase: 'start' },
+    { ...lint, seq: 9 }, { ...linted, seq: 10 }, { ...stopped, seq: 11 },
+  ]
+  const turns = transcript(facts).turns
+  assert.deepEqual(turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: { ...lint, seq: 9 }, end: { ...linted, seq: 10 } }], end: { ...stopped, seq: 11 } })
+  assert.deepEqual(turns[1]?.entries, [])
+})
