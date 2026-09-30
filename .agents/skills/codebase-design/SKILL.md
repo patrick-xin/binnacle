@@ -9,7 +9,7 @@ Design **deep** modules: much behaviour behind a small interface, at a seam a te
 
 ## binnacle's deep modules
 
-The layers and what each may import are `layers.json`'s and [the architecture](../../../docs/architecture.md)'s. What design here keeps deep:
+The layers and what each may import are `packages/binnacle/layers.json`'s and [the architecture](../../../docs/architecture.md)'s. What design here keeps deep:
 
 - **The blocks a view returns** (`binnacle:packages/binnacle/src/ui/node.ts#Node`). A block promises how it is drawn **and how it answers**: whether it scrolls, where focus goes, how it is dismissed, what it does when it overflows its room. That promise is kept by the block, wherever it is placed; no placement decides it again. The host once gave placed screens a scroll and placed lines none, so an ask in the composer's place was cut off (#85).
 - **The registrations** (`binnacle:packages/binnacle/src/api.ts#Registrations`): one interface an author and every built-in feature share, stacking and disposing the same way for both.

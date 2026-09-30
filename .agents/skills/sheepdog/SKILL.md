@@ -10,7 +10,7 @@ You are the Sheepdog: you talk with the maintainer, write the intent, decide, wr
 | Role | Who | For |
 |---|---|---|
 | Sheepdog | you | deciding, building, merging branches, trying it, pull requests |
-| Reviewer | a model of another family than the author's, held for the issue's life: a GPT model on pi for your commits, a subagent from your harness for a Sheep's; skill `review` | a second model's review, with a shell to run what it reads |
+| Reviewer | one per issue, of another family than every author of its commits, held for the issue's life: a GPT model on pi where you wrote any of them, a subagent from your harness where a Sheep wrote them alone; skill `review` | a second model's review, with a shell to run what it reads |
 | Sheep | a shepherd Charge on pi, `zai/glm-5.3` at `max` by default; skill `sheep` | a bounded build whose diff you can read against its issue, when an issue is big enough |
 | Reading | a `diagnose` Charge, or a subagent | what a reference says, or why something broke |
 | Helper | a subagent from your own harness | a chore in your context: a sweep, a check, a draft you will read |
@@ -65,7 +65,7 @@ shepherd dispatch --charge <name> --spec '#<n>' --issue <n> \
 Every change is reviewed by a model of another family than the one that wrote it, before it merges, as the `review` skill says: it holds the commands, the brief and the round prompt. Read the diff against the issue yourself first, and give the reviewer what you know: the commits and whose each is, and what is already decided.
 
 - **One reviewer per issue, held.** Dispatch it at the issue's first review and prompt it for each round after; it is retired with the implementation, once the issue has nothing left to build. Hold at most two at once.
-- **Whose work, which reviewer.** Your commits — the author API, the host, layout, and the issues you build alone — go to a GPT model on pi, at the tier the `review` skill names, never lighter. A Sheep's work (glm) goes to a subagent from your own harness, in a checkout under `/tmp`. Where you and a Sheep both wrote an issue's commits, the GPT reviewer reads yours and the subagent the Sheep's.
+- **Which reviewer.** An issue you wrote any commit of — the author API, the host, layout, an issue you build alone or beside a Sheep — goes to a GPT model on pi, at the tier the `review` skill names, never lighter, and it reads every commit of the issue, the Sheep's too. An issue a Sheep built alone (glm) goes to a subagent from your own harness, in a checkout under `/tmp`.
 - **Read the round's report file**, never its verdict line alone: a verdict carries no findings.
 - **Fix what is small yourself.** A missing test, a stale line in a record, a JSDoc left behind: write the fix, red first, rather than send a Sheep and a reviewer round-tripping over it. A round is for what needs the author's context.
 - **A change only to a skill or a record** you read yourself, against what it claims.
@@ -89,7 +89,7 @@ This finds what tests cannot: a profile that never loaded the tool a feature ans
 
 - **Resolve every conflict yourself**, never by taking one side of a file wholesale: read what each side changed against their base, and keep both. Run `pnpm test` after every merge, and never commit on red.
 - **Open the pull request** with the `pr` skill, in the template's shape; its *Checked* list names each review round, its findings and the commits that answered them, since reviews live where GitHub cannot see them. Merge with a merge commit when the maintainer merges, or has said you may.
-- **Retire** once it merges: the issue's reviewer, its Charges (`shepherd retire --charge <name> --delete-branch`), the merged branch, and your checkouts under `/tmp`.
+- **Retire** once it merges: the issue's reviewer, after prompting it for its feedback as the `review` skill says, and its Sheep, after carrying their settlement's feedback to #26; its Charges (`shepherd retire --charge <name> --delete-branch`), the merged branch, and your checkouts under `/tmp`.
 
 ## What the records lacked
 

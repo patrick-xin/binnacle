@@ -19,7 +19,7 @@ Load `codebase-design` for the vocabulary — **module**, **interface**, **depth
 git log --first-parent --merges -20 --format=%H main | while read m; do git diff --name-only "$m^1" "$m"; done | grep '^packages/binnacle/src/' | sort | uniq -c | sort -rn | head
 ```
 
-Read `docs/architecture.md`, `layers.json`, `pnpm map <folder>` and the folder notes for the hot spots. Then have a subagent walk the code, noting where it met friction:
+Read `docs/architecture.md`, `packages/binnacle/layers.json`, `pnpm map <folder>` and the folder notes for the hot spots. Then have a subagent walk the code, noting where it met friction:
 
 - **A rule decided where it is used, not where it belongs**: what a block, a registration or a layer promises, decided again by each placement or caller, and differently.
 - **Shallow modules**: an interface nearly as large as what it hides.
