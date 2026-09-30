@@ -39,6 +39,8 @@ export interface CardParts {
   readonly reason: string | undefined
   /** The result's own text, as it lands in the log; empty while the call has no result. */
   readonly resultText: string
+  /** Each call its `run_code` program made, a line marked as a call is, to be held beneath the head; none for a call that made none. */
+  readonly made: readonly Node[]
   /** How long the call took, in milliseconds: its result's log time less its call's; none while it has no result. */
   readonly took: number | undefined
   /** Fold a child beneath the card as the call's `output` part, under this call's fold id. `rows` is how many show while folded; left out, what the theme gives the tool kind, or three. */

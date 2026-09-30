@@ -10,6 +10,7 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
 import type { RetryId } from '@deepseek-ai/dsh-llm-retry'
 import type { PresentedFile } from '@deepseek-ai/dsh-tool-present/types'
 import type { ToolWorkflowAgentStartData } from '@deepseek-ai/dsh-tool-workflow/types'
+import type { PtcDispatchStartEventData } from '@deepseek-ai/dsh-tools/types'
 import type { WorkflowAgentOutcome, WorkflowRunId, WorkflowStopReason } from '@deepseek-ai/dsh-workflow/types'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
@@ -154,6 +155,32 @@ export type Fact =
     readonly kind: 'presented'
     /** The files the agent handed the person, each where it lies and what the model said of it. */
     readonly files: readonly Readonly<PresentedFile>[]
+  }
+  | Logged & {
+    readonly kind: 'sub-call'
+    /** The call whose `run_code` program made it, at the top of any nesting: the call entry it is drawn in. */
+    readonly rootCallId: string
+    /** The call that made it: the root's, or another sub-call's when programs nest. */
+    readonly parentCallId: string
+    /** Pairs it with its settling. */
+    readonly subCallId: string
+    /** The tool it called. */
+    readonly name: PtcDispatchStartEventData['name']
+    /** What it called it with, as JSON. */
+    readonly arguments: string
+  }
+  | Logged & {
+    readonly kind: 'sub-result'
+    /** The call whose program made it. */
+    readonly rootCallId: string
+    /** The sub-call it settles. */
+    readonly subCallId: string
+    /** Whether it failed. */
+    readonly failed: boolean
+    /** Why it failed, as dsh says it to a person, when it says. */
+    readonly reason?: string
+    /** What it returned. */
+    readonly blocks: readonly Block[]
   }
   | Logged & {
     readonly kind: 'workflow'
@@ -329,6 +356,14 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
   'deliverables/presented': ({ seq, time, data }) => ({
     kind: 'presented', seq, time,
     files: data.files.map(file => file.description === undefined ? { path: file.path } : { path: file.path, description: file.description }),
+  }),
+  'tool/ptc-dispatch-start': ({ seq, time, data }) => ({
+    kind: 'sub-call', seq, time, rootCallId: data.rootCallId, parentCallId: data.parentCallId, subCallId: data.subCallId, name: data.name, arguments: JSON.stringify(data.arguments) ?? '',
+  }),
+  'tool/ptc-dispatch': ({ seq, time, data }) => ({
+    kind: 'sub-result', seq, time, rootCallId: data.rootCallId, subCallId: data.subCallId, failed: data.isError,
+    ...data.error?.reason === undefined ? {} : { reason: data.error.reason },
+    blocks: data.content.map(blockOf),
   }),
   'tool-workflow/run-start': ({ seq, time, data }) => ({ kind: 'workflow', seq, time, runId: data.runId, name: data.name }),
   'tool-workflow/agent-start': ({ seq, time, data }) => ({

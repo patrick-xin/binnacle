@@ -107,6 +107,20 @@ export type Fact = (Logged & {
     readonly kind: 'presented';
     readonly files: readonly Readonly<PresentedFile>[];
 }) | (Logged & {
+    readonly kind: 'sub-call';
+    readonly rootCallId: string;
+    readonly parentCallId: string;
+    readonly subCallId: string;
+    readonly name: PtcDispatchStartEventData['name'];
+    readonly arguments: string;
+}) | (Logged & {
+    readonly kind: 'sub-result';
+    readonly rootCallId: string;
+    readonly subCallId: string;
+    readonly failed: boolean;
+    readonly reason?: string;
+    readonly blocks: readonly Block[];
+}) | (Logged & {
     readonly kind: 'workflow';
     readonly runId: WorkflowRunId;
     readonly name: string;
@@ -183,6 +197,7 @@ export type Block = {
 // ToolCallId ← @deepseek-ai/dsh-llm
 // ApprovalOutcome ← @deepseek-ai/dsh-user-approval
 // PresentedFile ← @deepseek-ai/dsh-tool-present/types
+// PtcDispatchStartEventData ← @deepseek-ai/dsh-tools/types
 // WorkflowRunId ← @deepseek-ai/dsh-workflow/types
 // ToolWorkflowAgentStartData ← @deepseek-ai/dsh-tool-workflow/types
 // WorkflowAgentOutcome ← @deepseek-ai/dsh-workflow/types
@@ -199,6 +214,10 @@ export type Entry = Single<Exclude<Alone, 'prompt'>> | {
     readonly call: FactOf<'call'>;
     readonly result?: FactOf<'result'>;
     readonly left?: string;
+    readonly subCalls?: readonly {
+        readonly call: FactOf<'sub-call'>;
+        readonly result?: FactOf<'sub-result'>;
+    }[];
 } | {
     readonly kind: 'approval';
     readonly asked: FactOf<'asked'>;
@@ -240,7 +259,7 @@ type FactOf<K extends Fact['kind']> = Extract<Fact, {
     readonly kind: K;
 }>;
 // models/transcript.d.ts
-type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'member' | 'member-end' | 'workflow-end' | 'authored' | 'unknown' | 'quiet';
+type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'member' | 'member-end' | 'workflow-end' | 'sub-call' | 'sub-result' | 'authored' | 'unknown' | 'quiet';
 // facts/stream.d.ts
 export interface Streamed {
     readonly turn: number;
@@ -514,6 +533,7 @@ export interface CardParts {
     readonly waiting: Node | undefined;
     readonly reason: string | undefined;
     readonly resultText: string;
+    readonly made: readonly Node[];
     readonly took: number | undefined;
     fold(child: Node, rows?: number): Node;
 }

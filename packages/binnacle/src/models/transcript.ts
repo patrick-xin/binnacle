@@ -8,7 +8,7 @@ type FactOf<K extends Fact['kind']> = Extract<Fact, { readonly kind: K }>
 type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, readonly fact: FactOf<K> } : never
 
 /** The kinds of fact that stand as an entry of their own, never paired with another. */
-type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'member' | 'member-end' | 'workflow-end' | 'authored' | 'unknown' | 'quiet'
+type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'member' | 'member-end' | 'workflow-end' | 'sub-call' | 'sub-result' | 'authored' | 'unknown' | 'quiet'
 
 /**
  * One thing a turn holds, in log order: a fact, or a tool call with its
@@ -34,7 +34,7 @@ type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | '
 export type Entry =
   | Single<Exclude<Alone, 'prompt'>>
   | { readonly kind: 'prompt', readonly fact: FactOf<'prompt'>, readonly steer?: true }
-  | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'>, readonly left?: string }
+  | { readonly kind: 'tool', readonly call: FactOf<'call'>, readonly result?: FactOf<'result'>, readonly left?: string, readonly subCalls?: readonly { readonly call: FactOf<'sub-call'>, readonly result?: FactOf<'sub-result'> }[] }
   | { readonly kind: 'approval', readonly asked: FactOf<'asked'>, readonly decided?: FactOf<'decided'> }
   | { readonly kind: 'command', readonly run: FactOf<'run'>, readonly done?: FactOf<'done'> }
   | { readonly kind: 'compaction', readonly start: FactOf<'start'>, readonly summary?: FactOf<'summary'>, readonly end?: FactOf<'end'> }
@@ -80,7 +80,7 @@ export function fold(model: Transcript, fact: Fact): Transcript {
   } else if (fact.kind === 'result') {
     const at = last.entries.findLastIndex(entry => entry.kind === 'tool' && entry.call.callId === fact.callId)
     const pending = last.entries[at]
-    entries = pending?.kind === 'tool' ? last.entries.with(at, Object.freeze({ kind: 'tool', call: pending.call, result: fact })) : [...last.entries, single(fact)]
+    entries = pending?.kind === 'tool' ? last.entries.with(at, Object.freeze({ kind: 'tool', call: pending.call, result: fact, ...pending.subCalls === undefined ? {} : { subCalls: pending.subCalls } })) : [...last.entries, single(fact)]
   } else if (fact.kind === 'asked') {
     entries = [...last.entries, Object.freeze({ kind: 'approval', asked: fact })]
   } else if (fact.kind === 'decided') {
@@ -93,6 +93,20 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     const at = last.entries.findLastIndex(entry => entry.kind === 'command' && entry.run.commandId === fact.commandId)
     const pending = last.entries[at]
     entries = pending?.kind === 'command' ? last.entries.with(at, Object.freeze({ kind: 'command', run: pending.run, done: fact })) : [...last.entries, single(fact)]
+  } else if (fact.kind === 'sub-call' || fact.kind === 'sub-result') {
+    const ran = (entry: Entry): boolean => entry.kind === 'tool' && entry.call.callId === fact.rootCallId
+    const turn = model.turns.findLastIndex(each => each.entries.some(ran))
+    const holding = model.turns[turn]
+    if (holding === undefined) entries = [...last.entries, single(fact)]
+    else {
+      const at = holding.entries.findLastIndex(ran)
+      const pending = holding.entries[at] as Extract<Entry, { readonly kind: 'tool' }>
+      const held = pending.subCalls ?? []
+      const subCalls = fact.kind === 'sub-call'
+        ? [...held, Object.freeze({ call: fact })]
+        : held.map(sub => sub.call.subCallId === fact.subCallId ? Object.freeze({ ...sub, result: fact }) : sub)
+      return { turns: model.turns.with(turn, { ...holding, entries: holding.entries.with(at, Object.freeze({ ...pending, subCalls: Object.freeze(subCalls) })) }) }
+    }
   } else if (fact.kind === 'workflow') {
     entries = [...last.entries, Object.freeze({ kind: 'workflow', run: fact, members: Object.freeze([]) })]
   } else if (fact.kind === 'member' || fact.kind === 'member-end' || fact.kind === 'workflow-end') {

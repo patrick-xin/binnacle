@@ -12,9 +12,9 @@ export const genericCard: CardRow = {
   draw: parts => {
     const head = [parts.mark, ` ${titled(parts.result?.title ?? parts.call.title)}`] as const
     const title = parts.took === undefined || parts.took < 1000 ? head : [...head, { text: ` · took ${spent(parts.took)}`, tone: 'muted' } as const]
-    if (parts.waiting !== undefined) return { kind: 'show', title, child: parts.waiting }
+    if (parts.waiting !== undefined) return { kind: 'show', title, child: parts.made.length === 0 ? parts.waiting : { kind: 'stack', children: [...parts.made, parts.waiting] } }
     const reason: Node[] = parts.reason === undefined ? [] : [{ kind: 'text', text: parts.reason, tone: 'error' }]
     const presented = parts.result?.content === undefined ? undefined : { kind: 'text' as const, text: textOfPresented(parts.result.content) }
-    return { kind: 'show', title, child: { kind: 'stack', children: [...reason, parts.fold(presented ?? { kind: 'text', text: parts.resultText })] } }
+    return { kind: 'show', title, child: { kind: 'stack', children: [...parts.made, ...reason, parts.fold(presented ?? { kind: 'text', text: parts.resultText })] } }
   },
 }
