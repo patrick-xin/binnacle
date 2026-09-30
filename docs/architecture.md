@@ -65,4 +65,4 @@ Below the gates, the tests mount the host on a real Cordis context with a fake t
 
 ## How it follows upstream
 
-`pnpm upstream` reads each release past a pin. Daily, the upstream job carries the newest on a branch, `upstream/<reference>/<version>`: it moves the pin with `pnpm pin`, runs the tests and the boot, and writes the verdict in the commit message, with the log of where it stopped when it is red. It never touches `main`; merging the branch is the upgrade.
+`pnpm upstream` reads each release past a pin. Daily, the upstream job carries the newest, once npm lists every package the move would take at it, on a branch, `upstream/<reference>/<version>`: it moves the pin with `pnpm pin`, runs the tests and the boot, and writes the verdict in the commit message, with the log of where it stopped when it is red. It never touches `main`; merging the branch is the upgrade.

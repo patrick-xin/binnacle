@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { plan, taggedCommit } from './refs.mjs'
+import { plan, taggedCommit, tagMismatch } from './refs.mjs'
 
 const MANIFEST = {
   pi: { url: 'https://example.com/pi.git', commit: 'aaa', role: 'the renderer' },
@@ -44,4 +44,9 @@ test('a tag names the commit it peels to, whether annotated or not', () => {
   assert.equal(taggedCommit(annotated), 'bbb')
   assert.equal(taggedCommit('ccc\trefs/tags/v2\n'), 'ccc')
   assert.equal(taggedCommit(''), undefined)
+})
+
+test('a tag its source does not name says which source, and to fetch the tag there', () => {
+  const ref = { name: 'dsh', url: '/clones/dsh', commit: 'bbb', local: false, tag: 'dsh-v1.0.0' }
+  assert.equal(tagMismatch(ref, undefined), 'dsh: /clones/dsh has no tag dsh-v1.0.0; fetch its tags there, or check the pin in references.json')
 })

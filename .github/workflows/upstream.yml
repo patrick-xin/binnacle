@@ -27,7 +27,7 @@ jobs:
         run: |
           node scripts/upstream.mjs
           node scripts/upstream.mjs --json \
-            | node -e "for (const r of JSON.parse(require('fs').readFileSync(0, 'utf8'))) if (r.newest && !r.carried) console.log(r.name, r.newest, r.branch)" \
+            | node -e "for (const r of JSON.parse(require('fs').readFileSync(0, 'utf8'))) if (r.newest && !r.carried && r.waiting.length === 0) console.log(r.name, r.newest, r.branch)" \
             > "$RUNNER_TEMP/carry.txt"
       - name: Carry each on a branch, with the canary's verdict
         run: |
