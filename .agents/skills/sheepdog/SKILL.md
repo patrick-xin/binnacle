@@ -117,6 +117,7 @@ On a branch, never on `main`; red before green; reviewed like any other. They en
 - A pin of a new dsh package asks `check-pins` to declare the rest of its tree; declare what it names, at the pin.
 - A question a Sheep asked stays listed a moment after you answer it; a watcher that wakes on it again is not a new question.
 - A prompt to a settled Charge goes with `--wait --until working --timeout 20000`: `herdr agent prompt` has acknowledged a prompt that never reached the pane, twice on one round (#86), and a watcher then woke on the Charge's last settlement as if it were this one. `agent_prompt_stalled` or a timeout means it did not land: send it again.
+- After `shepherd escalate`, read the level the reviewer runs at from its pane's footer (`herdr agent read binnacle-review-<n> | tail -1`), not from shepherd's record: an escalate to `medium` was recorded while the reviewer ran on at `xhigh` (#86).
 
 ## Keep
 
