@@ -2,9 +2,9 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { AffordanceKind } from './contract/index.ts'
 import type { AuthorAdapter, Fact } from './facts/adapt.ts'
 import type { KeyId } from './ui/keys.ts'
-import type { Node } from './ui/node.ts'
+import type { Node, Part } from './ui/node.ts'
 import type { ThemeChanges } from './ui/theme.ts'
-import type { View } from './views/entries.ts'
+import type { PartView, View } from './views/entries.ts'
 
 export type { AffordanceKind } from './contract/index.ts'
 export type { AuthorAdapter, Fact } from './facts/adapt.ts'
@@ -12,8 +12,8 @@ export type { Entry } from './models/transcript.ts'
 export type { KeyId } from './ui/keys.ts'
 export type { Mark } from './ui/theme.ts'
 export type { Background, ThemeChanges } from './ui/theme.ts'
-export type { Node } from './ui/node.ts'
-export type { View, Views } from './views/entries.ts'
+export type { Node, Part } from './ui/node.ts'
+export type { PartView, View, Views } from './views/entries.ts'
 
 /** A screen a plugin places in the transcript's place: the key its plugin offers, and how it draws. */
 export interface PlacedScreen {
@@ -101,6 +101,18 @@ export interface Registrations {
    * @returns a disposer, for taking it back before the plugin is disposed.
    */
   facts(type: string, adapter: AuthorAdapter): () => void
+  /**
+   * Draw a part of an entry a person names — `thinking`, an answer's
+   * reasoning; `output`, what a tool returned — wherever an entry holds it,
+   * leaving the rest of the entry as its view draws it. The newest view of a
+   * part draws, handed the part and what the one beneath draws; disposing
+   * one gives its place back. A view that throws, or returns no node, is
+   * drawn over by the one beneath, saying why.
+   * @param key - the part.
+   * @param view - how it is drawn.
+   * @returns a disposer, for taking it back before the plugin is disposed.
+   */
+  view<K extends Part['kind']>(key: K, view: PartView<K>): () => void
   /**
    * Draw a kind of entry: a built-in kind, a quiet kind by its dsh event
    * type, or an authored fact by its name. The newest view of a key draws,

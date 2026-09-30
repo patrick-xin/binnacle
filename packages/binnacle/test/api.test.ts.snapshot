@@ -381,6 +381,10 @@ export type Node = {
     readonly tone?: Tone;
     readonly rows?: number;
     readonly child: Node;
+} | {
+    readonly kind: 'part';
+    readonly part: Part;
+    readonly child: Node;
 };
 // ui/node.d.ts
 export type Span = string | {
@@ -399,6 +403,19 @@ export interface Affordance {
     readonly kind: AffordanceKind;
     readonly label?: string;
 }
+// ui/node.d.ts
+export type Part = {
+    readonly kind: 'thinking';
+    readonly text: string;
+} | {
+    readonly kind: 'output';
+    readonly tool: string;
+    readonly text: string;
+};
+// views/entries.d.ts
+export type PartView<K extends Part['kind'] = Part['kind']> = (part: Extract<Part, {
+    readonly kind: K;
+}>, next: () => Node) => Node;
 // views/entries.d.ts
 export type View = (entry: Entry, next: () => Node) => Node;
 // views/entries.d.ts
@@ -429,6 +446,7 @@ export type Placement = {
 // api.d.ts
 export interface Registrations {
     facts(type: string, adapter: AuthorAdapter): () => void;
+    view<K extends Part['kind']>(key: K, view: PartView<K>): () => void;
     view(key: string, view: View): () => void;
     invalidate(key: string): void;
     redraw(): void;

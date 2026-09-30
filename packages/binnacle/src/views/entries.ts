@@ -4,7 +4,7 @@ import { describe } from '../contract/index.ts'
 import { parseNode } from '../ui/node.ts'
 import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
-import type { Node, Span } from '../ui/node.ts'
+import type { Node, Part, Span } from '../ui/node.ts'
 
 /**
  * How a kind of entry is drawn: a built-in view, or one an author registered.
@@ -20,6 +20,14 @@ import type { Node, Span } from '../ui/node.ts'
  */
 export type View = (entry: Entry, next: () => Node) => Node
 
+/**
+ * How a part of an entry is drawn wherever an entry holds it, whichever view
+ * drew the entry: handed the part and what it draws from, and `next`, which
+ * draws it as the view beneath does, binnacle's own at the bottom. It is kept
+ * as an entry's view is, drawn again when the entry holding it is.
+ */
+export type PartView<K extends Part['kind'] = Part['kind']> = (part: Extract<Part, { readonly kind: K }>, next: () => Node) => Node
+
 /** Authors' views, by entry kind, quiet kind's dsh type, or the name of an authored fact, each key's oldest first: the newest draws, on what the one before it draws. */
 export type Views = ReadonlyMap<string, readonly View[]>
 
@@ -33,11 +41,15 @@ function drawAnswer(fact: { readonly blocks: readonly Block[], readonly interrup
     ? []
     : block.kind === 'reasoning'
       ? [{
-        kind: 'fold',
-        id: `reasoning-${reasoning++}`,
-        title: [{ mark: 'thinking' } as const, ' thinking'],
-        tone: 'muted',
-        child: { kind: 'text', text: block.text, tone: 'dim' },
+        kind: 'part',
+        part: { kind: 'thinking', text: block.text },
+        child: {
+          kind: 'fold',
+          id: `reasoning-${reasoning++}`,
+          title: [{ mark: 'thinking' } as const, ' thinking'],
+          tone: 'muted',
+          child: { kind: 'text', text: block.text, tone: 'dim' },
+        },
       }]
       : block.kind === 'text'
         ? [{ kind: 'markdown', text: block.text }]
@@ -94,7 +106,8 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
     return { kind: 'show', title, child: waiting }
   }
   const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: result.failure.reason, tone: 'error' }]
-  const output: Node = { kind: 'fold', id: 'output', child: { kind: 'text', text: textOf(result.blocks) } }
+  const text = textOf(result.blocks)
+  const output: Node = { kind: 'part', part: { kind: 'output', tool: call.name, text }, child: { kind: 'fold', id: 'output', child: { kind: 'text', text } } }
   return { kind: 'show', title, child: { kind: 'stack', children: [...reason, output] } }
 }
 
@@ -105,12 +118,37 @@ const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context
  * @returns what it draws, or what the view beneath draws with an error message if the view fails or returns an invalid node.
  */
 export function drawEntry(entry: Entry, views: Views = new Map(), theme: Theme = binnacleTheme): Node {
-  if (entry.kind === 'authored' && Object.hasOwn(drawnHere, entry.fact.name)) {
+  if (entry.kind === 'authored' && (Object.hasOwn(drawnHere, entry.fact.name) || (partKinds as readonly string[]).includes(entry.fact.name))) {
     return builtIn(entry, `${entry.fact.name} is a kind binnacle draws; the adapter must give its fact another name`)
   }
   const key = keyOf(entry)
   const stack = views.get(key) ?? []
-  return drawnBy(entry, key, stack, stack.length, theme)
+  return withParts(drawnBy(entry, key, stack, stack.length, theme, problem => builtIn(entry, problem)), views, theme)
+}
+
+/** The part keys: a view registered under one draws that part wherever an entry holds it. */
+export const partKinds: readonly Part['kind'][] = ['thinking', 'output']
+
+// Parts are drawn one level deep: a part a part's view returns is drawn as binnacle draws it.
+function withParts(node: Node, views: Views, theme: Theme): Node {
+  switch (node.kind) {
+    case 'blank':
+    case 'text':
+    case 'markdown':
+      return node
+    case 'stack':
+      return { ...node, children: node.children.map(child => withParts(child, views, theme)) }
+    case 'offer':
+    case 'ask':
+    case 'show':
+    case 'band':
+    case 'fold':
+      return { ...node, child: withParts(node.child, views, theme) }
+    case 'part': {
+      const stack = views.get(node.part.kind) ?? []
+      return drawnBy(node.part, node.part.kind, stack, stack.length, theme, problem => noted(node.child, problem))
+    }
+  }
 }
 
 export function keyOf(entry: Entry): string {
@@ -118,13 +156,14 @@ export function keyOf(entry: Entry): string {
   return entry.kind === 'quiet' ? entry.fact.type : entry.kind
 }
 
-function drawnBy(entry: Entry, key: string, stack: readonly View[], height: number, theme: Theme): Node {
+function drawnBy(drawn: Entry | Part, key: string, stack: readonly View[], height: number, theme: Theme, bottom: (problem?: string) => Node): Node {
   const view = stack[height - 1]
-  if (view === undefined) return builtIn(entry)
-  const beneath = (problem: string): Node => height === 1 ? builtIn(entry, problem) : noted(drawnBy(entry, key, stack, height - 1, theme), problem)
+  if (view === undefined) return bottom()
+  const next = (): Node => drawnBy(drawn, key, stack, height - 1, theme, bottom)
+  const beneath = (problem: string): Node => height === 1 ? bottom(problem) : noted(next(), problem)
   let returned: unknown
   try {
-    returned = view(entry, () => drawnBy(entry, key, stack, height - 1, theme))
+    returned = (view as (drawn: Entry | Part, next: () => Node) => unknown)(drawn, next)
   } catch (error) {
     return beneath(`binnacle.view(${key}) threw: ${describe(error)}`)
   }

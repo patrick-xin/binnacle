@@ -10,6 +10,7 @@ import type { AffordanceKind, Fact, Node, Placement } from '../../src/api.ts'
 import { RegistrationService } from '../../src/host/registrations.ts'
 import { ScreenPane } from '../../src/panes/screen.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
+import { drawText } from '../support/draw.ts'
 import { initial } from '../../src/ui/state.ts'
 import { screen } from '../../src/views/screen.ts'
 import { prompt as promptFact, call, returned } from '../support/facts.ts'
@@ -54,6 +55,17 @@ test('an author\'s view replaces a built-in one, until the author\'s plugin is d
   assert.deepEqual(shown(registrations), ['ME: 1 block'])
   await fiber.dispose()
   assert.deepEqual(shown(registrations), ['', ' › fix the build', ''])
+})
+
+test('an author\'s view of thinking draws an answer already on screen again, its thinking alone, until the author\'s plugin is disposed', async () => {
+  const { registrations, author } = surface()
+  const pane = new TranscriptPane(() => {}, () => registrations.views, {}, () => registrations.currentTheme)
+  pane.push({ kind: 'answer', seq: 2, time: 2, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'reasoning', text: 'check tsc' }, { kind: 'text', text: 'Fixed.' }] })
+  assert.deepEqual(drawText(pane, 40), ['∴ thinking · 1 line', 'Fixed.'])
+  const fiber = await author((ctx) => { ctx.binnacle.view('thinking', part => ({ kind: 'text', text: `(${part.text})` })) })
+  assert.deepEqual(drawText(pane, 40), ['(check tsc)', 'Fixed.'])
+  await fiber.dispose()
+  assert.deepEqual(drawText(pane, 40), ['∴ thinking · 1 line', 'Fixed.'])
 })
 
 test('an author\'s theme draws a mark in its own glyph, until the author\'s plugin is disposed', async () => {

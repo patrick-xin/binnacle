@@ -2,7 +2,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
-import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Slot, ThemeChanges, View, Views } from '../api.ts'
+import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Part, PartView, Slot, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
@@ -73,8 +73,10 @@ export class RegistrationService extends Service implements Registrations {
   }
 
   /** @inheritDoc */
-  view(key: string, view: View): () => void {
-    return this.register(this.viewTable, key, view, `binnacle.view(${key})`, 'views')
+  view<K extends Part['kind']>(key: K, view: PartView<K>): () => void
+  view(key: string, view: View): () => void
+  view(key: string, view: View | PartView<'thinking'> | PartView<'output'>): () => void {
+    return this.register(this.viewTable, key, view as View, `binnacle.view(${key})`, 'views')
   }
 
   get currentTheme(): Theme {
