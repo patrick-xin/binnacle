@@ -34,12 +34,12 @@ Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.t
 
 ## Upstream
 
-dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-reached-through-named-seams-each-held-by-a-gate.md) is how binnacle stays upright on it.
+binnacle is the glue between two upstreams that move: dsh, a preview, and pi-tui. A release of either may rename anything, and both are read the same way when a pin moves. [ADR 3](docs/adr/0003-dsh-is-reached-through-named-seams-each-held-by-a-gate.md) is how binnacle stays upright on dsh.
 
-- **Reach dsh only through a named seam.** A dsh package is a line in `layers.json`; a service is a key in `inject`, typed against `Context`; a row is an id in the patch. Widen a seam by naming more, never by reaching further through one already named.
+- **Reach dsh only through a named seam.** A dsh package is a line in `layers.json`; a service is a key in `inject`, typed against `Context`; a row is an id in the patch. Widen a seam by naming more, never by reaching further through one already named. pi-tui is imported only by the layers `layers.json` names for it, and never reaches a plugin.
 - **Take what upstream exports; never derive it again.** A component, layout, key table, text measure, schema or patch semantics that ships upstream is imported, never restated. A shape that must be restated names upstream's type and is held to it by a type-level test.
 - **Follow an upstream rename wholesale** — no shim, no fallback branch.
-- **Moving a pin is `pnpm pin <name> <tag>`, then `pnpm test` and `pnpm check:boot`.** Its pull request reads what upstream changed in the packages binnacle imports, a behaviour behind a switch the tests never turn on included, and re-reads every citation to a file that changed.
+- **Moving a pin is `pnpm pin <name> <tag>`, then `pnpm test` and `pnpm check:boot`.** Its pull request reads what upstream changed in the packages binnacle imports — dsh's diff between the tags, pi-tui's changelog — a behaviour behind a switch the tests never turn on included, and re-reads every citation to a file that changed.
 - **An `upstream/<reference>/<version>` branch is mail** from the upstream job: a release past a pin, carried with the canary's verdict, and on red the log of where it stopped, the pin's own move included. Read its commit, then read upstream at the new pin; merging it is the upgrade.
 
 ## Code
