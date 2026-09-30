@@ -3,8 +3,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { CombinedAutocompleteProvider, Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
-import type { Component, Keybinding, OverlayHandle, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
+import { CombinedAutocompleteProvider, Editor, getNativeClipboard, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
+import type { Component, Keybinding, NativeClipboard, OverlayHandle, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { AnswerStream } from '../facts/stream.ts'
@@ -31,11 +31,13 @@ export const internals: {
   stderr: { write(chunk: string): unknown }
   open: (ctx: Context) => Promise<OpenedSession>
   clock: { now(): number, after(ms: number, then: () => void): () => void }
+  clipboard: () => NativeClipboard | undefined
 } = {
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
   stderr: process.stderr,
   open: openSession,
+  clipboard: getNativeClipboard,
   clock: {
     now: () => Date.now(),
     after: (ms, then) => {
@@ -109,6 +111,12 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
+    copy: (text) => {
+      const byTerminal = (): void => { terminal.write(`\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`) }
+      const native = internals.clipboard()
+      if (native?.setText === undefined) byTerminal()
+      else native.setText(text).catch(byTerminal)
+    },
   }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
   const screenPanes = new Map<string, ScreenPane>()
   const screenViews = new Map<string, ScrollView>()

@@ -28,6 +28,8 @@ export interface Region {
   readonly id: string
   readonly affordances: readonly Affordance[]
   readonly overflows: boolean
+  /** What `copy` writes, where the region offers it: all it holds, as text. */
+  readonly text?: string
 }
 
 export type KeyBinding = 'focus.next' | 'focus.previous' | 'focus.out' | 'primary' | AffordanceKind

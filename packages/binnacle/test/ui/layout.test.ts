@@ -406,3 +406,10 @@ test('whatever a show opens answers only on its head, however many folds its con
   const frame = layout({ kind: 'show', title: ['● twice'], opens: 'output', child: { kind: 'stack', children: [fold, fold] } }, 40, { toggled: new Set() })
   for (let row = 1; row < frame.lines.length; row++) assert.deepEqual(under(frame.regions, row, 3).filter(region => region.affordances.length > 0), [], `row ${row}`)
 })
+
+test('a show that opens a fold offers to copy on its head, after expand, all it holds as text, what is folded away included', () => {
+  const card: Node = { kind: 'show', title: ['● pnpm test'], opens: 'output', child: { kind: 'stack', children: [{ kind: 'text', text: ['exited ', { text: '2', tone: 'error' }] }, { kind: 'fold', id: 'output', rows: 1, child: { kind: 'markdown', text: 'a\nb\nc' } }] } }
+  const head = under(layout(card, 40, { toggled: new Set() }).regions, 0, 3)[0]
+  assert.deepEqual(head?.affordances.map(offer => offer.kind), ['expand', 'copy'])
+  assert.equal(head?.text, 'exited 2\na\nb\nc')
+})

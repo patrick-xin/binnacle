@@ -94,6 +94,8 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
   host.internals.stderr = { write: (chunk: string) => { out.push(chunk); return true } }
   host.internals.open = open
   host.internals.clock = clock
+  // No test writes the machine's own clipboard.
+  host.internals.clipboard = () => undefined
   const ctx = new Context()
   await provide(ctx)
   provideCmdline(ctx, {
@@ -1352,7 +1354,7 @@ test('disposing the plugin that rebound quit gives ctrl+c back', async () => {
   assert.deepEqual(exits, [0])
 })
 
-test('a key a plugin binds to expand opens the focused fold, and one bound to copy does nothing on a fold, which offers no copy', async () => {
+test('a key a plugin binds to expand opens the focused card, and one bound to copy writes all it holds to the clipboard: natively where the platform can, by OSC 52 where not', async () => {
   // Tall enough for the card's head and all it returned, once open.
   const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([called(13, 'read'), returned(14, 13, 'w\nx\ny\nz')])
@@ -1362,10 +1364,15 @@ test('a key a plugin binds to expand opens the focused fold, and one bound to co
   await until(async () => (await terminal.altScreen()).some(row => row.includes('… 1 more line')))
   terminal.type('\x1b[Z')
   await until(async () => (await terminal.altScreen()).some(row => row.includes('▸ show 1 more line')))
-  const focused = await terminal.altScreen()
   terminal.type('\x1b[18~')
-  await settle()
-  assert.deepEqual(await terminal.altScreen(), focused)
+  await until(() => terminal.written.includes(`\x1b]52;c;${Buffer.from('w\nx\ny\nz').toString('base64')}\x07`))
+  const native: string[] = []
+  host.internals.clipboard = () => ({ getText: async () => null, getImage: async () => null, setText: async (text: string) => { native.push(text) } })
+  const before = terminal.written.length
+  terminal.type('\x1b[18~')
+  await until(() => native.length === 1)
+  assert.deepEqual(native, ['w\nx\ny\nz'])
+  assert.equal(terminal.written.slice(before).includes('\x1b]52;'), false)
   terminal.type('\x1b[17~')
   await until(async () => (await terminal.altScreen()).some(row => row.trim() === '│ z'))
 })

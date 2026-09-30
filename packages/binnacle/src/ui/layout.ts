@@ -232,7 +232,7 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
   const frame = drawn(node.child, inner < 1 ? width : inner, state, theme)
   const gutter = inTone(theme.chrome.gutter, 'dim', theme)
   const opened = frame.regions.find(placed => placed.region.id === node.opens)
-  const head = opened === undefined ? [] : [{ region: opened.region, top: 0, height: title.length, left: 0, width }]
+  const head = opened === undefined ? [] : [{ region: { ...opened.region, affordances: [...opened.region.affordances, { kind: 'copy' as const }], text: plainText(node.child, theme) }, top: 0, height: title.length, left: 0, width }]
   // The fold keeps its rows, offering nothing there, so what focus brings into view is all of it.
   const held = frame.regions.map(placed => placed.region.id === node.opens ? { ...placed, region: { ...placed.region, affordances: [] } } : placed)
   return {
@@ -262,6 +262,30 @@ function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, sta
   return {
     lines: box.render(width),
     regions: frame.regions.map(placed => ({ ...placed, top: placed.top + BAND_PAD, left: placed.left + BAND_PAD })),
+  }
+}
+
+/** What a node says, as text: every line of it, what a fold holds away included. */
+function plainText(node: Node, theme: Theme): string {
+  switch (node.kind) {
+    case 'blank':
+      return ''
+    case 'text':
+      return typeof node.text === 'string' ? node.text : plainTitle(node.text, theme)
+    case 'markdown':
+      return node.text
+    case 'stack':
+      return node.children.map(child => plainText(child, theme)).join('\n')
+    case 'show':
+      return [plainTitle(node.title, theme), plainText(node.child, theme)].join('\n')
+    case 'fold':
+      return node.title === undefined ? plainText(node.child, theme) : [plainTitle(node.title, theme), plainText(node.child, theme)].join('\n')
+    case 'ask':
+      return node.title === undefined ? plainText(node.child, theme) : [node.title, plainText(node.child, theme)].join('\n')
+    case 'offer':
+    case 'part':
+    case 'band':
+      return plainText(node.child, theme)
   }
 }
 

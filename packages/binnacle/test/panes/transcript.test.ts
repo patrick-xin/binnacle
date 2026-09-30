@@ -462,3 +462,17 @@ test('an ask an author\'s view draws in the transcript names on its bottom edge 
   pane.push(prompt)
   assert.equal(shown(pane).at(-1), '╰─ enter select · tab next ────────────╯')
 })
+
+test('a key bound to copy on a focused card hands the host all the card holds, and on nothing else hands it nothing', () => {
+  const copied: string[] = []
+  const pane = new TranscriptPane(() => {}, () => new Map(), { copy: (text) => { copied.push(text) } })
+  pane.push(callFact(1, 1, 'c1', 'read', '{}'))
+  pane.push(returnedFact(2, 2, 'c1', 'w\nx\ny\nz'))
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'copy' })
+  assert.deepEqual(copied, [])
+  pane.handleKey({ kind: 'key', binding: 'focus.previous' })
+  shown(pane)
+  pane.handleKey({ kind: 'key', binding: 'copy' })
+  assert.deepEqual(copied, ['w\nx\ny\nz'])
+})
