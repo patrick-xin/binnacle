@@ -5,7 +5,7 @@ import type { Events } from '@deepseek-ai/cordis'
 import { CommandId } from '@deepseek-ai/dsh-commands'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
-import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { LlmAttemptId, MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
@@ -465,6 +465,55 @@ test('on the main screen, a command run between turns draws once it settles, its
   const shown = await terminal.mainScreen()
   assert.equal(shown.some(row => row.includes('running…')), false)
   assert.ok(shown.some(row => row === '/compact'), 'the line the person typed heads the entry')
+})
+
+const attemptId = LlmAttemptId('a1')
+
+/** The answer dsh logs for turn 1, step 1, saying what it says. */
+const answered = (seq: number, text: string): SessionEvent<'assistant/message'> => ({
+  type: 'assistant/message',
+  seq: SessionSeq(seq),
+  time: seq,
+  surfaceOp: 'append',
+  data: { turn: 1, step: 1, stream: [], message: { role: 'assistant', id: MessageId(`m${seq}`), source: { kind: 'model', provider: 'deepseek', model: 'deepseek-v4' }, content: [{ type: 'text', text }] } },
+})
+
+test('on the main screen, an answer is drawn as it streams, and printed once when the session logs it', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([{ type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } }, prompt(2, 'say hello')])
+  const { commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('say hello')))
+  session.stream({ type: 'start', attemptId, revision: 1, turn: 1, step: 1 })
+  session.stream({ type: 'chunk', attemptId, revision: 1, index: 0, time: 3, chunk: { type: 'block-start', index: 0, blockType: 'text' } })
+  session.stream({ type: 'chunk', attemptId, revision: 1, index: 1, time: 3, chunk: { type: 'text-delta', index: 0, text: 'Hello' } })
+  await until(async () => (await terminal.mainScreen()).some(row => row === 'Hello'))
+  session.stream({ type: 'chunk', attemptId, revision: 1, index: 2, time: 4, chunk: { type: 'text-delta', index: 0, text: ', world' } })
+  await until(async () => (await terminal.mainScreen()).some(row => row === 'Hello, world'))
+  session.log(answered(3, 'Hello, world'))
+  session.stream({ type: 'end', attemptId, revision: 1, index: 3, outcome: { kind: 'committed', eventType: 'assistant/message', seq: SessionSeq(3) } })
+  session.log({ type: 'turn/end', seq: SessionSeq(4), time: 5, data: { turn: 1, reason: { kind: 'completed' } } })
+  session.log(prompt(5, 'next'))
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('next')))
+  assert.deepEqual((await terminal.mainScreen()).filter(row => row.startsWith('Hello')), ['Hello, world'])
+})
+
+test('quitting while an answer streams leaves only what the session logged on the main screen', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([{ type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } }, prompt(2, 'say hello')])
+  const { exits, commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('say hello')))
+  session.stream({ type: 'start', attemptId, revision: 1, turn: 1, step: 1 })
+  session.stream({ type: 'chunk', attemptId, revision: 1, index: 0, time: 3, chunk: { type: 'block-start', index: 0, blockType: 'text' } })
+  session.stream({ type: 'chunk', attemptId, revision: 1, index: 1, time: 3, chunk: { type: 'text-delta', index: 0, text: 'Hello' } })
+  await until(async () => (await terminal.mainScreen()).some(row => row === 'Hello'))
+  terminal.type('\x03')
+  terminal.type('\x03')
+  await until(() => exits.length > 0)
+  const shown = await terminal.mainScreen()
+  assert.ok(shown.some(row => row.includes('say hello')))
+  assert.equal(shown.some(row => row === 'Hello'), false)
 })
 
 test('ctrl+t switches screens both ways, and what is typed, what every entry drew, and ctrl+c come along', async () => {

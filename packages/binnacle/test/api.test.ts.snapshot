@@ -171,6 +171,9 @@ export type Entry = Single<Exclude<Alone, 'prompt'>> | {
     readonly start: FactOf<'start'>;
     readonly summary?: FactOf<'summary'>;
     readonly end?: FactOf<'end'>;
+} | {
+    readonly kind: 'streaming';
+    readonly answer: Streamed;
 };
 // models/transcript.d.ts
 type Single<K extends Fact['kind']> = K extends unknown ? {
@@ -183,6 +186,12 @@ type FactOf<K extends Fact['kind']> = Extract<Fact, {
 }>;
 // models/transcript.d.ts
 type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'authored' | 'unknown' | 'quiet';
+// facts/stream.d.ts
+export interface Streamed {
+    readonly turn: number;
+    readonly step: number;
+    readonly blocks: readonly Block[];
+}
 // KeyId ← @earendil-works/pi-tui
 // ui/theme.d.ts
 export type Mark = keyof typeof marks | (string & {});

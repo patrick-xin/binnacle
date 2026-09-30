@@ -7,6 +7,7 @@ import { CombinedAutocompleteProvider, Editor, ProcessTerminal, ScrollView, setK
 import type { Component, Keybinding, OverlayHandle, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
+import { AnswerStream } from '../facts/stream.ts'
 import { editorTheme } from '../ui/theme.ts'
 import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
@@ -380,12 +381,19 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     for (const pane of screenPanes.values()) pane.factsChanged()
     for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
   })
+  const answering = new AnswerStream()
+  const unstream = session.onStream((frame) => {
+    answering.read(frame)
+    transcript.stream(answering.answer)
+  })
   let held = true
   let started = false
   const release = (): void => {
     if (!held) return
     held = false
     unfollow()
+    unstream()
+    transcript.stream(undefined)
     unstand()
     unraise?.()
     arming?.()

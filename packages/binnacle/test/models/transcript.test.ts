@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Fact } from '../../src/facts/adapt.ts'
-import { settled, transcript } from '../../src/models/transcript.ts'
+import { answering, settled, transcript } from '../../src/models/transcript.ts'
 import { prompt as promptFact, call as callFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact, started as startedFact, summarized as summarizedFact, ended as endedFact } from '../support/facts.ts'
 
 const prompt = promptFact(2, 10, 'fix the build')
@@ -266,7 +266,7 @@ test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s i
       else if (entry.kind === 'approval') drawn.push(entry.asked, ...entry.decided === undefined ? [] : [entry.decided])
       else if (entry.kind === 'command') drawn.push(entry.run, ...entry.done === undefined ? [] : [entry.done])
       else if (entry.kind === 'compaction') drawn.push(entry.start, ...entry.summary === undefined ? [] : [entry.summary], ...entry.end === undefined ? [] : [entry.end])
-      else drawn.push(entry.fact)
+      else if (entry.kind !== 'streaming') drawn.push(entry.fact)
     }
   }
   // Entries hold their facts in log order, so what they hold reads back as the log does, turn and step facts excepted: the model spends those naming the turns themselves.
@@ -287,4 +287,23 @@ test('a prompt in a turn that already holds one steered it; the turn\'s first pr
     [{ kind: 'prompt', fact: promptFact(1, 1, 'before any turn') }],
     [{ kind: 'prompt', fact: promptFact(4, 10, 'fix the build') }, { kind: 'prompt', fact: steer, steer: true }],
   ])
+})
+
+const streamed = { turn: 1, step: 1, blocks: [{ kind: 'text', text: 'Do' }] } as const
+
+test('an answer streaming stands at the end of its turn, after what the log holds', () => {
+  const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, prompt]
+  assert.deepEqual(answering(transcript(facts), streamed), {
+    turns: [{ turn: 1, entries: [{ kind: 'prompt', fact: prompt }, { kind: 'streaming', answer: streamed }] }],
+  })
+})
+
+test('once the log holds the answer of its turn and step, the answer streamed is drawn no more', () => {
+  const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, prompt, answer]
+  assert.deepEqual(answering(transcript(facts), streamed), transcript(facts))
+})
+
+test('an answer streaming is not settled: the log has yet to hold it', () => {
+  const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, prompt]
+  assert.equal(settled(answering(transcript(facts), streamed)), 1)
 })
