@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { longComments, ratchet } from './check-comments.mjs'
+import { authorSurface } from './check-jsdoc.mjs'
 
 test('a comment of two lines or fewer passes', () => {
   const text = `// one\nconst a = 1\n/** Two\n * lines. */\nconst b = 2\n/**\n * Two, with bare delimiters.\n * Still two.\n */\nconst c = 3\n`
@@ -43,4 +44,20 @@ test('a baseline for a file that is gone is removed', () => {
 test('the JSDoc of a member of a declaration an author reads may say more too', () => {
   const text = "export interface Read {\n  /**\n   * One.\n   * Two.\n   * Three.\n   */\n  readonly a: string\n}\nconst b = {\n  /**\n   * One.\n   * Two.\n   * Three.\n   */\n  c: 1,\n}\n"
   assert.deepEqual(longComments('a.ts', text, [], [{ line: 1, end: 8 }]), ['a.ts:10: 3 lines'])
+})
+
+test('line comments on consecutive lines are one comment where lines end in CRLF too', () => {
+  assert.deepEqual(longComments('a.ts', '// One.\r\n// Two.\r\n// Three.\r\nconst a = 1\r\n'), ['a.ts:1: 3 lines'])
+})
+
+test('only JSDoc an author reads may say more: a plain block, or a comment in a body, is held to two lines', () => {
+  const cases = [
+    '/* one\n two\n three */\nexport interface Read {}\n',
+    '/** Doc. */\nexport interface Read {\n  /* one\n  two\n  three */\n  value: string\n}\n',
+    '/** Doc. */\nexport const run = (): void => {\n  /** one\n   * two\n   * three */\n  console.log("ok")\n}\n',
+  ]
+  for (const text of cases) {
+    const surface = authorSurface('a.ts', () => text)
+    assert.equal(longComments('a.ts', text, [], surface).length, 1, text)
+  }
 })

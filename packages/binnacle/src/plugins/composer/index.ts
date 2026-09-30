@@ -21,7 +21,7 @@ export function apply(ctx: Context): void {
           // The session closed under the line: there is nothing left to send it to.
         }
       }, () => {
-        // Session closed; command already logged and settled.
+        // The grant rejects only when no session is open: there is nothing to run the line in.
       })
     },
   })

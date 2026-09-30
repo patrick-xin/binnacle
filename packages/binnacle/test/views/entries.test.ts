@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
+import { BlockAssembler } from '@deepseek-ai/dsh-llm'
 import type { Entry, Transcript } from '../../src/models/transcript.ts'
 import type { UiState } from '../../src/ui/state.ts'
 import type { Node } from '../../src/ui/node.ts'
@@ -113,6 +114,14 @@ test('an answer draws no line for a call it made: the call is its tool entry\'s 
     },
   }
   assert.deepEqual(lines(entry), ['Let me look.', 'Then I will fix it.'])
+})
+
+test('a stream cut short keeps none of the calls it streamed, so an answer hiding its calls hides none left without a tool entry', () => {
+  const stream = new BlockAssembler()
+  stream.push({ type: 'text-delta', index: 0, text: 'Let me look.' })
+  stream.push({ type: 'tool-call-delta', index: 1, id: 'c1' as never, name: 'bash', argumentsDelta: '{"command":"ls"}' })
+  stream.push({ type: 'block-end', index: 1, block: { type: 'tool-call', id: 'c1' as never, name: 'bash', arguments: '{"command":"ls"}' } })
+  assert.deepEqual(stream.interruptedBlocks().map(block => block.type), ['text'])
 })
 
 test('the reasoning\'s line is muted, marker and all, the reasoning under it dim, and an interruption dim', () => {

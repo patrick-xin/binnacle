@@ -25,7 +25,7 @@ export function longComments(path, text, names = [], read = []) {
   const blocks = []
   for (const comment of comments) {
     const last = blocks.at(-1)
-    const joins = comment.type === 'Line' && last?.type === 'Line' && /^[ \t]*\n[ \t]*$/.test(text.slice(last.end, comment.start))
+    const joins = comment.type === 'Line' && last?.type === 'Line' && /^[ \t]*\r?\n[ \t]*$/.test(text.slice(last.end, comment.start))
     if (joins) blocks[blocks.length - 1] = { ...last, end: comment.end, value: `${last.value}\n${comment.value}` }
     else blocks.push({ type: comment.type, start: comment.start, end: comment.end, value: comment.value })
   }
@@ -33,7 +33,7 @@ export function longComments(path, text, names = [], read = []) {
   for (const block of blocks) {
     const said = block.value.split('\n').filter(line => line.replace(/^[\s*]*/, '').trim() !== '').length
     const documents = lineOf(block.end + text.slice(block.end).search(/\S|$/))
-    if (said > 2 && !(block.type === 'Block' && read.some(({ line, end }) => line <= documents && documents <= end))) problems.push(`${path}:${lineOf(block.start)}: ${said} lines`)
+    if (said > 2 && !(block.type === 'Block' && block.value.startsWith('*') && read.some(({ line, end }) => line <= documents && documents <= end))) problems.push(`${path}:${lineOf(block.start)}: ${said} lines`)
     for (const cited of new Set(findCitations(block.value, names).map(citation => citation.name))) problems.push(`${path}:${lineOf(block.start)}: cites ${cited}`)
   }
   return problems

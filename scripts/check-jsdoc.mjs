@@ -75,6 +75,13 @@ function readText(text, declaration) {
   return text.slice(declaration.start, declaration.end)
 }
 
+/** A function's body, or a variable's function body, which an author does not read. */
+function bodyOf(declaration) {
+  const init = declaration.declarations?.length === 1 ? declaration.declarations[0].init : undefined
+  const body = declaration.body ?? init?.body
+  return body?.type === 'BlockStatement' ? body : undefined
+}
+
 /**
  * One source module, read for the author's surface: what it declares, whether each is documented and what each
  * mentions, what it imports, and what it exports.
@@ -120,7 +127,7 @@ function readModule(path, text) {
     const declaration = exporting ? node.declaration : node
     const names = declaration.id?.name ? [declaration.id.name] : declaration.declarations ? declaration.declarations.map(item => item.id?.name).filter(Boolean) : []
     for (const name of names) {
-      declare(name, node, readText(text, declaration), declaration.body?.type === 'BlockStatement' ? declaration.body.start : node.end)
+      declare(name, node, readText(text, declaration), bodyOf(declaration)?.start ?? node.end)
       if (exporting) exported.push(name)
     }
   }

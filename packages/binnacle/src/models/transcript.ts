@@ -104,7 +104,10 @@ export function fold(model: Transcript, fact: Fact): Transcript {
   return { turns: [...turns, { ...last, entries }] }
 }
 
-/** How many entries can no longer change: all before the last turn's first pending call, approval, command or compaction. */
+/**
+ * How many entries can no longer change: all before the last turn's first running command or compaction, or,
+ * while that turn runs, its first call or approval still waiting. dsh can log a command or compaction outside a turn.
+ */
 export function settled(model: Transcript): number {
   const last = model.turns.at(-1)
   const before = model.turns.slice(0, -1).reduce((count, turn) => count + turn.entries.length, 0)
