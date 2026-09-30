@@ -75,17 +75,26 @@ The reviewer is of another family than the change's author, with a shell in a ch
 
 **Before it is retired**, the Sheepdog prompts it once more for its feedback, across every round it held: what in this skill, `AGENTS.md`, the records or shepherd cost it a call, a round or a finding; what it had to read code to learn; and what it would change first. It writes that to `/tmp/review-<n>-feedback.md` and ends `REPORT /tmp/review-<n>-feedback.md`. The Sheepdog carries it to #26, and what is shepherd's to shepherd's field report, before retiring it.
 
-**Which reviewer.** An issue has one reviewer, of another family than every author of its commits. Where the Sheepdog wrote any of them, alone or beside a Sheep, it is a GPT model on pi, as a shepherd Charge whose Fold is cut at the Pasture, the tip checked out there; it reads every commit of the issue, whoever wrote each. GPT on pi, codex and opencode's `openai` models share one ChatGPT usage window, so it is spent on the issues the Sheepdog wrote in. A review is never run at a lighter tier than its first round:
+**Which reviewer.** An issue has one reviewer, of another family than every author of its commits. Where the Sheepdog wrote any of them, alone or beside a Sheep, it is a GPT model on pi, as a shepherd Charge whose Fold is cut at the Pasture, the tip checked out there; it reads every commit of the issue, whoever wrote each. GPT on pi, codex and opencode's `openai` models share one ChatGPT usage window, so it is spent on the issues the Sheepdog wrote in. A review never runs on a lighter model than it was dispatched on; its thinking is set per round, below:
 
 ```sh
 git switch --detach <tip>
 shepherd dispatch --charge review-<n> --spec '#<n>' --issue <n> \
-  --model openai-codex/gpt-6.1-sol --thinking high --policy worktree_write \
+  --model openai-codex/gpt-6.1-sol --thinking xhigh --policy worktree_write \
   --verify 'pnpm install --frozen-lockfile && pnpm refs' \
   --brief "<the brief>"
 ```
 
-A held reviewer moves to a newer model between rounds with `shepherd escalate --charge review-<n> --model <model> --thinking high`, keeping what it read.
+**Thinking, by what the round asks** — `minimal`, `low`, `medium`, `high`, `xhigh` (pi's default) or `max`. A held reviewer is moved between rounds with `shepherd escalate --charge review-<n> --model <model> --thinking <level>`, keeping what it read; the new level applies from its next turn, so escalate before the round's prompt.
+
+| Round | Thinking |
+|---|---|
+| round 1 of a change to code | `xhigh` |
+| round 1 of a change only to skills or records | `high` |
+| a round that checks fixes | `high` |
+| the feedback before it is retired | `medium` |
+
+A round whose findings the fixes did not answer goes back up to `xhigh`; `max` is for a change the maintainer names as the hardest, or a round two runs found nothing in and the maintainer doubts.
 
 **An issue a Sheep built alone** — glm's — is reviewed by a subagent from the Sheepdog's own harness, named `review-<n>` so each round reaches it again, in a checkout under `/tmp`:
 
