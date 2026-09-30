@@ -498,6 +498,24 @@ test('on the main screen, an answer is drawn as it streams, and printed once whe
   assert.deepEqual((await terminal.mainScreen()).filter(row => row.startsWith('Hello')), ['Hello, world'])
 })
 
+test('quitting while an answer streams leaves only what the session logged on the main screen', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([{ type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } }, prompt(2, 'say hello')])
+  const { exits, commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.mainScreen()).some(row => row.includes('say hello')))
+  session.stream({ type: 'start', attemptId, revision: 1, turn: 1, step: 1 })
+  session.stream({ type: 'chunk', attemptId, revision: 1, index: 0, time: 3, chunk: { type: 'block-start', index: 0, blockType: 'text' } })
+  session.stream({ type: 'chunk', attemptId, revision: 1, index: 1, time: 3, chunk: { type: 'text-delta', index: 0, text: 'Hello' } })
+  await until(async () => (await terminal.mainScreen()).some(row => row === 'Hello'))
+  terminal.type('\x03')
+  terminal.type('\x03')
+  await until(() => exits.length > 0)
+  const shown = await terminal.mainScreen()
+  assert.ok(shown.some(row => row.includes('say hello')))
+  assert.equal(shown.some(row => row === 'Hello'), false)
+})
+
 test('ctrl+t switches screens both ways, and what is typed, what every entry drew, and ctrl+c come along', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])

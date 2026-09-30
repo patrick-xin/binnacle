@@ -393,6 +393,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     held = false
     unfollow()
     unstream()
+    transcript.stream(undefined)
     unstand()
     unraise?.()
     arming?.()
