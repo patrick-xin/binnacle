@@ -95,3 +95,13 @@ test('a binding a person set resolves as they bound it where a default shares it
   assert.deepEqual(table.resolve('\r', true), { kind: 'gesture', binding: 'copy' })
   assert.deepEqual(table.resolve('\r', false), undefined, 'with nothing focused, copy is not live and enter reaches the composer')
 })
+
+test('the table names the keys that give a gesture each meaning, as a person bound them', () => {
+  const table = keyTable()
+  assert.deepEqual(table.keysOf('primary'), ['enter'])
+  assert.deepEqual(table.keysOf('focus.next'), ['tab', 'down'])
+  assert.deepEqual(table.keysOf('grant'), [])
+  table.bind({ 'binnacle.grant': 'y', 'binnacle.primary': ['enter', 'space'] })
+  assert.deepEqual(table.keysOf('grant'), ['y'])
+  assert.deepEqual(table.keysOf('primary'), ['enter', 'space'])
+})

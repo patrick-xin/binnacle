@@ -1,4 +1,5 @@
 import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
+import type { AffordanceKind } from '../contract/index.ts'
 
 /** Leave text as it is. */
 const plain = (text: string): string => text
@@ -74,11 +75,29 @@ export const words = {
   away: 'fold it away',
   /** What folding a fold of rows back is called. */
   to: (count: number): string => `fold to ${count} ${lineWord(count)}`,
-} as const
+  /** What the keys that invoke what has focus in an ask do, as its bottom edge names them. */
+  select: 'select',
+  /** What the keys that move focus on in an ask do, as its bottom edge names them. */
+  next: 'next',
+  /** What each kind of offer does, said where an offer names no label of its own. */
+  'offer.expand': 'expand',
+  'offer.choose': 'choose',
+  'offer.open': 'open',
+  'offer.copy': 'copy',
+  'offer.answer': 'answer',
+  'offer.grant': 'allow',
+  'offer.dismiss': 'dismiss',
+} as const satisfies { readonly [kind in AffordanceKind as `offer.${kind}`]: string } & Readonly<Record<string, string | ((count: number) => string)>>
+
+/** The words that say no count: each is said as it is, where the rest are templates of a count. */
+const plainWords = ['less', 'away', 'select', 'next', 'offer.expand', 'offer.choose', 'offer.open', 'offer.copy', 'offer.answer', 'offer.grant', 'offer.dismiss'] as const
+
+/** A word that says no count. */
+type PlainWord = typeof plainWords[number]
 
 /**
  * The theme's chrome: the glyphs the chrome — the focus row, a cut fold, a
- * card's border, the jump label — draws with, named beside the marks. A view
+ * border an ask is framed in, the jump label — draws with, named beside the marks. A view
  * names none of it; the ui and the host do, so what they draw is the theme's
  * as a mark is.
  */
@@ -89,10 +108,12 @@ export const chrome = {
   cut: '…',
   /** What a fold that shows no rows separates the line it folds under from what that line says it holds. */
   separator: '·',
-  /** A card's rounded border, in its pieces. */
+  /** The rounded border an ask is framed in, in its pieces. */
   border: { topLeft: '╭', horizontal: '─', topRight: '╮', side: '│', bottomLeft: '╰', bottomRight: '╯' },
   /** What the jump label names, to come down to the end. */
   jump: '↓',
+  /** What runs down beside what a show holds, marking it as what the surface shows and did not write. */
+  gutter: '│',
 } as const
 
 /**
@@ -159,7 +180,7 @@ export interface Theme {
   /** The chrome's glyphs. */
   readonly chrome: { readonly [part in Exclude<keyof typeof chrome, 'border'>]: string } & { readonly border: { readonly [piece in keyof typeof chrome.border]: string } }
   /** What a fold says of itself: what it says of a count of lines, or, for `less` and `away`, what it says. */
-  readonly words: { readonly [word in Exclude<keyof typeof words, 'less' | 'away'>]: (count: number) => string } & { readonly less: string, readonly away: string }
+  readonly words: { readonly [word in Exclude<keyof typeof words, PlainWord>]: (count: number) => string } & { readonly [word in PlainWord]: string }
   /** The styles a markdown document is drawn in. */
   readonly markdown: MarkdownTheme
   /** How the folds of each kind of entry start, by the key its views are registered under, falling back to its kind when no start is given for its key, when a fold does not say. */
@@ -183,10 +204,10 @@ export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, 
 export interface ThemeChanges {
   /** Tones, by name — binnacle's, or new ones a view may then name: the colour and attributes each is drawn in, replacing how the theme beneath drew it. */
   readonly tones?: { readonly [name: string]: Style }
-  /** Backgrounds, by name — binnacle's, or new ones a band or a card may then be filled with: one of the terminal's sixteen colours. */
+  /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: one of the terminal's sixteen colours. */
   readonly backgrounds?: { readonly [name: string]: Colour }
-  /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. */
-  readonly chrome?: { readonly focus?: string, readonly cut?: string, readonly separator?: string, readonly jump?: string, readonly border?: { readonly [piece in keyof typeof chrome.border]?: string } }
+  /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. The gutter and a border's pieces are each one column wide. */
+  readonly chrome?: { readonly focus?: string, readonly cut?: string, readonly separator?: string, readonly jump?: string, readonly gutter?: string, readonly border?: { readonly [piece in keyof typeof chrome.border]?: string } }
   /**
    * What a fold says of itself, each a template: `{n}` is the count of lines, and `{lines}` the word for that many (`line` or `lines`). `less` and `away` count nothing.
    */
@@ -288,7 +309,7 @@ export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
     glyphs = { ...glyphs, ...rest, border: { ...glyphs.border, ...border } }
     for (const [word, template] of Object.entries(change.words ?? {})) {
       if (template === undefined) continue
-      said = word === 'less' || word === 'away' ? { ...said, [word]: template } : { ...said, [word]: counting(template) }
+      said = (plainWords as readonly string[]).includes(word) ? { ...said, [word]: template } : { ...said, [word]: counting(template) }
     }
   }
   let starts: Theme['folds'] = base.folds

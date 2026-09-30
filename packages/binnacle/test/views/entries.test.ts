@@ -144,14 +144,14 @@ test('a command still running says so, and a success that said nothing draws onl
   assert.deepEqual(lines({ kind: 'command', run: command, done: doneFact(10, 23, 'cmd-1a2b3c4d-1', 'success') }), ['/compact --keep 2'])
 })
 
-test('a tool still running says so', () => {
-  assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '  running 0s'])
+test('a tool still running says so, along the gutter of what the surface shows and did not write', () => {
+  assert.deepEqual(lines({ kind: 'tool', call }), ['● bash {"command":"pnpm build"}', '│ running 0s'])
 })
 
 test('a call its turn left without a result says so, and why', () => {
   const left: Entry = { kind: 'tool', call, left: 'aborted' }
-  assert.deepEqual(lines(left), ['● bash {"command":"pnpm build"}', '  the turn ended without it: aborted'])
-  assert.equal(styled(left)[1], '\x1b[90m  the turn ended without it: aborted\x1b[39m')
+  assert.deepEqual(lines(left), ['● bash {"command":"pnpm build"}', '│ the turn ended without it: aborted'])
+  assert.equal(styled(left)[1], '\x1b[2m│\x1b[22m \x1b[90mthe turn ended without it: aborted\x1b[39m')
   assert.equal(styled(left)[0], '\x1b[90m●\x1b[39m bash {"command":"pnpm build"}')
 })
 
@@ -165,13 +165,13 @@ test('a tool\'s glyph says how the call stands: muted while it runs, success onc
 
 test('running is muted, and why a tool failed is error', () => {
   const failed = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: true, failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' }, blocks: [], meta: undefined } as const
-  assert.equal(styled({ kind: 'tool', call })[1], '\x1b[90m  running 0s\x1b[39m')
-  assert.equal(styled({ kind: 'tool', call, result: failed })[1], '\x1b[31m  the command exited 2\x1b[39m')
+  assert.equal(styled({ kind: 'tool', call })[1], '\x1b[2m│\x1b[22m \x1b[90mrunning 0s\x1b[39m')
+  assert.equal(styled({ kind: 'tool', call, result: failed })[1], '\x1b[2m│\x1b[22m \x1b[31mthe command exited 2\x1b[39m')
 })
 
 test('a finished tool shows its output, folded to three rows', () => {
   const result = { kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: false, blocks: [{ kind: 'text', text: 'a\nb\nc\nd\ne' }], meta: undefined } as const
-  assert.deepEqual(lines({ kind: 'tool', call, result }), ['● bash {"command":"pnpm build"}', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(lines({ kind: 'tool', call, result }), ['● bash {"command":"pnpm build"}', '│ a', '│ b', '│ c', '│ … 2 more lines'])
 })
 
 test('a failed tool is marked, with the reason dsh gave a person', () => {
@@ -179,7 +179,7 @@ test('a failed tool is marked, with the reason dsh gave a person', () => {
     kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: true,
     failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' }, blocks: [{ kind: 'text', text: 'tsc: 1 error' }], meta: undefined,
   } as const
-  assert.deepEqual(lines({ kind: 'tool', call, result }), ['✗ bash {"command":"pnpm build"}', '  the command exited 2', 'tsc: 1 error'])
+  assert.deepEqual(lines({ kind: 'tool', call, result }), ['✗ bash {"command":"pnpm build"}', '│ the command exited 2', '│ tsc: 1 error'])
 })
 
 const approval = askedFact(5, 22, 'a1', 'bash', 'writes outside the repo')
@@ -279,11 +279,11 @@ const raw = (entry: Entry, focus?: string): string[] =>
   onScreen(entry, focus === undefined ? { toggled: new Set() } : { toggled: new Set(), focus }, new Map(), 40).map(line => line.trimEnd())
 
 test('a tool\'s output that clears the screen is drawn as its text, and clears nothing', () => {
-  assert.deepEqual(raw(toolWith('wiped\x1b[2Jclean'))[1], 'wipedclean')
+  assert.deepEqual(raw(toolWith('wiped\x1b[2Jclean'))[1], '\x1b[2m│\x1b[22m wipedclean')
 })
 
 test('a sequence that writes the clipboard or sets the title is dropped, its visible text kept', () => {
-  assert.deepEqual(raw(toolWith('copied \x1b]52;c;aGVsbG8=\x07 by \x1b]0;owned\x1b\\ one'))[1], 'copied  by  one')
+  assert.deepEqual(raw(toolWith('copied \x1b]52;c;aGVsbG8=\x07 by \x1b]0;owned\x1b\\ one'))[1], '\x1b[2m│\x1b[22m copied  by  one')
 })
 
 test('a colour in a tool\'s output is dropped, and the rows after it are drawn in the theme\'s tones', () => {
@@ -291,15 +291,15 @@ test('a colour in a tool\'s output is dropped, and the rows after it are drawn i
     kind: 'result', seq: 11, time: 40, turn: 1, step: 1, callId: 'c1', failed: true,
     failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' }, blocks: [{ kind: 'text', text: '\x1b[31mred\x1b[39m and plain' }], meta: undefined,
   } as const
-  assert.deepEqual(raw({ kind: 'tool', call, result }), ['\x1b[31m✗\x1b[39m bash {"command":"pnpm build"}', '\x1b[31m  the command exited 2\x1b[39m', 'red and plain'])
+  assert.deepEqual(raw({ kind: 'tool', call, result }), ['\x1b[31m✗\x1b[39m bash {"command":"pnpm build"}', '\x1b[2m│\x1b[22m \x1b[31mthe command exited 2\x1b[39m', '\x1b[2m│\x1b[22m red and plain'])
 })
 
 test('a bell, and any other control character, is drawn as a symbol a person can see', () => {
-  assert.deepEqual(raw(toolWith('a\x07b\x7fc\x9bd\x00e'))[1], 'a␇b␡c�d␀e')
+  assert.deepEqual(raw(toolWith('a\x07b\x7fc\x9bd\x00e'))[1], '\x1b[2m│\x1b[22m a␇b␡c�d␀e')
 })
 
 test('a line ending with a carriage return reads as a line ending, and one anywhere else is drawn ␍', () => {
-  assert.deepEqual(raw(toolWith('done\r\nnext\ralso')).slice(1), ['done', 'next␍also'])
+  assert.deepEqual(raw(toolWith('done\r\nnext\ralso')).slice(1), ['\x1b[2m│\x1b[22m done', '\x1b[2m│\x1b[22m next␍also'])
 })
 
 test('an answer\'s markdown carrying an escape is drawn without it, in the theme\'s styles', () => {
@@ -404,6 +404,13 @@ test('an unknown fact carrying a problem says it under its one line', () => {
   assert.deepEqual(seen(entry, [], new Map(), 80), ['? test/marker · 1 line', '✗ binnacle.facts(test/marker) threw: no fork recorded'])
 })
 
+test('an author\'s view may show what it did not write, its title read as spans and what it holds beneath it', () => {
+  const shown = new Map<string, View[]>([['prompt', [() => ({ kind: 'show', title: ['notes.md'], child: { kind: 'text', text: 'first line' } })]]])
+  assert.deepEqual(drawn(prompt, shown), ['notes.md', '│ first line'])
+  const untitled = new Map<string, View[]>([['prompt', [() => ({ kind: 'show', title: 'notes.md', child: { kind: 'blank' } }) as unknown as Node]]])
+  assert.deepEqual(drawn(prompt, untitled).at(-1), '✗ binnacle.view(prompt) returned no drawable node: a show\'s title is notes.md')
+})
+
 /** An array of one slot with nothing in it, as a careless view might return. */
 const hole = <T>(): T[] => Object.assign<T[], { length: number }>([], { length: 1 })
 
@@ -423,8 +430,8 @@ test('an author\'s view that returns what binnacle cannot lay out is drawn over,
   assert.deepEqual(drawn(prompt, untitled), [...band, '✗ binnacle.view(prompt) returned no drawable node: a fold\'s title is one line'])
   const loud = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: 'hi', tone: 'shouting' }) as unknown as Node]]])
   assert.deepEqual(drawn(prompt, loud), [...band, '✗ binnacle.view(prompt) returned no drawable node: shouting is no tone'])
-  const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'card', title: 'two\nlines', child: { kind: 'blank' } })]]])
-  assert.deepEqual(drawn(prompt, titled), [...band, '✗ binnacle.view(prompt) returned no drawable node: a card\'s title is one line'])
+  const titled = new Map<string, View[]>([['prompt', [() => ({ kind: 'ask', title: 'two\nlines', child: { kind: 'blank' } })]]])
+  assert.deepEqual(drawn(prompt, titled), [...band, '✗ binnacle.view(prompt) returned no drawable node: an ask\'s title is one line'])
   const undocumented = new Map<string, View[]>([['prompt', [() => ({ kind: 'markdown' }) as unknown as Node]]])
   assert.deepEqual(drawn(prompt, undocumented), [...band, '✗ binnacle.view(prompt) returned no drawable node: a markdown block needs text'])
   const unspanned = new Map<string, View[]>([['prompt', [() => ({ kind: 'text', text: ['fix', 3] }) as unknown as Node]]])
@@ -469,7 +476,7 @@ test('an author\'s card title and affordance label carrying a control sequence a
     kind: 'offer',
     id: 'theirs',
     affordances: [{ kind: 'open', label: 'open \x1b]0;owned\x07wide' }],
-    child: { kind: 'card', title: 'to\x1b[2Jdo', child: { kind: 'text', text: 'the body' } },
+    child: { kind: 'ask', title: 'to\x1b[2Jdo', child: { kind: 'text', text: 'the body' } },
   }) as unknown as Node]]])
   assert.deepEqual(rawWith(prompt, views, 20, '2/theirs'), [
     '\x1b[2m╭─ \x1b[22mtodo\x1b[2m ───────────╮\x1b[22m',

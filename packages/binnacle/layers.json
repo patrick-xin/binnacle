@@ -120,6 +120,25 @@
       "plugins"
     ]
   },
+  "owners": {
+    "@earendil-works/pi-tui": {
+      "TuiMouseEvent": [
+        "ui/pointer.ts",
+        "panes/transcript.ts",
+        "panes/screen.ts"
+      ],
+      "stripTerminalSequences": [
+        "ui/readable.ts"
+      ],
+      "KeybindingsManager": [
+        "ui/keys.ts"
+      ],
+      "setKeybindings": [
+        "ui/keys.ts",
+        "host/index.ts"
+      ]
+    }
+  },
   "services": {
     "agentDefaultModel": "@deepseek-ai/dsh-agent-default-model",
     "agents": "@deepseek-ai/dsh-agent",

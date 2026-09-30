@@ -77,7 +77,7 @@ function asked(question: AskUserQuestionItem): readonly Node[] {
 function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
   const multi = question.multiSelect === true
   return {
-    kind: 'card',
+    kind: 'ask',
     ...question.header === undefined ? {} : { title: question.header },
     edge: 'accent',
     child: {
@@ -216,7 +216,7 @@ class Ask {
     this.unshow = this.ctx.binnacle.place('above-composer', {
       kind: 'lines',
       draw: () => ({
-        kind: 'card',
+        kind: 'ask',
         ...question.header === undefined ? {} : { title: question.header },
         edge: 'accent',
         child: { kind: 'stack', children: asked(question) },

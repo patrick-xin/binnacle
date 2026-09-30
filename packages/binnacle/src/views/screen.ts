@@ -2,7 +2,7 @@ import type { Fact } from '../facts/adapt.ts'
 import { transcript } from '../models/transcript.ts'
 import type { Entry, Transcript } from '../models/transcript.ts'
 import { layout } from '../ui/layout.ts'
-import type { Frame, Placed } from '../ui/layout.ts'
+import type { Frame, LayoutState, Placed } from '../ui/layout.ts'
 import type { Node, Span } from '../ui/node.ts'
 import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
@@ -53,7 +53,8 @@ function foldsIn(node: Node): string[] {
     case 'stack':
       return node.children.flatMap(foldsIn)
     case 'offer':
-    case 'card':
+    case 'ask':
+    case 'show':
     case 'band':
       return foldsIn(node.child)
     case 'fold':
@@ -87,7 +88,8 @@ function scopedWithin(node: Node, scope: string): Node {
     case 'offer':
     case 'fold':
       return { ...node, id: `${scope}/${node.id}`, child: scopedWithin(node.child, scope) }
-    case 'card':
+    case 'ask':
+    case 'show':
     case 'band':
       return { ...node, child: scopedWithin(node.child, scope) }
   }
@@ -107,7 +109,8 @@ function regionsIn(node: Node): string[] {
     case 'offer':
     case 'fold':
       return [node.id, ...regionsIn(node.child)]
-    case 'card':
+    case 'ask':
+    case 'show':
     case 'band':
       return regionsIn(node.child)
   }
@@ -125,9 +128,10 @@ function regionsIn(node: Node): string[] {
  * against the width and against which of its folds are open, which is all of
  * the state layout reads, and against the theme, which is replaced as a whole
  * when a theme registration comes or goes.
+ * @param keys - the keys the one key table binds to each meaning, for an ask to name what answers it; read as an entry is laid out, so a drawer is made anew when a person rebinds a key.
  * @returns the drawer, holding nothing yet.
  */
-export function screens(): DrawScreen {
+export function screens(keys: () => LayoutState['keys'] = () => undefined): DrawScreen {
   const drawings = new WeakMap<Entry, Drawing>()
   const frameOf = (entry: Entry, state: UiState, width: number, views: Views, theme: Theme, now: number | undefined): Frame => {
     const by = views.get(keyOf(entry))
@@ -143,7 +147,8 @@ export function screens(): DrawScreen {
     if (laid?.width === width && laid.theme === theme && drawing.folds.every((id, index) => state.toggled.has(id) === laid.open[index]) && laid.focus === focus && (!drawing.timed || laid.now === now)) return laid.frame
     // How its folds start is the theme's for its key, then for its kind; the theme is what the layout is kept against, so this needs no key of its own.
     const starts = theme.folds[keyOf(entry)] ?? theme.folds[entry.kind]
-    const frame = layout(drawing.node, width, { ...state, ...starts === undefined ? {} : { folds: starts }, ...now === undefined ? {} : { now } }, theme)
+    const bound = keys()
+    const frame = layout(drawing.node, width, { ...state, ...starts === undefined ? {} : { folds: starts }, ...now === undefined ? {} : { now }, ...bound === undefined ? {} : { keys: bound } }, theme)
     drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.toggled.has(id)), focus, now, frame } })
     return frame
   }
@@ -197,9 +202,11 @@ export function timedIn(node: Node): boolean {
     case 'stack':
       return node.children.some(timedIn)
     case 'offer':
-    case 'card':
+    case 'ask':
     case 'band':
       return timedIn(node.child)
+    case 'show':
+      return timedSpans(node.title) || timedIn(node.child)
     case 'fold':
       return timedSpans(node.title) || timedIn(node.child)
   }

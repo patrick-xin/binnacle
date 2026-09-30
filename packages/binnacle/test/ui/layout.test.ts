@@ -211,27 +211,27 @@ test('a span that wraps keeps its tone on every line it wraps to', () => {
   assert.ok(frame.lines[2]?.startsWith('\x1b[31m'), JSON.stringify(frame.lines[2]))
 })
 
-test('a card draws what it holds inside a rounded border, its title on the top edge', () => {
-  assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'exit 0' } }, 20, OPEN)), {
+test('an ask draws what it holds inside a rounded border, its title on the top edge', () => {
+  assert.deepEqual(plain(layout({ kind: 'ask', title: 'bash', child: { kind: 'text', text: 'exit 0' } }, 20, OPEN)), {
     lines: ['╭─ bash ───────────╮', '│ exit 0           │', '╰──────────────────╯'],
     regions: [],
   })
 })
 
-test('what a card holds is a region inside its border, by its rows and by its columns', () => {
+test('what an ask holds is a region inside its border, by its rows and by its columns', () => {
   const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
-  const { regions } = layout({ kind: 'card', child: held }, 20, OPEN)
+  const { regions } = layout({ kind: 'ask', child: held }, 20, OPEN)
   assert.deepEqual(regions.map(({ region, top, height, left, width }) => [region.id, top, height, left, width]), [['o', 1, 1, 2, 16]])
   assert.deepEqual([0, 1, 2, 17, 18, 19].map(column => under(regions, 1, column).map(region => region.id)), [[], [], ['o'], ['o'], [], []])
   assert.deepEqual(under(regions, 0, 2), [])
 })
 
 test('a title too wide for the top edge is left off whole, never cut', () => {
-  assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'ok' } }, 9, OPEN)).lines, ['╭───────╮', '│ ok    │', '╰───────╯'])
+  assert.deepEqual(plain(layout({ kind: 'ask', title: 'bash', child: { kind: 'text', text: 'ok' } }, 9, OPEN)).lines, ['╭───────╮', '│ ok    │', '╰───────╯'])
 })
 
 test('a card with no column inside its border draws what it holds without one', () => {
-  assert.deepEqual(plain(layout({ kind: 'card', title: 'bash', child: { kind: 'text', text: 'ok' } }, 4, OPEN)).lines, ['ok'])
+  assert.deepEqual(plain(layout({ kind: 'ask', title: 'bash', child: { kind: 'text', text: 'ok' } }, 4, OPEN)).lines, ['ok'])
 })
 
 test('what a band holds is a region inside its padding, by its rows and by its columns', () => {
@@ -306,8 +306,40 @@ test('a cut fold says what an author\'s theme gives the chrome and the words: it
   assert.deepEqual(layout(fold, 20, { toggled: new Set() }, theme).lines.map(line => line.trimEnd()), ['a', '+ 2 hidden lines'])
 })
 
+/** The keys a table binds: Enter answers what has focus, Tab moves it on; nothing else is bound. */
+const keys = (binding: string): readonly string[] => ({ primary: ['enter'], 'focus.next': ['tab'] } as Readonly<Record<string, readonly string[]>>)[binding] ?? []
+
+/** An ask holding two offers, as an approval does. */
+const asked = {
+  kind: 'ask',
+  title: 'run ls?',
+  child: {
+    kind: 'stack',
+    children: [
+      { kind: 'offer', id: 'allow', affordances: [{ kind: 'grant', label: 'allow once' }], child: { kind: 'text', text: 'allow once' } },
+      { kind: 'offer', id: 'reject', affordances: [{ kind: 'dismiss', label: 'reject' }], child: { kind: 'text', text: 'reject' } },
+    ],
+  },
+} as const
+
+test('a show draws its title, and what it holds beneath it along the theme\'s gutter', () => {
+  assert.deepEqual(plain(layout({ kind: 'show', title: ['bash ls'], child: { kind: 'text', text: 'a\nb' } }, 20, OPEN)).lines, ['bash ls', '│ a', '│ b'])
+})
+
+test('what a show holds is a region beside its gutter, below its title, its rows as it wraps', () => {
+  const held = { kind: 'offer', id: 'out', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'abcd efgh' } } as const
+  const frame = layout({ kind: 'show', title: ['bash'], child: held }, 8, OPEN)
+  assert.deepEqual(plain(frame).lines, ['bash', '│ abcd', '│ efgh'])
+  assert.deepEqual(frame.regions.map(({ region, top, height, left, width }) => [region.id, top, height, left, width]), [['out', 1, 2, 2, 6]])
+  assert.deepEqual([0, 1, 2, 7].map(column => under(frame.regions, 2, column).map(region => region.id)), [[], [], ['out'], ['out']])
+})
+
+test('an ask names on its bottom edge the keys that answer what it holds, as the key table binds them', () => {
+  assert.equal(plain(layout(asked, 30, { ...OPEN, keys })).lines.at(-1), '╰─ enter select · tab next ──╯')
+})
+
 test('a card may be filled with a background and edged in a tone, both the theme\'s, every line of it filled', () => {
-  const card = { kind: 'card', background: 'prompt', edge: 'accent', child: { kind: 'text', text: 'x' } } as const
+  const card = { kind: 'ask', background: 'prompt', edge: 'accent', child: { kind: 'text', text: 'x' } } as const
   assert.deepEqual(layout(card, 6, { toggled: new Set() }).lines, [
     '\x1b[100m\x1b[36m╭────╮\x1b[39m\x1b[49m',
     '\x1b[100m\x1b[36m│\x1b[39m x  \x1b[36m│\x1b[39m\x1b[49m',
@@ -317,7 +349,7 @@ test('a card may be filled with a background and edged in a tone, both the theme
 
 test('a filled card stays filled around what it holds that is filled otherwise: every cell after an inner fill ends is the card\'s again', () => {
   const theme = themed(binnacleTheme, [{ backgrounds: { failed: 'red' } }])
-  const card = { kind: 'card', background: 'failed', child: { kind: 'band', background: 'prompt', child: { kind: 'text', text: 'x' } } } as const
+  const card = { kind: 'ask', background: 'failed', child: { kind: 'band', background: 'prompt', child: { kind: 'text', text: 'x' } } } as const
   for (const line of layout(card, 9, { toggled: new Set() }, theme).lines) {
     const inner = line.slice(0, -'\x1b[49m'.length)
     assert.equal(inner.split('\x1b[49m').slice(1).every(rest => rest.startsWith('\x1b[41m')), true, JSON.stringify(line))
@@ -336,4 +368,11 @@ test('a span that says the time since a moment is laid out at the time it is giv
   assert.equal(since(5_400), 'running 4s')
   assert.equal(since(66_000), 'running 1m 05s')
   assert.equal(since(1_000 + 3_723_000), 'running 1h 02m')
+})
+
+test('an offer that names no label says what it does in the theme\'s words for its kind, as a person changes them', () => {
+  const unlabelled = { kind: 'offer', id: 'allow', affordances: [{ kind: 'grant' }], child: { kind: 'text', text: 'allow once' } } as const
+  assert.deepEqual(plain(layout(unlabelled, 30, { toggled: new Set(), focus: 'allow' })).lines, ['allow once', '▸ allow'])
+  const renamed = themed(binnacleTheme, [{ words: { 'offer.grant': 'yes' } }])
+  assert.deepEqual(plain(layout(unlabelled, 30, { toggled: new Set(), focus: 'allow' }, renamed)).lines, ['allow once', '▸ yes'])
 })

@@ -29,7 +29,7 @@ export interface GrantedSession {
 }
 
 /** The slots of the page, top to bottom. */
-const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer'] satisfies readonly Slot[]
+const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'below-composer', 'dialog'] satisfies readonly Slot[]
 
 /**
  * Why a placement cannot go in a slot, as what to change.
@@ -39,7 +39,7 @@ const slots: readonly string[] = ['transcript', 'above-composer', 'composer', 'b
  */
 function misplaced(slot: Slot, placement: Placement): string | undefined {
   // An author's code may be untyped, so what the types say is checked here, where it enters.
-  if (!slots.includes(slot)) return 'no such slot; the slots are transcript, above-composer, composer and below-composer'
+  if (!slots.includes(slot)) return 'no such slot; the slots are transcript, above-composer, composer, below-composer and dialog'
   const kind: unknown = (placement as { readonly kind?: unknown } | undefined)?.kind
   const drawn = kind === 'lines' && typeof (placement as { readonly draw?: unknown }).draw === 'function'
   const submits = kind === 'composer' && typeof (placement as { readonly submit?: unknown }).submit === 'function'

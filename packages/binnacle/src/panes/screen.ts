@@ -4,7 +4,7 @@ import type { AffordanceKind, Gesture } from '../contract/index.ts'
 import { answer } from '../ui/answer.ts'
 import { describe } from '../contract/index.ts'
 import { layout, under } from '../ui/layout.ts'
-import type { Frame } from '../ui/layout.ts'
+import type { Frame, LayoutState } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
 import { drawPlaced, refused } from './placed.ts'
 import { gestureOf } from '../ui/pointer.ts'
@@ -45,6 +45,7 @@ export class ScreenPane implements Component {
   readonly #facts: () => readonly Fact[]
   readonly #theme: () => Theme
   readonly #now: () => number | undefined
+  readonly #keys: () => LayoutState['keys']
   readonly #changed: () => void
   readonly #inView: (top: number, height: number) => void
   readonly #invoked: (region: string, affordance: AffordanceKind) => void
@@ -63,11 +64,13 @@ export class ScreenPane implements Component {
    * @param theme - the theme as it stands, read at every frame; the screen is laid out again when it changes.
    * @param now - the time, in milliseconds since the epoch, as the host hands it at every frame: what a drawing that
    * says the time since a moment is laid out at, counting up. The pane reads no clock of its own.
+   * @param keys - the keys the one key table binds to each meaning, for an ask to name what answers it; read as the screen is laid out, which the host has it do again when a person rebinds a key.
    */
-  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined) {
+  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined, keys: () => LayoutState['keys'] = () => undefined) {
     this.#facts = facts
     this.#theme = theme
     this.#now = now
+    this.#keys = keys
     this.#changed = reports.changed ?? (() => {})
     this.#inView = reports.inView ?? (() => {})
     this.#invoked = reports.invoked ?? (() => {})
@@ -216,7 +219,8 @@ export class ScreenPane implements Component {
     if (!this.#stale && laid !== undefined && laid.width === width && laid.state === state && laid.theme === theme && (!this.#timed || laid.now === now)) return laid
     const node = this.#drawn(theme)
     this.#timed = timedIn(node)
-    const frame = layout(node, width, { ...state, ...now === undefined ? {} : { now } }, theme)
+    const keys = this.#keys()
+    const frame = layout(node, width, { ...state, ...now === undefined ? {} : { now }, ...keys === undefined ? {} : { keys } }, theme)
     const next: Laid = { width, state, theme, now, frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
     this.#laid = next
     this.#stale = false

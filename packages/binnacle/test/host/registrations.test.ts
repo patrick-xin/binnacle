@@ -128,9 +128,9 @@ test('a theme says how many rows a tool\'s output fold shows', async () => {
   const { registrations, author } = surface()
   const facts: Fact[] = [call(2, 2, 'c1', 'bash', '{}'), returned(3, 3, 'c1', 'a\nb\nc\nd\ne')]
   const lines = () => screen(facts, initial, 40, registrations.views, registrations.currentTheme).lines.map(line => stripTerminalSequences(line).trimEnd())
-  assert.deepEqual(lines(), ['● bash {}', 'a', 'b', 'c', '… 2 more lines'])
+  assert.deepEqual(lines(), ['● bash {}', '│ a', '│ b', '│ c', '│ … 2 more lines'])
   await author((ctx) => { ctx.binnacle.theme({ folds: { tool: { rows: 1 } } }) })
-  assert.deepEqual(lines(), ['● bash {}', 'a', '… 4 more lines'])
+  assert.deepEqual(lines(), ['● bash {}', '│ a', '│ … 4 more lines'])
 })
 
 test('a theme says how many rows the fold of a result no call claims shows', async () => {
@@ -328,7 +328,7 @@ test('two plugins can each draw one tool\'s card, and every other card stays bin
   const { registrations, author } = surface()
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'bash' ? { kind: 'text', text: '$ make' } : next()) })
   await author((ctx) => { ctx.binnacle.view('tool', (entry, next) => entry.kind === 'tool' && entry.call.name === 'read' ? { kind: 'text', text: 'read a file' } : next()) })
-  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['', ' › fix the build', '', '', '$ make', '', 'read a file', '', '● grep {}', '  running 0s'])
+  assert.deepEqual(shown(registrations, called(2, 'bash'), called(3, 'read'), called(4, 'grep')), ['', ' › fix the build', '', '', '$ make', '', 'read a file', '', '● grep {}', '│ running 0s'])
 })
 
 test('a view that read something besides its entry invalidates its key, and only that key\'s entries are drawn again', async () => {
@@ -404,7 +404,7 @@ test('a transcript or composer placed outside its own slot, or lines in the tran
 
 test('a slot or a placement binnacle has not is refused, naming what it has', () => {
   const { registrations } = surface()
-  assert.throws(() => registrations.place('footer' as never, { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(footer): no such slot; the slots are transcript, above-composer, composer and below-composer' })
+  assert.throws(() => registrations.place('footer' as never, { kind: 'lines', draw: () => ({ kind: 'blank' }) }), { message: 'binnacle.place(footer): no such slot; the slots are transcript, above-composer, composer, below-composer and dialog' })
   assert.throws(() => registrations.place('below-composer', { kind: 'status' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
   assert.throws(() => registrations.place('below-composer', { kind: 'lines' } as never), { message: 'binnacle.place(below-composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
   assert.throws(() => registrations.place('composer', { kind: 'composer' } as never), { message: 'binnacle.place(composer): a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function' })
@@ -503,4 +503,11 @@ test('an author types what their lines are invoked with from the author API alon
   const placement: Placement = { kind: 'lines', draw: () => ({ kind: 'blank' }), invoke: (_region, affordance) => { heard.push(affordance) } }
   if (placement.kind === 'lines') placement.invoke?.('reject', 'dismiss')
   assert.deepEqual(heard, ['dismiss'])
+})
+
+test('a theme changes the gutter a show is drawn along, one column wide as its border pieces are', () => {
+  const { registrations } = surface()
+  assert.throws(() => registrations.theme({ chrome: { gutter: '||' } }), { message: 'binnacle.theme: chrome.gutter is "||", not one column wide' })
+  registrations.theme({ chrome: { gutter: '┃' } })
+  assert.equal(registrations.currentTheme.chrome.gutter, '┃')
 })

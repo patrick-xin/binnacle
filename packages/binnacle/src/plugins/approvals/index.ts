@@ -13,7 +13,7 @@ type Asked = Parameters<Events['approval/request']>[0]
 function card(req: Asked): Node {
   const reason = req.displayReason?.en ?? req.reason
   return {
-    kind: 'card',
+    kind: 'ask',
     title: `${req.toolName} asks`,
     edge: 'accent',
     child: {
