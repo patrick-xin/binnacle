@@ -1,22 +1,17 @@
-/**
- * The author API: what an author, or a built-in feature, may depend on — the
- * `binnacle` service and the types its registrations take and return.
- *
- * Removing or renaming an export here breaks every author; its commit says so.
- */
-
+import type { AffordanceKind } from './contract/index.ts'
 import type { AuthorAdapter, Fact } from './facts/adapt.ts'
 import type { KeyId } from './ui/keys.ts'
-import type { AffordanceKind, Node } from './ui/node.ts'
+import type { Node } from './ui/node.ts'
 import type { ThemeChanges } from './ui/theme.ts'
 import type { View } from './views/entries.ts'
 
+export type { AffordanceKind } from './contract/index.ts'
 export type { AuthorAdapter, Fact } from './facts/adapt.ts'
 export type { Entry } from './models/transcript.ts'
 export type { KeyId } from './ui/keys.ts'
 export type { Mark } from './ui/theme.ts'
 export type { Background, ThemeChanges } from './ui/theme.ts'
-export type { AffordanceKind, Node } from './ui/node.ts'
+export type { Node } from './ui/node.ts'
 export type { View, Views } from './views/entries.ts'
 
 /** A screen a plugin places in the transcript's place: the key its plugin offers, and how it draws. */

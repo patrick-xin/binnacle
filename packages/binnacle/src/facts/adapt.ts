@@ -1,20 +1,3 @@
-/**
- * The facts adapter: one dsh session event as one fact.
- *
- * This is where dsh's event shapes are read, and nowhere else below the host;
- * everything above it knows only the facts it returns. Every kind dsh knows
- * is named in the kinds table (`kinds.ts`): a kind named `read` has an
- * adapter here; a kind named `quiet` becomes a `quiet` fact, which the
- * transcript draws as nothing; a kind named `unread`, and a kind dsh does
- * not know at all, is an `unknown` fact carrying its raw record, so the
- * fallback view can show it — dsh has already refused any log whose unknown
- * events are not marked ignorable, so what arrives here unadapted is a kind
- * binnacle has not learned yet, never one it may silently drop. A surface
- * event dsh logged as a replacement is never read as a row: the append-origin
- * events alone are the transcript's source material, as dsh's own
- * `isAppendSurfaceEvent` has it, so a replacement becomes a `quiet` fact.
- */
-
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { describe } from '../contract/index.ts'
@@ -212,7 +195,8 @@ export type AuthorAdapter = (event: SessionEvent) => { readonly name: string, re
 /**
  * A replacement as a quiet fact: a surface event that shadowed a range instead of appending to the tail, whose copy
  * stays model-only (`dsh:packages/core/session/src/surface.ts#isAppendSurfaceEvent`), so it draws as nothing and its
- * record is kept for a view an author registers for its kind.
+ * record is kept for a view an author registers for its kind. The append-origin events alone are the transcript's
+ * source material, so a replacement is never read as a row.
  * @param event - the replacement, as dsh logged it.
  * @returns the quiet fact of it.
  */
@@ -346,6 +330,10 @@ function authored(event: SessionEvent, author: AuthorAdapter): Fact {
 
 /**
  * Adapt one session event.
+ *
+ * A kind the kinds table names `unread`, or one dsh does not know at all, becomes an `unknown` fact carrying its raw
+ * record, so the fallback view can show it; it is never dropped. dsh has already refused any log whose unknown events
+ * are not marked ignorable, so what arrives here unadapted is a kind binnacle has not learned yet.
  * @param event - the event, as dsh logged it.
  * @param authors - authors' adapters by event type; one for a kind binnacle also reads wins.
  * @returns the fact it is; `unknown` when no adapter reads its kind.

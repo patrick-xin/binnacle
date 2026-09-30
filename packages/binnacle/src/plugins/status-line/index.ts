@@ -1,17 +1,12 @@
-/**
- * The Status line: one line under the composer saying what the session runs
- * and where it stands — the model it runs, the tokens it has used and the
- * share of its context, muted — with a notice in its place while one stands. A built-in plugin, holding only what an
- * author holds: the `binnacle` service, to place its line where an author
- * could place one of their own. What it says arrives in the surface the host
- * hands every lines drawing, read live from the session, so it names no
- * service of dsh's and reads nothing at any tick of its own.
- */
-
 import type { Context } from '@deepseek-ai/cordis'
 import type { Surface } from '../../api.ts'
 
-/** The Status line plugin, loaded by the host beside the surface it draws on. */
+/**
+ * The Status line plugin, loaded by the host beside the surface it draws on.
+ * What it says arrives in the surface the host hands every lines drawing,
+ * read live from the session, so it names no service of dsh's and reads
+ * nothing at any tick of its own.
+ */
 export const statusLine = {
   name: 'status-line',
   inject: ['binnacle'] satisfies (keyof Context)[],

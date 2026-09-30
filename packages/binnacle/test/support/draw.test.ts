@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Text } from '@earendil-works/pi-tui'
-import { drawText } from '../../src/ui/draw.ts'
+import { drawText } from './draw.ts'
 
 test('a component is drawn at a width as the lines a person reads', () => {
   assert.deepEqual(drawText(new Text('the quick brown fox jumps', 0, 0), 10), ['the quick', 'brown fox', 'jumps'])

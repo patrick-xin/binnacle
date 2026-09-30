@@ -1,12 +1,4 @@
 /**
- * The contract: what layers that otherwise know nothing of each other share.
- *
- * Content offers affordances; a region of the screen carries them; a gesture
- * lands on regions and means an action, or nothing.
- * Nothing here draws or reads input; it imports nothing.
- */
-
-/**
  * Every affordance, and its policy. `pointer` says whether a click may invoke
  * it: a grant and a dismiss never, so an approval is always answered by a key
  * pressed on purpose — allowed or refused.

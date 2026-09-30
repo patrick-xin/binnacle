@@ -18,10 +18,11 @@ Standing orders — the one page here that binds. A record is evidence, never a 
 | `dsh --profile binnacle` | run it |
 | `pnpm upstream` | list each release upstream has published past a pin |
 | `pnpm pin <name> <tag>` | move a pin, and every package that follows it |
+| `pnpm map [folder]` | what each file under `src/` is for, what it exports, who imports it, and what the author API takes from it |
 
 Agents here work in roles, each with a skill in [`.agents/skills`](.agents/skills): the Sheepdog coordinates (`sheepdog`), a Sheep builds one issue (`sheep`), a reviewer checks a change (`review`), and every change's tests follow `tdd`. Load yours first.
 
-Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.ts`; what each may import is [`layers.json`](packages/binnacle/layers.json), and a gate's error says what to change. What each layer is for, how they connect, and where a change goes is [the package map](packages/binnacle/README.md).
+Code lives in `packages/binnacle/src/<layer>/`, and the author API in `src/api.ts`; what each may import is [`layers.json`](packages/binnacle/layers.json), and a gate's error says what to change. **Each folder under `src/` has an `AGENTS.md`**: a line for each file saying what it is for, and what binds every file there. Read it before opening a file in that folder; [`src/AGENTS.md`](packages/binnacle/src/AGENTS.md) says where a change goes. How a session and a gesture pass through the layers is [the package README](packages/binnacle/README.md).
 
 ## One root
 
@@ -55,7 +56,7 @@ dsh is a preview; a release may rename anything. [ADR 3](docs/adr/0003-dsh-is-re
 - **A type lives with the layer that owns its meaning.** `contract` holds what otherwise-independent layers share; who may import it is `layers.json`'s.
 - **An error names what to change.** A seam that cannot hold throws where it is crossed, never degrades quietly. Author code is fenced: what an author's adapter or view does wrong is drawn, naming the registration and why, and never takes the surface down.
 - **Names say what a thing is:** files kebab-case, one job each; named exports only; service names camelCase, dotted when grouped; an event is `binnacle/<name>`. A file is split when a part earns its own behaviour, dependencies or tests.
-- **Every source file opens with a block saying what it is for, and every export carries JSDoc.** Document the contract, including what types cannot say: units, ordering, ownership, lifecycle, failure, a return that is not obvious. Explain a constraint where a plausible simplification would break it. Never repeat a name or a type in prose; an empty `catch` names what it swallows.
+- **A file says what it is for in a line of its folder's `AGENTS.md`, never in a block of its own, and every export carries JSDoc.** Document the contract, including what types cannot say: units, ordering, ownership, lifecycle, failure, a return that is not obvious. Explain a constraint where a plausible simplification would break it. Never repeat a name or a type in prose; an empty `catch` names what it swallows.
 - **Markers by urgency:** `FIXME` blocks a release, `TODO` is soon, `XXX` is someday.
 
 ## Tests
@@ -67,7 +68,7 @@ The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/
 - **Expected values come from outside the code** — a literal, a worked example, upstream's behaviour — never recomputed the way the code computes them.
 - **Assert the contract, not the implementation**; a test written against working code cannot disagree with it.
 - **Prefer the real implementation over a fake.** Fake the terminal and the model; keep everything downstream real, dsh's own functions included.
-- **What a person sees is asserted as lines**, drawn by `drawText` (`binnacle:packages/binnacle/src/ui/draw.ts#drawText`) through real pi-tui components — never by reading a component's fields.
+- **What a person sees is asserted as lines**, drawn by `drawText` (`binnacle:packages/binnacle/test/support/draw.ts#drawText`) through real pi-tui components — never by reading a component's fields.
 - **A registration proves its disposal.** Dispose the fiber and assert the contribution is gone.
 - **A guard is shown to bind.** Break what a gate or type-level test holds once, watch it fail, and say so in the commit.
 - **Test the real entry path**: load the built bundle under plain `node`, and boot it under the real launcher.
@@ -78,7 +79,8 @@ The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/
 | Record | Home |
 |---|---|
 | what it commits to, and why | [`docs/architecture.md`](docs/architecture.md) |
-| how the code is laid out: what each layer is for, how they connect, and where a change goes | [`packages/binnacle/README.md`](packages/binnacle/README.md) |
+| what each file is for, what binds every file in a folder, and where a change goes | the folder's `AGENTS.md` under `packages/binnacle/src/`, held by `check:notes` |
+| how a session and a gesture pass through the layers | [`packages/binnacle/README.md`](packages/binnacle/README.md) |
 | a decision that binds beyond one feature: why, and what it beat | a decision record in [`docs/adr/`](docs/adr/) |
 | what a person can do with a feature, how its parts work together, and its choices | its page in [`docs/features/`](docs/features/), listed in [the feature map](docs/features.md) |
 | what a term means, and whose word it is | [`docs/glossary.md`](docs/glossary.md) |

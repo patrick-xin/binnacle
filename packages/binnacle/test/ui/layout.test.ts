@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import { layout, under } from '../../src/ui/layout.ts'
 import type { Frame } from '../../src/ui/layout.ts'
-import { drawText } from '../../src/ui/draw.ts'
+import { drawText } from '../support/draw.ts'
 import { componentOf } from '../support/drawn.ts'
 import { binnacleTheme, themed } from '../../src/ui/theme.ts'
 

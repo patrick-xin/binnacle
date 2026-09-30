@@ -1,17 +1,3 @@
-/**
- * The tool cards: each tool call drawn from what its tool presents — a title
- * saying what the call does, and once it returns, what it returned folded
- * beneath — rather than as its name and raw JSON.
- *
- * binnacle's first built-in plugin, holding only what an author holds:
- * the author API, type-only; the `binnacle` service, to register a view for
- * the `tool` entry kind; and dsh's `tools` service, to reach the definition
- * that presents each call. Where it cannot draw from a presentation it leaves
- * the entry to the view beneath it, binnacle's own card; a presenter that
- * throws also says so beneath that card, naming the tool, the presenter and
- * why, in error, so the seam never degrades quietly.
- */
-
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { Node, View } from '../../api.ts'
@@ -31,7 +17,10 @@ export const toolCards = {
 /**
  * The view of a tool entry this plugin registers: the call as its mark and
  * the title its tool presented, and once it returns, what it returned folded
- * beneath, as its tool presents it.
+ * beneath, as its tool presents it. Where it cannot draw from a presentation
+ * it leaves the entry to the view beneath it, binnacle's own card; what a
+ * presenter does wrong is said beneath that card, naming the tool, the
+ * presenter and why, in error, so the seam never degrades quietly.
  * @param tools - dsh's tool registry, reached through the `tools` service.
  * @returns the view.
  */

@@ -30,6 +30,7 @@
       "views"
     ],
     "api.ts": [
+      "contract",
       "facts",
       "models",
       "ui",

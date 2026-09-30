@@ -1,22 +1,3 @@
-/**
- * The host: the one layer that touches the terminal and the process.
- *
- * It reads the invocation through dsh's command line, and once the launcher
- * commits startup it opens a session on the default model. With `--check`
- * it reports the model and closes it; otherwise it takes the terminal until
- * the person quits, on the screen they asked for and switch to: the alternate
- * screen, the transcript in a scroll view that follows its end, or the main
- * screen, the transcript printed into the scrollback; the composer below
- * either; and, on the key a plugin offered, a screen it placed in the
- * transcript's place there, to which the person is switched while it is
- * open.
- * It provides the `binnacle` service authors register through, and reads the
- * whole log again when an adapter comes or goes. A failure it cannot recover from gives
- * back what it took, a terminal half-started included, says what failed, and
- * asks the launcher to exit 1. Every layer below it is a function of facts,
- * UI state and a size; this is where those meet a real process.
- */
-
 import { Command, Option } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
@@ -533,7 +514,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
 }
 
 /**
- * Parse the invocation and, once startup commits, open a session and check or draw it.
+ * Parse the invocation and, once startup commits, open a session and check or draw it. A failure it cannot recover
+ * from gives back what it took, a terminal half-started included, says what failed, and asks the launcher to exit 1.
  * @param ctx - the row's context, carrying the launcher's command line, exit request and readiness, and dsh's agents and default model.
  */
 export function apply(ctx: Context): void {

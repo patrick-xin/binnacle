@@ -1,12 +1,3 @@
-/**
- * The built-in views: how each kind of transcript entry is drawn.
- *
- * Each returns nodes and declares what its content offers; none reads input
- * or holds a pi-tui component. A quiet entry's built-in drawing is no lines
- * at all — the session's machinery, which an author's view for its kind
- * draws again — though what a view over it did wrong is still said.
- */
-
 import type { Block, Fact } from '../facts/adapt.ts'
 import type { Entry } from '../models/transcript.ts'
 import { describe } from '../contract/index.ts'

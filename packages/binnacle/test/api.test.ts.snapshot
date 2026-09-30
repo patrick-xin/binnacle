@@ -1,0 +1,434 @@
+exports[`an author reaches exactly these declarations: changing one changes what authors depend on, and this snapshot 1`] = `
+// contract/index.d.ts
+export type AffordanceKind = keyof typeof affordances;
+// contract/index.d.ts
+export declare const affordances: {
+    readonly expand: {
+        readonly pointer: true;
+    };
+    readonly choose: {
+        readonly pointer: true;
+    };
+    readonly open: {
+        readonly pointer: true;
+    };
+    readonly copy: {
+        readonly pointer: true;
+    };
+    readonly answer: {
+        readonly pointer: true;
+    };
+    readonly grant: {
+        readonly pointer: false;
+    };
+    readonly dismiss: {
+        readonly pointer: false;
+    };
+};
+// facts/adapt.d.ts
+export type AuthorAdapter = (event: SessionEvent) => {
+    readonly name: string;
+    readonly data: unknown;
+};
+// SessionEvent ← @deepseek-ai/dsh-session
+// facts/adapt.d.ts
+export type Fact = (Logged & {
+    readonly kind: 'turn';
+    readonly turn: number;
+    readonly phase: 'start' | 'end';
+    readonly ending?: string;
+}) | (Logged & {
+    readonly kind: 'step';
+    readonly turn: number;
+    readonly step: number;
+    readonly phase: 'start' | 'end';
+}) | (Logged & {
+    readonly kind: 'prompt';
+    readonly blocks: readonly Block[];
+}) | (Logged & {
+    readonly kind: 'context';
+    readonly source: string;
+    readonly blocks: readonly Block[];
+}) | (Logged & {
+    readonly kind: 'answer';
+    readonly turn: number;
+    readonly step: number;
+    readonly provider: string;
+    readonly model: string;
+    readonly interrupted: boolean;
+    readonly blocks: readonly Block[];
+}) | (Logged & {
+    readonly kind: 'call';
+    readonly turn: number;
+    readonly step: number;
+    readonly callId: string;
+    readonly name: string;
+    readonly arguments: string;
+}) | (Logged & {
+    readonly kind: 'result';
+    readonly turn: number;
+    readonly step: number;
+    readonly callId: string;
+    readonly failed: boolean;
+    readonly failure?: {
+        readonly name: string;
+        readonly code: string;
+        readonly reason?: string;
+    };
+    readonly blocks: readonly Block[];
+    readonly meta: unknown;
+}) | (Logged & {
+    readonly kind: 'run';
+    readonly commandId: CommandId;
+    readonly name: string;
+    readonly args?: string;
+    readonly source: string;
+}) | (Logged & {
+    readonly kind: 'done';
+    readonly commandId: CommandId;
+    readonly outcome: 'success' | 'error';
+    readonly text?: string;
+    readonly sourceEventSeq?: SessionSeq;
+}) | (Logged & {
+    readonly kind: 'authored';
+    readonly name: string;
+    readonly data: unknown;
+}) | (Logged & {
+    readonly kind: 'asked';
+    readonly id: ApprovalRequestId;
+    readonly toolName: string;
+    readonly callId?: ToolCallId;
+    readonly reason?: string;
+}) | (Logged & {
+    readonly kind: 'decided';
+    readonly id: ApprovalRequestId;
+    readonly outcome: ApprovalOutcome;
+}) | (Logged & {
+    readonly kind: 'start';
+    readonly compactionId: CompactionId;
+}) | (Logged & {
+    readonly kind: 'summary';
+    readonly compactionId: CompactionId;
+    readonly items: number;
+    readonly tokens: number;
+    readonly blocks: readonly Block[];
+}) | (Logged & {
+    readonly kind: 'end';
+    readonly compactionId: CompactionId;
+    readonly error?: string;
+}) | (Logged & {
+    readonly kind: 'quiet';
+    readonly type: string;
+    readonly record: unknown;
+}) | (Logged & {
+    readonly kind: 'unknown';
+    readonly type: string;
+    readonly record: unknown;
+    readonly problem?: string;
+});
+// facts/adapt.d.ts
+interface Logged {
+    readonly seq: number;
+    readonly time: number;
+}
+// facts/adapt.d.ts
+export type Block = {
+    readonly kind: 'text';
+    readonly text: string;
+} | {
+    readonly kind: 'reasoning';
+    readonly text: string;
+} | {
+    readonly kind: 'unread';
+    readonly type: string;
+};
+// CommandId ← @deepseek-ai/dsh-commands
+// SessionSeq ← @deepseek-ai/dsh-session
+// ApprovalRequestId ← @deepseek-ai/dsh-user-approval
+// ToolCallId ← @deepseek-ai/dsh-llm
+// ApprovalOutcome ← @deepseek-ai/dsh-user-approval
+// CompactionId ← @deepseek-ai/dsh-compaction
+// models/transcript.d.ts
+export type Entry = Single<Exclude<Alone, 'prompt'>> | {
+    readonly kind: 'prompt';
+    readonly fact: FactOf<'prompt'>;
+    readonly steer?: true;
+} | {
+    readonly kind: 'tool';
+    readonly call: FactOf<'call'>;
+    readonly result?: FactOf<'result'>;
+    readonly left?: string;
+} | {
+    readonly kind: 'approval';
+    readonly asked: FactOf<'asked'>;
+    readonly decided?: FactOf<'decided'>;
+} | {
+    readonly kind: 'command';
+    readonly run: FactOf<'run'>;
+    readonly done?: FactOf<'done'>;
+} | {
+    readonly kind: 'compaction';
+    readonly start: FactOf<'start'>;
+    readonly summary?: FactOf<'summary'>;
+    readonly end?: FactOf<'end'>;
+};
+// models/transcript.d.ts
+type Single<K extends Fact['kind']> = K extends unknown ? {
+    readonly kind: K;
+    readonly fact: FactOf<K>;
+} : never;
+// models/transcript.d.ts
+type FactOf<K extends Fact['kind']> = Extract<Fact, {
+    readonly kind: K;
+}>;
+// models/transcript.d.ts
+type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'authored' | 'unknown' | 'quiet';
+// KeyId ← @earendil-works/pi-tui
+// ui/theme.d.ts
+export type Mark = keyof typeof marks | (string & {});
+// ui/theme.d.ts
+export declare const marks: {
+    readonly running: {
+        readonly glyph: '●';
+        readonly tone: 'muted';
+    };
+    readonly done: {
+        readonly glyph: '●';
+        readonly tone: 'success';
+    };
+    readonly failed: {
+        readonly glyph: '✗';
+        readonly tone: 'error';
+    };
+    readonly problem: {
+        readonly glyph: '✗';
+        readonly tone: 'error';
+    };
+    readonly prompt: {
+        readonly glyph: '›';
+        readonly tone: 'accent';
+    };
+    readonly steer: {
+        readonly glyph: '↳';
+        readonly tone: 'accent';
+    };
+    readonly thinking: {
+        readonly glyph: '∴';
+        readonly tone: 'muted';
+    };
+    readonly context: {
+        readonly glyph: '⋯';
+        readonly tone: 'muted';
+    };
+    readonly approval: {
+        readonly glyph: '⚑';
+        readonly tone: 'warning';
+    };
+    readonly unknown: {
+        readonly glyph: '?';
+        readonly tone: 'muted';
+    };
+    readonly compaction: {
+        readonly glyph: '≡';
+        readonly tone: 'muted';
+    };
+};
+// ui/theme.d.ts
+export type Background = keyof typeof backgrounds | (string & {});
+// ui/theme.d.ts
+export declare const backgrounds: {
+    readonly prompt: (text: string) => string;
+};
+// ui/theme.d.ts
+export interface ThemeChanges {
+    readonly tones?: {
+        readonly [name: string]: Style;
+    };
+    readonly backgrounds?: {
+        readonly [name: string]: Colour;
+    };
+    readonly chrome?: {
+        readonly focus?: string;
+        readonly cut?: string;
+        readonly separator?: string;
+        readonly jump?: string;
+        readonly border?: {
+            readonly [piece in keyof typeof chrome.border]?: string;
+        };
+    };
+    readonly words?: {
+        readonly [word in keyof typeof words]?: string;
+    };
+    readonly folds?: {
+        readonly [key: string]: FoldStart;
+    };
+    readonly marks?: {
+        readonly [name: string]: {
+            readonly glyph?: string;
+            readonly tone?: Tone;
+        };
+    };
+}
+// ui/theme.d.ts
+export declare const tones: {
+    readonly accent: (text: string) => string;
+    readonly muted: (text: string) => string;
+    readonly dim: (text: string) => string;
+    readonly success: (text: string) => string;
+    readonly warning: (text: string) => string;
+    readonly error: (text: string) => string;
+};
+// ui/theme.d.ts
+export interface Style {
+    readonly color?: Colour;
+    readonly bold?: boolean;
+    readonly dim?: boolean;
+    readonly italic?: boolean;
+    readonly underline?: boolean;
+}
+// ui/theme.d.ts
+export type Colour = typeof colours[number];
+// ui/theme.d.ts
+export declare const colours: readonly ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'];
+// ui/theme.d.ts
+export declare const chrome: {
+    readonly focus: '▸';
+    readonly cut: '…';
+    readonly separator: '·';
+    readonly border: {
+        readonly topLeft: '╭';
+        readonly horizontal: '─';
+        readonly topRight: '╮';
+        readonly side: '│';
+        readonly bottomLeft: '╰';
+        readonly bottomRight: '╯';
+    };
+    readonly jump: '↓';
+};
+// ui/theme.d.ts
+export declare const words: {
+    readonly holds: (count: number) => string;
+    readonly cut: (count: number) => string;
+    readonly less: 'show less';
+    readonly show: (count: number) => string;
+    readonly away: 'fold it away';
+    readonly to: (count: number) => string;
+};
+// ui/theme.d.ts
+export interface FoldStart {
+    readonly rows?: number;
+    readonly open?: boolean;
+}
+// ui/theme.d.ts
+export type Tone = keyof typeof tones | (string & {});
+// ui/node.d.ts
+export type Node = {
+    readonly kind: 'blank';
+} | {
+    readonly kind: 'text';
+    readonly text: string | readonly Span[];
+    readonly tone?: Tone;
+} | {
+    readonly kind: 'markdown';
+    readonly text: string;
+} | {
+    readonly kind: 'stack';
+    readonly children: readonly Node[];
+} | {
+    readonly kind: 'offer';
+    readonly id: string;
+    readonly affordances: readonly Affordance[];
+    readonly child: Node;
+} | {
+    readonly kind: 'card';
+    readonly title?: string;
+    readonly background?: Background;
+    readonly edge?: Tone;
+    readonly child: Node;
+} | {
+    readonly kind: 'band';
+    readonly background: Background;
+    readonly child: Node;
+} | {
+    readonly kind: 'fold';
+    readonly id: string;
+    readonly title?: readonly Span[];
+    readonly tone?: Tone;
+    readonly rows?: number;
+    readonly child: Node;
+};
+// ui/node.d.ts
+export type Span = string | {
+    readonly text: string;
+    readonly tone: Tone;
+} | {
+    readonly mark: Mark;
+    readonly tone?: Tone;
+}
+ | {
+    readonly since: number;
+    readonly tone?: Tone;
+};
+// contract/index.d.ts
+export interface Affordance {
+    readonly kind: AffordanceKind;
+    readonly label: string;
+}
+// views/entries.d.ts
+export type View = (entry: Entry, next: () => Node) => Node;
+// views/entries.d.ts
+export type Views = ReadonlyMap<string, readonly View[]>;
+// api.d.ts
+export interface PlacedScreen {
+    readonly key: KeyId;
+    readonly description: string;
+    readonly draw: (facts: readonly Fact[]) => Node;
+}
+// api.d.ts
+export interface Surface {
+    readonly model: string;
+    readonly running: boolean;
+    readonly usage?: {
+        readonly input: number;
+        readonly output: number;
+        readonly cacheRead: number;
+    };
+    readonly context?: {
+        readonly used: number;
+        readonly window: number;
+    };
+    readonly notice?: string;
+}
+// api.d.ts
+export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-composer';
+// api.d.ts
+export type Placement = {
+    readonly kind: 'transcript';
+} | {
+    readonly kind: 'composer';
+    readonly submit: (text: string) => void;
+} | {
+    readonly kind: 'lines';
+    readonly draw: (facts: readonly Fact[], surface: Surface) => Node;
+    readonly invoke?: (region: string, affordance: AffordanceKind) => void;
+};
+// api.d.ts
+export interface Registrations {
+    facts(type: string, adapter: AuthorAdapter): () => void;
+    view(key: string, view: View): () => void;
+    invalidate(key: string): void;
+    screen(name: string, screen: PlacedScreen): () => void;
+    place(slot: Slot, placement: Placement): () => void;
+    theme(changes: ThemeChanges): () => void;
+    keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void;
+    send(text: string): void;
+    command(line: string): Promise<boolean>;
+}
+// api.d.ts
+declare module '@deepseek-ai/cordis' {
+    interface Context {
+        binnacle: Registrations;
+    }
+}
+
+`;

@@ -1,13 +1,10 @@
-/**
- * UI state: what a person has changed about how the session is shown.
- *
- * Never a copy of the session: that is the log's. Only what they opened and
- * what has focus; where they scrolled and what they selected are pi-tui's.
- */
-
 import type { Action } from '../contract/index.ts'
 
-/** What a person has changed about the screen. */
+/**
+ * What a person has changed about the screen. Never a copy of the session:
+ * that is the log's. Only what they opened and what has focus; where they
+ * scrolled and what they selected are pi-tui's.
+ */
 export interface UiState {
   /** The ids of the folds they toggled from how they start — open where they start folded, folded where they start open — each scoped to the entry that drew it. */
   readonly toggled: ReadonlySet<string>

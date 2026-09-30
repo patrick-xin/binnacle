@@ -1,10 +1,3 @@
-/**
- * Reading an author's theme registration: data from code binnacle does not
- * own, checked where it enters and copied, so a theme that names what
- * binnacle cannot draw is refused at its registration, saying what to
- * change, and nothing of it runs later.
- */
-
 import { visibleWidth } from '@earendil-works/pi-tui'
 import { chrome, colours, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
@@ -110,7 +103,10 @@ function known<T>(value: unknown, at: string, allowed: readonly string[], read: 
 }
 
 /**
- * Read a theme registration's changes from code binnacle does not own.
+ * Read a theme registration's changes from code binnacle does not own:
+ * checked here, where they enter, and copied, so a theme that names what
+ * binnacle cannot draw is refused at its registration, and nothing of it
+ * runs later.
  * @param value - what the author registered.
  * @param theme - the theme it is laid over, as the registrations leave it now: a mark it has may be changed in part, and a tone it gives, or the changes add, may be named.
  * @returns the changes, as data of binnacle's own.
