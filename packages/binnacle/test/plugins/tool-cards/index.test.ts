@@ -140,6 +140,18 @@ test('a presented call draws each call its run_code program made beneath its hea
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ ● grep {}', '│   ● read {}', '│ running 0s'])
 })
 
+test('a click on a card\'s head opens what it returned and a second folds it; a click on what it returned does nothing', async () => {
+  const { pane } = await withCards(read)
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  pane.push(returned('a\nb\nc\nd\ne'))
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ … 2 more lines'])
+  assert.equal(pane.handleMouse(pointer('click', 2, 4, 60)), undefined)
+  assert.deepEqual(pane.handleMouse(pointer('click', 0, 4, 60)), { handled: true })
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ d', '│ e'])
+  pane.handleMouse(pointer('click', 0, 4, 60))
+  assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ … 2 more lines'])
+})
+
 test('a completed call reads as the title its result presents, when it presents one', async () => {
   const build = defineTool({
     name: 'build',
@@ -475,7 +487,7 @@ test('a fold a person opened stays open when the plugin drawing it is disposed, 
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('a\nb\nc\nd\ne'))
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ … 2 more lines'])
-  assert.deepEqual(pane.handleMouse(pointer('click', 4, 2, 60)), { handled: true })
+  assert.deepEqual(pane.handleMouse(pointer('click', 0, 2, 60)), { handled: true })
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ b', '│ c', '│ d', '│ e'])
   await fiber.dispose()
   assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', '│ a', '│ b', '│ c', '│ d', '│ e'])

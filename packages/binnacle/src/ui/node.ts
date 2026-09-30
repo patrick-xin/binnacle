@@ -66,6 +66,8 @@ export type Node =
     readonly title: readonly Span[]
     /** The theme's tone the title is drawn in; the terminal's own when it has none. */
     readonly tone?: Tone
+    /** The id of a fold it holds that its title opens and folds, as the line that fold folds under; that fold's content then answers no click. */
+    readonly opens?: string
     /** What is shown, drawn beneath the title along the theme's gutter, which marks it as what the surface shows and did not write. */
     readonly child: Node
   }
@@ -166,9 +168,11 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
       const tone = field('tone')
       if (!Array.isArray(title)) throw new Error(`a show's title is ${describe(title)}`)
       if (tone !== undefined && (typeof tone !== 'string' || !Object.hasOwn(theme.tones, tone))) throw new Error(`${describe(tone)} is no tone`)
+      const opens = field('opens')
+      if (opens !== undefined && typeof opens !== 'string') throw new Error(`the fold a show opens is ${describe(opens)}`)
       const read = Array.from(title, span => spanOf(span, theme))
       const child = parseNode(field('child'), theme)
-      return tone === undefined ? { kind: 'show', title: read, child } : { kind: 'show', title: read, tone: tone as Tone, child }
+      return { kind: 'show', title: read, ...tone === undefined ? {} : { tone: tone as Tone }, ...opens === undefined ? {} : { opens }, child }
     }
     case 'band': {
       const background = field('background')

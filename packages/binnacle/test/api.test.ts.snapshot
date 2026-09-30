@@ -455,6 +455,7 @@ export type Node = {
     readonly kind: 'show';
     readonly title: readonly Span[];
     readonly tone?: Tone;
+    readonly opens?: string;
     readonly child: Node;
 } | {
     readonly kind: 'band';

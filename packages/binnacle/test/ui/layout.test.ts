@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
-import { layout, under } from '../../src/ui/layout.ts'
+import { extent, layout, under } from '../../src/ui/layout.ts'
 import type { Frame } from '../../src/ui/layout.ts'
+import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../support/draw.ts'
 import { componentOf } from '../support/drawn.ts'
 import { binnacleTheme, themed } from '../../src/ui/theme.ts'
@@ -388,4 +389,20 @@ test('a span that says the time until a moment counts down to it at the time it 
   assert.equal(until(6_000), 'in 4s')
   assert.equal(until(9_500), 'in 0s')
   assert.equal(until(12_000), 'in 0s')
+})
+
+test('a show that opens a fold it holds answers on its head for that fold, folded or open, and its content answers nothing', () => {
+  const card: Node = { kind: 'show', title: ['● pnpm test'], opens: 'output', child: { kind: 'fold', id: 'output', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } } }
+  for (const toggled of [new Set<string>(), new Set(['output'])]) {
+    const frame = layout(card, 40, { toggled })
+    assert.deepEqual(under(frame.regions, 0, 3).map(region => region.id), ['output'], [...toggled].join())
+    for (let row = 1; row < frame.lines.length; row++) assert.deepEqual(under(frame.regions, row, 3).filter(region => region.affordances.length > 0), [], `row ${row} ${[...toggled].join()}`)
+    assert.deepEqual(extent(frame.regions, 'output'), { top: 0, height: frame.lines.length }, 'focus brings the fold into view with its head')
+  }
+})
+
+test('whatever a show opens answers only on its head, however many folds its content names alike', () => {
+  const fold: Node = { kind: 'fold', id: 'output', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } }
+  const frame = layout({ kind: 'show', title: ['● twice'], opens: 'output', child: { kind: 'stack', children: [fold, fold] } }, 40, { toggled: new Set() })
+  for (let row = 1; row < frame.lines.length; row++) assert.deepEqual(under(frame.regions, row, 3).filter(region => region.affordances.length > 0), [], `row ${row}`)
 })

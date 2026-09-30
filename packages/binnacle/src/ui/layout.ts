@@ -231,9 +231,13 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
   const inner = width - SHOW_GUTTER
   const frame = drawn(node.child, inner < 1 ? width : inner, state, theme)
   const gutter = inTone(theme.chrome.gutter, 'dim', theme)
+  const opened = frame.regions.find(placed => placed.region.id === node.opens)
+  const head = opened === undefined ? [] : [{ region: opened.region, top: 0, height: title.length, left: 0, width }]
+  // The fold keeps its rows, offering nothing there, so what focus brings into view is all of it.
+  const held = frame.regions.map(placed => placed.region.id === node.opens ? { ...placed, region: { ...placed.region, affordances: [] } } : placed)
   return {
     lines: [...title, ...inner < 1 ? frame.lines : frame.lines.map(row => `${gutter} ${row}`)],
-    regions: frame.regions.map(placed => ({ ...placed, top: placed.top + title.length, left: placed.left + (inner < 1 ? 0 : SHOW_GUTTER) })),
+    regions: [...head, ...held.map(placed => ({ ...placed, top: placed.top + title.length, left: placed.left + (inner < 1 ? 0 : SHOW_GUTTER) }))],
   }
 }
 
@@ -259,6 +263,17 @@ function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, sta
     lines: box.render(width),
     regions: frame.regions.map(placed => ({ ...placed, top: placed.top + BAND_PAD, left: placed.left + BAND_PAD })),
   }
+}
+
+/**
+ * Every row a region is placed on, top to bottom: where its placements begin and how far they run.
+ * @returns undefined when nothing of that id is placed.
+ */
+export function extent(regions: readonly Placed[], id: string): { readonly top: number, readonly height: number } | undefined {
+  const placed = regions.filter(each => each.region.id === id)
+  if (placed.length === 0) return undefined
+  const top = Math.min(...placed.map(each => each.top))
+  return { top, height: Math.max(...placed.map(each => each.top + each.height)) - top }
 }
 
 export function under(regions: readonly Placed[], row: number, column: number): Region[] {

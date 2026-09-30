@@ -2,7 +2,7 @@
 
 A person reads each tool call as its tool presents it, rather than as its name and raw JSON: a title saying what this call does — `Read src/api.ts`, `pnpm test` — and once it returns, what it returned, folded beneath as the tool presents it, along the gutter that marks what the surface shows and did not write.
 
-The call stands as its mark says — `running` while it runs, `done` once it returned, `failed` in error, with why it failed when it gave a reason ([Theme](theme.md)) — and the completed call reads as the title its result presents, when it presents one. A click opens the fold, as anywhere else ([Keys](keys.md)).
+The call stands as its mark says — `running` while it runs, `done` once it returned, `failed` in error, with why it failed when it gave a reason ([Theme](theme.md)) — and the completed call reads as the title its result presents, when it presents one. A click on the head opens what it returned and a second folds it; a click on what it returned does nothing, so selecting it leaves it as it is ([Keys](keys.md)).
 
 ## How it works
 

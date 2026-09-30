@@ -588,7 +588,8 @@ test('where the terminal reports holding and releasing a key, as pi-tui asks a k
 })
 
 test('shift+tab steps in from the composer, enter opens the focused fold, and a key keys does not answer reaches the composer typed', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  // Tall enough for the card's head and all it returned, once open.
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([called(13, 'read'), returned(14, 13, 'w\nx\ny\nz')])
   const { session: sent, commit } = await mount([], session, async () => session, terminal)
   commit()
@@ -620,7 +621,7 @@ test('on the alternate screen, focus brings what it is on into view as it moves 
     terminal.type('\x1b[Z')
     await until(async () => {
       const rows = await terminal.altScreen()
-      return rows[0] === `│ w${entry}` && rows[3]?.includes('▸ show 1 more line') === true
+      return rows[0] === `● read${entry} {}` && rows[4]?.includes('▸ show') === true
     })
   }
 })
@@ -692,7 +693,8 @@ test('the label names whatever the one key table binds to jump to the end, so a 
 })
 
 test('from the main screen, a fold in a printed entry opens on the fullscreen by key, in view and focused, and the main screen is as it was after switching back', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  // Tall enough for the card's head and all it returned, once open.
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([prompt(1, 'fix the build'), called(2, 'read'), returned(3, 2, 'w\nx\ny\nz')])
   const { commit } = await mount(['--tui-mode', 'regular'], session, async () => session, terminal)
   commit()
@@ -736,14 +738,14 @@ test('focus the fullscreen gives back is brought into view, however far up the s
   commit()
   await until(async () => (await terminal.altScreen()).some(row => row.includes('read6')))
   for (let step = 0; step < 6; step++) terminal.type('\x1b[Z')
-  await until(async () => (await terminal.altScreen())[3]?.includes('▸ show 1 more line') === true)
+  await until(async () => (await terminal.altScreen())[0] === '● read1 {}')
   terminal.type('\x14')
   await until(async () => (await terminal.onAlternateScreen()) === false && (await terminal.mainScreen()).includes('● read6 {}'))
   terminal.type('\x14')
-  await until(async () => (await terminal.onAlternateScreen()) === true && (await terminal.altScreen())[0] === '│ w')
+  await until(async () => (await terminal.onAlternateScreen()) === true && (await terminal.altScreen())[0] === '● read1 {}')
   const rows = await terminal.altScreen()
-  assert.deepEqual(rows.slice(0, 4), ['│ w', '│ x', '│ y', '│ ▸ show 1 more line'])
-  assert.match(rows[4] ?? '', /Jump to latest/)
+  assert.deepEqual(rows.slice(0, 4), ['● read1 {}', '│ w', '│ x', '│ y'])
+  assert.match(rows[4] ?? '', /▸ show.*Jump to latest/)
 })
 
 test('typing on the main screen forgets where focus was, so enter back on the fullscreen sends what was typed', async () => {
@@ -1351,7 +1353,8 @@ test('disposing the plugin that rebound quit gives ctrl+c back', async () => {
 })
 
 test('a key a plugin binds to expand opens the focused fold, and one bound to copy does nothing on a fold, which offers no copy', async () => {
-  const terminal = new XtermTerminal(40, 8)
+  // Tall enough for the card's head and all it returned, once open.
+  const terminal = new XtermTerminal(40, 9)
   const session = new FakeSession([called(13, 'read'), returned(14, 13, 'w\nx\ny\nz')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => { author.binnacle.keys({ 'binnacle.expand': 'f6', 'binnacle.copy': 'f7' }) } })
