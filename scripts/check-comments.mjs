@@ -20,7 +20,8 @@ import { repositoryFiles } from './check-paths.mjs'
  * @returns {string[]} one line per comment refused, with its 1-based line.
  */
 export function longComments(path, text, names = [], read = []) {
-  const { comments } = parseSync(path, text)
+  const { program, comments } = parseSync(path, text)
+  const documentable = declarationsAndMembers(program)
   const lineOf = offset => text.slice(0, offset).split('\n').length
   const blocks = []
   for (const comment of comments) {
@@ -32,13 +33,30 @@ export function longComments(path, text, names = [], read = []) {
   const problems = []
   for (const block of blocks) {
     const said = block.value.split('\n').filter(line => line.replace(/^[\s*]*/, '').trim() !== '').length
-    const documents = lineOf(block.end + text.slice(block.end).search(/\S|$/))
-    if (said > 2 && !(block.type === 'Block' && block.value.startsWith('*') && read.some(({ line, end }) => line <= documents && documents <= end))) problems.push(`${path}:${lineOf(block.start)}: ${said} lines`)
+    const attached = block.end + text.slice(block.end).search(/\S|$/)
+    const documents = lineOf(attached)
+    if (said > 2 && !(block.type === 'Block' && block.value.startsWith('*') && documentable.has(attached) && read.some(({ line, end }) => line <= documents && documents <= end))) problems.push(`${path}:${lineOf(block.start)}: ${said} lines`)
     for (const cited of new Set(findCitations(block.value, names).map(citation => citation.name))) problems.push(`${path}:${lineOf(block.start)}: cites ${cited}`)
   }
   return problems
 }
 
+
+const MEMBERS = new Set(['TSPropertySignature', 'TSMethodSignature', 'TSIndexSignature', 'TSEnumMember', 'Property', 'PropertyDefinition', 'MethodDefinition'])
+const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'])
+
+/** Where each statement and each member starts, outside any function's body: what a JSDoc may document. */
+function declarationsAndMembers(program) {
+  const starts = new Set(program.body.map(node => node.start))
+  const visit = (node) => {
+    if (node === null || typeof node !== 'object') return
+    if (Array.isArray(node)) return node.forEach(visit)
+    if (MEMBERS.has(node.type)) starts.add(node.start)
+    for (const [key, value] of Object.entries(node)) if (!(FUNCTIONS.has(node.type) && key === 'body')) visit(value)
+  }
+  visit(program.body)
+  return starts
+}
 
 /**
  * Hold each file to the comments its baseline records: never more, and a baseline above what is left is lowered.

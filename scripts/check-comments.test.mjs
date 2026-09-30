@@ -61,3 +61,19 @@ test('only JSDoc an author reads may say more: a plain block, or a comment in a 
     assert.equal(longComments('a.ts', text, [], surface).length, 1, text)
   }
 })
+
+test('a comment in any function an author declaration holds is held to two lines, however the function is reached', () => {
+  const body = '{\n  /** one\n   * two\n   * three */\n}'
+  const cases = [
+    `/** Doc. */\nexport const a = () => ${body}, b = 1\n`,
+    `/** Doc. */\nexport const a = true ? () => ${body} : () => {}\n`,
+    `/** Doc. */\nexport const a = { run: () => ${body} }\n`,
+  ]
+  for (const text of cases) assert.equal(longComments('a.ts', text, [], authorSurface('a.ts', () => text)).length, 1, text)
+})
+
+test('the JSDoc of an author declaration\'s members, in an interface, a type or an object, may say more', () => {
+  const doc = '/**\n * One.\n * Two.\n * Three.\n */\n'
+  const text = `export interface A {\n${doc}  a: string\n}\nexport type B = {\n${doc}  b: string\n}\nexport const c = {\n${doc}  c: 1,\n}\n`
+  assert.deepEqual(longComments('a.ts', text, [], authorSurface('a.ts', () => text)), [])
+})
