@@ -1,6 +1,6 @@
 # 11. Placements reach the whole screen, and the built-in surface is placed through them
 
-- Status: accepted; widens placements in [ADR 2](0002-five-layers-and-the-registrations-an-author-shares.md)
+- Status: accepted; widens placements in [ADR 2](0002-five-layers-and-the-registrations-an-author-shares.md); the session on screen granted, updated in place
 - Date: 2026-09-26
 
 ## Context
@@ -15,7 +15,7 @@ pi lets an extension replace its header, footer and editor, place a widget near 
 
 **A placement is anywhere binnacle draws: the transcript, the composer, a line above or below them, a dialog over the page, a screen in its place, or a side panel. The built-in transcript and composer are placed through the registration an author uses.**
 
-- The host holds the terminal and the session, and lays out what is placed. What is placed is a registration, disposed with its plugin.
+- The host holds the terminal and opens the session, and lays out what is placed. What is placed is a registration, disposed with its plugin. The agent whose session is on screen is granted to plugins, so what a placement draws of the session it reads from dsh ([ADR 4](0004-a-fact-is-one-event-and-what-dsh-folds-is-taken-from-dsh.md)).
 - A placement holds blocks, as a view does ([ADR 10](0010-a-view-draws-with-blocks-binnacle-grows-on-request-in-the-themes-tones.md)), or a pane that draws them ([ADR 6](0006-a-pane-joins-views-to-pi-tui-and-the-host-keeps-only-what-is-impure.md)). It never holds a pi-tui component an author wrote.
 - What the host answers itself, such as quitting, stays the host's, whatever is placed.
 

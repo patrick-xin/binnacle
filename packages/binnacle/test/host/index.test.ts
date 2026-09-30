@@ -16,6 +16,11 @@ import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import * as host from '../../src/host/index.ts'
+import * as transcript from '../../src/plugins/transcript/index.ts'
+import * as composer from '../../src/plugins/composer/index.ts'
+import * as statusLine from '../../src/plugins/status-line/index.ts'
+import * as toolCards from '../../src/plugins/tool-cards/index.ts'
+import * as trajectory from '../../src/plugins/trajectory/index.ts'
 import type { OpenedSession } from '../../src/host/session.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
 import { FakeClock } from '../support/clock.ts'
@@ -69,8 +74,14 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
   }
 }
 
+/** A Cordis row, as binnacle's patch loads one: its module. */
+type Row = { readonly name: string, readonly inject: readonly (keyof Context)[], apply(ctx: Context): void }
+
+/** The built-in features binnacle's patch loads as rows beside the host's, in the order it inserts them. */
+const ROWS: readonly Row[] = [transcript, composer, statusLine, toolCards, trajectory]
+
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
-async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, clock: { now(): number, after(ms: number, then: () => void): () => void } = new FakeClock()) {
+async function mount(args: string[], session = new FakeSession(), open: () => Promise<OpenedSession> = async () => session, terminal = new FakeTerminal(), provide: (ctx: Context) => Promise<void> = async () => {}, clock: { now(): number, after(ms: number, then: () => void): () => void } = new FakeClock(), rows: readonly Row[] = ROWS) {
   const exits: number[] = []
   const out: string[] = []
   // The launcher's readiness: every listener runs once, in one go, at the commit — as the real one does (`dsh:apps/cli/src/profile-boot.ts#createAppReady`).
@@ -100,20 +111,37 @@ async function mount(args: string[], session = new FakeSession(), open: () => Pr
     },
   })
   ctx.provide('agents', {} as never)
-  // dsh's session projections, whose snapshot the real opening reads; the host's tests fake the session, so a stub answers the seam the row names.
-  ctx.provide('sessionProjections', { snapshot: () => ({ values: {} }) } as never)
+  // dsh's session projections, which the Status line reads for the agent on screen: a stub answering with what the fake session says dsh has measured.
+  ctx.provide('sessionProjections', { snapshot: () => ({ values: session.projections }), onChanged: (listener: () => void) => session.onProjections(listener) } as never)
   // dsh's default model, which opening a session reads; the host's tests fake the session, so nothing here varies it.
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
   // dsh's commands, which the row names; the host's tests fake the session, whose commands a test names, so nothing reads this.
   ctx.provide('commands', {} as never)
   const fiber = ctx.plugin(host)
   await fiber
+  for (const row of rows) void ctx.plugin(row)
   return { ctx, fiber, exits, out, terminal, session, commit: () => { committed = true; const run = [...listeners]; listeners.clear(); for (const listener of run) listener() } }
 }
 
-test('the row is named binnacle and needs the command line, the agents, the default model, the session projections and the commands', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model and the commands', () => {
   assert.equal(host.name, 'binnacle')
-  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'])
+  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'])
+})
+
+test('the host alone draws no built-in feature a patch row loads: no transcript, no status line, and no composer takes typing', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal, async () => {}, new FakeClock(), [])
+  commit()
+  await until(() => terminal.started)
+  await settle()
+  terminal.type('hello')
+  terminal.type('\r')
+  await settle()
+  const rows = await terminal.altScreen()
+  assert.equal(rows.some(row => row.includes('fix the build')), false, 'no transcript is drawn')
+  assert.equal(rows.some(row => row.includes('deepseek/deepseek-v4')), false, 'no status line is drawn')
+  assert.deepEqual(session.sent, [], 'no composer takes typing')
 })
 
 test('--check opens a session on the default model once startup commits, reports it, closes it, and exits 0 drawing nothing', async () => {
@@ -1082,13 +1110,13 @@ test('out of the box, the line under the composer names the model the session ru
   assert.ok(terminal.written.includes('\x1b[90mdeepseek/deepseek-v4\x1b[39m'), 'the model is drawn in the muted tone')
 })
 
-test('the line names the model the session runs, and follows it as the session stands elsewhere', async () => {
+test('the line names the model the session last asked for, and before its first request the one it opened on', async () => {
   const terminal = new XtermTerminal(40, 8)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { commit } = await mount([], session, async () => session, terminal)
   commit()
   await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
-  session.stands = { model: 'moonshot/kimi-k2', running: true }
+  session.asked = { provider: 'moonshot', model: 'kimi-k2' }
   session.standsChanged()
   await until(async () => (await terminal.altScreen()).at(-1) === 'moonshot/kimi-k2')
 })
@@ -1099,12 +1127,40 @@ test('the line names the tokens the session used and the share of its context, e
   const { commit } = await mount([], session, async () => session, terminal)
   commit()
   await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
-  session.stands = { model: 'deepseek/deepseek-v4', running: false, usage: { input: 12_000, output: 400, cacheRead: 0 } }
+  session.projections = { tokenUsage: { uncachedInputTokens: 12_000, outputTokens: 400, cacheReadTokens: 0 } }
   session.standsChanged()
   await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 12.4k tokens')
-  session.stands = { model: 'deepseek/deepseek-v4', running: false, usage: { input: 12_000, output: 400, cacheRead: 0 }, context: { used: 12_400, window: 32_768 } }
+  session.projections = { tokenUsage: { uncachedInputTokens: 12_000, outputTokens: 400, cacheReadTokens: 0 }, contextPressure: { projectedTokens: 12_400, contextWindow: 32_768 } }
   session.standsChanged()
   await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 12.4k tokens · 38% of context')
+})
+
+test('lines that read what no session event announces are drawn again when their plugin asks', async () => {
+  const terminal = new XtermTerminal(40, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  const read = { count: 0 }
+  const plugin: { redraw?: () => void } = {}
+  await ctx.plugin({ name: 'author', inject: ['binnacle'], apply: (author: Context) => {
+    author.binnacle.place('above-composer', { kind: 'lines', draw: () => ({ kind: 'text', text: `read ${read.count}` }) })
+    plugin.redraw = () => { author.binnacle.redraw() }
+  } })
+  commit()
+  await until(async () => (await terminal.altScreen()).some(row => row === 'read 0'))
+  read.count = 1
+  plugin.redraw?.()
+  await until(async () => (await terminal.altScreen()).some(row => row === 'read 1'))
+})
+
+test('the line follows the token meter\'s own change feed, not only the session\'s events', async () => {
+  const terminal = new XtermTerminal(60, 8)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4')
+  session.projections = { tokenUsage: { uncachedInputTokens: 900, outputTokens: 100, cacheReadTokens: 0 } }
+  session.projectionsChanged()
+  await until(async () => (await terminal.altScreen()).at(-1) === 'deepseek/deepseek-v4 · 1k tokens')
 })
 
 test('a notice stands in the line\'s place while one stands, and the line returns once it goes', async () => {
@@ -1704,22 +1760,31 @@ test('an ask still standing when the session closes goes to the next answerer, a
   assert.ok((await terminal.mainScreen()).every(row => !row.includes('which database?')), 'the card is gone from what the session left printed')
 })
 
-test('lines are handed where the session stands, and are drawn again as it changes', async () => {
+test('lines read what dsh knows of the session from the agent on screen and dsh\'s services, and are drawn again as it changes', async () => {
   const terminal = new XtermTerminal(60, 10)
   const session = new FakeSession([prompt(1, 'fix the build')])
   const { ctx, commit } = await mount([], session, async () => session, terminal)
   await ctx.plugin({
     name: 'author',
-    inject: ['binnacle'],
+    inject: ['binnacle', 'sessionProjections'],
     apply: (author: Context) => {
-      author.binnacle.place('above-composer', { kind: 'lines', draw: (_facts, surface) => ({ kind: 'text', text: `${surface.model} ${surface.running ? 'working' : 'idle'} ${surface.usage?.output ?? 0}` }) })
+      author.binnacle.place('above-composer', {
+        kind: 'lines',
+        draw: () => {
+          const agent = author.binnacle.agent()
+          const output = author.sessionProjections.snapshot(agent.session, ['tokenUsage']).values.tokenUsage?.outputTokens ?? 0
+          return { kind: 'text', text: `${agent.session.requestHeader()?.config.model ?? agent.options.model} ${agent.status === 'running' ? 'working' : 'idle'} ${output}` }
+        },
+      })
     },
   })
   commit()
-  await until(async () => (await terminal.altScreen()).some(row => row === 'deepseek/deepseek-v4 idle 0'))
-  session.stands = { model: 'moonshot/kimi-k2', running: true, usage: { input: 1200, output: 340, cacheRead: 0 } }
+  await until(async () => (await terminal.altScreen()).some(row => row === 'deepseek-v4 idle 0'))
+  session.asked = { provider: 'moonshot', model: 'kimi-k2' }
+  session.running = true
+  session.projections = { tokenUsage: { uncachedInputTokens: 1200, outputTokens: 340, cacheReadTokens: 0 } }
   session.standsChanged()
-  await until(async () => (await terminal.altScreen()).some(row => row === 'moonshot/kimi-k2 working 340'))
+  await until(async () => (await terminal.altScreen()).some(row => row === 'kimi-k2 working 340'))
 })
 
 /** A plugin that places the notice the session stands at above the composer, or nothing. */

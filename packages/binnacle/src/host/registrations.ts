@@ -1,5 +1,6 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
 import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Slot, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
@@ -7,8 +8,8 @@ import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
 import type { Theme } from '../ui/theme.ts'
 
-/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, or the theme. */
-export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys'
+/** What changed in the registrations, for a listener: the adapters, the views, the placed screens, the placements, the theme, the keys, or what a plugin's drawings read, which it asked to draw again. */
+export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys' | 'drawn'
 
 /** What the host performs the grants with, on the session it opened. */
 export interface GrantedSession {
@@ -23,6 +24,8 @@ export interface GrantedSession {
    * @returns whether a command ran.
    */
   command(line: string): Promise<boolean>
+  /** The agent whose session is on screen, as dsh holds it. */
+  readonly agent: Agent
 }
 
 /** The slots of the page, top to bottom. */
@@ -155,6 +158,12 @@ export class RegistrationService extends Service implements Registrations {
   }
 
   /** @inheritDoc */
+  agent(): Agent {
+    const session = this.granted
+    if (session === undefined) throw new Error('binnacle.agent: no session is open; the agent on screen can be read once the session opens, and until it closes')
+    return session.agent
+  }
+
   async command(line: string): Promise<boolean> {
     const session = this.granted
     if (session === undefined) throw new Error('binnacle.command: no session is open; a command can be run once the session opens, and until it closes')
@@ -191,6 +200,10 @@ export class RegistrationService extends Service implements Registrations {
    * @inheritDoc
    * The key's views are put back as a new stack, which is how a drawing knows it is stale.
    */
+  redraw(): void {
+    this.changed('drawn')
+  }
+
   invalidate(key: string): void {
     const stack = this.viewTable.get(key)
     if (stack === undefined) return

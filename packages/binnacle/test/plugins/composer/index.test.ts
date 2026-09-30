@@ -11,8 +11,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { RegistrationService } from '../../../src/host/registrations.ts'
-import { composer } from '../../../src/plugins/composer/index.ts'
+import * as composer from '../../../src/plugins/composer/index.ts'
 
 test('a line naming no command whose session closes under it sends nothing and rejects nothing', async () => {
   const ctx = new Context()
@@ -27,6 +28,7 @@ test('a line naming no command whose session closes under it sends nothing and r
   const close = registrations.open({
     send: (text) => { sent.push(text); throw new Error('binnacle.send: no session is open') },
     command: () => new Promise<boolean>(resolve => { gate.resolve = resolve }),
+    agent: {} as Agent,
   })
 
   // What the process holds against a plugin that leaves a rejection unhandled: heard here, so the test can name it.

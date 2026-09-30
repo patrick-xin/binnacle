@@ -33,7 +33,34 @@ test('plain node loads the built entry as a Cordis row, with no default export a
   assert.deepEqual(JSON.parse(run.stdout), {
     keys: ['apply', 'inject', 'name'],
     name: 'binnacle',
-    inject: ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'],
+    inject: ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'],
     apply: 'function',
   })
+})
+
+/** The built-in features the patch loads as rows of their own, in the order it inserts them. */
+const FEATURES = ['transcript', 'composer', 'status-line', 'tool-cards', 'trajectory']
+
+test('plain node loads each built-in feature\'s subpath, as the manifest exports it, as a Cordis row with no default export', () => {
+  for (const feature of FEATURES) {
+    const probe = `const m = await import('${manifest.name}/plugins/${feature}'); console.log(JSON.stringify({ keys: Object.keys(m).sort(), apply: typeof m.apply }))`
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], { cwd: packageDir, encoding: 'utf8' })
+    assert.equal(run.status, 0, `${feature}: ${run.stderr}`)
+    assert.deepEqual(JSON.parse(run.stdout), { keys: ['apply', 'inject', 'name'], apply: 'function' }, feature)
+    assert.deepEqual(manifest.exports[`./plugins/${feature}`], { types: `./dist/plugins/${feature}/index.d.ts`, default: `./dist/plugins/${feature}/index.js` }, feature)
+  }
+})
+
+test('the patch inserts a row for each built-in feature after binnacle\'s own, by an id a person disables it by, in order', () => {
+  const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+  const rows = [...patch.matchAll(/- id: (\S+)\n\s+name: '([^']+)'/g)].map(([, id, name]) => ({ id, name }))
+  const own = rows.findIndex(row => row.name === manifest.name)
+  assert.deepEqual(rows.slice(own, own + 1 + FEATURES.length), [
+    { id: 'binnacle', name: 'binnacle' },
+    { id: 'binnacle-transcript', name: 'binnacle/plugins/transcript' },
+    { id: 'binnacle-composer', name: 'binnacle/plugins/composer' },
+    { id: 'binnacle-status-line', name: 'binnacle/plugins/status-line' },
+    { id: 'binnacle-tool-cards', name: 'binnacle/plugins/tool-cards' },
+    { id: 'binnacle-trajectory', name: 'binnacle/plugins/trajectory' },
+  ])
 })

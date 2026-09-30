@@ -13,12 +13,13 @@ While it is open, it answers the transcript's gestures ([Keys](keys.md)): a clic
 
 ## How it works
 
-The Trajectory is a built-in plugin (`binnacle:packages/binnacle/src/plugins/trajectory/index.ts#trajectory`), placing its screen through the author API's `screen` registration (`binnacle:packages/binnacle/src/api.ts#Registrations`), drawn by the screen pane (`binnacle:packages/binnacle/src/panes/screen.ts#ScreenPane`) in the transcript's place. Its drawing (`binnacle:packages/binnacle/src/plugins/trajectory/draw.ts#drawTrajectory`) reads only the facts it is handed, never the events: what binnacle has read of an event is the fact, and what it has not is the record the fact carries, so no dsh shape is read here — the facts layer's is the only one. dsh web's Trajectory, a turn-aware ledger of every event (`dsh:packages/client/ui-trajectory/src/client/TrajectoryView.tsx`), is its model; its timeline, search and token counts are not taken.
+The Trajectory is a built-in plugin (`binnacle:packages/binnacle/src/plugins/trajectory/index.ts#apply`), placing its screen through the author API's `screen` registration (`binnacle:packages/binnacle/src/api.ts#Registrations`), drawn by the screen pane (`binnacle:packages/binnacle/src/panes/screen.ts#ScreenPane`) in the transcript's place. Its drawing (`binnacle:packages/binnacle/src/plugins/trajectory/draw.ts#drawTrajectory`) reads only the facts it is handed, never the events: what binnacle has read of an event is the fact, and what it has not is the record the fact carries, so no dsh shape is read here — the facts layer's is the only one. dsh web's Trajectory, a turn-aware ledger of every event (`dsh:packages/client/ui-trajectory/src/client/TrajectoryView.tsx`), is its model; its timeline, search and token counts are not taken.
 
 A frame costs what changed, as the transcript's does: the screen is laid out again as events arrive or a fold opens, never the whole session at every frame.
 
 ## Choices
 
+- The Trajectory is a row of binnacle's patch, `binnacle-trajectory`, so a person removes it by disabling that row in their profile's patch ([Authoring](authoring.md#removing-a-built-in-feature)).
 - The key, Ctrl+O, and what it is called in help, a person's to change through the one key table ([Keys](keys.md)).
 - One line per event, and what each line says: the kind first, then a few words — what a person sent, the tool a call asked for, which model answered, how a turn ended. The record beneath each line holds the rest.
 - A read fact's line opens to the fact binnacle read of it — the adapter's own words — while a quiet or unknown one opens to the event as logged. The fact is the honest record of what binnacle knows; the event is the fallback's.

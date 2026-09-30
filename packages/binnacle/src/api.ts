@@ -1,3 +1,4 @@
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { AffordanceKind } from './contract/index.ts'
 import type { AuthorAdapter, Fact } from './facts/adapt.ts'
 import type { KeyId } from './ui/keys.ts'
@@ -31,19 +32,12 @@ export interface PlacedScreen {
 }
 
 /**
- * Where the session stands, as the host reads it from the live session, never
- * folded again from the log: handed to what lines draw, read-only. What dsh
- * has not measured yet is absent.
+ * What binnacle itself says to the person while it stands, handed to what
+ * lines draw, read-only. What dsh knows of the session — its model, whether
+ * a turn runs, what it has measured — a drawing reads from dsh, through the
+ * agent `binnacle.agent()` hands it and the services its plugin names.
  */
 export interface Surface {
-  /** The model the session runs, as `provider/model`. */
-  readonly model: string
-  /** Whether a turn is running. */
-  readonly running: boolean
-  /** The tokens the session has used, as dsh's token meter counts them: sent, received, and read from the cache. */
-  readonly usage?: { readonly input: number, readonly output: number, readonly cacheRead: number }
-  /** How much of the model's context the session fills, in tokens, and the window it fills. */
-  readonly context?: { readonly used: number, readonly window: number }
   /** A notice for the person while one stands: what a second Ctrl+C does, or what went wrong. */
   readonly notice?: string
 }
@@ -77,10 +71,11 @@ export type Placement =
     readonly kind: 'lines'
     /**
      * How the lines draw, with nodes as a view draws, handed the session's
-     * facts and where the session stands, both read-only. It is called again
-     * as the facts arrive, where the session stands changes, the width or the
-     * theme changes, or the registrations change — not at every frame — so it
-     * is a function of what it is handed and of what its plugin read at the
+     * facts and what binnacle says, both read-only. It is called again as the
+     * session logs anything, as its agent starts or ends a turn, as a notice
+     * comes or goes, and as the width, the theme or the registrations change —
+     * not at every frame — so it is a function of what it is handed, of what
+     * dsh holds for the agent on screen, and of what its plugin read at the
      * last of those.
      */
     readonly draw: (facts: readonly Fact[], surface: Surface) => Node
@@ -123,6 +118,14 @@ export interface Registrations {
    * @param key - the entry kind, quiet kind's dsh event type, or fact name, as it was registered.
    */
   invalidate(key: string): void
+  /**
+   * Draw again, at the next frame, every placement's lines and every placed
+   * screen. They are drawn again as the session logs anything and as its
+   * agent starts or ends a turn, so a drawing that reads anything else — a
+   * dsh service's own change feed, a setting — calls this when what it read
+   * has changed.
+   */
+  redraw(): void
   /**
    * Place a screen in the transcript's place: drawn with nodes as a view
    * draws, in the alternate screen's scroll view, handed the session's facts
@@ -204,6 +207,20 @@ export interface Registrations {
    * @throws when no session is open — before it opens, or after it closes — saying so.
    */
   command(line: string): Promise<boolean>
+  /**
+   * The agent whose session is on screen, as dsh holds it: a grant, so what
+   * dsh knows of the session is read through dsh's own API, never a shape of
+   * binnacle's — the model it opened on (`agent.options`) and the one its
+   * session last asked for (`agent.session.requestHeader()`), whether a turn
+   * runs (`agent.status`), and what dsh's services keep for it
+   * (`ctx.sessionProjections.snapshot(agent.session, …)`, its plugin naming
+   * the service in `inject`). Lines are drawn again as the session logs
+   * anything and as its agent starts or ends a turn, so a drawing that reads
+   * it here stays current.
+   * @returns the agent, live: read it where it is used, rather than keeping what it said.
+   * @throws when no session is open — before it opens, or after it closes — saying so.
+   */
+  agent(): Agent
 }
 
 declare module '@deepseek-ai/cordis' {

@@ -14,12 +14,7 @@ import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
 import type { Placement, Slot, Surface } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
-import { composer as composerFeature } from '../plugins/composer/index.ts'
 import { questions } from '../plugins/questions/index.ts'
-import { statusLine } from '../plugins/status-line/index.ts'
-import { transcript as transcriptFeature } from '../plugins/transcript/index.ts'
-import { toolCards } from '../plugins/tool-cards/index.ts'
-import { trajectory } from '../plugins/trajectory/index.ts'
 import { RegistrationService } from './registrations.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
@@ -28,8 +23,8 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 /** The row's Cordis name, as the bundle patch inserts it. */
 export const name = 'binnacle'
 
-/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, the session projections the token meter's readings ride, and its commands. Each is a key dsh declares on `Context`. */
-export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'sessionProjections', 'commands'] satisfies (keyof Context)[]
+/** The services the row needs before it applies: the launcher's command line, dsh's agents, its default model, and its commands. Each is a key dsh declares on `Context`. */
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'] satisfies (keyof Context)[]
 
 /** Process-facing seams, replaced by tests. */
 export const internals: {
@@ -295,6 +290,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     else if (changed === 'keys') {
       table.bind(registrations.bindings)
       setKeybindings(table.manager)
+    } else if (changed === 'drawn') {
+      // What a plugin's drawings read changed where no session event says so; its lines are drawn again above, its placed screens here.
+      for (const pane of screenPanes.values()) pane.invalidate()
+      tui.requestRender()
     } else if (changed === 'placements') {
       page = arrange()
       stack(tui)
@@ -304,7 +303,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   // Where the session stands, as the session reads it live, with the notice the host raises laid over it: what lines
   // are handed, and drawn again as it changes.
   let notice: string | undefined
-  const surface = (): Surface => ({ ...session.standing(), ...notice === undefined ? {} : { notice } })
+  const surface = (): Surface => notice === undefined ? {} : { notice }
   const restand = (): void => {
     for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
     tui.requestRender()
@@ -360,7 +359,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   offer()
   const unoffer = session.onOffers(offer)
-  const closeGrants = registrations.open({ send: (text) => { session.send(text) }, command: line => session.command(line) })
+  const closeGrants = registrations.open({ send: (text) => { session.send(text) }, command: line => session.command(line), agent: session.agent })
   // The one key table, installed so the composer and the alternate screen read it too. It answers a press only, once,
   // wherever keys enter; nothing else in binnacle matches a key. Each placed screen offers its key in it, as a binding.
   const table = keyTable()
@@ -405,7 +404,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
         quit()
         return { consume: true }
       }
-      if (session.running) session.interrupt()
+      if (session.agent.status === 'running') session.interrupt()
       const quitKeys = table.manager.getKeys('binnacle.quit').join(', ')
       raise(`${quitKeys} again to quit`, quitWindow)
       arming = internals.clock.after(quitWindow, () => { arming = undefined })
@@ -428,7 +427,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     }
     // Interrupting is the host's to answer, as quitting is; while nothing runs, the key is the composer's, as any key
     // nothing answers.
-    if (resolved?.kind === 'interrupt' && session.running) {
+    if (resolved?.kind === 'interrupt' && session.agent.status === 'running') {
       session.interrupt()
       return { consume: true }
     }
@@ -520,12 +519,6 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
  */
 export function apply(ctx: Context): void {
   const registrations = new RegistrationService(ctx)
-  // The built-in features, loaded beside the surface they draw on: each holds only what an author holds, and its registrations are effects of its own fiber.
-  ctx.plugin(transcriptFeature)
-  ctx.plugin(composerFeature)
-  ctx.plugin(statusLine)
-  ctx.plugin(toolCards)
-  ctx.plugin(trajectory)
   let parsed: Mode | undefined
   parseCmdline(ctx, surfaceCommand((chosen) => { parsed = chosen }))
   if (parsed === undefined) return
@@ -570,7 +563,7 @@ export function apply(ctx: Context): void {
     }
     session = opened
     if (mode === 'check') {
-      internals.stdout.write(`binnacle: ok (${opened.model})\n`)
+      internals.stdout.write(`binnacle: ok (${opened.agent.options.provider}/${opened.agent.options.model})\n`)
       quit()
       return
     }
