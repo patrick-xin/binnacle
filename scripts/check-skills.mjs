@@ -13,7 +13,7 @@
 import { lstatSync, readdirSync, readFileSync, readlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { load } from 'js-yaml'
+import { load, YAMLException } from 'js-yaml'
 
 /**
  * What is at a path, a link read as itself.
@@ -39,7 +39,14 @@ export function findProblems(root) {
     if (at(file) === undefined) problems.push({ path: `.agents/skills/${name}`, problem: 'has no SKILL.md' })
     else {
       const front = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(readFileSync(file, 'utf8'))?.[1]
-      const called = front === undefined ? undefined : load(front)?.name
+      let called
+      try {
+        called = front === undefined ? undefined : load(front)?.name
+      } catch (error) {
+        if (!(error instanceof YAMLException)) throw error
+        problems.push({ path: `.agents/skills/${name}/SKILL.md`, problem: `has frontmatter that is not YAML (${error.reason} at ${error.mark.line + 2}:${error.mark.column + 1}); quote the value` })
+        continue
+      }
       if (called !== name) problems.push({ path: `.agents/skills/${name}/SKILL.md`, problem: `is named ${called ?? 'nothing'}; name it ${name}, as its folder is` })
     }
     if (at(join(links, name)) === undefined) problems.push({ path: `.agents/skills/${name}`, problem: `has no link; add .claude/skills/${name} -> ../../.agents/skills/${name}` })

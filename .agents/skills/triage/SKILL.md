@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Show what needs the maintainer's attention, and move issues between states: evaluated, verified, grilled if needed, and written into the template's shape for an agent.
+description: "Show what needs the maintainer's attention, and move issues between states: evaluated, verified, grilled if needed, and written into the template's shape for an agent."
 disable-model-invocation: true
 ---
 

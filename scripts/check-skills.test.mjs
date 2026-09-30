@@ -61,3 +61,12 @@ test('a skill whose SKILL.md is missing, or names another skill, is refused', ()
     { path: '.agents/skills/tdd/SKILL.md', problem: 'is named red-green; name it tdd, as its folder is' },
   ])
 })
+
+test('a SKILL.md whose frontmatter is not YAML is refused, saying where it breaks', () => {
+  const root = repository()
+  skill(root, 'triage', '---\nname: triage\ndescription: Show what needs attention: and move issues.\n---\n')
+  linked(root, 'triage')
+  assert.deepEqual(findProblems(root), [
+    { path: '.agents/skills/triage/SKILL.md', problem: 'has frontmatter that is not YAML (bad indentation of a mapping entry at 3:39); quote the value' },
+  ])
+})
