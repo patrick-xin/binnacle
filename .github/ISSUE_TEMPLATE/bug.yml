@@ -1,6 +1,6 @@
 name: Bug
 description: Something binnacle does wrong.
-labels: [bug]
+labels: [bug, needs-triage]
 body:
   - type: textarea
     id: what

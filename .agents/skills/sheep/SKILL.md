@@ -34,5 +34,5 @@ Findings reach you from the Sheepdog or from a reviewer, reviewing in rounds. Ea
 
 When every behaviour is done, `pnpm test` is green and the tree is clean, end with:
 
-1. one line: what in `AGENTS.md`, the skills or the docs was missing, wrong or misleading for this Charge — or that nothing was;
+1. what you had to read code to learn because no record says it — which block to use for what, who owns a behaviour, why a line is there — each a line, or that nothing was; and what in `AGENTS.md` or the skills was wrong or misleading for this Charge;
 2. the verdict: `DONE <sha>`, `REPORT <what you found>` for a Charge that asked a question, or `FAILED <why>`.
