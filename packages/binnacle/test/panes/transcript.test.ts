@@ -132,7 +132,7 @@ test('on the main screen, focus below what was printed stays drawn there, and fo
   assert.deepEqual(fullscreen, [])
   assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '│ running 0s', '', '▸ ⋯ added by goal · show 2 more lines'])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(fullscreen, [[5, 4]])
+  assert.deepEqual(fullscreen, [[4, 5]], 'the card, from its head')
 })
 
 test('switching to the main screen drops focus that sits on a printed entry, and the printed rows are as they were', () => {

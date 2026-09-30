@@ -142,7 +142,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   const reason: Node[] = result.failure?.reason === undefined ? [] : [{ kind: 'text', text: result.failure.reason, tone: 'error' }]
   const text = textOf(result.blocks)
   const output: Node = { kind: 'part', part: { kind: 'output', tool: call.name, text }, child: { kind: 'fold', id: 'output', child: { kind: 'text', text } } }
-  return { kind: 'show', title, child: { kind: 'stack', children: [...made, ...reason, output] } }
+  return { kind: 'show', title, opens: 'output', child: { kind: 'stack', children: [...made, ...reason, output] } }
 }
 
 const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true, retry: true, retried: true, presented: true, workflow: true, member: true, 'member-end': true, 'workflow-end': true, 'sub-call': true, 'sub-result': true }

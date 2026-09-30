@@ -3,7 +3,7 @@ import type { Fact } from '../facts/adapt.ts'
 import type { AffordanceKind, Gesture } from '../contract/index.ts'
 import { answer } from '../ui/answer.ts'
 import { describe } from '../contract/index.ts'
-import { layout, under } from '../ui/layout.ts'
+import { extent, layout, under } from '../ui/layout.ts'
 import type { Frame, LayoutState } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
 import { drawPlaced, refused } from './placed.ts'
@@ -110,7 +110,7 @@ export class ScreenPane implements Component {
       this.#state = next.state
       if (next.focus !== undefined) {
         const screen = this.laidAt(drawn.width, next.state)
-        const placed = screen.frame.regions.find(candidate => candidate.region.id === next.focus)
+        const placed = extent(screen.frame.regions, next.focus)
         if (placed !== undefined) this.#inView(placed.top, placed.height)
       }
       this.#changed()

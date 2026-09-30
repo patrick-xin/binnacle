@@ -63,8 +63,9 @@ function scopedWithin(node: Node, scope: string): Node {
     case 'offer':
     case 'fold':
       return { ...node, id: `${scope}/${node.id}`, child: scopedWithin(node.child, scope) }
-    case 'ask':
     case 'show':
+      return { ...node, ...node.opens === undefined ? {} : { opens: `${scope}/${node.opens}` }, child: scopedWithin(node.child, scope) }
+    case 'ask':
     case 'part':
     case 'band':
       return { ...node, child: scopedWithin(node.child, scope) }

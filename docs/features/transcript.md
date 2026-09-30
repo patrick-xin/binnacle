@@ -16,7 +16,7 @@ A person reads the session as it happens, turn by turn:
 
 The session's machinery draws no line at all. The transcript is the conversation: what the person asked, what the model said and did. Everything the session logged stays one key away, on the [Trajectory](trajectory.md).
 
-A click on a fold opens it, and a click on an open one folds it again — a fold of no rows on its title line alone, its content offering nothing; so does Enter on the focused fold ([Keys](keys.md)). The wheel scrolls, and a drag selects.
+A click on a fold opens it, and a click on an open one folds it again — a fold of no rows on its title line alone, its content offering nothing, and a tool call's output on the call's head alone; so does Enter on the focused fold ([Keys](keys.md)). The wheel scrolls, and a drag selects.
 
 ## How it works
 

@@ -5,7 +5,7 @@ import type { Gesture } from '../contract/index.ts'
 import { answering, empty, fold, settled, transcript } from '../models/transcript.ts'
 import type { Transcript } from '../models/transcript.ts'
 import { answer } from '../ui/answer.ts'
-import { under } from '../ui/layout.ts'
+import { extent, under } from '../ui/layout.ts'
 import type { LayoutState } from '../ui/layout.ts'
 import { gestureOf } from '../ui/pointer.ts'
 import { act, initial } from '../ui/state.ts'
@@ -126,7 +126,7 @@ export class TranscriptPane implements Component {
     const drawn = this.#drawn
     const focus = this.#state.focus
     if (drawn === undefined || focus === undefined) return
-    const placed = this.#draw(this.#transcript, this.#state, drawn.width, this.#views(), this.#theme(), this.#now()).regions.find(candidate => candidate.region.id === focus)
+    const placed = extent(this.#draw(this.#transcript, this.#state, drawn.width, this.#views(), this.#theme(), this.#now()).regions, focus)
     if (placed !== undefined) this.#inView(placed.top, placed.height)
   }
 
@@ -160,7 +160,7 @@ export class TranscriptPane implements Component {
       this.#state = next.state
       if (next.focus !== undefined) {
         const screen = this.#draw(this.#transcript, next.state, drawn.width, this.#views(), this.#theme(), this.#now())
-        const placed = screen.regions.find(candidate => candidate.region.id === next.focus)
+        const placed = extent(screen.regions, next.focus)
         if (placed !== undefined) {
           // Main screen can't repaint printed rows, so ask for fullscreen when focus moves there.
           if (this.#on === 'fullscreen') this.#inView(placed.top, placed.height)
