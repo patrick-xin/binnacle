@@ -1,74 +1,24 @@
 ---
 name: domain-modeling
-description: Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR.
+description: Build and sharpen binnacle's domain model while designing — challenge terms against the glossary, test them on concrete scenarios, and write the glossary and decision records as they settle. Use when a term is coined, contested or used loosely, when editing docs/glossary.md, or when a decision may need a record.
 ---
 
-# Domain Modeling
+# Domain modeling
 
-Actively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `GLOSSARY.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)
+Sharpen binnacle's language while a design is still moving, and write it down the moment it settles. Reading [the glossary](../../../docs/glossary.md) for words is a habit every skill has; this skill is for when the model is changing.
 
-## File structure
-
-Most repos have a single context:
-
-```
-/
-├── GLOSSARY.md
-├── docs/
-│   └── adr/
-│       ├── 0001-event-sourced-orders.md
-│       └── 0002-postgres-for-write-model.md
-└── src/
-```
-
-If a `GLOSSARY-MAP.md` exists at the root, the repo has multiple contexts. The map points to where each one lives:
-
-```
-/
-├── GLOSSARY-MAP.md
-├── docs/
-│   └── adr/                          ← system-wide decisions
-├── src/
-│   ├── ordering/
-│   │   ├── GLOSSARY.md
-│   │   └── docs/adr/                 ← context-specific decisions
-│   └── billing/
-│       ├── GLOSSARY.md
-│       └── docs/adr/
-```
-
-Create files lazily: only when you have something to write. If no `GLOSSARY.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
+Where each record lives, and what it may hold, is `AGENTS.md`'s *Where a record lives*: it binds, and this skill does not repeat it.
 
 ## During the session
 
-### Challenge against the glossary
+- **Challenge against the glossary.** A term used against its row is named at once: "The glossary's *entry* is a fact or a pair; you mean a turn. Which is it?"
+- **Use the owner's word.** A term dsh, Cordis or pi-tui already has is theirs, under their heading; coin one only when no owner has it, under *Ours*.
+- **Sharpen fuzzy words.** An overloaded word gets one precise term, and the others it could mean are named: "Do you mean the **ask**, or the **dialog** it is placed in?"
+- **Test with scenarios.** Invent the concrete case that finds the edge between two concepts: a question with forty options, an approval that arrives while the composer holds a draft, an author's view over a quiet kind.
+- **Check the code agrees.** Where the maintainer states how something works, look: "The host scrolls placed screens and not placed lines, but you said every ask scrolls. Which is right?"
 
-When the user uses a term that conflicts with the existing language in `GLOSSARY.md`, call it out immediately. "Your glossary defines 'cancellation' as X, but you seem to mean Y. Which is it?"
+## Writing it down
 
-### Sharpen fuzzy language
-
-When the user uses vague or overloaded terms, propose a precise canonical term. "You're saying 'account': do you mean the Customer or the User? Those are different things."
-
-### Discuss concrete scenarios
-
-When domain relationships are being discussed, stress-test them with specific scenarios. Invent scenarios that probe edge cases and force the user to be precise about the boundaries between concepts.
-
-### Cross-reference with code
-
-When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "Your code cancels entire Orders, but you just said partial cancellation is possible. Which is right?"
-
-### Update GLOSSARY.md inline
-
-When a term is resolved, update `GLOSSARY.md` right there. Don't batch these up: capture them as they happen. Use the format in [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md).
-
-`GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
-
-### Offer ADRs sparingly
-
-Only offer to create an ADR when all three are true:
-
-1. **Hard to reverse**: the cost of changing your mind later is meaningful
-2. **Surprising without context**: a future reader will wonder "why did they do it this way?"
-3. **The result of a real trade-off**: there were genuine alternatives and you picked one for specific reasons
-
-If any of the three is missing, skip the ADR. Use the format in [ADR-FORMAT.md](./ADR-FORMAT.md).
+- **A term settled goes into the glossary now**, in its table's shape: the term in bold, what it means in a sentence or two, whose word it is, and a citation where it names code. No implementation detail, and no change history.
+- **Which block, placement or registration to use for what**, and how each answers, is a record a person and an author both read: it goes on its feature page, which the glossary's row links. A rule an agent could learn only from code is a gap in the records, fixed where it is found.
+- **A decision is offered as a record only when all three hold**: it binds beyond one feature (a seam, a layer, the author API, what every view or plugin keeps); a later reader would ask why; and a real alternative lost. Offer it; the maintainer decides. It is written from [the template](../../../docs/adr/template.md), numbered after the highest in `docs/adr/`.

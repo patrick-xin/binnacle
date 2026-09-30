@@ -119,3 +119,15 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **TUI mode**: **regular** / **fullscreen** | pi's words for drawing on the main screen and on the alternate screen (`TuiMode`); a person picks one with `--tui-mode` ([TUI mode](features/tui-mode.md)). |
 | **terminal** | pi-tui's `Terminal`: the one object the host writes to and reads input from. |
 | **user bindings** | The bindings a person has set over the defaults, by id; the manager holds and resolves them (`pi:packages/tui/src/keybindings.ts#KeybindingsManager`). |
+
+## Design's
+
+The words binnacle's agents design and review code in, from John Ousterhout's *A Philosophy of Software Design* and Matt Pocock's `codebase-design` skill. **Seam** is ours, above; **adapter** is ours, an author's, never a design word here.
+
+| Term | Means |
+| --- | --- |
+| **module** | Anything with an interface and an implementation, at any grain: a function, a file, a layer, a plugin. Ousterhout's. |
+| **interface** | All a caller must know to use a module: its types, and its ordering, invariants, failures and cost. More than a TypeScript `interface`. Ousterhout's. |
+| **deep** / **shallow** | Of a module: much behaviour behind a small interface, or an interface nearly as large as what it hides. Ousterhout's. |
+| **leverage** / **locality** | What depth gives: callers more behaviour for each thing they learn; maintainers one place where a change, a bug or a test lands. Pocock's. |
+| **deletion test** | Imagine a module deleted: if its complexity vanishes, it passed calls on; if it reappears in each caller, it earned its place. Pocock's. |

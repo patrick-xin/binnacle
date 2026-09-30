@@ -1,40 +1,44 @@
 ---
 name: pr
-description: "Use when writing a PR body."
+description: "Write a pull request's body in binnacle's template: a picture of the change, evidence it works, what merging risks, and what was checked. Use when opening a pull request or updating its body."
 metadata:
   credits:
     skill: show-me
     author: Dex Horthy
-    organisation: Humanlayer
+    organisation: HumanLayer
     url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
-Use this template for writing the PR body:
+The body is `.github/pull_request_template.md`, filled in:
 
 ```markdown
+Closes #<n>
+
 ## Summary
 
-<diagram, diff-sketch, or tree>
+<a picture of the change: a diagram, a diff sketch or a tree>
 
 ## Evidence
 
-- **Before:** <screenshot/output/failing test run>
-  **After:** <screenshot/output/passing test run>
+- **Before:** <what was drawn, or how a test failed>
+  **After:** <what is drawn, or the test passing>
 
-## Merge Danger
+## Merge danger
 
 **Door:** <one-way or two-way>
 
-<optional: description>
+**Blast radius:** <one word>
 
-**Blast Radius:** <one-word description>
+<optional: what could break, and for whom>
 
-<optional: potential ramifications of merge>
+## Checked
+
+<the template's list, each item answered>
 ```
 
 ## Sections
 
-Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
+Skip all preambles and keep prose brief. Use the glossary's words. The story of how the change came to be is in its commits, never here.
 
 ### Summary
 
@@ -157,14 +161,18 @@ You may use one of these, you may use several, it is unlikely you will use all o
 
 ### Evidence
 
-Concrete evidence that the change works. Show a before and after.
+Concrete evidence that the change works, before and after.
 
-Screenshots are S-tier - when the environment is set up for it and the change is visual.
+- **What a person sees** is the best evidence: the lines drawn before and after, from `drawText` or a `tmux capture-pane` of the branch driven under `dsh --profile binnacle`, in a fenced block.
+- **A test red, then green**: its name, and how it failed before, in the failure's own words.
+- **For a gate or a script**: its output on the broken case and on the fixed one.
 
-Execution-based evidence is A-tier. Test results, console output. Show the exact test that now fails and passes, using pseudocode.
+### Merge danger
 
-### Merge Danger
+A **two-way door** is cheap to walk back: a merge reverted. A **one-way door** is not: a change to what `src/api.ts` exports breaks every author, a record renumbered breaks every link to it, a label or an issue published is seen. Say which, and why.
 
-Describe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A PR that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
+The **blast radius** is who a mistake would reach: the transcript, one feature, every author, the agents' workflow, the upstream job. One word, then what could break where it is not obvious.
 
-The blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.
+### Checked
+
+Each item of the template's list answered, not ticked blank: the reviews by round, with their report's findings and the commits that answered each, since reviews live where GitHub cannot see them; what was driven for real and what it drew; whether the author API changed.

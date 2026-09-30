@@ -7,7 +7,7 @@ description: Diagnosis loop for hard bugs and performance regressions. Use when 
 
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
-When exploring the codebase, read `GLOSSARY.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+Read the folder `AGENTS.md` of each layer the bug may be in, the glossary's words for what it touches, and the decision records in its area. Where the bug is in how a dsh kind or a pi-tui component behaves, read upstream at its pin in `.refs/`, and name what you read.
 
 ## Redact
 
@@ -23,16 +23,15 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 
 ### Ways to construct one, in roughly this order
 
-1. **Failing test** at whatever seam reaches the bug: unit, integration, e2e.
-2. **Curl / HTTP script** against a running dev server.
-3. **CLI invocation** with a fixture input, diffing stdout against a known-good snapshot.
-4. **Headless browser script** (Playwright / Puppeteer) that drives the UI and asserts on DOM/console/network.
-5. **Replay a captured trace.** Save a real network request / payload / event log to disk; replay it through the code path in isolation.
-6. **Throwaway harness.** Spin up a minimal subset of the system (one service, mocked deps) that exercises the bug code path with a single function call.
-7. **Property / fuzz loop.** If the bug is "sometimes wrong output", run 1000 random inputs and look for the failure mode.
-8. **Bisection harness.** If the bug appeared between two known states (commit, dataset, version), automate "boot at state X, check, repeat" so you can `git bisect run` it.
-9. **Differential loop.** Run the same input through old-version vs new-version (or two configs) and diff outputs.
-10. **HITL bash script.** Last resort. If a human must click, drive _them_ with `scripts/hitl-loop.template.sh` so the loop is still structured. Captured output feeds back to you.
+1. **A failing test at the seam that reaches the bug**, run alone: `node --test --test-name-pattern '<name>' test/<module>.test.ts` from `packages/binnacle`. `tdd`'s table says which seam holds which behaviour.
+2. **The host, with the terminal emulated**: bytes typed into xterm and the screens read back, as the host's tests do with `test/support/`.
+3. **A captured session log replayed** through the facts and the transcript into what a view draws, where the bug came from a real session.
+4. **The branch driven for real** in `tmux` under `dsh --profile binnacle`, as the `sheepdog` skill does, the pane captured after each step. The Sheepdog's alone: a Sheep and a reviewer never boot `dsh`.
+5. **A throwaway probe**: a test file that drives one function with the smallest input, deleted before the fix is committed.
+6. **A property loop**: the same function over many generated inputs, for a bug that is sometimes wrong.
+7. **Bisection**: `git bisect run` with the loop's command, when the bug appeared between two commits.
+8. **Differential**: the same input through two versions or two pins, the output diffed.
+9. **A person in the loop**, last: drive the maintainer with `scripts/hitl-loop.template.sh`, so the loop is still structured and its output comes back to you.
 
 Build the right feedback loop, and the bug is 90% fixed.
 
@@ -56,7 +55,7 @@ Stop and say so explicitly. List what you tried. Ask the user for: (a) access to
 
 ### Completion criterion: a tight loop that goes red
 
-Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** (a script path, a test invocation, a curl) that you have **already run at least once** (show the invocation and its output, redacted), and that is:
+Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** (a test invocation, a script path, a tmux capture) that you have **already run at least once** (show the invocation and its output, redacted), and that is:
 
 - [ ] **Red-capable**: it drives the actual bug code path and asserts the **user's exact symptom**, so it can go red on this bug and green once fixed. Not "runs without erroring"; it must be able to _catch this specific bug_.
 - [ ] **Deterministic**: same verdict every run (flaky bugs: a pinned, high reproduction rate, per above).
@@ -121,7 +120,7 @@ A correct seam is one where the test exercises the **real bug pattern** as it oc
 
 If a correct seam exists:
 
-1. Turn the minimised repro into a failing test at that seam.
+1. Turn the minimised repro into a failing test at that seam, following `tdd`.
 2. Watch it fail.
 3. Apply the fix.
 4. Watch it pass.
