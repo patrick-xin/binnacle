@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { vendoredBy } from './check-pins.mjs'
 import { taggedCommit } from './refs.mjs'
-import { splitTag } from './upstream.mjs'
+import { follows, splitTag } from './upstream.mjs'
 
 /**
  * Move one reference in `references.json` to a tag.
@@ -44,9 +44,8 @@ export function movePin(manifest, name, tag, commit) {
  */
 export function moveDeps(deps, name, version, vendored) {
   return Object.fromEntries(Object.entries(deps).map(([dep, pinned]) => {
-    if (name === 'pi' && dep === '@earendil-works/pi-tui') return [dep, version]
+    if (follows(name, dep)) return [dep, version]
     if (name !== 'dsh' || !dep.startsWith('@deepseek-ai/')) return [dep, pinned]
-    if (dep.startsWith('@deepseek-ai/dsh-')) return [dep, version]
     if (!(dep in vendored)) throw new Error(`${dep}: dsh at ${version} vendors no such package; drop it or read why`)
     return [dep, vendored[dep]]
   }))

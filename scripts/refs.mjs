@@ -84,6 +84,18 @@ export function taggedCommit(listing) {
 }
 
 /**
+ * What is wrong when a reference's tag does not name its pinned commit.
+ * @param {Ref} ref - the reference, with its tag.
+ * @param {string | undefined} tagged - the commit its source says the tag names; undefined when the source has no such tag.
+ * @returns {string | undefined} the error to throw; undefined when the tag names the pin.
+ */
+export function tagMismatch(ref, tagged) {
+  if (tagged?.startsWith(ref.commit)) return undefined
+  if (tagged === undefined) return `${ref.name}: ${ref.url} has no tag ${ref.tag}; fetch its tags there, or check the pin in references.json`
+  return `${ref.name}: tag ${ref.tag} names ${tagged ?? 'nothing'}, pinned ${ref.commit}`
+}
+
+/**
  * Fetch one reference at its pin, shallow and detached.
  * @param {Ref} ref - the reference.
  * @param {string} root - the repository root.
@@ -102,7 +114,8 @@ function fetchRef(ref, root) {
   }
   if (ref.tag !== undefined) {
     const tagged = taggedCommit(execFileSync('git', ['-C', dir, 'ls-remote', 'origin', `refs/tags/${ref.tag}`, `refs/tags/${ref.tag}^{}`], { encoding: 'utf8' }))
-    if (!tagged?.startsWith(ref.commit)) throw new Error(`${ref.name}: tag ${ref.tag} names ${tagged ?? 'nothing'}, pinned ${ref.commit}`)
+    const mismatch = tagMismatch(ref, tagged)
+    if (mismatch !== undefined) throw new Error(mismatch)
   }
   git('fetch', '-q', '--depth', '1', 'origin', ref.commit)
   git('checkout', '-q', '--detach', 'FETCH_HEAD')
