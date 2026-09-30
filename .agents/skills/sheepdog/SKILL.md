@@ -116,6 +116,7 @@ On a branch, never on `main`; red before green; reviewed like any other. They en
 - A checkout under `/tmp` installs with `CI=true`, or pnpm waits on a prompt no one answers.
 - A pin of a new dsh package asks `check-pins` to declare the rest of its tree; declare what it names, at the pin.
 - A question a Sheep asked stays listed a moment after you answer it; a watcher that wakes on it again is not a new question.
+- A prompt to a settled Charge goes with `--wait --until working --timeout 20000`: `herdr agent prompt` has acknowledged a prompt that never reached the pane, twice on one round (#86), and a watcher then woke on the Charge's last settlement as if it were this one. `agent_prompt_stalled` or a timeout means it did not land: send it again.
 
 ## Keep
 

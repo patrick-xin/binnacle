@@ -75,17 +75,17 @@ The reviewer is of another family than the change's author, with a shell in a ch
 
 **Before it is retired**, the Sheepdog prompts it once more for its feedback, across every round it held: what in this skill, `AGENTS.md`, the records or shepherd cost it a call, a round or a finding; what it had to read code to learn; and what it would change first. It writes that to `/tmp/review-<n>-feedback.md` and ends `REPORT /tmp/review-<n>-feedback.md`. The Sheepdog carries it to #26, and what is shepherd's to shepherd's field report, before retiring it.
 
-**Which reviewer.** An issue has one reviewer, of another family than every author of its commits. Where the Sheepdog wrote any of them, alone or beside a Sheep, it is a GPT model on pi, as a shepherd Charge whose Fold is cut at the Pasture, the tip checked out there; it reads every commit of the issue, whoever wrote each. GPT on pi, codex and opencode's `openai` models share one ChatGPT usage window, so it is spent on the issues the Sheepdog wrote in. A review never runs on a lighter model than it was dispatched on; its thinking is set per round, below:
+**Which reviewer.** An issue has one reviewer, of another family than every author of its commits. Where the Sheepdog wrote any of them, alone or beside a Sheep, it is a GPT model on pi, as a shepherd Charge whose Fold is cut at the Pasture, the tip checked out there; it reads every commit of the issue, whoever wrote each. GPT on pi, codex and opencode's `openai` models share one ChatGPT usage window, so it is spent on the issues the Sheepdog wrote in. A review never runs on a lighter model than it was dispatched on; its thinking `<level>` is the table's below, for round 1 at dispatch and for each round after:
 
 ```sh
 git switch --detach <tip>
 shepherd dispatch --charge review-<n> --spec '#<n>' --issue <n> \
-  --model openai-codex/gpt-6.1-sol --thinking xhigh --policy worktree_write \
+  --model openai-codex/gpt-6.1-sol --thinking <level> --policy worktree_write \
   --verify 'pnpm install --frozen-lockfile && pnpm refs' \
   --brief "<the brief>"
 ```
 
-**Thinking, by what the round asks** — `minimal`, `low`, `medium`, `high`, `xhigh` (pi's default) or `max`. A held reviewer is moved between rounds with `shepherd escalate --charge review-<n> --model <model> --thinking <level>`, keeping what it read; the new level applies from its next turn, so escalate before the round's prompt.
+**Thinking, by what the round asks** — pi's levels are `minimal`, `low`, `medium`, `high`, `xhigh` and `max`, and these are binnacle's choices among them. A held reviewer is moved between rounds with `shepherd escalate --charge review-<n> --model <model> --thinking <level>`, keeping what it read; the new level applies from its next turn, so escalate before the round's prompt.
 
 | Round | Thinking |
 |---|---|
@@ -105,7 +105,7 @@ cd /tmp/review-<n> && CI=true pnpm install --frozen-lockfile && pnpm refs
 
 **The brief**, either way: "Load the review skill. Round 1 of #<n>: its commits are <shas>, <whose each is>; the author is <binnacle-<charge>, or the Sheepdog>. <What is already decided.> Commit nothing; write the report to /tmp/review-<n>-1.md, and end with its verdict line."
 
-**Each round after**, by prompt: `herdr agent prompt binnacle-review-<n> "…"` for a Charge, a message to `review-<n>` for a subagent:
+**Each round after**, by prompt: `herdr agent prompt binnacle-review-<n> "…" --wait --until working --timeout 20000` for a Charge (a stall is the `sheepdog` skill's to handle), a message to `review-<n>` for a subagent:
 
 > Round <round> of #<n> at <tip>: the fixes are <shas>. Move your checkout to the tip, check each round-<round-1> finding, then what the fixes touched. Report to /tmp/review-<n>-<round>.md.
 
