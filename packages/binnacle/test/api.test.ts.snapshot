@@ -109,6 +109,7 @@ export type Fact = (Logged & {
 }) | (Logged & {
     readonly kind: 'sub-call';
     readonly rootCallId: string;
+    readonly parentCallId: string;
     readonly subCallId: string;
     readonly name: PtcDispatchStartEventData['name'];
     readonly arguments: string;

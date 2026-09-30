@@ -114,11 +114,16 @@ function drawCompaction(summary: Extract<Fact, { readonly kind: 'summary' }> | u
   return folded('summary', [{ mark: 'compaction' } as const, ` context compacted · ${summary.items} items (~${compact(summary.tokens)} tokens)`], { kind: 'markdown', text: textOf(summary.blocks) })
 }
 
-/** Each call a `run_code` program made, a line marked as a call is. */
+/** Each call a `run_code` program made, a line marked as a call is, indented beneath the sub-call that made it. */
 function drawnSubCalls(subCalls: Extract<Entry, { readonly kind: 'tool' }>['subCalls']): Node[] {
-  return (subCalls ?? []).map(({ call, result }) => ({
+  const held = subCalls ?? []
+  const depth = (parent: string, seen: number): number => {
+    const made = held.find(sub => sub.call.subCallId === parent)
+    return made === undefined || seen > held.length ? 0 : 1 + depth(made.call.parentCallId, seen + 1)
+  }
+  return held.map(({ call, result }) => ({
     kind: 'text',
-    text: [result === undefined ? { mark: 'running' } : result.failed ? { mark: 'failed' } : { mark: 'done' }, ` ${call.name} ${call.arguments}`],
+    text: ['  '.repeat(depth(call.parentCallId, 0)), result === undefined ? { mark: 'running' } : result.failed ? { mark: 'failed' } : { mark: 'done' }, ` ${call.name} ${call.arguments}`],
   }))
 }
 

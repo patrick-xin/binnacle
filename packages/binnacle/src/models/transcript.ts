@@ -94,15 +94,18 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     const pending = last.entries[at]
     entries = pending?.kind === 'command' ? last.entries.with(at, Object.freeze({ kind: 'command', run: pending.run, done: fact })) : [...last.entries, single(fact)]
   } else if (fact.kind === 'sub-call' || fact.kind === 'sub-result') {
-    const at = last.entries.findLastIndex(entry => entry.kind === 'tool' && entry.call.callId === fact.rootCallId)
-    const pending = last.entries[at]
-    if (pending?.kind !== 'tool') entries = [...last.entries, single(fact)]
+    const ran = (entry: Entry): boolean => entry.kind === 'tool' && entry.call.callId === fact.rootCallId
+    const turn = model.turns.findLastIndex(each => each.entries.some(ran))
+    const holding = model.turns[turn]
+    if (holding === undefined) entries = [...last.entries, single(fact)]
     else {
+      const at = holding.entries.findLastIndex(ran)
+      const pending = holding.entries[at] as Extract<Entry, { readonly kind: 'tool' }>
       const held = pending.subCalls ?? []
       const subCalls = fact.kind === 'sub-call'
         ? [...held, Object.freeze({ call: fact })]
         : held.map(sub => sub.call.subCallId === fact.subCallId ? Object.freeze({ ...sub, result: fact }) : sub)
-      entries = last.entries.with(at, Object.freeze({ ...pending, subCalls: Object.freeze(subCalls) }))
+      return { turns: model.turns.with(turn, { ...holding, entries: holding.entries.with(at, Object.freeze({ ...pending, subCalls: Object.freeze(subCalls) })) }) }
     }
   } else if (fact.kind === 'workflow') {
     entries = [...last.entries, Object.freeze({ kind: 'workflow', run: fact, members: Object.freeze([]) })]

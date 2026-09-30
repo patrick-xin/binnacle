@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
-import type { CardKind, CardParts, CardRow, Node, View } from '../../api.ts'
+import type { CardKind, CardParts, CardRow, Entry, Node, View } from '../../api.ts'
 import { drawCard, refused } from './cards.ts'
 import { genericCard } from './generic.ts'
 import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks } from './presentation.ts'
@@ -13,6 +13,18 @@ export const inject = ['binnacle', 'tools'] satisfies (keyof Context)[]
 export function apply(ctx: Context): void {
   ctx.binnacle.card('generic', genericCard)
   ctx.binnacle.view('tool', viewOf(ctx.tools, kind => ctx.binnacle.cards(kind)))
+}
+
+/** Each call a `run_code` program made, a line marked as a call is, indented beneath the sub-call that made it. */
+function made(held: NonNullable<Extract<Entry, { readonly kind: 'tool' }>['subCalls']>): Node[] {
+  const depth = (parent: string, seen: number): number => {
+    const maker = held.find(sub => sub.call.subCallId === parent)
+    return maker === undefined || seen > held.length ? 0 : 1 + depth(maker.call.parentCallId, seen + 1)
+  }
+  return held.map(({ call, result }) => ({
+    kind: 'text',
+    text: ['  '.repeat(depth(call.parentCallId, 0)), result === undefined ? { mark: 'running' } : result.failed ? { mark: 'failed' } : { mark: 'done' }, ` ${call.name} ${call.arguments}`],
+  }))
 }
 
 /** Without a presentation it leaves the entry to binnacle's card, beneath which a presenter's failure is named. */
@@ -64,10 +76,7 @@ function viewOf(tools: ToolRuntime, rowsOf: (kind: CardKind) => readonly CardRow
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
       took: result === undefined ? undefined : result.time - entry.call.time,
-      made: (entry.subCalls ?? []).map(({ call: sub, result: settled }) => ({
-        kind: 'text',
-        text: [settled === undefined ? { mark: 'running' } : settled.failed ? { mark: 'failed' } : { mark: 'done' }, ` ${sub.name} ${sub.arguments}`],
-      })),
+      made: made(entry.subCalls ?? []),
       // Named as binnacle's own card names its result fold, so a fold a person opened stays open when the plugin is disposed or a presenter throws and the card beneath draws the call.
       fold: (child: Node, rows?: number) => ({
         kind: 'part',

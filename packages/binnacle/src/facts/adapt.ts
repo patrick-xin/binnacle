@@ -160,6 +160,8 @@ export type Fact =
     readonly kind: 'sub-call'
     /** The call whose `run_code` program made it, at the top of any nesting: the call entry it is drawn in. */
     readonly rootCallId: string
+    /** The call that made it: the root's, or another sub-call's when programs nest. */
+    readonly parentCallId: string
     /** Pairs it with its settling. */
     readonly subCallId: string
     /** The tool it called. */
@@ -356,7 +358,7 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
     files: data.files.map(file => file.description === undefined ? { path: file.path } : { path: file.path, description: file.description }),
   }),
   'tool/ptc-dispatch-start': ({ seq, time, data }) => ({
-    kind: 'sub-call', seq, time, rootCallId: data.rootCallId, subCallId: data.subCallId, name: data.name, arguments: JSON.stringify(data.arguments) ?? '',
+    kind: 'sub-call', seq, time, rootCallId: data.rootCallId, parentCallId: data.parentCallId, subCallId: data.subCallId, name: data.name, arguments: JSON.stringify(data.arguments) ?? '',
   }),
   'tool/ptc-dispatch': ({ seq, time, data }) => ({
     kind: 'sub-result', seq, time, rootCallId: data.rootCallId, subCallId: data.subCallId, failed: data.isError,
