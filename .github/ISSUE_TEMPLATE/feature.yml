@@ -1,6 +1,6 @@
 name: Feature
 description: Something a person or an author cannot do yet.
-labels: [enhancement]
+labels: [enhancement, needs-triage]
 body:
   - type: textarea
     id: what

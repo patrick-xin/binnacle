@@ -1,103 +1,41 @@
 ---
 name: to-tickets
-description: Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker (edges as text in one file per ticket locally, or native blocking links on a real tracker).
+description: Cut a big issue into slices, each a sub-issue in the template's shape with the slices that block it linked.
+argument-hint: "#<issue>"
 disable-model-invocation: true
 ---
 
-# To Tickets
+# To tickets
 
-Break a plan, spec, or conversation into a set of **tickets**: tracer-bullet vertical slices, each declaring the tickets that **block** it.
+Cut a big issue into **slices**: each one a sub-issue a single branch can build, review and merge from `main` on its own, with the slices that **block** it.
 
-## Process
+## 1. Read the parent
 
-### 1. Gather context
+`gh issue view <n> --comments`: its decisions, agreed seams, behaviours and out of scope. Read the folder `AGENTS.md` of every layer it touches, and the records in its area. A slice speaks the glossary's words.
 
-Work from whatever is already in the conversation context. If the user passes a reference (a spec path, an issue number or URL) as an argument, fetch it and read its full body and comments.
+Look for a **prefactor**: a change to the code that makes the rest easy ("make the change easy, then make the easy change"). It is the first slice, and blocks the others.
 
-### 2. Explore the codebase (optional)
+## 2. Draft the slices
 
-If you have not already explored the codebase, do so to understand the current state of the code. Ticket titles and descriptions should use the project's domain glossary vocabulary, and respect ADRs in the area you're touching.
+- **Each slice is a tracer bullet**: a narrow path through every layer it needs, from the facts to what is drawn, ending in behaviours a person or a caller can see. Never one layer at a time.
+- **Each takes behaviours from the parent**, whole; every behaviour of the parent lands in exactly one slice.
+- **Each is sized for one branch and one review**: a diff the Sheepdog reads against it in one sitting.
+- **Its blocking edges are only what gates it.** A slice that touches a file another slice touches is blocked by it: slices on the same files run one after the other.
 
-Look for opportunities to prefactor the code to make the implementation easier. "Make the change easy, then make the easy change."
+A **wide refactor** — one mechanical change whose blast radius fans across the codebase, so no slice lands green — is sequenced as *expand, migrate, contract*: add the new form beside the old; move the callers over in batches (per layer), each its own slice blocked by the expand; delete the old form in a slice blocked by every batch.
 
-### 3. Draft vertical slices
+## 3. Put them to the maintainer
 
-Break the work into **tracer bullet** tickets.
+A numbered list; for each: the title, what it lets a person or an author do, its behaviours, and what blocks it. Ask whether the grain is right, whether each edge truly gates, and what to merge or split. Iterate until they approve.
 
-<vertical-slice-rules>
+## 4. Publish
 
-- Each slice cuts a narrow but COMPLETE path through every layer (schema, API, UI, tests): vertical, NOT a horizontal slice of one layer
-- A completed slice is demoable or verifiable on its own
-- Each slice is sized to fit in a single fresh context window
-- Any prefactoring should be done first
+Blockers first, so each edge names a real issue. Each slice is an issue in the parent's template, its seams the parent's agreed seams it uses, and its *Out of scope* naming the sibling slices that do the rest. Then link each to the parent as a sub-issue and to its blockers, with GitHub's own relations:
 
-</vertical-slice-rules>
+```sh
+id() { gh api repos/{owner}/{repo}/issues/$1 --jq .id; }
+gh api -X POST repos/{owner}/{repo}/issues/<parent>/sub_issues -F sub_issue_id=$(id <slice>)
+gh api -X POST repos/{owner}/{repo}/issues/<slice>/dependencies/blocked_by -F issue_id=$(id <blocker>)
+```
 
-Give each ticket its **blocking edges**: the other tickets that must complete before it can start. A ticket with no blockers can start immediately.
-
-**Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical change (rename a column, retype a shared symbol) whose **blast radius** fans across the whole codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land green. Don't force it into a tracer bullet; sequence it as **expand–contract**. First expand: add the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping CI green batch to batch because the old form still exists. Finally contract: delete the old form once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay green alone, keep the sequence but let them share an integration branch that all block a final integrate-and-verify ticket; green is promised only there.
-
-### 4. Quiz the user
-
-Present the proposed breakdown as a numbered list. For each ticket, show:
-
-- **Title**: short descriptive name
-- **Blocked by**: which other tickets (if any) must complete first
-- **What it delivers**: the end-to-end behaviour this ticket makes work
-
-Ask the user:
-
-- Does the granularity feel right? (too coarse / too fine)
-- Are the blocking edges correct: does each ticket only depend on tickets that genuinely gate it?
-- Should any tickets be merged or split further?
-
-Iterate until the user approves the breakdown.
-
-### 5. Publish the tickets to the configured tracker
-
-Publish the approved tickets. The tickets are the same either way, only the shape of the blocking edges changes:
-
-- **Local files** → write one file per ticket under `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order (blockers first). Each file's "Blocked by" lists the numbers/titles it depends on. Use the per-ticket file template below: one ticket per file, never a single combined file.
-- **A real issue tracker (GitHub, Linear, …)** → publish one issue per ticket in dependency order (blockers first) so each ticket's blocking edges can reference real identifiers. Use the platform's native blocking / sub-issue relationship where it has one; otherwise set each ticket's "Blocked by" to the blocking issues. Apply the `ready-for-agent` triage label unless instructed otherwise; the tickets are agent-grabbable by construction.
-
-Work the **frontier**: any ticket whose blockers are all done. For a purely linear chain that means top to bottom.
-
-Do NOT close or modify any parent issue.
-
-<local-ticket-template>
-
-# <NN>: <Ticket title>
-
-**What to build:** the end-to-end behaviour this ticket makes work, from the user's perspective, not a layer-by-layer implementation list.
-
-**Blocked by:** the numbers/titles of the tickets that gate this one, or "None (can start immediately)".
-
-**Status:** ready-for-agent
-
-- [ ] Acceptance criterion 1
-- [ ] Acceptance criterion 2
-
-</local-ticket-template>
-
-<issue-template>
-
-## Parent
-
-A reference to the parent issue on the tracker (if the source was an existing issue, otherwise omit this section).
-
-## What to build
-
-The end-to-end behaviour this ticket makes work, from the user's perspective, not layer-by-layer implementation.
-
-## Acceptance criteria
-
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Blocked by
-
-- A reference to each blocking ticket, or "None (can start immediately)".
-
-</issue-template>
-
-In either form, avoid specific file paths or code snippets: they go stale fast. Exception: if a prototype produced a snippet that encodes a decision more precisely than prose can (state machine, reducer, schema, type shape), inline it and note briefly that it came from a prototype. Trim to the decision-rich parts, not a working demo, just the important bits.
+A slice is labelled `ready-for-agent` when its seams are agreed. The parent's body is left as it is; the Sheepdog keeps its state on the tracking issue.

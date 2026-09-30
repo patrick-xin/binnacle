@@ -1,16 +1,20 @@
 ---
 name: handoff
-description: Compact the current conversation into a handoff document for another agent to pick up.
+description: Write down what the next session needs to carry on this one's work, before this one ends.
 argument-hint: "What will the next session be used for?"
 disable-model-invocation: true
 ---
 
-Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save to the temporary directory of the user's OS - not the current workspace.
+Write a handoff to `/tmp/handoff-<issue or topic>.md`, never in the checkout, so a fresh session carries on where this one stops. Where the maintainer said what the next session is for, write for that.
 
-Include a "suggested skills" section in the document, naming which skills the next agent should call the Skill tool for.
+It holds only what no record holds, and points at the rest: the issue, the tracking issue, the branch and its last commit, round reports under `/tmp`. What a record already says is linked, never restated.
 
-Do not duplicate content already captured in other artifacts (specs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead.
+- **Where it stands**: the issue and branch in hand, the behaviours done and still to do, and what is red.
+- **Who is still working**: every Charge and subagent still held — the reviewer for the issue first, with its name, its last round and that round's report — so the next session prompts them rather than dispatching again. Say who owns each checkout under `/tmp`.
+- **Decided, not yet recorded**: what the maintainer decided in this session that is on no issue yet, and every decision taken for them, marked provisional.
+- **Next**: the one step to take first, and what to ask the maintainer.
+- **Skills to load**: `sheepdog` and `shepherd` for a coordinating session, and any other the next step needs.
 
-Redact any sensitive information, such as API keys, passwords, or personally identifiable information.
+A redaction placeholder in your context is never copied into the handoff; name where the original lives instead.
 
-If the user passed arguments, treat them as a description of what the next session will focus on and tailor the doc accordingly.
+End by giving the maintainer the file's path, and the first line to start the next session with.
