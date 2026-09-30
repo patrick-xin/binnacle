@@ -46,7 +46,8 @@ export const marks = {
   unknown: { glyph: '?', tone: 'muted' }, // a kind binnacle has no view for, an author's fact included
   compaction: { glyph: '≡', tone: 'muted' }, // where the model stopped seeing earlier history: one compaction's marker
   presented: { glyph: '▤', tone: 'accent' }, // files the agent handed the person
-  retry: { glyph: '↻', tone: 'muted' }, // a model request dsh tries again after it failed
+  retry: { glyph: '↻', tone: 'muted' },
+  workflow: { glyph: '◇', tone: 'accent' }, // a workflow run and the agents it set working // a model request dsh tries again after it failed
 } as const satisfies Record<string, { readonly glyph: string, readonly tone: Tone }>
 
 /** A mark of the theme's, named by what it stands for: binnacle's own, or one an author's theme adds. */

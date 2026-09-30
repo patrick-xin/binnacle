@@ -107,6 +107,25 @@ export type Fact = (Logged & {
     readonly kind: 'presented';
     readonly files: readonly Readonly<PresentedFile>[];
 }) | (Logged & {
+    readonly kind: 'workflow';
+    readonly runId: WorkflowRunId;
+    readonly name: string;
+}) | (Logged & {
+    readonly kind: 'member';
+    readonly runId: WorkflowRunId;
+    readonly member: number;
+    readonly label: ToolWorkflowAgentStartData['label'];
+    readonly phase?: ToolWorkflowAgentStartData['phase'];
+}) | (Logged & {
+    readonly kind: 'member-end';
+    readonly runId: WorkflowRunId;
+    readonly member: number;
+    readonly outcome: WorkflowAgentOutcome;
+}) | (Logged & {
+    readonly kind: 'workflow-end';
+    readonly runId: WorkflowRunId;
+    readonly stopped: WorkflowStopReason;
+}) | (Logged & {
     readonly kind: 'retry';
     readonly retryId: RetryId;
     readonly turn: number;
@@ -164,6 +183,10 @@ export type Block = {
 // ToolCallId ← @deepseek-ai/dsh-llm
 // ApprovalOutcome ← @deepseek-ai/dsh-user-approval
 // PresentedFile ← @deepseek-ai/dsh-tool-present/types
+// WorkflowRunId ← @deepseek-ai/dsh-workflow/types
+// ToolWorkflowAgentStartData ← @deepseek-ai/dsh-tool-workflow/types
+// WorkflowAgentOutcome ← @deepseek-ai/dsh-workflow/types
+// WorkflowStopReason ← @deepseek-ai/dsh-workflow/types
 // RetryId ← @deepseek-ai/dsh-llm-retry
 // CompactionId ← @deepseek-ai/dsh-compaction
 // models/transcript.d.ts
@@ -190,6 +213,15 @@ export type Entry = Single<Exclude<Alone, 'prompt'>> | {
     readonly summary?: FactOf<'summary'>;
     readonly end?: FactOf<'end'>;
 } | {
+    readonly kind: 'workflow';
+    readonly run: FactOf<'workflow'>;
+    readonly members: readonly {
+        readonly start: FactOf<'member'>;
+        readonly end?: FactOf<'member-end'>;
+    }[];
+    readonly end?: FactOf<'workflow-end'>;
+    readonly left?: string;
+} | {
     readonly kind: 'retry';
     readonly retry: FactOf<'retry'>;
     readonly started?: FactOf<'retried'>;
@@ -208,7 +240,7 @@ type FactOf<K extends Fact['kind']> = Extract<Fact, {
     readonly kind: K;
 }>;
 // models/transcript.d.ts
-type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'authored' | 'unknown' | 'quiet';
+type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'member' | 'member-end' | 'workflow-end' | 'authored' | 'unknown' | 'quiet';
 // facts/stream.d.ts
 export interface Streamed {
     readonly turn: number;
@@ -271,6 +303,10 @@ export declare const marks: {
     readonly retry: {
         readonly glyph: '↻';
         readonly tone: 'muted';
+    };
+    readonly workflow: {
+        readonly glyph: '◇';
+        readonly tone: 'accent';
     };
 };
 // ui/theme.d.ts

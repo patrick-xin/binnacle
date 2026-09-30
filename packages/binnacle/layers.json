@@ -116,6 +116,12 @@
     "@deepseek-ai/dsh-tool-present": [
       "facts"
     ],
+    "@deepseek-ai/dsh-tool-workflow": [
+      "facts"
+    ],
+    "@deepseek-ai/dsh-workflow": [
+      "facts"
+    ],
     "@deepseek-ai/dsh-skill": [
       "host"
     ],

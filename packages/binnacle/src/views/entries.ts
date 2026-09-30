@@ -57,6 +57,16 @@ function drawAnswer(fact: { readonly blocks: readonly Block[], readonly interrup
   return { kind: 'stack', children: fact.interrupted === true ? [...children, { kind: 'text', text: '(interrupted)', tone: 'dim' }] : children }
 }
 
+function drawWorkflow(entry: Extract<Entry, { readonly kind: 'workflow' }>): Node {
+  const stands = entry.end !== undefined ? entry.end.stopped : entry.left ?? 'running'
+  const members: Node[] = entry.members.map(({ start, end }) => ({
+    kind: 'text',
+    text: `${start.label}${start.phase === undefined ? '' : ` (${start.phase})`} · ${end?.outcome ?? 'running'}`,
+    tone: end === undefined ? 'muted' : end.outcome === 'completed' ? 'success' : end.outcome === 'failed' ? 'error' : 'muted',
+  }))
+  return { kind: 'fold', id: 'members', title: [{ mark: 'workflow' }, ` ${entry.run.name} · ${stands}`], child: { kind: 'stack', children: members } }
+}
+
 function drawRetry(retry: Extract<Fact, { readonly kind: 'retry' }>, started: Extract<Fact, { readonly kind: 'retried' }> | undefined, left: string | undefined): Node {
   const attempt = `attempt ${retry.attempt}${retry.of === undefined ? '' : ` of ${retry.of}`}`
   const title: readonly Span[] = started !== undefined
@@ -121,7 +131,7 @@ function drawTool(call: Extract<Fact, { readonly kind: 'call' }>, result: Extrac
   return { kind: 'show', title, child: { kind: 'stack', children: [...reason, output] } }
 }
 
-const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true, retry: true, retried: true, presented: true }
+const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context: true, answer: true, tool: true, approval: true, decided: true, command: true, done: true, result: true, compaction: true, summary: true, end: true, authored: true, unknown: true, quiet: true, streaming: true, retry: true, retried: true, presented: true, workflow: true, member: true, 'member-end': true, 'workflow-end': true }
 
 /**
  * Draw one entry.
@@ -216,6 +226,14 @@ function builtIn(entry: Entry, problem?: string): Node {
     }
     case 'done': {
       const title: Node = { kind: 'text', text: `done of command ${entry.fact.commandId}: ${entry.fact.outcome}`, tone: 'muted' }
+      return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
+    }
+    case 'workflow':
+      return noted(drawWorkflow(entry), problem)
+    case 'member':
+    case 'member-end':
+    case 'workflow-end': {
+      const title: Node = { kind: 'text', text: [{ mark: 'workflow' } as const, ` ${entry.fact.kind === 'workflow-end' ? `run ${entry.fact.runId} stopped: ${entry.fact.stopped}` : `member ${entry.fact.member} of run ${entry.fact.runId}`}`], tone: 'muted' }
       return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
     }
     case 'presented': {

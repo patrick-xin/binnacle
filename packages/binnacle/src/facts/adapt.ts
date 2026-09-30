@@ -9,6 +9,8 @@ import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 import type { RetryId } from '@deepseek-ai/dsh-llm-retry'
 import type { PresentedFile } from '@deepseek-ai/dsh-tool-present/types'
+import type { ToolWorkflowAgentStartData } from '@deepseek-ai/dsh-tool-workflow/types'
+import type { WorkflowAgentOutcome, WorkflowRunId, WorkflowStopReason } from '@deepseek-ai/dsh-workflow/types'
 
 /** A piece of message content, as a view draws it; `unread` names a kind of block binnacle cannot read yet. */
 export type Block =
@@ -154,6 +156,40 @@ export type Fact =
     readonly files: readonly Readonly<PresentedFile>[]
   }
   | Logged & {
+    readonly kind: 'workflow'
+    /** dsh's id of the run, which joins its members and its stop as one entry (dsh's `WorkflowRunId`). */
+    readonly runId: WorkflowRunId
+    /** What the run is called. */
+    readonly name: string
+  }
+  | Logged & {
+    readonly kind: 'member'
+    /** The run it belongs to. */
+    readonly runId: WorkflowRunId
+    /** Which member of the run, counting from 0, pairing it with its settling. */
+    readonly member: number
+    /** What the member is called. */
+    readonly label: ToolWorkflowAgentStartData['label']
+    /** The phase of the run it works in, when the run names phases. */
+    readonly phase?: ToolWorkflowAgentStartData['phase']
+  }
+  | Logged & {
+    readonly kind: 'member-end'
+    /** The run it belongs to. */
+    readonly runId: WorkflowRunId
+    /** Which member settled. */
+    readonly member: number
+    /** How it settled, in dsh's words (dsh's `WorkflowAgentOutcome`). */
+    readonly outcome: WorkflowAgentOutcome
+  }
+  | Logged & {
+    readonly kind: 'workflow-end'
+    /** The run that stopped. */
+    readonly runId: WorkflowRunId
+    /** Why it stopped, in dsh's words (dsh's `WorkflowStopReason`). */
+    readonly stopped: WorkflowStopReason
+  }
+  | Logged & {
     readonly kind: 'retry'
     /** dsh's id of the chain of retries this attempt belongs to, which joins them as one entry (dsh's `RetryId`). */
     readonly retryId: RetryId
@@ -294,6 +330,12 @@ const adapters: { readonly [K in SessionEventType]?: Adapter<K> } = {
     kind: 'presented', seq, time,
     files: data.files.map(file => file.description === undefined ? { path: file.path } : { path: file.path, description: file.description }),
   }),
+  'tool-workflow/run-start': ({ seq, time, data }) => ({ kind: 'workflow', seq, time, runId: data.runId, name: data.name }),
+  'tool-workflow/agent-start': ({ seq, time, data }) => ({
+    kind: 'member', seq, time, runId: data.runId, member: data.seq, label: data.label, ...data.phase === undefined ? {} : { phase: data.phase },
+  }),
+  'tool-workflow/agent-end': ({ seq, time, data }) => ({ kind: 'member-end', seq, time, runId: data.runId, member: data.seq, outcome: data.outcome }),
+  'tool-workflow/run-end': ({ seq, time, data }) => ({ kind: 'workflow-end', seq, time, runId: data.runId, stopped: data.stopReason }),
   'llm/retry': ({ seq, time, data }) => ({
     kind: 'retry', seq, time, retryId: data.retryId, turn: data.turn, step: data.step, attempt: data.retry,
     ...data.mode === 'normal' ? { of: data.maxRetries } : {},

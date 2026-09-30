@@ -8,7 +8,7 @@ type FactOf<K extends Fact['kind']> = Extract<Fact, { readonly kind: K }>
 type Single<K extends Fact['kind']> = K extends unknown ? { readonly kind: K, readonly fact: FactOf<K> } : never
 
 /** The kinds of fact that stand as an entry of their own, never paired with another. */
-type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'authored' | 'unknown' | 'quiet'
+type Alone = 'prompt' | 'context' | 'answer' | 'result' | 'decided' | 'done' | 'summary' | 'end' | 'retried' | 'presented' | 'member' | 'member-end' | 'workflow-end' | 'authored' | 'unknown' | 'quiet'
 
 /**
  * One thing a turn holds, in log order: a fact, or a tool call with its
@@ -38,6 +38,7 @@ export type Entry =
   | { readonly kind: 'approval', readonly asked: FactOf<'asked'>, readonly decided?: FactOf<'decided'> }
   | { readonly kind: 'command', readonly run: FactOf<'run'>, readonly done?: FactOf<'done'> }
   | { readonly kind: 'compaction', readonly start: FactOf<'start'>, readonly summary?: FactOf<'summary'>, readonly end?: FactOf<'end'> }
+  | { readonly kind: 'workflow', readonly run: FactOf<'workflow'>, readonly members: readonly { readonly start: FactOf<'member'>, readonly end?: FactOf<'member-end'> }[], readonly end?: FactOf<'workflow-end'>, readonly left?: string }
   | { readonly kind: 'retry', readonly retry: FactOf<'retry'>, readonly started?: FactOf<'retried'>, readonly left?: string }
   | { readonly kind: 'streaming', readonly answer: Streamed }
 
@@ -68,7 +69,7 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     const last = model.turns.at(-1)
     if (last === undefined) return model
     const ending = fact.ending
-    const entries = ending === undefined ? last.entries : last.entries.map(entry => (entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'retry' && entry.started === undefined) ? Object.freeze({ ...entry, left: ending }) : entry)
+    const entries = ending === undefined ? last.entries : last.entries.map(entry => (entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'retry' && entry.started === undefined) || (entry.kind === 'workflow' && entry.end === undefined) ? Object.freeze({ ...entry, left: ending }) : entry)
     return { turns: [...model.turns.slice(0, -1), { ...last, entries, ...ending === undefined ? {} : { ending } }] }
   }
   const last = model.turns.at(-1) ?? { turn: null, entries: [] }
@@ -92,6 +93,18 @@ export function fold(model: Transcript, fact: Fact): Transcript {
     const at = last.entries.findLastIndex(entry => entry.kind === 'command' && entry.run.commandId === fact.commandId)
     const pending = last.entries[at]
     entries = pending?.kind === 'command' ? last.entries.with(at, Object.freeze({ kind: 'command', run: pending.run, done: fact })) : [...last.entries, single(fact)]
+  } else if (fact.kind === 'workflow') {
+    entries = [...last.entries, Object.freeze({ kind: 'workflow', run: fact, members: Object.freeze([]) })]
+  } else if (fact.kind === 'member' || fact.kind === 'member-end' || fact.kind === 'workflow-end') {
+    const at = last.entries.findLastIndex(entry => entry.kind === 'workflow' && entry.run.runId === fact.runId)
+    const pending = last.entries[at]
+    if (pending?.kind !== 'workflow') entries = [...last.entries, single(fact)]
+    else {
+      const members = fact.kind === 'member'
+        ? [...pending.members, Object.freeze({ start: fact })]
+        : fact.kind === 'member-end' ? pending.members.map(member => member.start.member === fact.member ? Object.freeze({ ...member, end: fact }) : member) : pending.members
+      entries = last.entries.with(at, Object.freeze({ ...pending, members: Object.freeze(members), ...fact.kind === 'workflow-end' ? { end: fact } : {} }))
+    }
   } else if (fact.kind === 'retry') {
     const at = last.entries.findLastIndex(entry => entry.kind === 'retry' && entry.retry.retryId === fact.retryId)
     entries = at === -1 ? [...last.entries, Object.freeze({ kind: 'retry', retry: fact })] : last.entries.with(at, Object.freeze({ kind: 'retry', retry: fact }))
@@ -128,7 +141,7 @@ export function settled(model: Transcript): number {
   if (last === undefined) return 0
   const waiting = last.entries.findIndex(entry => entry.kind === 'streaming' || (entry.kind === 'command' && entry.done === undefined)
     || (entry.kind === 'compaction' && entry.end === undefined)
-    || (last.ending === undefined && ((entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined) || (entry.kind === 'retry' && entry.started === undefined))))
+    || (last.ending === undefined && ((entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined) || (entry.kind === 'retry' && entry.started === undefined) || (entry.kind === 'workflow' && entry.end === undefined))))
   return before + (waiting === -1 ? last.entries.length : waiting)
 }
 
