@@ -36,19 +36,14 @@ export type Entry =
   | { readonly kind: 'command', readonly run: FactOf<'run'>, readonly done?: FactOf<'done'> }
   | { readonly kind: 'compaction', readonly start: FactOf<'start'>, readonly summary?: FactOf<'summary'>, readonly end?: FactOf<'end'> }
 
-/** A turn: what a person sent and everything the agent did about it. */
+/** What a person sent and everything the agent did about it. */
 export interface Turn {
-  /** dsh's turn number; `null` for what the log holds before its first turn. */
   readonly turn: number | null
-  /** What happened in it, in log order. */
   readonly entries: readonly Entry[]
-  /** Why it ended, as dsh names it; absent while it runs. */
   readonly ending?: string
 }
 
-/** A session, as turns. */
 export interface Transcript {
-  /** Every turn, oldest first. */
   readonly turns: readonly Turn[]
 }
 
@@ -60,21 +55,13 @@ function single<K extends Alone>(fact: FactOf<K>): Single<K> {
   return Object.freeze({ kind: (fact as Fact).kind, fact }) as Single<K>
 }
 
-/**
- * A pure fold, so the host can apply one fact as it arrives and a replay can
- * apply the whole log, and both reach the same transcript.
- *
- * Each entry it makes is frozen: an author's view is handed entries, never
- * turns, so it cannot change what later facts are folded into.
- * @returns the transcript with it folded in; `model` is left as it was.
- */
+/** Each entry it makes is frozen, so an author's view cannot change what later facts fold into. */
 export function fold(model: Transcript, fact: Fact): Transcript {
   if (fact.kind === 'step') return model
   if (fact.kind === 'turn') {
     if (fact.phase === 'start') return { turns: [...model.turns, { turn: fact.turn, entries: [] }] }
     const last = model.turns.at(-1)
     if (last === undefined) return model
-    // A call still without its result when its turn ends is left: nothing later in this turn will answer it.
     const ending = fact.ending
     const entries = ending === undefined ? last.entries : last.entries.map(entry => entry.kind === 'tool' && entry.result === undefined ? Object.freeze({ ...entry, left: ending }) : entry)
     return { turns: [...model.turns.slice(0, -1), { ...last, entries, ...ending === undefined ? {} : { ending } }] }
@@ -117,24 +104,11 @@ export function fold(model: Transcript, fact: Fact): Transcript {
   return { turns: [...turns, { ...last, entries }] }
 }
 
-/**
- * How many entries, oldest first and across turns, nothing later in the log
- * can change: every one before a call still waiting for its result or an
- * approval still waiting for its decision in a turn still running, or before
- * a command still running or a compaction still running — a command dsh logs
- * with no turn around it
- * (`dsh:packages/interaction/commands/src/index.ts`), and a compaction dsh
- * logs between turns when it is manual
- * (`dsh:packages/compaction/compaction/src/types.ts`), so either can wait in
- * a turn already ended. Only the last turn is ever folded into, so every
- * turn before it has settled whole.
- */
+/** How many entries can no longer change: all before the last turn's first pending call, approval, command or compaction. */
 export function settled(model: Transcript): number {
   const last = model.turns.at(-1)
   const before = model.turns.slice(0, -1).reduce((count, turn) => count + turn.entries.length, 0)
   if (last === undefined) return 0
-  // A call its turn left, and an approval its turn outlived, have settled as they stand; a command or a compaction still
-  // running has not, wherever it sits, for its settling event is still to come and will change the entry.
   const waiting = last.entries.findIndex(entry => (entry.kind === 'command' && entry.done === undefined)
     || (entry.kind === 'compaction' && entry.end === undefined)
     || (last.ending === undefined && ((entry.kind === 'tool' && entry.result === undefined) || (entry.kind === 'approval' && entry.decided === undefined))))

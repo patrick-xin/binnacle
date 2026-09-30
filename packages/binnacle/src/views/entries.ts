@@ -23,16 +23,10 @@ export type View = (entry: Entry, next: () => Node) => Node
 /** Authors' views, by entry kind, quiet kind's dsh type, or the name of an authored fact, each key's oldest first: the newest draws, on what the one before it draws. */
 export type Views = ReadonlyMap<string, readonly View[]>
 
-// A block binnacle cannot read is its type in brackets.
 function textOf(blocks: readonly Block[]): string {
   return blocks.map(block => block.kind === 'unread' ? `[${block.type}]` : block.text).join('\n')
 }
 
-/**
- * A call an answer made is its tool entry's to draw — dsh logs every kept call, and one kept by a stream cut short there
- * is none (`BlockAssembler.interruptedBlocks`, at dsh-v0.1.7-rc.2) — so its block draws no line here.
- * Each reasoning fold is named by which reasoning it is, so a person's opening one holds that one alone.
- */
 function drawAnswer(fact: Extract<Fact, { readonly kind: 'answer' }>): Node {
   let reasoning = 0
   const children = fact.blocks.flatMap((block): Node[] => block.kind === 'unread' && block.type === 'tool-call'
@@ -66,21 +60,12 @@ function drawCommand(run: Extract<Fact, { readonly kind: 'run' }>, done: Extract
   return done.text === undefined ? head : { kind: 'stack', children: [head, { kind: 'text', text: `  ${done.text}` }] }
 }
 
-/**
- * A count of tokens as a person reads it: `517`, `12.4k`, `517k`, `1.2m` — dsh web's compact count
- * (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`), restated lowercase and without its
- * locale seat, as the status line restates it and #44's marker writes it.
- */
 function compact(value: number): string {
   if (value < 1_000) return `${value}`
   if (value < 1_000_000) return `${scaled(value / 1_000)}k`
   return `${scaled(value / 1_000_000)}m`
 }
 
-/**
- * A count scaled down from a unit, as a person reads it: rounded to a whole once a hundred, one decimal beneath
- * that — dsh web's compact count's own rule (`dsh:packages/client/ui-chat/src/client/chat/token-format.ts#formatTokens`).
- */
 function scaled(over: number): string {
   return over >= 100 ? `${Math.round(over)}` : `${Math.round(over * 10) / 10}`
 }
@@ -117,9 +102,7 @@ const drawnHere: Readonly<Record<Entry['kind'], true>> = { prompt: true, context
 
 /**
  * Draw one entry.
- * @param views - authors' views; the newest for the entry's key draws it, and one for a built-in kind builds on or replaces binnacle's.
- * @param theme - whose tones, marks and backgrounds are the names a view may use.
- * @returns what it draws, which for a quiet entry no view claims is no lines at all. When an author's view throws or returns no node binnacle can lay out, what the view beneath it draws, saying what went wrong; when an authored fact is named as a built-in kind, the built-in drawing, saying so.
+ * @returns what it draws, or what the view beneath draws with an error message if the view fails or returns an invalid node.
  */
 export function drawEntry(entry: Entry, views: Views = new Map(), theme: Theme = binnacleTheme): Node {
   if (entry.kind === 'authored' && Object.hasOwn(drawnHere, entry.fact.name)) {
@@ -130,18 +113,11 @@ export function drawEntry(entry: Entry, views: Views = new Map(), theme: Theme =
   return drawnBy(entry, key, stack, stack.length, theme)
 }
 
-/** The key an entry's views are registered under: its kind, a quiet kind's dsh type, or an authored fact's name. */
 export function keyOf(entry: Entry): string {
   if (entry.kind === 'authored') return entry.fact.name
   return entry.kind === 'quiet' ? entry.fact.type : entry.kind
 }
 
-/**
- * Draw one entry with the views of its key up to a height, the topmost drawing.
- * @param stack - the key's views, oldest first.
- * @param height - how many of them draw; none is binnacle's own drawing.
- * @returns what the topmost draws, or what the one beneath it draws, saying why, when it fails.
- */
 function drawnBy(entry: Entry, key: string, stack: readonly View[], height: number, theme: Theme): Node {
   const view = stack[height - 1]
   if (view === undefined) return builtIn(entry)
@@ -159,9 +135,6 @@ function drawnBy(entry: Entry, key: string, stack: readonly View[], height: numb
   }
 }
 
-/**
- * @param problem - what went wrong drawing it otherwise, said under its title, or after it when it has none.
- */
 function builtIn(entry: Entry, problem?: string): Node {
   switch (entry.kind) {
     case 'prompt':
@@ -179,13 +152,11 @@ function builtIn(entry: Entry, problem?: string): Node {
     case 'compaction':
       return noted(drawCompaction(entry.summary, entry.end), problem)
     case 'summary': {
-      // Reached only from a log torn between a compaction's start and its summary.
       const title: Node = { kind: 'text', text: [{ mark: 'compaction', tone: 'muted' } as const, ` summary of compaction ${entry.fact.compactionId}`], tone: 'muted' }
       const fold: Node = { kind: 'fold', id: 'summary', child: { kind: 'markdown', text: textOf(entry.fact.blocks) } }
       return problem === undefined ? { kind: 'stack', children: [title, fold] } : { kind: 'stack', children: [title, problemLine(problem), fold] }
     }
     case 'end': {
-      // Reached only from a log torn between a compaction's start and its end.
       const title: Node = { kind: 'text', text: [{ mark: 'compaction', tone: 'muted' } as const, ` end of compaction ${entry.fact.compactionId}`], tone: 'muted' }
       const why = entry.fact.error === undefined ? undefined : { kind: 'text' as const, text: `  ${entry.fact.error}`, tone: 'error' }
       return problem === undefined
@@ -193,17 +164,14 @@ function builtIn(entry: Entry, problem?: string): Node {
         : { kind: 'stack', children: [title, problemLine(problem), ...why === undefined ? [] : [why]] }
     }
     case 'done': {
-      // Reached only from a log torn between a command's run and its done.
       const title: Node = { kind: 'text', text: `done of command ${entry.fact.commandId}: ${entry.fact.outcome}`, tone: 'muted' }
       return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
     }
     case 'decided': {
-      // Reached only from a log torn between an approval's ask and its decision.
       const title: Node = { kind: 'text', text: [{ mark: 'approval', tone: 'muted' } as const, ` decision of approval ${entry.fact.id}: ${entry.fact.outcome}`], tone: 'muted' }
       return problem === undefined ? title : { kind: 'stack', children: [title, problemLine(problem)] }
     }
     case 'result': {
-      // A titled fold that shows rows is left to #23, so the title stays a line of its own above the fold.
       const title: Node = { kind: 'text', text: [{ mark: 'done', tone: 'muted' } as const, ` result of call ${entry.fact.callId}`], tone: 'muted' }
       const fold: Node = { kind: 'fold', id: 'output', child: { kind: 'text', text: textOf(entry.fact.blocks) } }
       return problem === undefined ? { kind: 'stack', children: [title, fold] } : { kind: 'stack', children: [title, problemLine(problem), fold] }
@@ -217,7 +185,6 @@ function builtIn(entry: Entry, problem?: string): Node {
   }
 }
 
-/** A fold under a muted title line, folded as the theme gives its kind's folds to start: showing no rows, its marker rides the title and the fold costs that one line. */
 function folded(id: string, title: readonly Span[], child: Node): Extract<Node, { readonly kind: 'fold' }> {
   return { kind: 'fold', id, title, tone: 'muted', child }
 }
@@ -234,7 +201,6 @@ function shown(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2) ?? describe(value)
   } catch {
-    // A cycle, a bigint or a getter that throws has no JSON: say what it is instead.
     return describe(value)
   }
 }

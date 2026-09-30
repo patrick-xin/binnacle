@@ -14,26 +14,18 @@ import { binnacleTheme } from '../ui/theme.ts'
 import type { Theme } from '../ui/theme.ts'
 import { timedIn } from '../views/screen.ts'
 
-/** What the pane reports about the screen it drew, for the host to act on beyond drawing. */
 export interface ScreenReports {
-  /** Called when what the pane draws has changed, so the renderer draws a frame. */
   readonly changed?: () => void
-  /** Something to bring into view: the rows a focused thing covers, on the screen as now drawn. */
   readonly inView?: (top: number, height: number) => void
-  /** An offer a person invoked that UI state does not answer — any but `expand` — for the registration to act on. */
   readonly invoked?: (region: string, affordance: AffordanceKind) => void
 }
 
 interface Laid {
   readonly width: number
-  /** The UI state it was laid out in, by identity: `act` returns the state itself when nothing changes. */
   readonly state: UiState
-  /** The theme it was laid out in, by identity: the registrations hand a new one at each change. */
   readonly theme: Theme
-  /** The time it was laid out at, when its drawing says the time since a moment: a later one lays it out again. */
   readonly now: number | undefined
   readonly frame: Frame
-  /** The regions that offer something, in screen order. */
   readonly focusable: readonly string[]
 }
 
@@ -51,16 +43,8 @@ export class ScreenPane implements Component {
   #laid: Laid | undefined
   #stale = true
   #timed = false
-  /** What the last report an invoked offer reached did wrong, drawn beneath what the pane drew until one returns. */
   #said: string | undefined
 
-  /**
-   * @param facts - handed to the placed screen's drawing as they change.
-   * @param theme - read at every frame; the screen is laid out again when it changes.
-   * @param now - the time, in milliseconds since the epoch, as the host hands it at every frame: what a drawing that
-   * says the time since a moment is laid out at, counting up. The pane reads no clock of its own.
-   * @param keys - the keys the one key table binds to each meaning, for an ask to name what answers it; read as the screen is laid out, which the host has it do again when a person rebinds a key.
-   */
   constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined, keys: () => LayoutState['keys'] = () => undefined) {
     this.#facts = facts
     this.#theme = theme
@@ -71,9 +55,6 @@ export class ScreenPane implements Component {
     this.#invoked = reports.invoked ?? (() => {})
   }
 
-  /**
-   * @param registration - the registration as an author wrote it, to name it by in what went wrong; a placed screen's by default.
-   */
   place(name: string, screen: { readonly draw: (facts: readonly Fact[]) => Node }, registration = `binnacle.screen(${name})`): void {
     this.#registration = registration
     this.#draw = screen.draw
@@ -81,36 +62,26 @@ export class ScreenPane implements Component {
     this.#stale = true
   }
 
-  /** The session's facts have arrived, or been read again: the screen draws again at the next frame. */
   factsChanged(): void {
     this.#stale = true
   }
 
-  /** Whether what it last drew offers something, so it can take focus. */
   get offering(): boolean {
     return (this.#laid?.focusable.length ?? 0) > 0
   }
 
-  /** Whether something on the screen has focus. */
   get focused(): boolean {
     return this.#state.focus !== undefined
   }
 
-  /** Whether what it last drew says the time since a moment, so a later time draws it again: the host's to tick. */
   get ticking(): boolean {
     return this.#timed
   }
 
-  /**
-   * @returns every line it draws; what it last drew, drawn and laid out again only as its facts, its width, what a person opened on it or its registration changed, or — where its drawing says the time since a moment — as that time passes.
-   */
   render(width: number): string[] {
     return [...this.laidAt(width, this.#state).frame.lines]
   }
 
-  /**
-   * @returns handled when the gesture changed the screen; undefined leaves it to pi-tui, which scrolls on the wheel and selects on a drag.
-   */
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
@@ -126,13 +97,6 @@ export class ScreenPane implements Component {
     return { handled: true }
   }
 
-  /**
-   * A key lands on the focused region, and, for lines in the composer's seat,
-   * on every region beyond it that offers something, top to bottom — so a key
-   * bound to a kind answers what the seat offers, whichever offer has focus.
-   * @param seated - whether these are lines in the composer's seat; a placed screen that is open is read, not answered, so its keys land on focus alone.
-   * @returns whether the pane answered it, so the key is consumed; false leaves it to the composer.
-   */
   handleKey(gesture: Extract<Gesture, { readonly kind: 'key' }>, seated = false): boolean {
     const drawn = this.#laid
     if (drawn === undefined) return false
@@ -154,10 +118,6 @@ export class ScreenPane implements Component {
     return true
   }
 
-  /**
-   * Report an invoked offer to the registration, fenced: what the report — author code — does wrong is drawn beneath
-   * what the pane drew, naming its registration. A report that returns draws the lines clean again.
-   */
   #report(region: string, affordance: AffordanceKind): void {
     try {
       this.#invoked(region, affordance)

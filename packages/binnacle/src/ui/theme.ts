@@ -3,10 +3,7 @@ import type { AffordanceKind } from '../contract/index.ts'
 
 const plain = (text: string): string => text
 
-/**
- * The theme's colours for content, named by what the content means; the names
- * are pi's (`pi:packages/coding-agent/docs/themes.md`).
- */
+/** The theme's colours for content, named by what the content means, in the names pi's themes use. */
 export const tones = {
   accent: (text: string): string => `\x1b[36m${text}\x1b[39m`,
   muted: (text: string): string => `\x1b[90m${text}\x1b[39m`,
@@ -124,15 +121,8 @@ const attributes = {
   strikethrough: (text: string): string => `\x1b[9m${text}\x1b[29m`,
 } as const satisfies Record<string, (text: string) => string>
 
-/**
- * The theme a markdown document is drawn in, following the terminal theme's
- * mapping: a heading is bold, a link and a list bullet accent, inline code
- * warning, and a quotation, its border, a rule and a code block's border dim.
- * Nothing is highlighted, so a fenced block's lines are the terminal's own.
- */
 export const markdownTheme: MarkdownTheme = markdownIn(tones)
 
-/** The markdown theme in a theme's tones, so a document follows a tone an author recolours. */
 function markdownIn(toned: Theme['tones']): MarkdownTheme {
   return {
     heading: attributes.bold,
@@ -152,31 +142,19 @@ function markdownIn(toned: Theme['tones']): MarkdownTheme {
   }
 }
 
-/**
- * The composer's theme: its border is the dim chrome nobody reads, and in its
- * select list the chosen row is accent while what supports a choice — the
- * description, the scroll state, a row that matches nothing — is muted.
- */
 export const editorTheme: EditorTheme = {
   borderColor: tones.dim,
   selectList: { selectedPrefix: tones.accent, selectedText: tones.accent, description: tones.muted, scrollInfo: tones.muted, noMatch: tones.muted },
 }
 
-/** A theme, as drawing reads it: each part of binnacle's own, or as registrations changed it. */
+/** A theme: each part of binnacle's own, or as registrations changed it. */
 export interface Theme {
-  /** Each tone, drawing text in its colour. */
   readonly tones: { readonly [name in keyof typeof tones]: (text: string) => string } & { readonly [name: string]: ((text: string) => string) | undefined }
-  /** Each background, filling a band's lines. */
   readonly backgrounds: { readonly [name in keyof typeof backgrounds]: (text: string) => string } & { readonly [name: string]: ((text: string) => string) | undefined }
-  /** Each mark: its glyph, and the tone it is drawn in. */
   readonly marks: { readonly [name in keyof typeof marks]: { readonly glyph: string, readonly tone: Tone } } & { readonly [name: string]: { readonly glyph: string, readonly tone: Tone } | undefined }
-  /** The chrome's glyphs. */
   readonly chrome: { readonly [part in Exclude<keyof typeof chrome, 'border'>]: string } & { readonly border: { readonly [piece in keyof typeof chrome.border]: string } }
-  /** What a fold says of itself: what it says of a count of lines, or, for `less` and `away`, what it says. */
   readonly words: { readonly [word in Exclude<keyof typeof words, PlainWord>]: (count: number) => string } & { readonly [word in PlainWord]: string }
-  /** The styles a markdown document is drawn in. */
   readonly markdown: MarkdownTheme
-  /** How the folds of each kind of entry start, by the key its views are registered under, falling back to its kind when no start is given for its key, when a fold does not say. */
   readonly folds: { readonly [key: string]: FoldStart | undefined }
 }
 
@@ -188,7 +166,7 @@ export interface FoldStart {
   readonly open?: boolean
 }
 
-/** binnacle's own theme, which registrations change. Its folds start as its views draw them: reasoning folded to nothing under the thinking line, context, the fallback, authored facts and a compaction's summary the same, a tool's and a result's output to three rows. */
+/** binnacle's own theme, which registrations change. */
 export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: { answer: { rows: 0 }, context: { rows: 0 }, unknown: { rows: 0 }, authored: { rows: 0 }, compaction: { rows: 0 }, tool: { rows: 3 }, result: { rows: 3 } } }
 
 /**
@@ -231,7 +209,6 @@ export interface Style {
   readonly underline?: boolean
 }
 
-/** What a style draws with: each attribute closed by the parameter that ends it alone, inside the colour, closed by the default foreground. */
 function styled(style: Style): (text: string) => string {
   const wraps: ((text: string) => string)[] = []
   if (style.bold === true) wraps.push(attributes.bold)
@@ -247,7 +224,6 @@ function styled(style: Style): (text: string) => string {
   return text => wraps.reduce((inner, wrap) => wrap(inner), text)
 }
 
-/** A word's template as a function of a count, as every word of the theme's is, those that count nothing ignoring it. */
 function counting(template: string): (count: number) => string {
   return count => template.replaceAll('{n}', String(count)).replaceAll('{lines}', lineWord(count))
 }
@@ -258,7 +234,7 @@ function filling(colour: Colour): (text: string) => string {
   return text => `\x1b[${code}m${text}\x1b[49m`
 }
 
-/** A theme with changes laid over it, oldest first, each over what the ones before it left. A new theme even when nothing changed, so what was kept against the old one is stale. */
+/** A theme with changes laid over it, oldest first, each over what the ones before it left. */
 export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
   const marked: Record<string, { readonly glyph: string, readonly tone: Tone } | undefined> = { ...base.marks }
   for (const change of changes) {

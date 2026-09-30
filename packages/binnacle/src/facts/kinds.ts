@@ -1,26 +1,8 @@
-/**
- * How binnacle treats one kind of event dsh knows.
- *
- * - `read`: binnacle's adapter reads it into a fact the transcript draws.
- * - `quiet`: the transcript draws it as nothing; an author's view registered
- *   for the kind draws it again.
- * - `unread`: no adapter reads it, so the fallback draws it until a feature does.
- */
 export type Treatment = 'read' | 'quiet' | 'unread'
 
 /**
- * The census of `dsh:packages/core/session/src/known-event-types.ts#KNOWN_SESSION_EVENT_TYPES`,
- * restated so a pin that adds a kind fails a test naming it rather than
- * slipping unannounced onto the screen. What is quiet is what dsh web's Chat
- * shows no row for (`dsh:packages/client/ui-chat/src/client/contract/chat-visibility.ts#isVisibleChatNode`):
- * the session's machinery, whose home is a screen of its own. What is unread
- * has a row there that no binnacle feature draws yet, so it is left to the
- * fallback on purpose, until a feature draws it. A kind Chat shows no row
- * for can still be read, when a feature draws what a person must see of it:
- * `approval/asked` and `approval/decided` are dsh's audit pair
- * (`dsh:packages/interaction/user-approval/src/index.ts#ApprovalService`),
- * and the transcript draws what an approval asked and what was decided of
- * it, paired as a call and its result are.
+ * Every kind dsh knows, restated so a pin that adds one fails a test. Quiet has no row in dsh web's
+ * chat; unread has one no feature here draws yet, so the fallback draws it.
  */
 export const kinds: Readonly<Record<string, Treatment>> = {
   'agent-preset/selected': 'quiet',

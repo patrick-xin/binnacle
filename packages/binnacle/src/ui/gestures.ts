@@ -1,12 +1,6 @@
 import { affordances } from '../contract/index.ts'
 import type { Action, Gesture, Region } from '../contract/index.ts'
 
-/**
- * What a gesture means where it lands, or undefined when nothing. `under` is
- * the regions it lands on: for a pointer, those under it, innermost first; for
- * a key, the focused region, then the regions the pane that answers it reaches
- * beyond focus, in the order it hands them.
- */
 export function meaning(gesture: Gesture, under: readonly Region[]): Action | undefined {
   switch (gesture.kind) {
     case 'click': {
@@ -27,8 +21,7 @@ export function meaning(gesture: Gesture, under: readonly Region[]): Action | un
       if (gesture.binding === 'focus.next') return { kind: 'focus', step: 1 }
       if (gesture.binding === 'focus.previous') return { kind: 'focus', step: -1 }
       if (gesture.binding === 'focus.out') return { kind: 'unfocus' }
-      // The primary key is the focused region's alone; a key bound to a kind invokes the first region it lands on
-      // that offers the kind, so a decision's reject answers its key while its allow has focus.
+      // Primary key invokes the focused region; a key bound to a kind invokes the first region it lands on that offers it.
       const binding = gesture.binding
       const region = binding === 'primary' ? under[0] : under.find(candidate => candidate.affordances.some(offer => offer.kind === binding))
       const offered = binding === 'primary' ? region?.affordances[0] : region?.affordances.find(offer => offer.kind === binding)

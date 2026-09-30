@@ -2,7 +2,6 @@ import { visibleWidth } from '@earendil-works/pi-tui'
 import { chrome, colours, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
-/** The parts a theme registration may name. */
 const parts = ['tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds'] as const
 
 function named(value: unknown): string {
@@ -18,7 +17,7 @@ function record(value: unknown, at: string): Readonly<Record<string, unknown>> {
 
 function text(value: unknown, at: string): string {
   if (typeof value !== 'string') throw new Error(`${at} is ${named(value)}, not a string`)
-  // What a theme says is drawn as it is, never made inert as a node's text is, so a control in it is refused here (ADR 14).
+  // What a theme says is drawn as it is, never made inert as a node's text is, so a control in it is refused.
   if (Array.from(value).some(isControl)) throw new Error(`${at} holds a control character, which would reach the terminal as one`)
   return value
 }
@@ -75,15 +74,6 @@ function known<T>(value: unknown, at: string, allowed: readonly string[], read: 
   return out
 }
 
-/**
- * Read a theme registration's changes from code binnacle does not own:
- * checked here, where they enter, and copied, so a theme that names what
- * binnacle cannot draw is refused at its registration, and nothing of it
- * runs later. `theme` is the theme it is laid over, as the registrations leave
- * it now: a mark it has may be changed in part, and a tone it gives, or the
- * changes add, may be named.
- * @throws an error beginning `binnacle.theme:` and naming, by its path, what binnacle cannot draw and what it accepts there.
- */
 export function parseThemeChanges(value: unknown, theme: Theme): ThemeChanges {
   try {
     const given = record(value, 'the theme') as Readonly<Record<string, unknown>> & { readonly tones?: object }
