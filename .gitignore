@@ -2,3 +2,4 @@ node_modules/
 dist/
 .refs/
 references.local.json
+.DS_Store
