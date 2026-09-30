@@ -9,23 +9,13 @@ export function readable(value: unknown): string {
 }
 
 import type { ToolResult } from '@deepseek-ai/dsh-tools'
-import type { Fact } from '../../api.ts'
+import type { Fact, PresentedCall, PresentedResult } from '../../api.ts'
 
 type Result = Extract<Fact, { readonly kind: 'result' }>
 
 const callCards: ReadonlySet<string> = new Set(['generic', 'terminal', 'diff'])
 
 const resultCards: ReadonlySet<string> = new Set(['generic', 'terminal', 'diff', 'read', 'search', 'web'])
-
-/** A call as its tool presented it, read as data. */
-export interface PresentedCall {
-  /** Which card the tool declared for the call. */
-  readonly card: 'generic' | 'terminal' | 'diff'
-  /** What this call does, as the tool titled it: drawn as the card's head, its first line beside the mark and each later line indented two columns beneath it. */
-  readonly title: string
-  /** A shallow copy of the object the presenter returned, frozen read-only and unread beyond the fields above: a row reads its kind's own fields here, parsing them where it draws, as data from code binnacle does not own. */
-  readonly returned: Readonly<Record<string, unknown>>
-}
 
 /** What a presenter returned, read as data: the view, or why it cannot be drawn. */
 export type Read<T> = { readonly view: T } | { readonly why: string }
@@ -41,21 +31,6 @@ export function callViewOf(value: unknown): Read<PresentedCall> | undefined {
   if (typeof title !== 'string') return { why: 'a call view needs its title' }
   return { view: { card: card as PresentedCall['card'], title, returned: frozenCopy(value) } }
 }
-
-/** A result as its tool presented it, read as data. */
-export interface PresentedResult {
-  /** Which card the tool declared for the completed call. */
-  readonly card: 'generic' | 'terminal' | 'diff' | 'read' | 'search' | 'web'
-  /** The title the completed call reads as, when the tool presented one; the call's own title when it did not. Drawn as the head, as a call title is. */
-  readonly title?: string
-  /** The content the completed call folds beneath it, when the tool presented some; the result's own text when it did not. */
-  readonly content?: readonly unknown[]
-  /** A shallow copy of the object the presenter returned, frozen read-only and unread beyond the fields above: a row reads its kind's own fields here, parsing them where it draws, as data from code binnacle does not own. */
-  readonly returned: Readonly<Record<string, unknown>>
-}
-
-/** Every card kind dsh's presentation vocabulary names, on a call or on a result. */
-export type CardKind = PresentedCall['card'] | PresentedResult['card']
 
 /** `undefined` when `presentResult` returned undefined, dsh's word for keeping the pending title and the raw result content; else the view, or why the value cannot be drawn. */
 export function resultViewOf(value: unknown): Read<PresentedResult> | undefined {

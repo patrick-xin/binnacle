@@ -1,8 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRuntime } from '@deepseek-ai/dsh-tools'
-import type { Node, View } from '../../api.ts'
-import type { CardParts } from './cards.ts'
-import { rowFor } from './cards.ts'
+import type { CardKind, CardParts, CardRow, Node, View } from '../../api.ts'
+import { drawCard, refused } from './cards.ts'
+import { genericCard } from './generic.ts'
 import { callViewOf, handedResult, readable, resultViewOf, textOfBlocks } from './presentation.ts'
 
 export const name = 'tool-cards'
@@ -11,11 +11,12 @@ export const name = 'tool-cards'
 export const inject = ['binnacle', 'tools'] satisfies (keyof Context)[]
 
 export function apply(ctx: Context): void {
-  ctx.binnacle.view('tool', viewOf(ctx.tools))
+  ctx.binnacle.card('generic', genericCard)
+  ctx.binnacle.view('tool', viewOf(ctx.tools, kind => ctx.binnacle.cards(kind)))
 }
 
 /** Without a presentation it leaves the entry to binnacle's card, beneath which a presenter's failure is named. */
-function viewOf(tools: ToolRuntime): View {
+function viewOf(tools: ToolRuntime, rowsOf: (kind: CardKind) => readonly CardRow[]): View {
   return (entry, next) => {
     if (entry.kind !== 'tool') return next()
     const tool = tools.get(entry.call.name)
@@ -62,6 +63,7 @@ function viewOf(tools: ToolRuntime): View {
         : undefined,
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
+      took: result === undefined ? undefined : result.time - entry.call.time,
       // Named as binnacle's own card names its result fold, so a fold a person opened stays open when the plugin is disposed or a presenter throws and the card beneath draws the call.
       fold: (child: Node, rows?: number) => ({
         kind: 'part',
@@ -69,13 +71,6 @@ function viewOf(tools: ToolRuntime): View {
         child: { kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child },
       }),
     }
-    const kind = shown?.card ?? call.card
-    const drawn = rowFor(kind).draw(parts)
-    if ('declined' in drawn) return refused(next(), `the ${kind} card could not draw this call: ${drawn.declined}`)
-    return drawn
+    return drawCard(rowsOf, shown?.card ?? call.card, parts, next)
   }
-}
-
-function refused(beneath: Node, what: string): Node {
-  return { kind: 'stack', children: [beneath, { kind: 'text', text: [{ mark: 'problem' }, ` ${what}`], tone: 'error' }] }
 }

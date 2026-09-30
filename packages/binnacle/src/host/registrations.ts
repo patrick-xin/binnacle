@@ -2,7 +2,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
-import type { AuthorAdapter, PlacedScreen, Placement, Registrations, Part, PartView, Slot, ThemeChanges, View, Views } from '../api.ts'
+import type { AuthorAdapter, CardKind, CardRow, PlacedScreen, Placement, Registrations, Part, PartView, Slot, ThemeChanges, View, Views } from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
@@ -41,6 +41,7 @@ export class RegistrationService extends Service implements Registrations {
   private readonly adapterTable = new Map<string, readonly AuthorAdapter[]>()
   private readonly newestAdapters = new Map<string, AuthorAdapter>()
   private readonly viewTable = new Map<string, readonly View[]>()
+  private readonly cardTable = new Map<string, readonly CardRow[]>()
   private readonly screenTable = new Map<string, readonly PlacedScreen[]>()
   private readonly newestScreens = new Map<string, PlacedScreen>()
   private readonly placementTable = new Map<string, readonly Placement[]>()
@@ -77,6 +78,16 @@ export class RegistrationService extends Service implements Registrations {
   view(key: string, view: View): () => void
   view(key: string, view: View | PartView<'thinking'> | PartView<'output'>): () => void {
     return this.register(this.viewTable, key, view as View, `binnacle.view(${key})`, 'views')
+  }
+
+  /** @inheritDoc */
+  card(kind: CardKind, row: CardRow): () => void {
+    return this.register(this.cardTable, kind, row, `binnacle.card(${kind})`, 'cards')
+  }
+
+  /** @inheritDoc */
+  cards(kind: CardKind): readonly CardRow[] {
+    return this.cardTable.get(kind) ?? []
   }
 
   get currentTheme(): Theme {
@@ -164,7 +175,7 @@ export class RegistrationService extends Service implements Registrations {
     return () => { this.listeners.delete(listener) }
   }
 
-  private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string, table: RegistrationsChanged): () => void {
+  private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string, table: RegistrationsChanged | 'cards'): () => void {
     return this.ctx.effect(() => {
       into.set(key, [...into.get(key) ?? [], value])
       this.changed(table)
@@ -179,7 +190,14 @@ export class RegistrationService extends Service implements Registrations {
     }, label)
   }
 
-  private changed(table: RegistrationsChanged): void {
+  private changed(changing: RegistrationsChanged | 'cards'): void {
+    let table: RegistrationsChanged
+    if (changing === 'cards') {
+      // A row draws inside the tool view, so the tool entries are drawn again as a new stack of it.
+      const tool = this.viewTable.get('tool')
+      if (tool !== undefined) this.viewTable.set('tool', [...tool])
+      table = 'views'
+    } else table = changing
     this.newestAdapters.clear()
     for (const [type, stack] of this.adapterTable) {
       const newest = stack.at(-1)

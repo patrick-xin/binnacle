@@ -420,6 +420,42 @@ export type PartView<K extends Part['kind'] = Part['kind']> = (part: Extract<Par
 export type View = (entry: Entry, next: () => Node) => Node;
 // views/entries.d.ts
 export type Views = ReadonlyMap<string, readonly View[]>;
+// views/cards.d.ts
+export type CardKind = PresentedCall['card'] | PresentedResult['card'];
+// views/cards.d.ts
+export interface PresentedCall {
+    readonly card: 'generic' | 'terminal' | 'diff';
+    readonly title: string;
+    readonly returned: Readonly<Record<string, unknown>>;
+}
+// views/cards.d.ts
+export interface PresentedResult {
+    readonly card: 'generic' | 'terminal' | 'diff' | 'read' | 'search' | 'web';
+    readonly title?: string;
+    readonly content?: readonly unknown[];
+    readonly returned: Readonly<Record<string, unknown>>;
+}
+// views/cards.d.ts
+export interface CardParts {
+    readonly call: PresentedCall;
+    readonly result: PresentedResult | undefined;
+    readonly mark: Span;
+    readonly waiting: Node | undefined;
+    readonly reason: string | undefined;
+    readonly resultText: string;
+    readonly took: number | undefined;
+    fold(child: Node, rows?: number): Node;
+}
+// views/cards.d.ts
+export interface CardRow {
+    draw(parts: CardParts): Shown | {
+        readonly declined: string;
+    };
+}
+// views/cards.d.ts
+export type Shown = Extract<Node, {
+    readonly kind: 'show';
+}>;
 // api.d.ts
 export interface PlacedScreen {
     readonly key: KeyId;
@@ -448,6 +484,8 @@ export interface Registrations {
     facts(type: string, adapter: AuthorAdapter): () => void;
     view<K extends Part['kind']>(key: K, view: PartView<K>): () => void;
     view(key: string, view: View): () => void;
+    card(kind: CardKind, row: CardRow): () => void;
+    cards(kind: CardKind): readonly CardRow[];
     invalidate(key: string): void;
     redraw(): void;
     screen(name: string, screen: PlacedScreen): () => void;
