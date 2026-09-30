@@ -182,3 +182,19 @@ test('an event both in the log as it is read and on the feed is heard once', asy
   session.follow((event) => { heard.push(event) })
   assert.deepEqual(heard, [first])
 })
+
+test('the answer streaming is heard for the session\'s own agent, and never for another', async () => {
+  const ctx = new Context()
+  const agent = { session: { snapshotEvents: (): readonly SessionEvent[] => [] } }
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('agents', { create: async () => ({ agent, dispose: async () => {} }) } as never)
+  const session = await openSession(ctx)
+  const heard: unknown[] = []
+  const stop = session.onStream((frame) => { heard.push(frame) })
+  const own = { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 }
+  ctx.emit('agent/assistant-stream', { agent: agent as never, frame: own as never })
+  ctx.emit('agent/assistant-stream', { agent: { session: {} } as never, frame: { ...own, attemptId: 'a2' } as never })
+  stop()
+  ctx.emit('agent/assistant-stream', { agent: agent as never, frame: { ...own, attemptId: 'a3' } as never })
+  assert.deepEqual(heard, [own])
+})

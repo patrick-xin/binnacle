@@ -4,7 +4,7 @@ The one layer that touches the terminal and the process: it reads the invocation
 
 - `index.ts` — the Cordis row: parses the invocation, then reports the model (`--check`) or takes the terminal until the person quits, on the alternate or main screen; reads the log again when an adapter comes or goes.
 - `registrations.ts` — the `binnacle` service: the author API's registrations, kept for the host to adapt and draw with.
-- `session.ts` — the session the surface draws: one agent on the default model, its log followed from the first event.
+- `session.ts` — the session the surface draws: one agent on the default model, its log followed from the first event, and its answer heard as it streams.
 
 ## Keep
 

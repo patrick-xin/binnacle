@@ -1,7 +1,8 @@
 import type { Component, TuiMode, TuiMouseEvent, TuiMouseEventResult } from '@earendil-works/pi-tui'
 import type { Fact } from '../facts/adapt.ts'
+import type { Streamed } from '../facts/stream.ts'
 import type { Gesture } from '../contract/index.ts'
-import { empty, fold, settled, transcript } from '../models/transcript.ts'
+import { answering, empty, fold, settled, transcript } from '../models/transcript.ts'
 import type { Transcript } from '../models/transcript.ts'
 import { answer } from '../ui/answer.ts'
 import { under } from '../ui/layout.ts'
@@ -27,6 +28,8 @@ export interface PaneReports {
 }
 
 export class TranscriptPane implements Component {
+  #logged: Transcript = empty
+  #streamed: Streamed | undefined
   #transcript: Transcript = empty
   readonly #changed: () => void
   readonly #views: () => Views
@@ -55,12 +58,20 @@ export class TranscriptPane implements Component {
   }
 
   push(fact: Fact): void {
-    this.#transcript = fold(this.#transcript, fact)
+    this.#logged = fold(this.#logged, fact)
+    this.#transcript = answering(this.#logged, this.#streamed)
+    this.#changed()
+  }
+
+  stream(streamed: Streamed | undefined): void {
+    this.#streamed = streamed
+    this.#transcript = answering(this.#logged, this.#streamed)
     this.#changed()
   }
 
   reset(facts: readonly Fact[]): void {
-    this.#transcript = transcript(facts)
+    this.#logged = transcript(facts)
+    this.#transcript = answering(this.#logged, this.#streamed)
     this.#draw = screens(this.#keys)
     this.#printed = undefined
     this.#changed()

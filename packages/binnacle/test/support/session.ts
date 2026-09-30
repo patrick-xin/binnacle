@@ -6,7 +6,7 @@
  * @module binnacle/test/support/session
  */
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { OpenedSession } from '../../src/host/session.ts'
 
 /** A session that records what the host does with it; the harness behind it is dsh's, proven by `check:boot`. */
@@ -77,4 +77,11 @@ export class FakeSession implements OpenedSession {
   }
   async close(): Promise<void> { this.closed = true }
   log(event: SessionEvent): void { this.#listener?.(event) }
+  #streamListener: ((frame: AssistantStreamFrame) => void) | undefined
+  onStream(listener: (frame: AssistantStreamFrame) => void): () => void {
+    this.#streamListener = listener
+    return () => { this.#streamListener = undefined }
+  }
+  /** Publish a frame of the answer streaming, as dsh does for the session's agent. */
+  stream(frame: AssistantStreamFrame): void { this.#streamListener?.(frame) }
 }

@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
-import type { Agent, AgentHandle, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, AssistantStreamFrame, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-model'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -12,6 +12,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 export interface OpenedSession {
   readonly agent: Agent
   follow(listener: (event: SessionEvent) => void): () => void
+  onStream(listener: (frame: AssistantStreamFrame) => void): () => void
   send(text: string): void
   onStanding(listener: () => void): () => void
   command(line: string): Promise<boolean>
@@ -59,6 +60,7 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       replaying = false
       return off
     },
+    onStream: listener => ctx.on('agent/assistant-stream', ({ agent, frame }) => { if (agent === handle.agent) listener(frame) }),
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
     },
