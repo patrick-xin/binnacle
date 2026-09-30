@@ -151,6 +151,17 @@ test('the files the agent presented are shown under one line, each path and what
   assert.deepEqual(seen(entry), ['▤ presented 2 files', '│ dist/report.pdf  the audit', '│ notes.md'])
 })
 
+test('a workflow run draws its name and how it stands, and beneath it each member and how it stands', () => {
+  const run = { kind: 'workflow', seq: 3, time: 3, runId: 'wf-1', name: 'review' }
+  const lint = { kind: 'member', seq: 4, time: 4, runId: 'wf-1', member: 0, label: 'lint', phase: 'check' }
+  const tests = { kind: 'member', seq: 5, time: 5, runId: 'wf-1', member: 1, label: 'test' }
+  const failed = { kind: 'member-end', seq: 6, time: 6, runId: 'wf-1', member: 0, outcome: 'failed' }
+  const going = { kind: 'workflow', run, members: [{ start: lint, end: failed }, { start: tests }] } as unknown as Entry
+  assert.deepEqual(seen(going), ['◇ review · running', 'lint (check) · failed', 'test · running'])
+  assert.deepEqual(seen({ ...going, end: { kind: 'workflow-end', seq: 7, time: 7, runId: 'wf-1', stopped: 'error' } } as unknown as Entry), ['◇ review · error', 'lint (check) · failed', 'test · running'])
+  assert.deepEqual(seen({ ...going, left: 'aborted' } as unknown as Entry), ['◇ review · aborted', 'lint (check) · failed', 'test · running'])
+})
+
 const scheduled = { kind: 'retry', seq: 9, time: 1_000, retryId: 'r1', turn: 1, step: 1, attempt: 2, of: 3, at: 5_000, failure: 'rate limited' } as const
 
 /**

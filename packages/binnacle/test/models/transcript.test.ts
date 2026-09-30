@@ -267,6 +267,7 @@ test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s i
       else if (entry.kind === 'command') drawn.push(entry.run, ...entry.done === undefined ? [] : [entry.done])
       else if (entry.kind === 'compaction') drawn.push(entry.start, ...entry.summary === undefined ? [] : [entry.summary], ...entry.end === undefined ? [] : [entry.end])
       else if (entry.kind === 'retry') drawn.push(entry.retry, ...entry.started === undefined ? [] : [entry.started])
+      else if (entry.kind === 'workflow') drawn.push(entry.run, ...entry.members.flatMap(member => [member.start, ...member.end === undefined ? [] : [member.end]]), ...entry.end === undefined ? [] : [entry.end])
       else if (entry.kind !== 'streaming') drawn.push(entry.fact)
     }
   }
@@ -330,4 +331,33 @@ test('a retry still scheduled when its turn ends is left, saying how the turn en
 test('the start of an attempt older than its chain\'s latest changes nothing: the chain stays one entry, its latest still scheduled', () => {
   const opened: Fact = { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }
   assert.deepEqual(transcript([opened, prompt, retry(3, 1), retry(4, 2), retried(5, 1)]).turns[0]?.entries, [{ kind: 'prompt', fact: prompt }, { kind: 'retry', retry: retry(4, 2) }])
+})
+
+const run = { kind: 'workflow', seq: 3, time: 3, runId: 'wf-1' as never, name: 'review' } as const
+const lint = { kind: 'member', seq: 4, time: 4, runId: 'wf-1' as never, member: 0, label: 'lint' } as const
+const linted = { kind: 'member-end', seq: 5, time: 5, runId: 'wf-1' as never, member: 0, outcome: 'completed' } as const
+const stopped = { kind: 'workflow-end', seq: 6, time: 6, runId: 'wf-1' as never, stopped: 'completed' } as const
+
+test('a workflow run is one entry where it opened, holding each member with its settling, and how the run stopped', () => {
+  const opened: Fact = { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }
+  assert.deepEqual(transcript([opened, prompt, run, lint, linted, stopped]).turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: lint, end: linted }], end: stopped })
+})
+
+test('a workflow run still going waits to settle while its turn runs, and one its turn ended is left, saying how', () => {
+  const opened: Fact = { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }
+  assert.equal(settled(transcript([opened, prompt, run, lint])), 1)
+  const ended = transcript([opened, prompt, run, lint, { kind: 'turn', seq: 9, time: 9, turn: 1, phase: 'end', ending: 'aborted' }])
+  assert.deepEqual(ended.turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: lint }], left: 'aborted' })
+})
+
+test('a workflow run that outlives its turn keeps its members and its stop in the one entry, which goes on from where its turn left it', () => {
+  const facts: Fact[] = [
+    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }, prompt, run,
+    { kind: 'turn', seq: 7, time: 7, turn: 1, phase: 'end', ending: 'completed' },
+    { kind: 'turn', seq: 8, time: 8, turn: 2, phase: 'start' },
+    { ...lint, seq: 9 }, { ...linted, seq: 10 }, { ...stopped, seq: 11 },
+  ]
+  const turns = transcript(facts).turns
+  assert.deepEqual(turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: { ...lint, seq: 9 }, end: { ...linted, seq: 10 } }], end: { ...stopped, seq: 11 } })
+  assert.deepEqual(turns[1]?.entries, [])
 })

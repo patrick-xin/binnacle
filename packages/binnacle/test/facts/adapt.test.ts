@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { CommandId } from '@deepseek-ai/dsh-commands'
 import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
-import { SessionSeq } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 import { RetryId } from '@deepseek-ai/dsh-llm-retry'
@@ -46,6 +46,22 @@ test('what dsh says of the workspace changing is quiet: its home is a service of
   // `workspace/changes` is declared in a dsh package binnacle does not name: a kind it keeps quiet needs no reading.
   const event = { type: 'workspace/changes' as string, seq: SessionSeq(13), time: 3_100, data: { turn: 2 } } as SessionEvent
   assert.equal(adapt(event).kind, 'quiet')
+})
+
+test('a workflow run is read as it opens, as each member starts and settles, and as it stops', () => {
+  const runId = 'wf-1' as never
+  const events = [
+    { type: 'tool-workflow/run-start', seq: SessionSeq(20), time: 1, data: { runId, name: 'review' } },
+    { type: 'tool-workflow/agent-start', seq: SessionSeq(21), time: 2, data: { runId, seq: 0, label: 'lint', phase: 'check', childId: SessionId('child-1') } },
+    { type: 'tool-workflow/agent-end', seq: SessionSeq(22), time: 3, data: { runId, seq: 0, outcome: 'failed' } },
+    { type: 'tool-workflow/run-end', seq: SessionSeq(23), time: 4, data: { runId, stopReason: 'error' } },
+  ] as const satisfies readonly SessionEvent[]
+  assert.deepEqual(events.map(event => adapt(event)), [
+    { kind: 'workflow', seq: 20, time: 1, runId: 'wf-1', name: 'review' },
+    { kind: 'member', seq: 21, time: 2, runId: 'wf-1', member: 0, label: 'lint', phase: 'check' },
+    { kind: 'member-end', seq: 22, time: 3, runId: 'wf-1', member: 0, outcome: 'failed' },
+    { kind: 'workflow-end', seq: 23, time: 4, runId: 'wf-1', stopped: 'error' },
+  ])
 })
 
 test('a retry dsh scheduled is a retry fact: which chain, which attempt of how many, when it starts, and what failed as a person reads it', () => {
