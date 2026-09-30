@@ -24,6 +24,7 @@ Each card is a `show`, the surface's container for what it shows and did not wri
 - The plugin registers one row, `generic`; every other kind — terminal, diff, read, search, web — draws through generic's rows until a row of its own is registered, by its title alone.
 - Each call a `run_code` program made is a line beneath the head, marked as a call is — `● grep {}`, `✗ read {"path":"a.ts"}` — before why it failed and what it returned; a row is handed them as its `made` part.
 - A call that took a second or more says so after its head, muted — `took 1.4s`, `took 1m 05s` — its result's log time less its call's, so the same log draws the same card; a faster call says nothing, as most do.
+- The head offers `copy` after `expand`, the text of all the card holds; no key is bound to `copy` until a person asks for one ([Keys](keys.md)).
 - The result fold is named as binnacle's own card names it (`output`), so what a person opened stays open when the plugin is disposed, or a presenter throws and the card beneath draws the call; the naming is [Authoring](authoring.md)'s.
 - `running` and the time since the call — `running 4s` — stays under a call while it runs, counting up once a second, so a presented card says what it is doing the way binnacle's own does; a call its turn left without a result says the turn ended without it, and how the turn ended, in that line's place — as binnacle's own card does ([Transcript](transcript.md)).
 

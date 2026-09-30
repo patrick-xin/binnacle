@@ -3,8 +3,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { CombinedAutocompleteProvider, Editor, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
-import type { Component, Keybinding, OverlayHandle, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
+import { CombinedAutocompleteProvider, Editor, getNativeClipboard, ProcessTerminal, ScrollView, setKeybindings, TuiAltScreen, TuiMainScreen, VStack } from '@earendil-works/pi-tui'
+import type { Component, Keybinding, NativeClipboard, OverlayHandle, Terminal, TUI, TuiInputListenerResult, TuiMainScreenRenderState, TuiMode, StackChild } from '@earendil-works/pi-tui'
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { AnswerStream } from '../facts/stream.ts'
@@ -31,11 +31,13 @@ export const internals: {
   stderr: { write(chunk: string): unknown }
   open: (ctx: Context) => Promise<OpenedSession>
   clock: { now(): number, after(ms: number, then: () => void): () => void }
+  clipboard: () => NativeClipboard | undefined
 } = {
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
   stderr: process.stderr,
   open: openSession,
+  clipboard: getNativeClipboard,
   clock: {
     now: () => Date.now(),
     after: (ms, then) => {
@@ -106,9 +108,16 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (top < view.scrollTop) view.scrollTo(top)
     else if (top + height > view.scrollTop + view.viewportHeight) view.scrollTo(top + height - view.viewportHeight)
   }
+  const copy = (text: string): void => {
+    const byTerminal = (): void => { terminal.write(`\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`) }
+    const native = internals.clipboard()
+    if (native?.setText === undefined) byTerminal()
+    else native.setText(text).catch(byTerminal)
+  }
   const transcript = new TranscriptPane(() => { tui.requestRender() }, () => registrations.views, {
     inView: intoView,
     fullscreen: () => { show('fullscreen') },
+    copy,
   }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
   const screenPanes = new Map<string, ScreenPane>()
   const screenViews = new Map<string, ScrollView>()
@@ -144,6 +153,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (kept !== undefined) return kept
     const answered = slot === 'composer' || slot === 'dialog'
     const pane = new ScreenPane(() => facts, {
+      copy,
       changed: () => { tui.requestRender() },
       invoked: (region, affordance) => { placement.invoke?.(region, affordance) },
     }, () => registrations.currentTheme, () => internals.clock.now(), () => answered ? table.keysOf : undefined)
@@ -197,7 +207,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     open = undefined
     let pane = screenPanes.get(id)
     if (pane === undefined) {
-      pane = new ScreenPane(() => facts, { changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
+      pane = new ScreenPane(() => facts, { copy, changed: () => { tui.requestRender() }, inView: intoView }, () => registrations.currentTheme, () => internals.clock.now(), () => table.keysOf)
       screenPanes.set(id, pane)
     }
     pane.place(id, placed)

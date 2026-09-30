@@ -134,3 +134,16 @@ test('an offer invoked by a key or a click reaches the registration’s invoke, 
   assert.deepEqual(invoked, ['reply answer', 'reply answer'])
   assert.deepEqual(drawText(pane, 70), ['reply', '▸ reply'])
 })
+
+test('a key bound to copy on a focused show on a placed screen hands the host all it holds, not the placement', () => {
+  const copied: string[] = []
+  const invoked: string[] = []
+  const pane = new ScreenPane(() => [], { copy: (text) => { copied.push(text) }, invoked: (_region, affordance) => { invoked.push(affordance) } })
+  pane.place('cards', { draw: () => ({ kind: 'show', title: ['● pnpm test'], opens: 'output', child: { kind: 'fold', id: 'output', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } } }) })
+  drawText(pane, 40)
+  pane.handleKey({ kind: 'key', binding: 'focus.next' })
+  drawText(pane, 40)
+  pane.handleKey({ kind: 'key', binding: 'copy' })
+  assert.deepEqual(copied, ['a\nb\nc'])
+  assert.deepEqual(invoked, [])
+})

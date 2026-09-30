@@ -18,6 +18,8 @@ export interface ScreenReports {
   readonly changed?: () => void
   readonly inView?: (top: number, height: number) => void
   readonly invoked?: (region: string, affordance: AffordanceKind) => void
+  /** Write what a person copied to the clipboard: only the host touches the terminal. */
+  readonly copy?: (text: string) => void
 }
 
 interface Laid {
@@ -37,6 +39,7 @@ export class ScreenPane implements Component {
   readonly #changed: () => void
   readonly #inView: (top: number, height: number) => void
   readonly #invoked: (region: string, affordance: AffordanceKind) => void
+  readonly #copy: (text: string) => void
   #registration: string | undefined
   #draw: ((facts: readonly Fact[]) => Node) | undefined
   #state: UiState = initial
@@ -53,6 +56,7 @@ export class ScreenPane implements Component {
     this.#changed = reports.changed ?? (() => {})
     this.#inView = reports.inView ?? (() => {})
     this.#invoked = reports.invoked ?? (() => {})
+    this.#copy = reports.copy ?? (() => {})
   }
 
   place(name: string, screen: { readonly draw: (facts: readonly Fact[]) => Node }, registration = `binnacle.screen(${name})`): void {
@@ -105,7 +109,10 @@ export class ScreenPane implements Component {
     const beyond = seated ? drawn.frame.regions.map(placed => placed.region).filter(region => region !== focused && region.affordances.length > 0) : []
     const next = answer(this.#state, gesture, focused === undefined ? beyond : [focused, ...beyond], drawn)
     if (next === undefined) return false
-    if (next.invoked !== undefined) this.#report(next.invoked.region, next.invoked.affordance)
+    const copies = next.invoked?.affordance === 'copy' ? drawn.frame.regions.find(placed => placed.region.id === next.invoked?.region)?.region.text : undefined
+    // The surface answers copy where a region carries its text; an author's own offer of copy reaches its invoke.
+    if (copies !== undefined) this.#copy(copies)
+    else if (next.invoked !== undefined) this.#report(next.invoked.region, next.invoked.affordance)
     if (next.state !== this.#state) {
       this.#state = next.state
       if (next.focus !== undefined) {

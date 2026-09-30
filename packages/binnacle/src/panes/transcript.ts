@@ -25,6 +25,8 @@ interface Printed {
 export interface PaneReports {
   readonly inView?: (top: number, height: number) => void
   readonly fullscreen?: (top: number, height: number) => void
+  /** Write what a person copied to the clipboard: only the host touches the terminal. */
+  readonly copy?: (text: string) => void
 }
 
 export class TranscriptPane implements Component {
@@ -36,6 +38,7 @@ export class TranscriptPane implements Component {
   readonly #theme: () => Theme
   readonly #inView: (top: number, height: number) => void
   readonly #fullscreen: (top: number, height: number) => void
+  readonly #copy: (text: string) => void
   #state: UiState = initial
   #draw: DrawScreen
   readonly #now: () => number | undefined
@@ -55,6 +58,7 @@ export class TranscriptPane implements Component {
     this.#theme = theme
     this.#inView = reports.inView ?? (() => {})
     this.#fullscreen = reports.fullscreen ?? (() => {})
+    this.#copy = reports.copy ?? (() => {})
   }
 
   push(fact: Fact): void {
@@ -156,6 +160,7 @@ export class TranscriptPane implements Component {
     const focused = focus === undefined ? undefined : drawn.screen.regions.find(placed => placed.region.id === focus)
     const next = answer(this.#state, gesture, focused === undefined ? [] : [focused.region], drawn.screen)
     if (next === undefined) return false
+    if (next.invoked?.affordance === 'copy' && focused?.region.text !== undefined) this.#copy(focused.region.text)
     if (next.state !== this.#state) {
       this.#state = next.state
       if (next.focus !== undefined) {
