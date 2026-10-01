@@ -17,5 +17,5 @@ import type { LayoutState } from '../../src/ui/layout.ts'
  * @returns the component.
  */
 export function componentOf(node: Node, state: LayoutState): Component {
-  return { render: width => [...layout(node, width, state).lines], invalidate: () => {} }
+  return { render: (width) => [...layout(node, width, state).lines], invalidate: () => {} }
 }

@@ -21,7 +21,12 @@ declare module '@deepseek-ai/dsh-session' {
  * @param time - when it was logged.
  * @returns the event.
  */
-export const seed = (seq: number, time: number): SessionEvent<'test/marker'> => ({ type: 'test/marker', seq: SessionSeq(seq), time, data: {} })
+export const seed = (seq: number, time: number): SessionEvent<'test/marker'> => ({
+  type: 'test/marker',
+  seq: SessionSeq(seq),
+  time,
+  data: {},
+})
 
 /**
  * A tool the model asked for, as dsh logs it: in turn 1, step 1, with no arguments, its call id taken from its place in the log.
@@ -30,5 +35,8 @@ export const seed = (seq: number, time: number): SessionEvent<'test/marker'> => 
  * @returns the event.
  */
 export const called = (seq: number, name: string): SessionEvent<'tool/call'> => ({
-  type: 'tool/call', seq: SessionSeq(seq), time: seq, data: { turn: 1, step: 1, callId: ToolCallId(`c${seq}`), name, arguments: '{}' },
+  type: 'tool/call',
+  seq: SessionSeq(seq),
+  time: seq,
+  data: { turn: 1, step: 1, callId: ToolCallId(`c${seq}`), name, arguments: '{}' },
 })

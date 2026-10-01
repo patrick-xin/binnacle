@@ -29,7 +29,10 @@ test('what an author reads is held: every name the entry exports, and each name 
     'src/api.ts': `export type { Kept } from './ui/node.ts'\n/** Doc. */\nexport interface Own {}\nexport type Bare = string\n`,
     'src/ui/node.ts': `export type Kept = string\nexport type Unread = number\n`,
   }
-  assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ['src/api.ts:4: Bare', 'src/ui/node.ts:1: Kept'])
+  assert.deepEqual(
+    undocumentedSurface('src/api.ts', (path) => files[path]),
+    ['src/api.ts:4: Bare', 'src/ui/node.ts:1: Kept'],
+  )
 })
 
 test('a declaration an author reaches through another is held too, through the files it is imported from, and nothing it does not reach', () => {
@@ -38,12 +41,20 @@ test('a declaration an author reaches through another is held too, through the f
     'src/ui/node.ts': `import type { Tone } from './theme.ts'\n/** Doc. */\nexport type Node = { span: Span, tone: Tone }\ntype Span = string\ntype Unreached = number\n`,
     'src/ui/theme.ts': `export type Tone = 'dim'\n`,
   }
-  assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ['src/ui/node.ts:4: Span', 'src/ui/theme.ts:1: Tone'])
+  assert.deepEqual(
+    undocumentedSurface('src/api.ts', (path) => files[path]),
+    ['src/ui/node.ts:4: Span', 'src/ui/theme.ts:1: Tone'],
+  )
 })
 
 test('a module augmentation an author reaches is held: ctx.binnacle is what every author reads', () => {
-  const files = { 'src/api.ts': `/** Doc. */\nexport interface Registrations {}\ndeclare module '@deepseek-ai/cordis' {\n  interface Context { binnacle: Registrations }\n}\n` }
-  assert.deepEqual(undocumentedSurface('src/api.ts', path => files[path]), ["src/api.ts:3: declare module '@deepseek-ai/cordis'"])
+  const files = {
+    'src/api.ts': `/** Doc. */\nexport interface Registrations {}\ndeclare module '@deepseek-ai/cordis' {\n  interface Context { binnacle: Registrations }\n}\n`,
+  }
+  assert.deepEqual(
+    undocumentedSurface('src/api.ts', (path) => files[path]),
+    ["src/api.ts:3: declare module '@deepseek-ai/cordis'"],
+  )
 })
 
 test('the author surface is every declaration an author reads, documented or not, by file then line', () => {
@@ -51,9 +62,12 @@ test('the author surface is every declaration an author reads, documented or not
     'src/api.ts': `export type { Kept, run } from './ui/node.ts'\n/** Doc. */\nexport interface Own {\n  a: string\n}\n`,
     'src/ui/node.ts': `export type Unread = number\nexport type Kept = string\nexport function run(\n  a: string,\n): void {\n  // body\n}\n`,
   }
-  assert.deepEqual(authorSurface('src/api.ts', path => files[path]), [
-    { path: 'src/api.ts', line: 3, end: 5, name: 'Own', documented: true },
-    { path: 'src/ui/node.ts', line: 2, end: 2, name: 'Kept', documented: false },
-    { path: 'src/ui/node.ts', line: 3, end: 5, name: 'run', documented: false },
-  ])
+  assert.deepEqual(
+    authorSurface('src/api.ts', (path) => files[path]),
+    [
+      { path: 'src/api.ts', line: 3, end: 5, name: 'Own', documented: true },
+      { path: 'src/ui/node.ts', line: 2, end: 2, name: 'Kept', documented: false },
+      { path: 'src/ui/node.ts', line: 3, end: 5, name: 'run', documented: false },
+    ],
+  )
 })

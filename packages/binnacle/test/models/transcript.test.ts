@@ -2,10 +2,31 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Fact } from '../../src/facts/adapt.ts'
 import { answering, settled, transcript } from '../../src/models/transcript.ts'
-import { prompt as promptFact, call as callFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact, started as startedFact, summarized as summarizedFact, ended as endedFact } from '../support/facts.ts'
+import {
+  prompt as promptFact,
+  call as callFact,
+  returned as returnedFact,
+  asked as askedFact,
+  decided as decidedFact,
+  run as runFact,
+  done as doneFact,
+  started as startedFact,
+  summarized as summarizedFact,
+  ended as endedFact,
+} from '../support/facts.ts'
 
 const prompt = promptFact(2, 10, 'fix the build')
-const answer: Fact = { kind: 'answer', seq: 4, time: 20, turn: 1, step: 1, provider: 'deepseek', model: 'deepseek-v4', interrupted: false, blocks: [{ kind: 'text', text: 'Done.' }] }
+const answer: Fact = {
+  kind: 'answer',
+  seq: 4,
+  time: 20,
+  turn: 1,
+  step: 1,
+  provider: 'deepseek',
+  model: 'deepseek-v4',
+  interrupted: false,
+  blocks: [{ kind: 'text', text: 'Done.' }],
+}
 
 test('a turn holds what happened in it, in log order, and why it ended; steps are not entries', () => {
   const facts: Fact[] = [
@@ -17,7 +38,16 @@ test('a turn holds what happened in it, in log order, and why it ended; steps ar
     { kind: 'turn', seq: 6, time: 30, turn: 1, phase: 'end', ending: 'completed' },
   ]
   assert.deepEqual(transcript(facts), {
-    turns: [{ turn: 1, entries: [{ kind: 'prompt', fact: prompt }, { kind: 'answer', fact: answer }], ending: 'completed' }],
+    turns: [
+      {
+        turn: 1,
+        entries: [
+          { kind: 'prompt', fact: prompt },
+          { kind: 'answer', fact: answer },
+        ],
+        ending: 'completed',
+      },
+    ],
   })
 })
 
@@ -49,7 +79,11 @@ test('an approval asked and its decision are one entry, where it was asked, as a
   ]
   assert.deepEqual(transcript(facts).turns[0]?.entries, [
     { kind: 'prompt', fact: prompt },
-    { kind: 'approval', asked: askedFact(5, 22, 'a1', 'bash', 'writes outside the workspace'), decided: decidedFact(6, 24, 'a1', 'allowed-once') },
+    {
+      kind: 'approval',
+      asked: askedFact(5, 22, 'a1', 'bash', 'writes outside the workspace'),
+      decided: decidedFact(6, 24, 'a1', 'allowed-once'),
+    },
   ])
 })
 
@@ -62,11 +96,15 @@ test('a command run and its done are one entry, where it ran, as a call and its 
   ]
   assert.deepEqual(transcript(facts).turns[0]?.entries, [
     { kind: 'prompt', fact: prompt },
-    { kind: 'command', run: runFact(5, 22, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2'), done: doneFact(6, 24, 'cmd-1a2b3c4d-1', 'success', 'compacted: 12 messages folded to a summary') },
+    {
+      kind: 'command',
+      run: runFact(5, 22, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2'),
+      done: doneFact(6, 24, 'cmd-1a2b3c4d-1', 'success', 'compacted: 12 messages folded to a summary'),
+    },
   ])
 })
 
-test('a compaction\'s start, summary and end are one entry, where it started, as a call and its result are paired', () => {
+test("a compaction's start, summary and end are one entry, where it started, as a call and its result are paired", () => {
   const facts: Fact[] = [
     { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
     prompt,
@@ -113,10 +151,18 @@ test('what the log holds before its first turn opens the transcript, in a turn n
 
 test('a turn still running has no ending, and a call still running has no result', () => {
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, prompt, call]
-  assert.deepEqual(transcript(facts).turns, [{ turn: 1, entries: [{ kind: 'prompt', fact: prompt }, { kind: 'tool', call }] }])
+  assert.deepEqual(transcript(facts).turns, [
+    {
+      turn: 1,
+      entries: [
+        { kind: 'prompt', fact: prompt },
+        { kind: 'tool', call },
+      ],
+    },
+  ])
 })
 
-test('a turn\'s end marks its calls left without results, with how the turn ended', () => {
+test("a turn's end marks its calls left without results, with how the turn ended", () => {
   const facts: Fact[] = [
     { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
     prompt,
@@ -150,7 +196,18 @@ const returned = (seq: number, callId: string): Fact => returnedFact(seq, 40, ca
 
 test('what has settled is every entry, oldest first, up to a call still waiting for its result in a turn still running', () => {
   const interrupted: Fact = { kind: 'turn', seq: 4, time: 4, turn: 1, phase: 'end', ending: 'aborted' }
-  const facts: Fact[] = [start(1, 1), prompt, asked(3, 'c1'), interrupted, start(5, 2), prompt, answer, asked(8, 'c2'), asked(9, 'c3'), returned(10, 'c3')]
+  const facts: Fact[] = [
+    start(1, 1),
+    prompt,
+    asked(3, 'c1'),
+    interrupted,
+    start(5, 2),
+    prompt,
+    answer,
+    asked(8, 'c2'),
+    asked(9, 'c3'),
+    returned(10, 'c3'),
+  ]
   // Turn 1 ended with c1 still waiting, so both its entries have settled. In turn 2, c2 waits: the prompt and the answer before it have settled; c2 and c3 after it have not.
   assert.equal(settled(transcript(facts)), 4)
   assert.equal(settled(transcript([...facts, returned(11, 'c2')])), 6)
@@ -203,7 +260,9 @@ test('a summary or end whose compaction is not in its turn is kept on its own, n
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, half]
   assert.deepEqual(transcript(facts).turns[0]?.entries, [{ kind: 'summary', fact: half }])
   const failed = endedFact(4, 40, 'cmp-8', 'summary: the provider refused the call')
-  assert.deepEqual(transcript([{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, failed]).turns[0]?.entries, [{ kind: 'end', fact: failed }])
+  assert.deepEqual(transcript([{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, failed]).turns[0]?.entries, [
+    { kind: 'end', fact: failed },
+  ])
 })
 
 test('a replacement leaves what it shadowed standing: the entries before a compaction keep their places, and a call keeps the result it had', () => {
@@ -234,7 +293,7 @@ test('a replacement leaves what it shadowed standing: the entries before a compa
   ])
 })
 
-test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s is held by exactly one entry, paired or alone', () => {
+test("nothing the log holds is dropped: every fact but a turn's and a step's is held by exactly one entry, paired or alone", () => {
   const machinery: Fact[] = [
     { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' },
     { kind: 'step', seq: 3, time: 15, turn: 1, step: 1, phase: 'start' },
@@ -262,12 +321,18 @@ test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s i
   const drawn: Fact[] = []
   for (const turn of transcript([...machinery, ...held]).turns) {
     for (const entry of turn.entries) {
-      if (entry.kind === 'tool') drawn.push(entry.call, ...entry.result === undefined ? [] : [entry.result])
-      else if (entry.kind === 'approval') drawn.push(entry.asked, ...entry.decided === undefined ? [] : [entry.decided])
-      else if (entry.kind === 'command') drawn.push(entry.run, ...entry.done === undefined ? [] : [entry.done])
-      else if (entry.kind === 'compaction') drawn.push(entry.start, ...entry.summary === undefined ? [] : [entry.summary], ...entry.end === undefined ? [] : [entry.end])
-      else if (entry.kind === 'retry') drawn.push(entry.retry, ...entry.started === undefined ? [] : [entry.started])
-      else if (entry.kind === 'workflow') drawn.push(entry.run, ...entry.members.flatMap(member => [member.start, ...member.end === undefined ? [] : [member.end]]), ...entry.end === undefined ? [] : [entry.end])
+      if (entry.kind === 'tool') drawn.push(entry.call, ...(entry.result === undefined ? [] : [entry.result]))
+      else if (entry.kind === 'approval') drawn.push(entry.asked, ...(entry.decided === undefined ? [] : [entry.decided]))
+      else if (entry.kind === 'command') drawn.push(entry.run, ...(entry.done === undefined ? [] : [entry.done]))
+      else if (entry.kind === 'compaction')
+        drawn.push(entry.start, ...(entry.summary === undefined ? [] : [entry.summary]), ...(entry.end === undefined ? [] : [entry.end]))
+      else if (entry.kind === 'retry') drawn.push(entry.retry, ...(entry.started === undefined ? [] : [entry.started]))
+      else if (entry.kind === 'workflow')
+        drawn.push(
+          entry.run,
+          ...entry.members.flatMap((member) => [member.start, ...(member.end === undefined ? [] : [member.end])]),
+          ...(entry.end === undefined ? [] : [entry.end]),
+        )
       else if (entry.kind !== 'streaming') drawn.push(entry.fact)
     }
   }
@@ -275,7 +340,7 @@ test('nothing the log holds is dropped: every fact but a turn\'s and a step\'s i
   assert.deepEqual(drawn, held)
 })
 
-test('a prompt in a turn that already holds one steered it; the turn\'s first prompt, and one before any turn, did not', () => {
+test("a prompt in a turn that already holds one steered it; the turn's first prompt, and one before any turn, did not", () => {
   const steer = promptFact(8, 30, 'use pnpm')
   const facts: Fact[] = [
     promptFact(1, 1, 'before any turn'),
@@ -285,10 +350,16 @@ test('a prompt in a turn that already holds one steered it; the turn\'s first pr
     call,
     steer,
   ]
-  assert.deepEqual(transcript(facts).turns.map(turn => turn.entries.filter(entry => entry.kind === 'prompt')), [
-    [{ kind: 'prompt', fact: promptFact(1, 1, 'before any turn') }],
-    [{ kind: 'prompt', fact: promptFact(4, 10, 'fix the build') }, { kind: 'prompt', fact: steer, steer: true }],
-  ])
+  assert.deepEqual(
+    transcript(facts).turns.map((turn) => turn.entries.filter((entry) => entry.kind === 'prompt')),
+    [
+      [{ kind: 'prompt', fact: promptFact(1, 1, 'before any turn') }],
+      [
+        { kind: 'prompt', fact: promptFact(4, 10, 'fix the build') },
+        { kind: 'prompt', fact: steer, steer: true },
+      ],
+    ],
+  )
 })
 
 const streamed = { turn: 1, step: 1, blocks: [{ kind: 'text', text: 'Do' }] } as const
@@ -296,7 +367,15 @@ const streamed = { turn: 1, step: 1, blocks: [{ kind: 'text', text: 'Do' }] } as
 test('an answer streaming stands at the end of its turn, after what the log holds', () => {
   const facts: Fact[] = [{ kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }, prompt]
   assert.deepEqual(answering(transcript(facts), streamed), {
-    turns: [{ turn: 1, entries: [{ kind: 'prompt', fact: prompt }, { kind: 'streaming', answer: streamed }] }],
+    turns: [
+      {
+        turn: 1,
+        entries: [
+          { kind: 'prompt', fact: prompt },
+          { kind: 'streaming', answer: streamed },
+        ],
+      },
+    ],
   })
 })
 
@@ -310,13 +389,37 @@ test('an answer streaming is not settled: the log has yet to hold it', () => {
   assert.equal(settled(answering(transcript(facts), streamed)), 1)
 })
 
-const retry = (seq: number, attempt: number): Extract<Fact, { readonly kind: 'retry' }> => ({ kind: 'retry', seq, time: seq, retryId: 'r1' as never, turn: 1, step: 1, attempt, of: 3, at: seq + 1_000, failure: 'rate limited' })
-const retried = (seq: number, attempt: number): Extract<Fact, { readonly kind: 'retried' }> => ({ kind: 'retried', seq, time: seq, retryId: 'r1' as never, attempt })
+const retry = (seq: number, attempt: number): Extract<Fact, { readonly kind: 'retry' }> => ({
+  kind: 'retry',
+  seq,
+  time: seq,
+  retryId: 'r1' as never,
+  turn: 1,
+  step: 1,
+  attempt,
+  of: 3,
+  at: seq + 1_000,
+  failure: 'rate limited',
+})
+const retried = (seq: number, attempt: number): Extract<Fact, { readonly kind: 'retried' }> => ({
+  kind: 'retried',
+  seq,
+  time: seq,
+  retryId: 'r1' as never,
+  attempt,
+})
 
 test('a chain of retries is one entry where its first was scheduled, holding its latest attempt and whether that one started', () => {
   const opened: Fact = { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }
-  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retried(4, 1), retry(5, 2)]).turns[0]?.entries, [{ kind: 'prompt', fact: prompt }, { kind: 'retry', retry: retry(5, 2) }])
-  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retried(4, 1), retry(5, 2), retried(6, 2)]).turns[0]?.entries.at(-1), { kind: 'retry', retry: retry(5, 2), started: retried(6, 2) })
+  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retried(4, 1), retry(5, 2)]).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    { kind: 'retry', retry: retry(5, 2) },
+  ])
+  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retried(4, 1), retry(5, 2), retried(6, 2)]).turns[0]?.entries.at(-1), {
+    kind: 'retry',
+    retry: retry(5, 2),
+    started: retried(6, 2),
+  })
 })
 
 test('a retry still scheduled when its turn ends is left, saying how the turn ended, and waits to settle only while the turn runs', () => {
@@ -328,9 +431,12 @@ test('a retry still scheduled when its turn ends is left, saying how the turn en
   assert.equal(settled(ended), 2)
 })
 
-test('the start of an attempt older than its chain\'s latest changes nothing: the chain stays one entry, its latest still scheduled', () => {
+test("the start of an attempt older than its chain's latest changes nothing: the chain stays one entry, its latest still scheduled", () => {
   const opened: Fact = { kind: 'turn', seq: 1, time: 5, turn: 1, phase: 'start' }
-  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retry(4, 2), retried(5, 1)]).turns[0]?.entries, [{ kind: 'prompt', fact: prompt }, { kind: 'retry', retry: retry(4, 2) }])
+  assert.deepEqual(transcript([opened, prompt, retry(3, 1), retry(4, 2), retried(5, 1)]).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    { kind: 'retry', retry: retry(4, 2) },
+  ])
 })
 
 const run = { kind: 'workflow', seq: 3, time: 3, runId: 'wf-1' as never, name: 'review' } as const
@@ -340,7 +446,12 @@ const stopped = { kind: 'workflow-end', seq: 6, time: 6, runId: 'wf-1' as never,
 
 test('a workflow run is one entry where it opened, holding each member with its settling, and how the run stopped', () => {
   const opened: Fact = { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }
-  assert.deepEqual(transcript([opened, prompt, run, lint, linted, stopped]).turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: lint, end: linted }], end: stopped })
+  assert.deepEqual(transcript([opened, prompt, run, lint, linted, stopped]).turns[0]?.entries.at(-1), {
+    kind: 'workflow',
+    run,
+    members: [{ start: lint, end: linted }],
+    end: stopped,
+  })
 })
 
 test('a workflow run still going waits to settle while its turn runs, and one its turn ended is left, saying how', () => {
@@ -352,33 +463,79 @@ test('a workflow run still going waits to settle while its turn runs, and one it
 
 test('a workflow run that outlives its turn keeps its members and its stop in the one entry, which goes on from where its turn left it', () => {
   const facts: Fact[] = [
-    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }, prompt, run,
+    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' },
+    prompt,
+    run,
     { kind: 'turn', seq: 7, time: 7, turn: 1, phase: 'end', ending: 'completed' },
     { kind: 'turn', seq: 8, time: 8, turn: 2, phase: 'start' },
-    { ...lint, seq: 9 }, { ...linted, seq: 10 }, { ...stopped, seq: 11 },
+    { ...lint, seq: 9 },
+    { ...linted, seq: 10 },
+    { ...stopped, seq: 11 },
   ]
   const turns = transcript(facts).turns
-  assert.deepEqual(turns[0]?.entries.at(-1), { kind: 'workflow', run, members: [{ start: { ...lint, seq: 9 }, end: { ...linted, seq: 10 } }], end: { ...stopped, seq: 11 } })
+  assert.deepEqual(turns[0]?.entries.at(-1), {
+    kind: 'workflow',
+    run,
+    members: [{ start: { ...lint, seq: 9 }, end: { ...linted, seq: 10 } }],
+    end: { ...stopped, seq: 11 },
+  })
   assert.deepEqual(turns[1]?.entries, [])
 })
 
 test('the calls a run_code program made are held by the call that ran it, each with its settling, never entries of their own', () => {
   const opened: Fact = { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }
   const code = callFact(3, 3, 'c1', 'run_code', '{}')
-  const sub = { kind: 'sub-call', seq: 4, time: 4, rootCallId: 'c1', parentCallId: 'c1', subCallId: 'c1:ptc:0', name: 'read', arguments: '{"path":"a.ts"}' } as const
-  const subbed = { kind: 'sub-result', seq: 5, time: 5, rootCallId: 'c1', subCallId: 'c1:ptc:0', failed: false, blocks: [{ kind: 'text', text: 'a' }] } as const
-  assert.deepEqual(transcript([opened, prompt, code, sub, subbed]).turns[0]?.entries, [{ kind: 'prompt', fact: prompt }, { kind: 'tool', call: code, subCalls: [{ call: sub, result: subbed }] }])
+  const sub = {
+    kind: 'sub-call',
+    seq: 4,
+    time: 4,
+    rootCallId: 'c1',
+    parentCallId: 'c1',
+    subCallId: 'c1:ptc:0',
+    name: 'read',
+    arguments: '{"path":"a.ts"}',
+  } as const
+  const subbed = {
+    kind: 'sub-result',
+    seq: 5,
+    time: 5,
+    rootCallId: 'c1',
+    subCallId: 'c1:ptc:0',
+    failed: false,
+    blocks: [{ kind: 'text', text: 'a' }],
+  } as const
+  assert.deepEqual(transcript([opened, prompt, code, sub, subbed]).turns[0]?.entries, [
+    { kind: 'prompt', fact: prompt },
+    { kind: 'tool', call: code, subCalls: [{ call: sub, result: subbed }] },
+  ])
   const done = returnedFact(6, 6, 'c1', 'ok')
-  assert.deepEqual(transcript([opened, prompt, code, sub, subbed, done]).turns[0]?.entries.at(-1), { kind: 'tool', call: code, result: done, subCalls: [{ call: sub, result: subbed }] })
+  assert.deepEqual(transcript([opened, prompt, code, sub, subbed, done]).turns[0]?.entries.at(-1), {
+    kind: 'tool',
+    call: code,
+    result: done,
+    subCalls: [{ call: sub, result: subbed }],
+  })
 })
 
 test('a call a run_code program made is held by the call that ran it even when that call is in an earlier turn', () => {
   const code = callFact(3, 3, 'c1', 'run_code', '{}')
-  const sub = { kind: 'sub-call', seq: 8, time: 8, rootCallId: 'c1', parentCallId: 'c1', subCallId: 'c1:ptc:0', name: 'read', arguments: '{}' } as const
+  const sub = {
+    kind: 'sub-call',
+    seq: 8,
+    time: 8,
+    rootCallId: 'c1',
+    parentCallId: 'c1',
+    subCallId: 'c1:ptc:0',
+    name: 'read',
+    arguments: '{}',
+  } as const
   const turns = transcript([
-    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' }, prompt, code,
+    { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' },
+    prompt,
+    code,
     { kind: 'turn', seq: 6, time: 6, turn: 1, phase: 'end', ending: 'completed' },
-    { kind: 'turn', seq: 7, time: 7, turn: 2, phase: 'start' }, sub,
+    { kind: 'turn', seq: 7, time: 7, turn: 2, phase: 'start' },
+    sub,
   ]).turns
   assert.deepEqual(turns[0]?.entries.at(-1), { kind: 'tool', call: code, left: 'completed', subCalls: [{ call: sub }] })
   assert.deepEqual(turns[1]?.entries, [])

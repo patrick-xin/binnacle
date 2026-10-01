@@ -5,8 +5,8 @@ import { findCitations, checkCitations } from './check-citations.mjs'
 const NAMES = ['pi', 'dsh', 'private']
 
 // `^` becomes a backtick at run time, so this file cites nothing itself.
-const cite = text => text.replaceAll('^', String.fromCharCode(96))
-const onlyTui = (name, path) => path === 'packages/tui/src/tui.ts' ? 'export class TUI extends Container {}' : null
+const cite = (text) => text.replaceAll('^', String.fromCharCode(96))
+const onlyTui = (name, path) => (path === 'packages/tui/src/tui.ts' ? 'export class TUI extends Container {}' : null)
 const unfetched = () => undefined
 
 test('a citation is a reference name and a path, in backticks, and the symbol after a hash', () => {
@@ -37,7 +37,12 @@ test('an unfetched public reference is a problem, an unfetched local one is skip
 })
 
 test('a symbol a reference cites must be written in its file at the pin, as a whole word', () => {
-  const files = [{ path: 'n.md', text: cite('^pi:packages/tui/src/tui.ts#TUI^\n^pi:packages/tui/src/tui.ts#TU^ ^pi:packages/tui/src/tui.ts#Contain.r^') }]
+  const files = [
+    {
+      path: 'n.md',
+      text: cite('^pi:packages/tui/src/tui.ts#TUI^\n^pi:packages/tui/src/tui.ts#TU^ ^pi:packages/tui/src/tui.ts#Contain.r^'),
+    },
+  ]
   const { problems } = checkCitations(files, { pi: { commit: 'abc' } }, onlyTui)
   assert.deepEqual(problems, [
     'n.md:2: pi:packages/tui/src/tui.ts has no TU at abc',
@@ -54,7 +59,14 @@ const own = {
 const here = (name, path) => own[path] ?? null
 
 test('this repository is cited as binnacle, and a symbol in its code must be one its module exports', () => {
-  const files = [{ path: 'n.md', text: cite('^binnacle:packages/binnacle/src/facts/adapt.ts#adapt^ ^binnacle:packages/binnacle/src/facts/adapt.ts#Fact^\n^binnacle:packages/binnacle/src/facts/adapt.ts#blockOf^') }]
+  const files = [
+    {
+      path: 'n.md',
+      text: cite(
+        '^binnacle:packages/binnacle/src/facts/adapt.ts#adapt^ ^binnacle:packages/binnacle/src/facts/adapt.ts#Fact^\n^binnacle:packages/binnacle/src/facts/adapt.ts#blockOf^',
+      ),
+    },
+  ]
   const { problems } = checkCitations(files, { binnacle: { self: true } }, here)
   assert.deepEqual(problems, ['n.md:2: binnacle:packages/binnacle/src/facts/adapt.ts does not export blockOf'])
 })
@@ -62,19 +74,23 @@ test('this repository is cited as binnacle, and a symbol in its code must be one
 test('a citation of this repository whose file is gone, or whose prose lacks the word, is a problem', () => {
   const files = [{ path: 'n.md', text: cite('^binnacle:docs/glossary.md#fact^ ^binnacle:docs/glossary.md#turn^\n^binnacle:src/gone.ts^') }]
   const { problems } = checkCitations(files, { binnacle: { self: true } }, here)
-  assert.deepEqual(problems, [
-    'n.md:1: binnacle:docs/glossary.md has no turn',
-    'n.md:2: binnacle:src/gone.ts is not in this repository',
-  ])
+  assert.deepEqual(problems, ['n.md:1: binnacle:docs/glossary.md has no turn', 'n.md:2: binnacle:src/gone.ts is not in this repository'])
 })
 
 test('a symbol is exported through a star re-export too, and a namespace re-export by its name', () => {
-  const files = [{ path: 'n.md', text: cite('^binnacle:packages/binnacle/src/api.ts#View^ ^binnacle:packages/binnacle/src/api.ts#ui^\n^binnacle:packages/binnacle/src/api.ts#default^') }]
+  const files = [
+    {
+      path: 'n.md',
+      text: cite(
+        '^binnacle:packages/binnacle/src/api.ts#View^ ^binnacle:packages/binnacle/src/api.ts#ui^\n^binnacle:packages/binnacle/src/api.ts#default^',
+      ),
+    },
+  ]
   const { problems } = checkCitations(files, { binnacle: { self: true } }, here)
   assert.deepEqual(problems, ['n.md:2: binnacle:packages/binnacle/src/api.ts does not export default'])
 })
 
-const everywhere = (name, path) => name === 'pi' ? onlyTui(name, path) : here(name, path)
+const everywhere = (name, path) => (name === 'pi' ? onlyTui(name, path) : here(name, path))
 
 test('a decision record cites nothing, as it is never edited to follow a move: a citation in one is a problem, resolved or not', () => {
   const files = [

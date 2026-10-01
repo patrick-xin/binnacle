@@ -25,7 +25,14 @@ interface Drawing {
   readonly folds: readonly string[]
   readonly regions: readonly string[]
   readonly timed: boolean
-  readonly laid?: { readonly width: number, readonly theme: Theme, readonly open: readonly boolean[], readonly focus: string | undefined, readonly now: number | undefined, readonly frame: Frame }
+  readonly laid?: {
+    readonly width: number
+    readonly theme: Theme
+    readonly open: readonly boolean[]
+    readonly focus: string | undefined
+    readonly now: number | undefined
+    readonly frame: Frame
+  }
 }
 
 function foldsIn(node: Node): string[] {
@@ -49,7 +56,21 @@ function foldsIn(node: Node): string[] {
 
 function scopeOf(entry: Entry): string {
   if (entry.kind === 'streaming') return `streaming-${entry.answer.turn}-${entry.answer.step}`
-  return String(entry.kind === 'tool' ? entry.call.seq : entry.kind === 'approval' ? entry.asked.seq : entry.kind === 'command' ? entry.run.seq : entry.kind === 'compaction' ? entry.start.seq : entry.kind === 'retry' ? entry.retry.seq : entry.kind === 'workflow' ? entry.run.seq : entry.fact.seq)
+  return String(
+    entry.kind === 'tool'
+      ? entry.call.seq
+      : entry.kind === 'approval'
+        ? entry.asked.seq
+        : entry.kind === 'command'
+          ? entry.run.seq
+          : entry.kind === 'compaction'
+            ? entry.start.seq
+            : entry.kind === 'retry'
+              ? entry.retry.seq
+              : entry.kind === 'workflow'
+                ? entry.run.seq
+                : entry.fact.seq,
+  )
 }
 
 function scopedWithin(node: Node, scope: string): Node {
@@ -59,12 +80,12 @@ function scopedWithin(node: Node, scope: string): Node {
     case 'markdown':
       return node
     case 'stack':
-      return { ...node, children: node.children.map(child => scopedWithin(child, scope)) }
+      return { ...node, children: node.children.map((child) => scopedWithin(child, scope)) }
     case 'offer':
     case 'fold':
       return { ...node, id: `${scope}/${node.id}`, child: scopedWithin(node.child, scope) }
     case 'show':
-      return { ...node, ...node.opens === undefined ? {} : { opens: `${scope}/${node.opens}` }, child: scopedWithin(node.child, scope) }
+      return { ...node, ...(node.opens === undefined ? {} : { opens: `${scope}/${node.opens}` }), child: scopedWithin(node.child, scope) }
     case 'ask':
     case 'part':
     case 'band':
@@ -95,7 +116,7 @@ function regionsIn(node: Node): string[] {
 export function screens(keys: () => LayoutState['keys'] = () => undefined): DrawScreen {
   const drawings = new WeakMap<Entry, Drawing>()
   const frameOf = (entry: Entry, state: UiState, width: number, views: Views, theme: Theme, now: number | undefined): Frame => {
-    const by = [keyOf(entry), ...partKinds].map(key => views.get(key))
+    const by = [keyOf(entry), ...partKinds].map((key) => views.get(key))
     let drawing = drawings.get(entry)
     if (drawing === undefined || drawing.by.some((stack, index) => stack !== by[index]) || drawing.theme !== theme) {
       const node = scopedWithin(drawEntry(entry, views, theme), scopeOf(entry))
@@ -103,11 +124,28 @@ export function screens(keys: () => LayoutState['keys'] = () => undefined): Draw
     }
     const laid = drawing.laid
     const focus = state.focus !== undefined && drawing.regions.includes(state.focus) ? state.focus : undefined
-    if (laid?.width === width && laid.theme === theme && drawing.folds.every((id, index) => state.toggled.has(id) === laid.open[index]) && laid.focus === focus && (!drawing.timed || laid.now === now)) return laid.frame
+    if (
+      laid?.width === width &&
+      laid.theme === theme &&
+      drawing.folds.every((id, index) => state.toggled.has(id) === laid.open[index]) &&
+      laid.focus === focus &&
+      (!drawing.timed || laid.now === now)
+    )
+      return laid.frame
     const starts = theme.folds[keyOf(entry)] ?? theme.folds[entry.kind]
     const bound = keys()
-    const frame = layout(drawing.node, width, { ...state, ...starts === undefined ? {} : { folds: starts }, ...now === undefined ? {} : { now }, ...bound === undefined ? {} : { keys: bound } }, theme)
-    drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map(id => state.toggled.has(id)), focus, now, frame } })
+    const frame = layout(
+      drawing.node,
+      width,
+      {
+        ...state,
+        ...(starts === undefined ? {} : { folds: starts }),
+        ...(now === undefined ? {} : { now }),
+        ...(bound === undefined ? {} : { keys: bound }),
+      },
+      theme,
+    )
+    drawings.set(entry, { ...drawing, laid: { width, theme, open: drawing.folds.map((id) => state.toggled.has(id)), focus, now, frame } })
     return frame
   }
   return (model, state, width, views = new Map(), theme = binnacleTheme, now = undefined) => {
@@ -129,12 +167,18 @@ export function screens(keys: () => LayoutState['keys'] = () => undefined): Draw
         ends.push(lines.length)
       }
     }
-    return { lines, regions, focusable: regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id), ends, timed }
+    return {
+      lines,
+      regions,
+      focusable: regions.filter((placed) => placed.region.affordances.length > 0).map((placed) => placed.region.id),
+      ends,
+      timed,
+    }
   }
 }
 
 function timedSpans(text: string | readonly Span[] | undefined): boolean {
-  return typeof text === 'object' && text.some(span => typeof span === 'object' && ('since' in span || 'until' in span))
+  return typeof text === 'object' && text.some((span) => typeof span === 'object' && ('since' in span || 'until' in span))
 }
 
 export function timedIn(node: Node): boolean {
@@ -158,6 +202,12 @@ export function timedIn(node: Node): boolean {
   }
 }
 
-export function screen(facts: readonly Fact[], state: UiState, width: number, views: Views = new Map(), theme: Theme = binnacleTheme): Screen {
+export function screen(
+  facts: readonly Fact[],
+  state: UiState,
+  width: number,
+  views: Views = new Map(),
+  theme: Theme = binnacleTheme,
+): Screen {
   return screens()(transcript(facts), state, width, views, theme)
 }

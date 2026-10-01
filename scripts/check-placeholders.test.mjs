@@ -7,7 +7,5 @@ const placeholder = (kind) => ['[', 'REDACTED', ':', kind, ']'].join('')
 
 test('a placeholder a privacy tool put where a value stood is found, by file and line', () => {
   const text = `see\nhttps://github.com/${placeholder('pii')}/binnacle/issues/32`
-  assert.deepEqual(findPlaceholders([{ path: 'a.md', text }]), [
-    { path: 'a.md', line: 2, found: placeholder('pii') },
-  ])
+  assert.deepEqual(findPlaceholders([{ path: 'a.md', text }]), [{ path: 'a.md', line: 2, found: placeholder('pii') }])
 })

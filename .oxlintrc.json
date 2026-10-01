@@ -1,12 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "oxc",
-    "import",
-    "node"
-  ],
+  "plugins": ["typescript", "unicorn", "oxc", "import", "node"],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
@@ -24,10 +18,13 @@
   },
   "overrides": [
     {
-      "files": [
-        "packages/binnacle/src/{contract,facts,models,ui,views,panes,plugins}/**/*.ts",
-        "packages/binnacle/src/api.ts"
-      ],
+      "files": ["commitlint.config.mjs"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["packages/binnacle/src/{contract,facts,models,ui,views,panes,plugins}/**/*.ts", "packages/binnacle/src/api.ts"],
       "rules": {
         "no-restricted-globals": [
           "error",
@@ -74,9 +71,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    ".refs/**",
-    "**/dist/**",
-    "node_modules/**"
-  ]
+  "ignorePatterns": [".refs/**", "**/dist/**", "node_modules/**"]
 }

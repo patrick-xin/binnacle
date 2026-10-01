@@ -12,7 +12,9 @@ export const inject = ['binnacle', 'sessionProjections'] satisfies (keyof Contex
 /** It reads from dsh as its line is drawn and at no tick of its own: lines are drawn again as the session logs anything and as its agent starts or ends a turn. */
 export function apply(ctx: Context): void {
   // The token meter's projections change on dsh's own feed, which the line follows as well as the session's events.
-  ctx.sessionProjections.onChanged(() => { ctx.binnacle.redraw() })
+  ctx.sessionProjections.onChanged(() => {
+    ctx.binnacle.redraw()
+  })
   ctx.binnacle.place('below-composer', {
     kind: 'lines',
     draw: (_facts, surface) => ({ kind: 'text', text: surface.notice ?? measured(ctx).join(' · '), tone: 'muted' }),
@@ -33,7 +35,8 @@ function measured(ctx: Context): readonly string[] {
   return parts
 }
 
-const count = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+const count = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
 
 /** Undefined until every field holds a count: a measure is left out, never guessed. */
 function tokensOf(value: TokenUsageProjection | undefined): number | undefined {
@@ -45,7 +48,7 @@ function tokensOf(value: TokenUsageProjection | undefined): number | undefined {
 }
 
 /** What the next request would cost, else the last one's size, out of the window; undefined until both are known. */
-function contextOf(value: ContextPressureProjection | undefined): { readonly used: number, readonly window: number } | undefined {
+function contextOf(value: ContextPressureProjection | undefined): { readonly used: number; readonly window: number } | undefined {
   if (value === undefined) return undefined
   const used = count(value.projectedTokens) ?? count(value.pressureTokens)
   const window = count(value.contextWindow)
@@ -65,5 +68,5 @@ function compact(value: number): string {
 }
 
 function share(used: number, window: number): string {
-  return `${Math.min(100, Math.round(used / window * 100))}%`
+  return `${Math.min(100, Math.round((used / window) * 100))}%`
 }

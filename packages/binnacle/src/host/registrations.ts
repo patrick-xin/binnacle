@@ -2,7 +2,20 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { KeybindingsConfig, KeyId } from '@earendil-works/pi-tui'
-import type { AuthorAdapter, CardKind, CardRow, PlacedScreen, Placement, Registrations, Part, PartView, Slot, ThemeChanges, View, Views } from '../api.ts'
+import type {
+  AuthorAdapter,
+  CardKind,
+  CardRow,
+  PlacedScreen,
+  Placement,
+  Registrations,
+  Part,
+  PartView,
+  Slot,
+  ThemeChanges,
+  View,
+  Views,
+} from '../api.ts'
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
@@ -24,16 +37,18 @@ function misplaced(slot: Slot, placement: Placement): string | undefined {
   const kind: unknown = (placement as { readonly kind?: unknown } | undefined)?.kind
   const drawn = kind === 'lines' && typeof (placement as { readonly draw?: unknown }).draw === 'function'
   const submits = kind === 'composer' && typeof (placement as { readonly submit?: unknown }).submit === 'function'
-  if (kind !== 'transcript' && !submits && !drawn) return 'a placement is { kind: \'transcript\' }, { kind: \'composer\', submit } or { kind: \'lines\', draw }, each a function'
+  if (kind !== 'transcript' && !submits && !drawn)
+    return "a placement is { kind: 'transcript' }, { kind: 'composer', submit } or { kind: 'lines', draw }, each a function"
   if (placement.kind === 'transcript' && slot !== 'transcript') return 'the transcript goes only in the transcript slot'
   if (placement.kind === 'composer' && slot !== 'composer') return 'the composer goes only in the composer slot'
-  if (placement.kind === 'lines' && slot === 'transcript') return 'lines cannot take the transcript\'s place; place a screen there with binnacle.screen'
+  if (placement.kind === 'lines' && slot === 'transcript')
+    return "lines cannot take the transcript's place; place a screen there with binnacle.screen"
   return undefined
 }
 
 // Using own properties prevents `__proto__` from reaching the prototype's setter.
 function overlaid(...sources: readonly Readonly<Record<string, KeyId | readonly KeyId[] | undefined>>[]): KeybindingsConfig {
-  return Object.fromEntries(sources.flatMap(source => Object.entries(source))) as KeybindingsConfig
+  return Object.fromEntries(sources.flatMap((source) => Object.entries(source))) as KeybindingsConfig
 }
 
 export class RegistrationService extends Service implements Registrations {
@@ -110,7 +125,10 @@ export class RegistrationService extends Service implements Registrations {
   /** @inheritDoc */
   keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void {
     // Types checked at entry since author code may be untyped.
-    if (typeof bindings !== 'object' || bindings === null || Array.isArray(bindings)) throw new Error(`binnacle.keys: bindings is ${String(bindings)}; bind a record from binding ids to keys, such as { 'binnacle.quit': 'ctrl+q' }`)
+    if (typeof bindings !== 'object' || bindings === null || Array.isArray(bindings))
+      throw new Error(
+        `binnacle.keys: bindings is ${String(bindings)}; bind a record from binding ids to keys, such as { 'binnacle.quit': 'ctrl+q' }`,
+      )
     // Copy to prevent changes after handing over; each registration its own object.
     const given = Object.fromEntries(Object.entries(bindings).map(([id, keys]) => [id, Array.isArray(keys) ? [...keys] : keys]))
     const refused = refusedBindings(overlaid(this.bound, given))
@@ -125,26 +143,31 @@ export class RegistrationService extends Service implements Registrations {
   /** @inheritDoc */
   send(text: string): void {
     const session = this.granted
-    if (session === undefined) throw new Error('binnacle.send: no session is open; a line can be sent once the session opens, and until it closes')
+    if (session === undefined)
+      throw new Error('binnacle.send: no session is open; a line can be sent once the session opens, and until it closes')
     session.send(text)
   }
 
   /** @inheritDoc */
   agent(): Agent {
     const session = this.granted
-    if (session === undefined) throw new Error('binnacle.agent: no session is open; the agent on screen can be read once the session opens, and until it closes')
+    if (session === undefined)
+      throw new Error('binnacle.agent: no session is open; the agent on screen can be read once the session opens, and until it closes')
     return session.agent
   }
 
   async command(line: string): Promise<boolean> {
     const session = this.granted
-    if (session === undefined) throw new Error('binnacle.command: no session is open; a command can be run once the session opens, and until it closes')
+    if (session === undefined)
+      throw new Error('binnacle.command: no session is open; a command can be run once the session opens, and until it closes')
     return await session.command(line)
   }
 
   open(session: GrantedSession): () => void {
     this.granted = session
-    return () => { if (this.granted === session) this.granted = undefined }
+    return () => {
+      if (this.granted === session) this.granted = undefined
+    }
   }
 
   /** @inheritDoc */
@@ -172,15 +195,23 @@ export class RegistrationService extends Service implements Registrations {
 
   onChange(listener: (changed: RegistrationsChanged) => void): () => void {
     this.listeners.add(listener)
-    return () => { this.listeners.delete(listener) }
+    return () => {
+      this.listeners.delete(listener)
+    }
   }
 
-  private register<T>(into: Map<string, readonly T[]>, key: string, value: T, label: string, table: RegistrationsChanged | 'cards'): () => void {
+  private register<T>(
+    into: Map<string, readonly T[]>,
+    key: string,
+    value: T,
+    label: string,
+    table: RegistrationsChanged | 'cards',
+  ): () => void {
     return this.ctx.effect(() => {
-      into.set(key, [...into.get(key) ?? [], value])
+      into.set(key, [...(into.get(key) ?? []), value])
       this.changed(table)
       return () => {
-        const rest = [...into.get(key) ?? []]
+        const rest = [...(into.get(key) ?? [])]
         // Find by reference, so duplicate registrations only remove the first.
         rest.splice(rest.indexOf(value), 1)
         if (rest.length === 0) into.delete(key)
@@ -208,7 +239,7 @@ export class RegistrationService extends Service implements Registrations {
       const newest = stack.at(-1)
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
-    if (table === 'keys') this.bound = overlaid(...this.bindingTable.get('keys') ?? [])
+    if (table === 'keys') this.bound = overlaid(...(this.bindingTable.get('keys') ?? []))
     if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
     for (const listener of this.listeners) listener(table)
   }

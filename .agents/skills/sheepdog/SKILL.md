@@ -109,7 +109,7 @@ A question whose answer is in a reference, or why something broke, is a reading:
 
 ## Your own commits
 
-On a branch, never on `main`; red before green; reviewed like any other. They end with the attribution trailer your harness gives. Where a privacy tool shows the trailer's address as a placeholder, copy the whole line from an earlier commit (`git log --all --format=%B | grep -m1 '^Co-Authored-By: Claude'`) into a message file, rather than typing it. A Sheep's commits carry none.
+On a branch, never on `main`; red before green; reviewed like any other. The header is Conventional Commits as the sheep skill's Commits section says, and a round's fix is headed `fix: <what changed> (#<n> review, round N)`. They end with the attribution trailer your harness gives. Where a privacy tool shows the trailer's address as a placeholder, copy the whole line from an earlier commit (`git log --all --format=%B | grep -m1 '^Co-Authored-By: Claude'`) into a message file, rather than typing it. A Sheep's commits carry none.
 
 ## Mechanics that cost a round here
 

@@ -31,7 +31,10 @@ function linksIn(text) {
   const links = []
   let fenced = false
   text.split('\n').forEach((line, index) => {
-    if (line.trimStart().startsWith('```')) { fenced = !fenced; return }
+    if (line.trimStart().startsWith('```')) {
+      fenced = !fenced
+      return
+    }
     if (fenced) return
     for (const match of line.replace(/`[^`]*`/g, '').matchAll(/\]\(([^)\s]+)\)/g)) {
       const target = match[1].split('#')[0]
@@ -48,12 +51,15 @@ function linksIn(text) {
  * @returns {string[]} one line per broken link, with its file and 1-based line.
  */
 export function brokenLinks(files, exists) {
-  return files.flatMap(file => linksIn(file.text).flatMap(({ target, line }) => {
-    const resolved = normalize(join(dirname(file.path), target))
-    if (!exists(resolved)) return [`${file.path}:${line}: ${target} does not exist`]
-    if (file.path.startsWith(RECORDS) && !resolved.startsWith(RECORDS)) return [`${file.path}:${line}: ${target} is not a decision record; a record links only other records, and names the rest in words`]
-    return []
-  }))
+  return files.flatMap((file) =>
+    linksIn(file.text).flatMap(({ target, line }) => {
+      const resolved = normalize(join(dirname(file.path), target))
+      if (!exists(resolved)) return [`${file.path}:${line}: ${target} does not exist`]
+      if (file.path.startsWith(RECORDS) && !resolved.startsWith(RECORDS))
+        return [`${file.path}:${line}: ${target} is not a decision record; a record links only other records, and names the rest in words`]
+      return []
+    }),
+  )
 }
 
 /**
@@ -62,17 +68,17 @@ export function brokenLinks(files, exists) {
  * @returns {string[]} one line per page left out.
  */
 export function unlistedFeatures(files) {
-  const map = files.find(file => file.path === MAP)
+  const map = files.find((file) => file.path === MAP)
   const listed = new Set(map === undefined ? [] : linksIn(map.text).map(({ target }) => normalize(join(dirname(MAP), target))))
   return files
-    .filter(file => file.path.startsWith(PAGES) && !file.path.slice(PAGES.length).includes('/') && !listed.has(file.path))
-    .map(file => `${file.path}: not listed in ${MAP}; list it under the stage it serves`)
+    .filter((file) => file.path.startsWith(PAGES) && !file.path.slice(PAGES.length).includes('/') && !listed.has(file.path))
+    .map((file) => `${file.path}: not listed in ${MAP}; list it under the stage it serves`)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const files = repositoryFiles(root).filter(file => file.path.endsWith('.md'))
-  const problems = [...brokenLinks(files, path => existsSync(join(root, path))), ...unlistedFeatures(files)]
+  const files = repositoryFiles(root).filter((file) => file.path.endsWith('.md'))
+  const problems = [...brokenLinks(files, (path) => existsSync(join(root, path))), ...unlistedFeatures(files)]
   for (const problem of problems) console.error(problem)
   console.log(problems.length === 0 ? `check-links: ok (${files.length} files)` : `check-links: ${problems.length} broken`)
   process.exitCode = problems.length === 0 ? 0 : 1

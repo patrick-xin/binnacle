@@ -48,7 +48,13 @@ export class ScreenPane implements Component {
   #timed = false
   #said: string | undefined
 
-  constructor(facts: () => readonly Fact[], reports: ScreenReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined, keys: () => LayoutState['keys'] = () => undefined) {
+  constructor(
+    facts: () => readonly Fact[],
+    reports: ScreenReports = {},
+    theme: () => Theme = () => binnacleTheme,
+    now: () => number | undefined = () => undefined,
+    keys: () => LayoutState['keys'] = () => undefined,
+  ) {
     this.#facts = facts
     this.#theme = theme
     this.#now = now
@@ -105,11 +111,16 @@ export class ScreenPane implements Component {
     const drawn = this.#laid
     if (drawn === undefined) return false
     const focus = this.#state.focus
-    const focused = drawn.frame.regions.find(placed => placed.region.id === focus)?.region
-    const beyond = seated ? drawn.frame.regions.map(placed => placed.region).filter(region => region !== focused && region.affordances.length > 0) : []
+    const focused = drawn.frame.regions.find((placed) => placed.region.id === focus)?.region
+    const beyond = seated
+      ? drawn.frame.regions.map((placed) => placed.region).filter((region) => region !== focused && region.affordances.length > 0)
+      : []
     const next = answer(this.#state, gesture, focused === undefined ? beyond : [focused, ...beyond], drawn)
     if (next === undefined) return false
-    const copies = next.invoked?.affordance === 'copy' ? drawn.frame.regions.find(placed => placed.region.id === next.invoked?.region)?.region.text : undefined
+    const copies =
+      next.invoked?.affordance === 'copy'
+        ? drawn.frame.regions.find((placed) => placed.region.id === next.invoked?.region)?.region.text
+        : undefined
     // The surface answers copy where a region carries its text; an author's own offer of copy reaches its invoke.
     if (copies !== undefined) this.#copy(copies)
     else if (next.invoked !== undefined) this.#report(next.invoked.region, next.invoked.affordance)
@@ -153,12 +164,27 @@ export class ScreenPane implements Component {
     const laid = this.#laid
     const theme = this.#theme()
     const now = this.#now()
-    if (!this.#stale && laid !== undefined && laid.width === width && laid.state === state && laid.theme === theme && (!this.#timed || laid.now === now)) return laid
+    if (
+      !this.#stale &&
+      laid !== undefined &&
+      laid.width === width &&
+      laid.state === state &&
+      laid.theme === theme &&
+      (!this.#timed || laid.now === now)
+    )
+      return laid
     const node = this.#drawn(theme)
     this.#timed = timedIn(node)
     const keys = this.#keys()
-    const frame = layout(node, width, { ...state, ...now === undefined ? {} : { now }, ...keys === undefined ? {} : { keys } }, theme)
-    const next: Laid = { width, state, theme, now, frame, focusable: frame.regions.filter(placed => placed.region.affordances.length > 0).map(placed => placed.region.id) }
+    const frame = layout(node, width, { ...state, ...(now === undefined ? {} : { now }), ...(keys === undefined ? {} : { keys }) }, theme)
+    const next: Laid = {
+      width,
+      state,
+      theme,
+      now,
+      frame,
+      focusable: frame.regions.filter((placed) => placed.region.affordances.length > 0).map((placed) => placed.region.id),
+    }
     this.#laid = next
     this.#stale = false
     return next

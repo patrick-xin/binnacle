@@ -17,14 +17,18 @@ export class FakeSession implements OpenedSession {
   running = false
   interrupted = 0
   /** The model the session last asked for, in its latest request header; none before its first request. A test changes it and says so. */
-  asked: { readonly provider: string, readonly model: string } | undefined
+  asked: { readonly provider: string; readonly model: string } | undefined
   /** What dsh's session projections hold for the session, by key, as a snapshot hands them. A test changes it and says so. */
   projections: Readonly<Record<string, unknown>> = {}
   /** The agent whose session this stands in for, as dsh holds it, in the shape a drawing reads: the model it opened on, its status, its session's latest request header; and the scope its approvals are answered under. */
-  readonly agent = Object.defineProperty({
-    options: { provider: 'deepseek', model: 'deepseek-v4' },
-    session: { requestHeader: () => this.asked === undefined ? undefined : { config: this.asked } },
-  }, 'status', { get: () => this.running ? 'running' : 'idle' }) as unknown as Agent
+  readonly agent = Object.defineProperty(
+    {
+      options: { provider: 'deepseek', model: 'deepseek-v4' },
+      session: { requestHeader: () => (this.asked === undefined ? undefined : { config: this.asked }) },
+    },
+    'status',
+    { get: () => (this.running ? 'running' : 'idle') },
+  ) as unknown as Agent
   #standsChanged: (() => void) | undefined
   /** The commands the session has and the skills a person may invoke, each name to its description, and each line run as a command. */
   readonly commands = new Map<string, string>()
@@ -32,18 +36,30 @@ export class FakeSession implements OpenedSession {
   readonly ran: string[] = []
   #listener: ((event: SessionEvent) => void) | undefined
   readonly #logged: SessionEvent[]
-  constructor(logged: SessionEvent[] = []) { this.#logged = logged }
+  constructor(logged: SessionEvent[] = []) {
+    this.#logged = logged
+  }
   follow(listener: (event: SessionEvent) => void): () => void {
     for (const event of this.#logged) listener(event)
     this.#listener = listener
-    return () => { this.#listener = undefined }
+    return () => {
+      this.#listener = undefined
+    }
   }
-  get following(): boolean { return this.#listener !== undefined }
-  send(text: string): void { this.sent.push(text) }
-  interrupt(): void { this.interrupted += 1 }
+  get following(): boolean {
+    return this.#listener !== undefined
+  }
+  send(text: string): void {
+    this.sent.push(text)
+  }
+  interrupt(): void {
+    this.interrupted += 1
+  }
   onStanding(listener: () => void): () => void {
     this.#standsChanged = listener
-    return () => { this.#standsChanged = undefined }
+    return () => {
+      this.#standsChanged = undefined
+    }
   }
   readonly #projectionListeners = new Set<() => void>()
   /**
@@ -53,35 +69,53 @@ export class FakeSession implements OpenedSession {
    */
   onProjections(listener: () => void): () => void {
     this.#projectionListeners.add(listener)
-    return () => { this.#projectionListeners.delete(listener) }
+    return () => {
+      this.#projectionListeners.delete(listener)
+    }
   }
   /** Say that the projections changed, as dsh's change feed does after an event is committed. */
-  projectionsChanged(): void { for (const listener of this.#projectionListeners) listener() }
+  projectionsChanged(): void {
+    for (const listener of this.#projectionListeners) listener()
+  }
   /** Say that where the session stands changed, as dsh does when a turn starts or tokens are counted. */
-  standsChanged(): void { this.#standsChanged?.() }
-  async offers(): Promise<readonly { readonly name: string, readonly description: string }[]> {
+  standsChanged(): void {
+    this.#standsChanged?.()
+  }
+  async offers(): Promise<readonly { readonly name: string; readonly description: string }[]> {
     return [...this.commands, ...this.skills].map(([name, description]) => ({ name, description }))
   }
   #offersChanged: (() => void) | undefined
   onOffers(listener: () => void): () => void {
     this.#offersChanged = listener
-    return () => { this.#offersChanged = undefined }
+    return () => {
+      this.#offersChanged = undefined
+    }
   }
   /** Say that what `/` offers changed, as dsh does when a command or skill comes or goes. */
-  offersChanged(): void { this.#offersChanged?.() }
+  offersChanged(): void {
+    this.#offersChanged?.()
+  }
   async command(line: string): Promise<boolean> {
     const name = /^\/(\S+)/.exec(line)?.[1]
     if (name === undefined || !this.commands.has(name)) return false
     this.ran.push(line)
     return true
   }
-  async close(): Promise<void> { this.closed = true }
-  log(event: SessionEvent): void { this.#listener?.(event) }
+  async close(): Promise<void> {
+    this.closed = true
+  }
+  log(event: SessionEvent): void {
+    this.#listener?.(event)
+  }
   #streamListener: ((frame: AssistantStreamFrame) => void) | undefined
   onStream(listener: (frame: AssistantStreamFrame) => void): () => void {
     this.#streamListener = listener
-    return () => { this.#streamListener = undefined }
+    return () => {
+      this.#streamListener = undefined
+    }
   }
   /** Publish a frame of the answer streaming, as dsh does for the session's agent. */
-  stream(frame: AssistantStreamFrame): void { this.#streamListener?.(frame) }
+  stream(frame: AssistantStreamFrame): void {
+    this.#streamListener?.(frame)
+  }
 }

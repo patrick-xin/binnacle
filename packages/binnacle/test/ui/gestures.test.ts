@@ -10,7 +10,10 @@ const transcript: Region = { id: 'transcript', affordances: [], overflows: true 
 /** An approval: `grant` is primary, `dismiss` second. */
 const approval: Region = {
   id: 'approval',
-  affordances: [{ kind: 'grant', label: 'allow the command' }, { kind: 'dismiss', label: 'refuse it' }],
+  affordances: [
+    { kind: 'grant', label: 'allow the command' },
+    { kind: 'dismiss', label: 'refuse it' },
+  ],
   overflows: false,
 }
 /** A line of prose that fits and offers nothing. */
@@ -61,19 +64,27 @@ test('the step-out key means focus is dropped, wherever it lands', () => {
   assert.deepEqual(meaning({ kind: 'key', binding: 'focus.out' }, []), { kind: 'unfocus' })
 })
 
-test('the primary key invokes the focused region\'s primary affordance, a grant included', () => {
+test("the primary key invokes the focused region's primary affordance, a grant included", () => {
   assert.deepEqual(meaning({ kind: 'key', binding: 'primary' }, [approval]), { kind: 'invoke', region: 'approval', affordance: 'grant' })
   assert.equal(meaning({ kind: 'key', binding: 'primary' }, []), undefined)
 })
 
-test('an affordance\'s own key invokes it only where a region it lands on offers it', () => {
+test("an affordance's own key invokes it only where a region it lands on offers it", () => {
   assert.deepEqual(meaning({ kind: 'key', binding: 'dismiss' }, [approval]), { kind: 'invoke', region: 'approval', affordance: 'dismiss' })
   assert.equal(meaning({ kind: 'key', binding: 'copy' }, [card, transcript]), undefined)
 })
 
-test('an affordance\'s own key lands on the focused region first, then on those beyond it, and invokes the first offering its kind', () => {
+test("an affordance's own key lands on the focused region first, then on those beyond it, and invokes the first offering its kind", () => {
   const allow: Region = { id: 'allow', affordances: [{ kind: 'grant', label: 'allow once' }], overflows: false }
   const reject: Region = { id: 'reject', affordances: [{ kind: 'dismiss', label: 'reject' }], overflows: false }
-  assert.deepEqual(meaning({ kind: 'key', binding: 'dismiss' }, [allow, reject]), { kind: 'invoke', region: 'reject', affordance: 'dismiss' })
-  assert.deepEqual(meaning({ kind: 'key', binding: 'primary' }, [reject, allow]), { kind: 'invoke', region: 'reject', affordance: 'dismiss' })
+  assert.deepEqual(meaning({ kind: 'key', binding: 'dismiss' }, [allow, reject]), {
+    kind: 'invoke',
+    region: 'reject',
+    affordance: 'dismiss',
+  })
+  assert.deepEqual(meaning({ kind: 'key', binding: 'primary' }, [reject, allow]), {
+    kind: 'invoke',
+    region: 'reject',
+    affordance: 'dismiss',
+  })
 })

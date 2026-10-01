@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { editorTheme, markdownTheme } from '../../src/ui/theme.ts'
 
-test('the markdown theme gives each part of a document the terminal theme\'s style for it', () => {
+test("the markdown theme gives each part of a document the terminal theme's style for it", () => {
   assert.equal(markdownTheme.heading('x'), '\x1b[1mx\x1b[22m')
   assert.equal(markdownTheme.link('x'), '\x1b[36mx\x1b[39m')
   assert.equal(markdownTheme.linkUrl('x'), '\x1b[2mx\x1b[22m')

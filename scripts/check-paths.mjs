@@ -15,12 +15,7 @@ import { lstatSync, readFileSync, readlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const LEAKS = [
-  /\/Users\/[^/\s`'")\]]+\//g,
-  /\/home\/[^/\s`'")\]]+\//g,
-  /[A-Za-z]:\\Users\\[^\\\s`'")\]]+\\/g,
-  /~\/[^.\s`'")\]/]/g,
-]
+const LEAKS = [/\/Users\/[^/\s`'")\]]+\//g, /\/home\/[^/\s`'")\]]+\//g, /[A-Za-z]:\\Users\\[^\\\s`'")\]]+\\/g, /~\/[^.\s`'")\]/]/g]
 
 /**
  * Find every machine-local path in a set of files.
@@ -47,17 +42,20 @@ export function findLeaks(files) {
  */
 export function repositoryFiles(root) {
   const listed = execFileSync('git', ['-C', root, 'ls-files', '-z', '-co', '--exclude-standard'], { encoding: 'utf8' })
-  return listed.split('\0').filter(Boolean).flatMap(path => {
-    let text
-    try {
-      const at = join(root, path)
-      text = lstatSync(at).isSymbolicLink() ? readlinkSync(at, 'utf8') : readFileSync(at, 'utf8')
-    } catch {
-      // Listed and since deleted from the worktree: nothing to read.
-      return []
-    }
-    return text.includes('\0') ? [] : [{ path, text }]
-  })
+  return listed
+    .split('\0')
+    .filter(Boolean)
+    .flatMap((path) => {
+      let text
+      try {
+        const at = join(root, path)
+        text = lstatSync(at).isSymbolicLink() ? readlinkSync(at, 'utf8') : readFileSync(at, 'utf8')
+      } catch {
+        // Listed and since deleted from the worktree: nothing to read.
+        return []
+      }
+      return text.includes('\0') ? [] : [{ path, text }]
+    })
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

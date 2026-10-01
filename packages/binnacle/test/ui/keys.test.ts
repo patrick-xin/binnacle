@@ -6,7 +6,7 @@ import { keyTable } from '../../src/ui/keys.ts'
 /** The one key table. */
 const { resolve } = keyTable()
 
-test('the host\'s two keys resolve from their legacy bytes, whatever has focus', () => {
+test("the host's two keys resolve from their legacy bytes, whatever has focus", () => {
   assert.deepEqual(resolve('\x03', false), { kind: 'quit' })
   assert.deepEqual(resolve('\x14', true), { kind: 'switch-screens' })
 })
@@ -20,7 +20,7 @@ test('where the terminal reports holding and releasing a key, as a kitty-protoco
   assert.deepEqual(resolve('\x1b[99;5:3u', true), undefined)
 })
 
-test('with nothing focused, step in is answered, shift+tab, and escape is the host\'s to interrupt with; tab, up, down and enter reach the composer', () => {
+test("with nothing focused, step in is answered, shift+tab, and escape is the host's to interrupt with; tab, up, down and enter reach the composer", () => {
   assert.deepEqual(resolve('\x1b[Z', false), { kind: 'gesture', binding: 'focus.previous' })
   assert.deepEqual(resolve('\t', false), undefined)
   assert.deepEqual(resolve('\x1b[A', false), undefined)
@@ -57,7 +57,7 @@ test('a key a plugin offers resolves to the screen it opens, and withdrawing the
   assert.equal(table.manager.getDefinition('binnacle.screen.trajectory' as keyof Keybindings), undefined)
 })
 
-test('while a placed screen is open it takes the transcript\'s keys: shift+tab steps in, and with it focused tab, up, down and enter are gestures; escape returns, quit still answers, and with nothing focused typing reaches the composer', () => {
+test("while a placed screen is open it takes the transcript's keys: shift+tab steps in, and with it focused tab, up, down and enter are gestures; escape returns, quit still answers, and with nothing focused typing reaches the composer", () => {
   const table = keyTable()
   table.offer('trajectory', { defaultKeys: 'f2', description: 'open the trajectory' })
   assert.deepEqual(table.resolve('\x1bOQ', false, true), { kind: 'screen', name: 'trajectory' }, 'the same key returns')
@@ -69,7 +69,11 @@ test('while a placed screen is open it takes the transcript\'s keys: shift+tab s
   }
   assert.deepEqual(table.resolve('\t', false, true), undefined, 'with nothing focused, typing reaches the composer')
   assert.deepEqual(table.resolve('\r', false, true), undefined)
-  assert.deepEqual(table.resolve('\t', true, true), { kind: 'gesture', binding: 'focus.next' }, 'with the screen focused, its regions take the keys')
+  assert.deepEqual(
+    table.resolve('\t', true, true),
+    { kind: 'gesture', binding: 'focus.next' },
+    'with the screen focused, its regions take the keys',
+  )
   assert.deepEqual(table.resolve('\x1b[B', true, true), { kind: 'gesture', binding: 'focus.next' })
   assert.deepEqual(table.resolve('\x1b[A', true, true), { kind: 'gesture', binding: 'focus.previous' })
   assert.deepEqual(table.resolve('\r', true, true), { kind: 'gesture', binding: 'primary' })

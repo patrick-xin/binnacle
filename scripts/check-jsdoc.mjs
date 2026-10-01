@@ -22,7 +22,7 @@ import { repositoryFiles } from './check-paths.mjs'
  */
 function declaredName(declaration) {
   if (declaration.id?.name) return declaration.id.name
-  if (declaration.declarations) return declaration.declarations.map(item => item.id?.name ?? '?').join(', ')
+  if (declaration.declarations) return declaration.declarations.map((item) => item.id?.name ?? '?').join(', ')
   return 'default'
 }
 
@@ -35,16 +35,16 @@ function declaredName(declaration) {
  */
 export function undocumented(path, text, names) {
   const { program, comments } = parseSync(path, text)
-  const lineOf = offset => text.slice(0, offset).split('\n').length
+  const lineOf = (offset) => text.slice(0, offset).split('\n').length
   const problems = []
   for (const node of program.body) {
-    const declaration = node.type === 'ExportNamedDeclaration' ? node.declaration
-      : node.type === 'ExportDefaultDeclaration' ? node.declaration : undefined
+    const declaration =
+      node.type === 'ExportNamedDeclaration' ? node.declaration : node.type === 'ExportDefaultDeclaration' ? node.declaration : undefined
     if (!declaration) continue
     if (names !== undefined && !names.has(declaredName(declaration))) continue
-    const above = comments.filter(comment => comment.end <= node.start).at(-1)
-    const documented = above !== undefined && above.type === 'Block' && above.value.startsWith('*')
-      && text.slice(above.end, node.start).trim() === ''
+    const above = comments.filter((comment) => comment.end <= node.start).at(-1)
+    const documented =
+      above !== undefined && above.type === 'Block' && above.value.startsWith('*') && text.slice(above.end, node.start).trim() === ''
     if (!documented) problems.push(`${path}:${lineOf(node.start)}: ${declaredName(declaration)}`)
   }
   return problems
@@ -58,7 +58,7 @@ export function undocumented(path, text, names) {
  * @returns {boolean} whether it is documented.
  */
 function documentedAbove(text, comments, node) {
-  const above = comments.filter(comment => comment.end <= node.start).at(-1)
+  const above = comments.filter((comment) => comment.end <= node.start).at(-1)
   return above !== undefined && above.type === 'Block' && above.value.startsWith('*') && text.slice(above.end, node.start).trim() === ''
 }
 
@@ -70,8 +70,16 @@ function documentedAbove(text, comments, node) {
  * @returns {string} the text it mentions names in.
  */
 function readText(text, declaration) {
-  if (declaration.type === 'FunctionDeclaration' || declaration.type === 'TSDeclareFunction') return text.slice(declaration.start, declaration.body?.start ?? declaration.end)
-  if (declaration.type === 'VariableDeclaration') return declaration.declarations.map(item => item.id.typeAnnotation === undefined || item.id.typeAnnotation === null ? '' : text.slice(item.id.typeAnnotation.start, item.id.typeAnnotation.end)).join('\n')
+  if (declaration.type === 'FunctionDeclaration' || declaration.type === 'TSDeclareFunction')
+    return text.slice(declaration.start, declaration.body?.start ?? declaration.end)
+  if (declaration.type === 'VariableDeclaration')
+    return declaration.declarations
+      .map((item) =>
+        item.id.typeAnnotation === undefined || item.id.typeAnnotation === null
+          ? ''
+          : text.slice(item.id.typeAnnotation.start, item.id.typeAnnotation.end),
+      )
+      .join('\n')
   return text.slice(declaration.start, declaration.end)
 }
 
@@ -91,18 +99,27 @@ function bodyOf(declaration) {
  */
 function readModule(path, text) {
   const { program, comments } = parseSync(path, text)
-  const lineOf = offset => text.slice(0, offset).split('\n').length
+  const lineOf = (offset) => text.slice(0, offset).split('\n').length
   const declared = new Map()
   const imported = new Map()
   const exported = []
   const declare = (name, outer, mentionedIn, end = outer.end) => {
     const statements = declared.get(name) ?? []
-    statements.push({ line: lineOf(outer.start), end: lineOf(end), documented: documentedAbove(text, comments, outer), mentions: [...new Set(mentionedIn.match(/[A-Za-z_$][\w$]*/g) ?? [])] })
+    statements.push({
+      line: lineOf(outer.start),
+      end: lineOf(end),
+      documented: documentedAbove(text, comments, outer),
+      mentions: [...new Set(mentionedIn.match(/[A-Za-z_$][\w$]*/g) ?? [])],
+    })
     declared.set(name, statements)
   }
   for (const node of program.body) {
     if (node.type === 'ImportDeclaration') {
-      for (const specifier of node.specifiers ?? []) imported.set(specifier.local.name, { spec: node.source.value, name: specifier.type === 'ImportSpecifier' ? (specifier.imported.name ?? specifier.imported.value) : 'default' })
+      for (const specifier of node.specifiers ?? [])
+        imported.set(specifier.local.name, {
+          spec: node.source.value,
+          name: specifier.type === 'ImportSpecifier' ? (specifier.imported.name ?? specifier.imported.value) : 'default',
+        })
       continue
     }
     if (node.type === 'TSModuleDeclaration' && node.id.type === 'Literal') {
@@ -125,7 +142,11 @@ function readModule(path, text) {
       continue
     }
     const declaration = exporting ? node.declaration : node
-    const names = declaration.id?.name ? [declaration.id.name] : declaration.declarations ? declaration.declarations.map(item => item.id?.name).filter(Boolean) : []
+    const names = declaration.id?.name
+      ? [declaration.id.name]
+      : declaration.declarations
+        ? declaration.declarations.map((item) => item.id?.name).filter(Boolean)
+        : []
     for (const name of names) {
       declare(name, node, readText(text, declaration), bodyOf(declaration)?.start ?? node.end)
       if (exporting) exported.push(name)
@@ -157,7 +178,8 @@ export function authorSurface(entry, read) {
     if (statements !== undefined) {
       for (const statement of statements) {
         surface.push({ path, line: statement.line, end: statement.end, name, documented: statement.documented })
-        for (const mentioned of statement.mentions) if (mentioned !== name && (module.declared.has(mentioned) || module.imported.has(mentioned))) visit(path, mentioned)
+        for (const mentioned of statement.mentions)
+          if (mentioned !== name && (module.declared.has(mentioned) || module.imported.has(mentioned))) visit(path, mentioned)
       }
       return
     }
@@ -182,14 +204,21 @@ export function undocumentedSurface(entry, read) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const files = new Map(repositoryFiles(root).map(file => [file.path, file.text]))
-  const entries = [...files.keys()].filter(path => /^packages\/[^/]+\/src\/api\.ts$/.test(path))
-  const problems = entries.flatMap(entry => undocumentedSurface(entry, (path) => {
-    const text = files.get(path)
-    if (text === undefined) throw new Error(`${entry} re-exports from ${path}, which is not in the repository`)
-    return text
-  }))
-  for (const problem of problems) console.error(`${problem} — an author reads it from api.ts: add a JSDoc block directly above it stating its contract`)
-  console.log(problems.length === 0 ? `check-jsdoc: ok (${entries.length} author APIs)` : `check-jsdoc: ${problems.length} undocumented names an author reads`)
+  const files = new Map(repositoryFiles(root).map((file) => [file.path, file.text]))
+  const entries = [...files.keys()].filter((path) => /^packages\/[^/]+\/src\/api\.ts$/.test(path))
+  const problems = entries.flatMap((entry) =>
+    undocumentedSurface(entry, (path) => {
+      const text = files.get(path)
+      if (text === undefined) throw new Error(`${entry} re-exports from ${path}, which is not in the repository`)
+      return text
+    }),
+  )
+  for (const problem of problems)
+    console.error(`${problem} — an author reads it from api.ts: add a JSDoc block directly above it stating its contract`)
+  console.log(
+    problems.length === 0
+      ? `check-jsdoc: ok (${entries.length} author APIs)`
+      : `check-jsdoc: ${problems.length} undocumented names an author reads`,
+  )
   process.exitCode = problems.length === 0 ? 0 : 1
 }

@@ -13,6 +13,8 @@ Standing orders — the one page here that binds. A record is evidence, never a 
 | `pnpm install && pnpm refs` | install, point git at [`.githooks`](.githooks) (a push runs `pnpm test` first), and fetch every reference into `.refs/` |
 | `pnpm test` | every gate, then every test — what CI runs |
 | `pnpm build` | build the bundle into `packages/binnacle/dist/` |
+| `pnpm fmt` | format the tree with oxfmt; `fmt:check`, inside `pnpm test`, holds it |
+| `pnpm changeset` | describe a change the published package's person or author would notice; merged ones become a version PR |
 | `pnpm dsh:profile` | create the `binnacle` dsh profile linking this checkout |
 | `pnpm check:boot` | boot it under the real `dsh` at the pin, draw nothing, exit |
 | `dsh --profile binnacle` | run it |
@@ -86,7 +88,7 @@ The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/
 | what a person can do with a feature, how its parts work together, and its choices | its page in [`docs/features/`](docs/features/), listed in [the feature map](docs/features.md) |
 | what a term means, and whose word it is | [`docs/glossary.md`](docs/glossary.md) |
 | what is wrong, missing, being read, or not built yet | a GitHub issue |
-| what one change did and why | its commit message |
+| what one change did and why | its commit message, headed as Conventional Commits (`commitlint.config.mjs`) |
 
 - **Each fact has one home; everywhere else links to it.** What code or config states — the layers, the affordances, what a gate refuses — is linked or cited, never restated.
 - **No implementation status or progress in prose, and no inventory restated from code or config.** The architecture states commitments, which may run ahead of the code; where the code falls short, that is an issue.

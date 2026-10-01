@@ -14,6 +14,16 @@ import type { TuiMouseEvent } from '@earendil-works/pi-tui'
  * @returns the event.
  */
 export const pointer = (type: TuiMouseEvent['type'], y: number, x = 0, width = 40): TuiMouseEvent => ({
-  type, button: type === 'wheel' || type === 'move' ? 'none' : 'left', x, y, screenX: x, screenY: y, width, height: 3,
-  shift: false, alt: false, ctrl: false, ...type === 'wheel' ? { wheelDelta: -1 } : {},
+  type,
+  button: type === 'wheel' || type === 'move' ? 'none' : 'left',
+  x,
+  y,
+  screenX: x,
+  screenY: y,
+  width,
+  height: 3,
+  shift: false,
+  alt: false,
+  ctrl: false,
+  ...(type === 'wheel' ? { wheelDelta: -1 } : {}),
 })

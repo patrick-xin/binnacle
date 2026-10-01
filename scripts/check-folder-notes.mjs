@@ -45,9 +45,12 @@ function foldersOf(files) {
  * @returns {string[]} its `.ts` files, then its subfolders as `name/`, each sorted.
  */
 function heldBy(files, folder) {
-  const below = files.map(file => file.path).filter(path => path.startsWith(`${folder}/`)).map(path => path.slice(folder.length + 1).split('/'))
-  const modules = below.filter(parts => parts.length === 1 && parts[0].endsWith('.ts')).map(parts => parts[0])
-  const folders = below.filter(parts => parts.length > 1).map(parts => `${parts[0]}/`)
+  const below = files
+    .map((file) => file.path)
+    .filter((path) => path.startsWith(`${folder}/`))
+    .map((path) => path.slice(folder.length + 1).split('/'))
+  const modules = below.filter((parts) => parts.length === 1 && parts[0].endsWith('.ts')).map((parts) => parts[0])
+  const folders = below.filter((parts) => parts.length > 1).map((parts) => `${parts[0]}/`)
   return [...new Set(modules)].toSorted().concat([...new Set(folders)].toSorted())
 }
 
@@ -74,13 +77,13 @@ function named(text) {
 export function checkFolderNotes(files) {
   const problems = []
   for (const folder of foldersOf(files)) {
-    const note = files.find(file => file.path === `${folder}/AGENTS.md`)
+    const note = files.find((file) => file.path === `${folder}/AGENTS.md`)
     if (note === undefined) {
       problems.push(`${folder}: no AGENTS.md — add one saying in a line what each file here is for`)
       continue
     }
     const bullets = named(note.text)
-    const says = bullets.map(bullet => bullet.name)
+    const says = bullets.map((bullet) => bullet.name)
     const held = heldBy(files, folder)
     for (const name of held) {
       if (!says.includes(name)) problems.push(`${note.path}: says nothing of ${name} — add a line for it`)
@@ -88,7 +91,8 @@ export function checkFolderNotes(files) {
     for (const [index, { name, says: line }] of bullets.entries()) {
       if (!held.includes(name)) problems.push(`${note.path}: names ${name}, which is not here — remove its line`)
       else if (says.indexOf(name) !== index) problems.push(`${note.path}: names ${name} twice — keep one line for it`)
-      else if (line === '') problems.push(`${note.path}: says nothing of what ${name} is for — follow its name with " — " and a line saying it`)
+      else if (line === '')
+        problems.push(`${note.path}: says nothing of what ${name} is for — follow its name with " — " and a line saying it`)
     }
   }
   return problems
@@ -96,9 +100,15 @@ export function checkFolderNotes(files) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const files = repositoryFiles(root).filter(file => file.path.startsWith(`${SRC}/`) && (file.path.endsWith('.ts') || file.path.endsWith('/AGENTS.md')))
+  const files = repositoryFiles(root).filter(
+    (file) => file.path.startsWith(`${SRC}/`) && (file.path.endsWith('.ts') || file.path.endsWith('/AGENTS.md')),
+  )
   const problems = checkFolderNotes(files)
   for (const problem of problems) console.error(problem)
-  console.log(problems.length === 0 ? `check-folder-notes: ok (${foldersOf(files).length} folders)` : `check-folder-notes: ${problems.length} problems`)
+  console.log(
+    problems.length === 0
+      ? `check-folder-notes: ok (${foldersOf(files).length} folders)`
+      : `check-folder-notes: ${problems.length} problems`,
+  )
   process.exitCode = problems.length === 0 ? 0 : 1
 }

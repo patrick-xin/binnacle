@@ -67,7 +67,10 @@ test('a SKILL.md whose frontmatter is not YAML is refused, saying where it break
   skill(root, 'triage', '---\nname: triage\ndescription: Show what needs attention: and move issues.\n---\n')
   linked(root, 'triage')
   assert.deepEqual(findProblems(root), [
-    { path: '.agents/skills/triage/SKILL.md', problem: 'has frontmatter that is not YAML: bad indentation of a mapping entry at 3:39; make that line YAML' },
+    {
+      path: '.agents/skills/triage/SKILL.md',
+      problem: 'has frontmatter that is not YAML: bad indentation of a mapping entry at 3:39; make that line YAML',
+    },
   ])
 })
 
@@ -87,6 +90,9 @@ test('frontmatter with a key twice is refused at the second, without being told 
   skill(root, 'tdd', '---\nname: tdd\nname: tdd\ndescription: What it is for.\n---\n')
   linked(root, 'tdd')
   assert.deepEqual(findProblems(root), [
-    { path: '.agents/skills/tdd/SKILL.md', problem: 'has frontmatter that is not YAML: duplicated mapping key at 3:1; make that line YAML' },
+    {
+      path: '.agents/skills/tdd/SKILL.md',
+      problem: 'has frontmatter that is not YAML: duplicated mapping key at 3:1; make that line YAML',
+    },
   ])
 })

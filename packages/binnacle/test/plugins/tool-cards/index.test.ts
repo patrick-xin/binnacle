@@ -35,7 +35,12 @@ async function withCards(...tools: ToolDefinition[]) {
   const runtime = new ToolRuntime(ctx)
   for (const tool of tools) runtime.register(tool)
   const fiber = await ctx.plugin(toolCards)
-  const pane = new TranscriptPane(() => {}, () => registrations.views, {}, () => registrations.currentTheme)
+  const pane = new TranscriptPane(
+    () => {},
+    () => registrations.views,
+    {},
+    () => registrations.currentTheme,
+  )
   return { registrations, fiber, pane }
 }
 
@@ -46,7 +51,7 @@ const read = defineTool({
   parameters: { path: { type: 'string', required: true } },
   output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
   execute: async () => 'the file',
-  presentCall: args => ({ card: 'generic', title: `Read ${args.path}` }),
+  presentCall: (args) => ({ card: 'generic', title: `Read ${args.path}` }),
   presentResult: (_args, result) => ({ card: 'generic', content: result.content }),
 })
 
@@ -61,14 +66,20 @@ const returned = (text: string): Extract<Fact, { readonly kind: 'result' }> => r
  * @param node - what a row drew.
  * @returns its lines.
  */
-const lines = (node: Node): string[] =>
-  layout(node, 40, { toggled: new Set() }).lines.map(line => stripTerminalSequences(line).trimEnd())
+const lines = (node: Node): string[] => layout(node, 40, { toggled: new Set() }).lines.map((line) => stripTerminalSequences(line).trimEnd())
 
 /** What a call returned, having failed, as it lands in the log. */
 const failed = (callId: string): Extract<Fact, { readonly kind: 'result' }> => ({
-  kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId, failed: true,
+  kind: 'result',
+  seq: 3,
+  time: 3,
+  turn: 1,
+  step: 1,
+  callId,
+  failed: true,
   failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' },
-  blocks: [{ kind: 'text', text: 'the model was told' }], meta: undefined,
+  blocks: [{ kind: 'text', text: 'the model was told' }],
+  meta: undefined,
 })
 
 test('a call to a tool that presents it reads as its presented title, and while it runs says so along the gutter of what the surface shows', async () => {
@@ -87,17 +98,19 @@ test('once it returns, what it returned is folded beneath it along the dim gutte
   assert.equal(pane.render(60)[1]?.trimEnd(), '\x1b[2m│\x1b[22m a')
 })
 
-test('a view of output draws what a card holds, handed the tool and what it returned, and the card around it stays the tool\'s', async () => {
+test("a view of output draws what a card holds, handed the tool and what it returned, and the card around it stays the tool's", async () => {
   const { registrations, pane } = await withCards(read)
-  registrations.view('output', part => ({ kind: 'text', text: `${part.tool}: ${part.text}` }))
+  registrations.view('output', (part) => ({ kind: 'text', text: `${part.tool}: ${part.text}` }))
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('the file'))
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ read: the file'])
 })
 
-test('a card row an author registers draws its kind\'s cards, the newest over the tool cards\' own, until it is taken back', async () => {
+test("a card row an author registers draws its kind's cards, the newest over the tool cards' own, until it is taken back", async () => {
   const { registrations, pane } = await withCards(read)
-  const takeBack = registrations.card('generic', { draw: parts => ({ kind: 'show', title: [parts.mark, ` mine: ${parts.call.title}`], child: { kind: 'blank' } }) })
+  const takeBack = registrations.card('generic', {
+    draw: (parts) => ({ kind: 'show', title: [parts.mark, ` mine: ${parts.call.title}`], child: { kind: 'blank' } }),
+  })
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   assert.deepEqual(drawText(pane, 60), ['● mine: Read src/api.ts', '│'])
   takeBack()
@@ -107,7 +120,11 @@ test('a card row an author registers draws its kind\'s cards, the newest over th
 test('a card row that throws, or returns no show, is drawn over by the row beneath, which says whose row failed and why', async () => {
   const { registrations, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
-  const takeBack = registrations.card('generic', { draw: () => { throw new Error('no theme') } })
+  const takeBack = registrations.card('generic', {
+    draw: () => {
+      throw new Error('no theme')
+    },
+  })
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s', '✗ binnacle.card(generic) threw: no theme'])
   takeBack()
   registrations.card('generic', { draw: () => ({ kind: 'stack', children: [] }) as never })
@@ -117,11 +134,18 @@ test('a card row that throws, or returns no show, is drawn over by the row benea
 test('a card row whose returned value throws as it is read is drawn over by the row beneath, saying why', async () => {
   const { registrations, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
-  registrations.card('generic', { draw: () => ({ get kind(): string { throw new Error('boom') } }) as never })
+  registrations.card('generic', {
+    draw: () =>
+      ({
+        get kind(): string {
+          throw new Error('boom')
+        },
+      }) as never,
+  })
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ running 0s', '✗ binnacle.card(generic) threw: boom'])
 })
 
-test('a returned call\'s head says how long it took, muted, by its result\'s log time less its call\'s', async () => {
+test("a returned call's head says how long it took, muted, by its result's log time less its call's", async () => {
   const { pane } = await withCards(read)
   pane.push(callFact(2, 10_000, 'c1', 'read', '{"path":"src/api.ts"}'))
   pane.push(returnedFact(3, 11_400, 'c1', 'the file'))
@@ -134,13 +158,31 @@ test('a returned call\'s head says how long it took, muted, by its result\'s log
 test('a presented call draws each call its run_code program made beneath its head, marked as a call is', async () => {
   const { pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
-  pane.push({ kind: 'sub-call', seq: 4, time: 4, rootCallId: 'c1', parentCallId: 'c1', subCallId: 'c1:ptc:0', name: 'grep', arguments: '{}' })
+  pane.push({
+    kind: 'sub-call',
+    seq: 4,
+    time: 4,
+    rootCallId: 'c1',
+    parentCallId: 'c1',
+    subCallId: 'c1:ptc:0',
+    name: 'grep',
+    arguments: '{}',
+  })
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ ● grep {}', '│ running 0s'])
-  pane.push({ kind: 'sub-call', seq: 5, time: 5, rootCallId: 'c1', parentCallId: 'c1:ptc:0', subCallId: 'c1:ptc:0:ptc:0', name: 'read', arguments: '{}' })
+  pane.push({
+    kind: 'sub-call',
+    seq: 5,
+    time: 5,
+    rootCallId: 'c1',
+    parentCallId: 'c1:ptc:0',
+    subCallId: 'c1:ptc:0:ptc:0',
+    name: 'read',
+    arguments: '{}',
+  })
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ ● grep {}', '│   ● read {}', '│ running 0s'])
 })
 
-test('a click on a card\'s head opens what it returned and a second folds it; a click on what it returned does nothing', async () => {
+test("a click on a card's head opens what it returned and a second folds it; a click on what it returned does nothing", async () => {
   const { pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('a\nb\nc\nd\ne'))
@@ -169,7 +211,7 @@ test('a completed call reads as the title its result presents, when it presents 
   assert.deepEqual(drawText(pane, 60), ['● Built the package', '│ built'])
 })
 
-test('presentResult is handed the result\'s content rebuilt from its text blocks, whether it failed, and its meta as logged', async () => {
+test("presentResult is handed the result's content rebuilt from its text blocks, whether it failed, and its meta as logged", async () => {
   const echo = defineTool({
     name: 'echo',
     description: 'Echo what it is handed.',
@@ -179,20 +221,38 @@ test('presentResult is handed the result\'s content rebuilt from its text blocks
     presentCall: () => ({ card: 'generic', title: 'Echo' }),
     presentResult: (_args, result) => ({
       card: 'generic',
-      content: [{ type: 'text', text: `handed ${JSON.stringify({ types: result.content.map(block => block.type), isError: result.isError, meta: result.meta })}` }],
+      content: [
+        {
+          type: 'text',
+          text: `handed ${JSON.stringify({ types: result.content.map((block) => block.type), isError: result.isError, meta: result.meta })}`,
+        },
+      ],
     }),
   })
   const { pane } = await withCards(echo)
   pane.push(asked('echo', '{}'))
   pane.push({
-    kind: 'result', seq: 3, time: 3, turn: 1, step: 1, callId: 'c1', failed: true,
+    kind: 'result',
+    seq: 3,
+    time: 3,
+    turn: 1,
+    step: 1,
+    callId: 'c1',
+    failed: true,
     failure: { name: 'ExitError', code: 'exit', reason: 'the command exited 2' },
-    blocks: [{ kind: 'text', text: 'ok' }, { kind: 'unread', type: 'image' }],
+    blocks: [
+      { kind: 'text', text: 'ok' },
+      { kind: 'unread', type: 'image' },
+    ],
     meta: { pages: 3 },
   })
-  assert.deepEqual(drawText(pane, 90), ['✗ Echo', '│ the command exited 2', '│ handed {"types":["text"],"isError":true,"meta":{"pages":3}}'])
-  assert.equal(pane.render(90).map(line => line.trimEnd())[0], '\x1b[31m✗\x1b[39m Echo')
-  assert.equal(pane.render(90).map(line => line.trimEnd())[1], '\x1b[2m│\x1b[22m \x1b[31mthe command exited 2\x1b[39m')
+  assert.deepEqual(drawText(pane, 90), [
+    '✗ Echo',
+    '│ the command exited 2',
+    '│ handed {"types":["text"],"isError":true,"meta":{"pages":3}}',
+  ])
+  assert.equal(pane.render(90).map((line) => line.trimEnd())[0], '\x1b[31m✗\x1b[39m Echo')
+  assert.equal(pane.render(90).map((line) => line.trimEnd())[1], '\x1b[2m│\x1b[22m \x1b[31mthe command exited 2\x1b[39m')
 })
 
 test('a call to a tool binnacle cannot find, or that presents nothing, reads as it does today', async () => {
@@ -210,14 +270,16 @@ test('a call to a tool binnacle cannot find, or that presents nothing, reads as 
   assert.deepEqual(drawText(pane, 60).slice(2), ['', '● silent {}', '│ running 0s'])
 })
 
-test('a presenter that throws leaves the call to binnacle\'s card, which says what went wrong', async () => {
+test("a presenter that throws leaves the call to binnacle's card, which says what went wrong", async () => {
   const flaky = defineTool({
     name: 'flaky',
     description: 'Presents by throwing.',
     parameters: {},
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     execute: async () => 'flaked',
-    presentCall: () => { throw new Error('the presenter fell over') },
+    presentCall: () => {
+      throw new Error('the presenter fell over')
+    },
   })
   const unstable = defineTool({
     name: 'unstable',
@@ -226,13 +288,20 @@ test('a presenter that throws leaves the call to binnacle\'s card, which says wh
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     execute: async () => 'unstable',
     presentCall: () => ({ card: 'generic', title: 'Boom' }),
-    presentResult: () => { throw new Error('the presenter fell over') },
+    presentResult: () => {
+      throw new Error('the presenter fell over')
+    },
   })
   const { pane } = await withCards(flaky, unstable)
   pane.push(asked('flaky', '{}'))
   assert.deepEqual(drawText(pane, 60), ['● flaky {}', '│ running 0s', '✗ flaky.presentCall threw: the presenter fell over'])
   pane.push(failed('c1'))
-  assert.deepEqual(drawText(pane, 60), ['✗ flaky {}', '│ the command exited 2', '│ the model was told', '✗ flaky.presentCall threw: the presenter fell over'])
+  assert.deepEqual(drawText(pane, 60), [
+    '✗ flaky {}',
+    '│ the command exited 2',
+    '│ the model was told',
+    '✗ flaky.presentCall threw: the presenter fell over',
+  ])
   pane.push({ ...asked('unstable', '{}'), seq: 5, callId: 'c2' })
   assert.deepEqual(drawText(pane, 60).slice(4), ['', '● Boom', '│ running 0s'])
   pane.push({ ...returned('ok'), callId: 'c2' })
@@ -251,16 +320,10 @@ test('presentCall returning undefined, and a call whose arguments are not JSON, 
   const { pane } = await withCards(voided)
   pane.push(asked('voided', '{}'))
   pane.push({ ...asked('read', '{oops'), seq: 6, callId: 'c3' })
-  assert.deepEqual(drawText(pane, 60), [
-    '● voided {}',
-    '│ running 0s',
-    '',
-    '● read {oops',
-    '│ running 0s',
-  ])
+  assert.deepEqual(drawText(pane, 60), ['● voided {}', '│ running 0s', '', '● read {oops', '│ running 0s'])
 })
 
-test('presentResult returning undefined keeps the presented title and folds the result\'s own text', async () => {
+test("presentResult returning undefined keeps the presented title and folds the result's own text", async () => {
   const mute = defineTool({
     name: 'mute',
     description: 'Presents its calls only.',
@@ -322,7 +385,7 @@ test('a presenter that returns something the cards cannot draw says so under the
     '',
     '● crooked {}',
     '│ crooked',
-    '✗ crooked.presentResult returned no drawable view: a result view\'s title is not text',
+    "✗ crooked.presentResult returned no drawable view: a result view's title is not text",
   ])
 })
 
@@ -347,7 +410,7 @@ test('every other card kind is drawn by its title alone in this slice', async ()
     parameters: { command: { type: 'string', required: true } },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     execute: async () => 'ran',
-    presentCall: args => ({ card: 'terminal', title: args.command, description: 'Run the tests' }),
+    presentCall: (args) => ({ card: 'terminal', title: args.command, description: 'Run the tests' }),
     presentResult: () => ({ card: 'terminal', title: 'pnpm test (2 s)', output: 'tsc: 1 error\n' }),
   })
   const write = defineTool({
@@ -356,7 +419,11 @@ test('every other card kind is drawn by its title alone in this slice', async ()
     parameters: { path: { type: 'string', required: true } },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     execute: async () => 'wrote',
-    presentCall: args => ({ card: 'diff', title: `Write ${args.path}`, diffs: [{ path: args.path, oldText: null, newText: 'the file' }] }),
+    presentCall: (args) => ({
+      card: 'diff',
+      title: `Write ${args.path}`,
+      diffs: [{ path: args.path, oldText: null, newText: 'the file' }],
+    }),
   })
   const { pane } = await withCards(bash, write)
   pane.push(asked('bash', '{"command":"pnpm test"}'))
@@ -367,20 +434,25 @@ test('every other card kind is drawn by its title alone in this slice', async ()
   assert.deepEqual(drawText(pane, 60).slice(2), ['', '● Write foo.txt', '│ running 0s'])
 })
 
-test('a kind with no row of its own draws through generic\'s', () => {
-  const generic: CardRow = { draw: parts => ({ kind: 'show', title: [` generic: ${parts.call.title}`], child: { kind: 'blank' } }) }
-  const rows = (kind: string): readonly CardRow[] => kind === 'generic' ? [generic] : []
+test("a kind with no row of its own draws through generic's", () => {
+  const generic: CardRow = { draw: (parts) => ({ kind: 'show', title: [` generic: ${parts.call.title}`], child: { kind: 'blank' } }) }
+  const rows = (kind: string): readonly CardRow[] => (kind === 'generic' ? [generic] : [])
   const parts = { call: { card: 'terminal', title: 'pnpm test', returned: {} } } as unknown as CardParts
-  for (const kind of ['terminal', 'web'] as const) assert.deepEqual(lines(drawCard(rows, kind, parts, () => ({ kind: 'blank' }))), [' generic: pnpm test', '│'])
+  for (const kind of ['terminal', 'web'] as const)
+    assert.deepEqual(lines(drawCard(rows, kind, parts, () => ({ kind: 'blank' }))), [' generic: pnpm test', '│'])
 })
 
-test('a row draws a head of its own as its show\'s title, and a line under it along the gutter', () => {
+test("a row draws a head of its own as its show's title, and a line under it along the gutter", () => {
   const shell: CardRow = {
-    draw: parts => {
+    draw: (parts) => {
       const head = [{ text: '$', tone: 'accent' } as const, ` ${parts.call.title}`]
       if (parts.waiting !== undefined) return { kind: 'show', title: head, child: parts.waiting }
       const status: Node = { kind: 'text', text: 'exited badly', tone: 'warning' }
-      return { kind: 'show', title: head, child: { kind: 'stack', children: [status, parts.fold({ kind: 'text', text: parts.resultText }, 1)] } }
+      return {
+        kind: 'show',
+        title: head,
+        child: { kind: 'stack', children: [status, parts.fold({ kind: 'text', text: parts.resultText }, 1)] },
+      }
     },
   }
   const drawn = (parts: CardParts): string[] => lines(shell.draw(parts) as Node)
@@ -393,7 +465,7 @@ test('a row draws a head of its own as its show\'s title, and a line under it al
     resultText: '',
     took: undefined,
     made: [],
-    fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
+    fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...(rows === undefined ? {} : { rows }), child }),
   }
   assert.deepEqual(drawn(running), ['$ pnpm test', '│ running 0s'])
   const done: CardParts = {
@@ -409,7 +481,7 @@ test('a row draws a head of its own as its show\'s title, and a line under it al
 test('a row draws its card inside a show, or declines', () => {
   const bare: CardRow = {
     // @ts-expect-error a card drawn as a bare stack has no show as its parent
-    draw: parts => ({ kind: 'stack', children: [{ kind: 'text', text: parts.call.title }] }),
+    draw: (parts) => ({ kind: 'stack', children: [{ kind: 'text', text: parts.call.title }] }),
   }
   assert.equal(typeof bare.draw, 'function')
 })
@@ -424,10 +496,10 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
     resultText: 'tsc: 1 error',
     took: undefined,
     made: [],
-    fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child }),
+    fold: (child: Node, rows?: number) => ({ kind: 'fold', id: 'output', ...(rows === undefined ? {} : { rows }), child }),
   }
   const exit: CardRow = {
-    draw: current => {
+    draw: (current) => {
       const head = [current.mark, ` ${current.call.title}`]
       if (current.waiting !== undefined) return { kind: 'show', title: head, child: current.waiting }
       const code: unknown = current.result?.returned.exitCode
@@ -435,13 +507,23 @@ test("a row reads its kind's own fields, and one that cannot read them declines"
       return {
         kind: 'show',
         title: head,
-        child: { kind: 'stack', children: [{ kind: 'text', text: `exited ${code}`, tone: code === 0 ? 'success' : 'error' }, current.fold({ kind: 'text', text: current.resultText })] },
+        child: {
+          kind: 'stack',
+          children: [
+            { kind: 'text', text: `exited ${code}`, tone: code === 0 ? 'success' : 'error' },
+            current.fold({ kind: 'text', text: current.resultText }),
+          ],
+        },
       }
     },
   }
   assert.deepEqual(lines(exit.draw(parts) as Node), ['✗ pnpm test', '│ exited 2', '│ tsc: 1 error'])
-  assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal' } } }), { declined: 'exitCode is absent' })
-  assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal', exitCode: 'two' } } }), { declined: 'exitCode is a string' })
+  assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal' } } }), {
+    declined: 'exitCode is absent',
+  })
+  assert.deepEqual(exit.draw({ ...parts, result: { card: 'terminal', returned: { card: 'terminal', exitCode: 'two' } } }), {
+    declined: 'exitCode is a string',
+  })
 })
 
 test('the object a presenter returned is not frozen after drawing', async () => {
@@ -473,7 +555,7 @@ test('a presented output fold shows the rows the theme gives the tool kind, not 
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ … 4 more lines'])
 })
 
-test('disposing the plugin gives every call back to binnacle\'s card', async () => {
+test("disposing the plugin gives every call back to binnacle's card", async () => {
   const { fiber, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('the file'))
@@ -482,7 +564,7 @@ test('disposing the plugin gives every call back to binnacle\'s card', async () 
   assert.deepEqual(drawText(pane, 60), ['● read {"path":"src/api.ts"}', '│ the file'])
 })
 
-test('a fold a person opened stays open when the plugin drawing it is disposed, for binnacle\'s card names it alike', async () => {
+test("a fold a person opened stays open when the plugin drawing it is disposed, for binnacle's card names it alike", async () => {
   const { fiber, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))
   pane.push(returned('a\nb\nc\nd\ne'))

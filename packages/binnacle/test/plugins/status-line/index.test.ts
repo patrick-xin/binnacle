@@ -17,11 +17,15 @@ async function lineWith(values: Record<string, unknown>): Promise<string> {
   const registrations = new RegistrationService(ctx)
   ctx.provide('sessionProjections', { snapshot: () => ({ values }), onChanged: () => () => {} } as never)
   await ctx.plugin(statusLine)
-  registrations.open({ send: () => {}, command: async () => true, agent: { options: { provider: 'deepseek', model: 'v4' }, session: { requestHeader: () => undefined } } as unknown as Agent })
+  registrations.open({
+    send: () => {},
+    command: async () => true,
+    agent: { options: { provider: 'deepseek', model: 'v4' }, session: { requestHeader: () => undefined } } as unknown as Agent,
+  })
   const placed = registrations.placed('below-composer').at(-1)
   assert.ok(placed?.kind === 'lines')
   const pane = new ScreenPane(() => [])
-  pane.place('below-composer', { draw: drawn => placed.draw(drawn, {}) })
+  pane.place('below-composer', { draw: (drawn) => placed.draw(drawn, {}) })
   return drawText(pane, 60).join('\n')
 }
 
@@ -30,7 +34,8 @@ async function lineWith(values: Record<string, unknown>): Promise<string> {
  * @param count - the tokens.
  * @returns the line.
  */
-const tokens = (count: number): Promise<string> => lineWith({ tokenUsage: { uncachedInputTokens: count, outputTokens: 0, cacheReadTokens: 0 } })
+const tokens = (count: number): Promise<string> =>
+  lineWith({ tokenUsage: { uncachedInputTokens: count, outputTokens: 0, cacheReadTokens: 0 } })
 
 test('a count that rounds to a thousand of its unit is written in the next unit: 999,999 tokens is 1m, never 1000k', async () => {
   assert.equal(await tokens(999), 'deepseek/v4 · 999 tokens')

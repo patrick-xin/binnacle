@@ -25,7 +25,7 @@ const SRC = 'packages/binnacle/src/'
  */
 function declared(declaration) {
   if (declaration.id?.name) return [declaration.id.name]
-  return (declaration.declarations ?? []).flatMap(item => (item.id?.name ? [item.id.name] : []))
+  return (declaration.declarations ?? []).flatMap((item) => (item.id?.name ? [item.id.name] : []))
 }
 
 /**
@@ -39,7 +39,7 @@ function exportsOf(path, text) {
   for (const node of parseSync(path, text).program.body) {
     if (node.type !== 'ExportNamedDeclaration') continue
     if (node.declaration) names.push(...declared(node.declaration))
-    else if (!node.source) names.push(...node.specifiers.map(specifier => nameOf(specifier.exported)))
+    else if (!node.source) names.push(...node.specifiers.map((specifier) => nameOf(specifier.exported)))
   }
   return names
 }
@@ -95,7 +95,8 @@ function identifiersIn(node, into) {
 function exposedIn(path, text) {
   const names = new Set()
   for (const node of parseSync(path, text).program.body) {
-    if (node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration' || node.type === 'TSModuleDeclaration') identifiersIn(node, names)
+    if (node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration' || node.type === 'TSModuleDeclaration')
+      identifiersIn(node, names)
   }
   return names
 }
@@ -109,7 +110,8 @@ function exposedIn(path, text) {
 function dynamicSpecifiers(node, into) {
   if (Array.isArray(node)) for (const item of node) dynamicSpecifiers(item, into)
   else if (node !== null && typeof node === 'object') {
-    if (node.type === 'ImportExpression' && node.source?.type === 'Literal' && typeof node.source.value === 'string') into.push(node.source.value)
+    if (node.type === 'ImportExpression' && node.source?.type === 'Literal' && typeof node.source.value === 'string')
+      into.push(node.source.value)
     for (const value of Object.values(node)) if (typeof value === 'object') dynamicSpecifiers(value, into)
   }
   return into
@@ -129,15 +131,28 @@ function importsOf(path, text, known) {
   const add = (spec, names, locals) => {
     if (!spec.startsWith('.')) return
     const base = posix.join(posix.dirname(path), spec)
-    const target = [base, base.replace(/\.js$/, '.ts'), `${base}.ts`, `${base}/index.ts`].find(candidate => known.has(candidate))
+    const target = [base, base.replace(/\.js$/, '.ts'), `${base}.ts`, `${base}/index.ts`].find((candidate) => known.has(candidate))
     if (target !== undefined) found.push({ target, names, locals })
   }
   for (const node of program.body) {
     if (!node.source || !['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type)) continue
-    const names = node.type === 'ImportDeclaration'
-      ? node.specifiers.map(specifier => specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : '*')
-      : node.type === 'ExportAllDeclaration' ? ['*'] : node.specifiers.map(specifier => nameOf(specifier.local))
-    add(node.source.value, names, node.type === 'ImportDeclaration' ? node.specifiers.map(specifier => specifier.local.name) : names.map(() => null))
+    const names =
+      node.type === 'ImportDeclaration'
+        ? node.specifiers.map((specifier) =>
+            specifier.type === 'ImportSpecifier'
+              ? nameOf(specifier.imported)
+              : specifier.type === 'ImportDefaultSpecifier'
+                ? 'default'
+                : '*',
+          )
+        : node.type === 'ExportAllDeclaration'
+          ? ['*']
+          : node.specifiers.map((specifier) => nameOf(specifier.local))
+    add(
+      node.source.value,
+      names,
+      node.type === 'ImportDeclaration' ? node.specifiers.map((specifier) => specifier.local.name) : names.map(() => null),
+    )
   }
   for (const spec of dynamicSpecifiers(program.body, [])) add(spec, [], [])
   return found
@@ -153,7 +168,7 @@ function noteOf(files, path) {
   const slash = path.lastIndexOf('/')
   const notePath = `${SRC}${slash < 0 ? '' : path.slice(0, slash + 1)}AGENTS.md`
   const name = path.slice(slash + 1)
-  const note = files.find(file => file.path === notePath)
+  const note = files.find((file) => file.path === notePath)
   for (const line of note?.text.split('\n') ?? []) {
     if (line.startsWith('## ')) break
     if (line.startsWith(`- \`${name}\``)) return line.slice(name.length + 4).replace(/^\s*[—-]\s*/, '')
@@ -168,32 +183,42 @@ function noteOf(files, path) {
  * @returns {{ path: string, note: string, exports: string[], reExports: { name: string, from: string }[], importedBy: string[], authorApi: string[] }[]} one entry per module, ordered by path, its path relative to `src/`.
  */
 export function mapOf(files, folder) {
-  const modules = files.filter(file => file.path.startsWith(SRC) && file.path.endsWith('.ts')).map(file => ({ ...file, path: file.path.slice(SRC.length) }))
-  const known = new Set(modules.map(module => module.path))
+  const modules = files
+    .filter((file) => file.path.startsWith(SRC) && file.path.endsWith('.ts'))
+    .map((file) => ({ ...file, path: file.path.slice(SRC.length) }))
+  const known = new Set(modules.map((module) => module.path))
   const importers = new Map()
   for (const module of modules) {
-    for (const { target } of importsOf(module.path, module.text, known)) importers.set(target, new Set([...importers.get(target) ?? [], module.path]))
+    for (const { target } of importsOf(module.path, module.text, known))
+      importers.set(target, new Set([...(importers.get(target) ?? []), module.path]))
   }
-  const api = modules.find(module => module.path === 'api.ts')
+  const api = modules.find((module) => module.path === 'api.ts')
   const taken = new Map()
   const exposed = api ? exposedIn(api.path, api.text) : new Set()
   for (const { target, names, locals } of api ? importsOf(api.path, api.text, known) : []) {
-    taken.set(target, [...taken.get(target) ?? [], ...names.filter((_name, index) => locals[index] === null || exposed.has(locals[index]))])
+    taken.set(target, [
+      ...(taken.get(target) ?? []),
+      ...names.filter((_name, index) => locals[index] === null || exposed.has(locals[index])),
+    ])
   }
-  const shown = folder === undefined ? modules : modules.filter(module => module.path.startsWith(`${folder.replace(/\/$/, '')}/`))
-  return shown.toSorted((a, b) => (a.path < b.path ? -1 : 1)).map(module => {
-    const exports = exportsOf(module.path, module.text)
-    const reExports = reExportsOf(module.path, module.text)
-    const names = taken.get(module.path) ?? []
-    return {
-      path: module.path,
-      note: noteOf(files, module.path),
-      exports,
-      reExports,
-      importedBy: [...importers.get(module.path) ?? []].toSorted(),
-      authorApi: [...exports, ...reExports.map(reExport => reExport.name)].filter(name => names.includes('*') || names.includes(name)),
-    }
-  })
+  const shown = folder === undefined ? modules : modules.filter((module) => module.path.startsWith(`${folder.replace(/\/$/, '')}/`))
+  return shown
+    .toSorted((a, b) => (a.path < b.path ? -1 : 1))
+    .map((module) => {
+      const exports = exportsOf(module.path, module.text)
+      const reExports = reExportsOf(module.path, module.text)
+      const names = taken.get(module.path) ?? []
+      return {
+        path: module.path,
+        note: noteOf(files, module.path),
+        exports,
+        reExports,
+        importedBy: [...(importers.get(module.path) ?? [])].toSorted(),
+        authorApi: [...exports, ...reExports.map((reExport) => reExport.name)].filter(
+          (name) => names.includes('*') || names.includes(name),
+        ),
+      }
+    })
 }
 
 /**
@@ -208,17 +233,19 @@ export function formatMap(map) {
     if (entry.exports.length > 0) lines.push(`  exports: ${entry.exports.join(', ')}`)
     if (entry.reExports.length > 0) {
       const groups = new Map()
-      for (const { name, from } of entry.reExports) groups.set(from, [...groups.get(from) ?? [], name])
+      for (const { name, from } of entry.reExports) groups.set(from, [...(groups.get(from) ?? []), name])
       lines.push(`  re-exports: ${[...groups].map(([from, names]) => `${names.join(', ')} ← ${from}`).join('; ')}`)
     }
     if (entry.importedBy.length > 0) lines.push(`  imported by: ${entry.importedBy.join(', ')}`)
     if (entry.authorApi.length > 0) lines.push(`  author API: ${entry.authorApi.join(', ')} (api.ts)`)
   }
-  return lines.map(line => `${line}\n`).join('')
+  return lines.map((line) => `${line}\n`).join('')
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const files = repositoryFiles(root).filter(file => file.path.startsWith(SRC) && (file.path.endsWith('.ts') || file.path.endsWith('/AGENTS.md')))
+  const files = repositoryFiles(root).filter(
+    (file) => file.path.startsWith(SRC) && (file.path.endsWith('.ts') || file.path.endsWith('/AGENTS.md')),
+  )
   process.stdout.write(formatMap(mapOf(files, process.argv[2])))
 }

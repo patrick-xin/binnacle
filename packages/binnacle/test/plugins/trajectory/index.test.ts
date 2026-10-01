@@ -15,7 +15,18 @@ import * as trajectory from '../../../src/plugins/trajectory/index.ts'
 import { drawText } from '../../support/draw.ts'
 import { layout } from '../../../src/ui/layout.ts'
 import { componentOf } from '../../support/drawn.ts'
-import { call as callFact, prompt as promptFact, returned as returnedFact, asked as askedFact, decided as decidedFact, run as runFact, done as doneFact, started as startedFact, summarized as summarizedFact, ended as endedFact } from '../../support/facts.ts'
+import {
+  call as callFact,
+  prompt as promptFact,
+  returned as returnedFact,
+  asked as askedFact,
+  decided as decidedFact,
+  run as runFact,
+  done as doneFact,
+  started as startedFact,
+  summarized as summarizedFact,
+  ended as endedFact,
+} from '../../support/facts.ts'
 import { logged } from '../../support/log.ts'
 
 /**
@@ -36,8 +47,13 @@ async function trajectoryOver(facts: readonly Fact[]) {
 }
 
 /** One event of a kind dsh knows but binnacle reads as quiet, as dsh logs it. */
-const quiet = (seq: number, type: string, data: unknown): Fact =>
-  ({ kind: 'quiet', seq, time: seq, type, record: { type, seq, time: seq, data } })
+const quiet = (seq: number, type: string, data: unknown): Fact => ({
+  kind: 'quiet',
+  seq,
+  time: seq,
+  type,
+  record: { type, seq, time: seq, data },
+})
 
 /** A session: machinery, then one turn that asks, answers, calls and ends. */
 function session(): Fact[] {
@@ -46,7 +62,17 @@ function session(): Fact[] {
     { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' },
     { kind: 'step', seq: 2, time: 2, turn: 1, step: 1, phase: 'start' },
     promptFact(3, 3, 'fix the build'),
-    { kind: 'answer', seq: 4, time: 4, turn: 1, step: 1, provider: 'deepseek-official', model: 'deepseek-flash', interrupted: false, blocks: [{ kind: 'text', text: 'on it' }] },
+    {
+      kind: 'answer',
+      seq: 4,
+      time: 4,
+      turn: 1,
+      step: 1,
+      provider: 'deepseek-official',
+      model: 'deepseek-flash',
+      interrupted: false,
+      blocks: [{ kind: 'text', text: 'on it' }],
+    },
     callFact(5, 5, 'c1', 'read', '{"path":"src/api.ts"}'),
     returnedFact(6, 6, 'c1', 'the file'),
     { kind: 'step', seq: 7, time: 7, turn: 1, step: 1, phase: 'end' },
@@ -56,7 +82,7 @@ function session(): Fact[] {
 }
 
 /** Every line as its title reads, the count each line folds left off. */
-const titles = (lines: readonly string[]): readonly string[] => lines.map(line => line.replace(/ · \d+ lines?$/, ''))
+const titles = (lines: readonly string[]): readonly string[] => lines.map((line) => line.replace(/ · \d+ lines?$/, ''))
 
 /** A second turn, asking again. */
 function secondTurn(): Fact[] {
@@ -71,8 +97,29 @@ test('a second turn opens under its own heading, a blank line between, and the k
   const facts: Fact[] = [
     { kind: 'context', seq: 20, time: 20, source: 'goal', blocks: [{ kind: 'text', text: 'ship it' }] },
     { kind: 'authored', seq: 21, time: 21, name: 'seeded', data: { from: 'fork' } },
-    { kind: 'answer', seq: 22, time: 22, turn: 2, step: 1, provider: 'p', model: 'm', interrupted: true, blocks: [{ kind: 'text', text: 'half said' }] },
-    { kind: 'result', seq: 23, time: 23, turn: 2, step: 1, callId: 'c9', failed: true, blocks: [], meta: undefined, failure: { name: 'ENOENT', code: 'not-found' } },
+    {
+      kind: 'answer',
+      seq: 22,
+      time: 22,
+      turn: 2,
+      step: 1,
+      provider: 'p',
+      model: 'm',
+      interrupted: true,
+      blocks: [{ kind: 'text', text: 'half said' }],
+    },
+    {
+      kind: 'result',
+      seq: 23,
+      time: 23,
+      turn: 2,
+      step: 1,
+      callId: 'c9',
+      failed: true,
+      blocks: [],
+      meta: undefined,
+      failure: { name: 'ENOENT', code: 'not-found' },
+    },
     startedFact(24, 24, 'cmp-1'),
     summarizedFact(25, 25, 'cmp-1', 42, 18_300, 'The person asked to fix the build, and it did.'),
     endedFact(26, 26, 'cmp-1'),
@@ -105,8 +152,8 @@ test('disposing the plugin takes its screen back', async () => {
   assert.equal(registrations.screens.has('trajectory'), false)
 })
 
-test('over a real session\'s log, every event is one line, quiet ones included, grouped by turn with the machinery before the first', async () => {
-  const { lines } = await trajectoryOver(logged().map(event => adapt(event)))
+test("over a real session's log, every event is one line, quiet ones included, grouped by turn with the machinery before the first", async () => {
+  const { lines } = await trajectoryOver(logged().map((event) => adapt(event)))
   assert.deepEqual(titles(lines()), [
     'before turn 1',
     '0 permission/preset',
@@ -159,19 +206,22 @@ test('each event is one line, its record folded on it: the line says how much it
   const { placed } = await trajectoryOver(facts)
   assert.ok(placed !== undefined)
   const closed = drawText(componentOf(placed.draw(facts), { toggled: new Set() }), 60)
-  assert.deepEqual([closed[1], closed[4], closed[11]], ['0 permission/preset · 8 lines', '1 turn 1 begins · 7 lines', '8 turn 1 ended · completed · 8 lines'])
+  assert.deepEqual(
+    [closed[1], closed[4], closed[11]],
+    ['0 permission/preset · 8 lines', '1 turn 1 begins · 7 lines', '8 turn 1 ended · completed · 8 lines'],
+  )
   assert.equal(closed[6], '3 › fix the build · 11 lines')
   const opened = drawText(componentOf(placed.draw(facts), { toggled: new Set(['3']) }), 60)
   assert.deepEqual(opened.slice(6, 10), ['3 › fix the build · show less', '{', '  "kind": "prompt",', '  "seq": 3,'])
 })
 
-test('each line folds its record: a read fact\'s opens to the fact binnacle read, a quiet one to the event as logged, as the fallback shows it', async () => {
+test("each line folds its record: a read fact's opens to the fact binnacle read, a quiet one to the event as logged, as the fallback shows it", async () => {
   const facts = session()
   const { placed } = await trajectoryOver(facts)
   assert.ok(placed !== undefined)
   const opened = (id: string): readonly string[] => {
-    const lines = layout(placed.draw(facts), 60, { toggled: new Set([id]) }).lines.map(line => stripTerminalSequences(line).trimEnd())
-    return lines.slice(lines.findIndex(line => line.startsWith(`${id} `)))
+    const lines = layout(placed.draw(facts), 60, { toggled: new Set([id]) }).lines.map((line) => stripTerminalSequences(line).trimEnd())
+    return lines.slice(lines.findIndex((line) => line.startsWith(`${id} `)))
   }
   assert.deepEqual(opened('3').slice(0, 12), [
     '3 › fix the build · show less',
@@ -217,7 +267,7 @@ test('an approval asked and its decision are each one line, naming the tool and 
   ])
 })
 
-test('a command\'s run and its done are each one line, the run the line as the person typed it, the done the outcome in dsh\'s words', async () => {
+test("a command's run and its done are each one line, the run the line as the person typed it, the done the outcome in dsh's words", async () => {
   const facts: Fact[] = [
     { kind: 'turn', seq: 1, time: 1, turn: 1, phase: 'start' },
     runFact(2, 2, 'cmd-1a2b3c4d-1', 'compact', ' --keep 2'),

@@ -23,7 +23,7 @@ let seq = 0
 
 /** The agents the host opens a session through, faked: each holds one idle agent whose session records what dsh appends. */
 const agents = {
-  async create(): Promise<{ readonly agent: object, readonly dispose: () => Promise<void> }> {
+  async create(): Promise<{ readonly agent: object; readonly dispose: () => Promise<void> }> {
     const agent = {
       session: {
         snapshotEvents: (): readonly SessionEvent[] => [],
@@ -45,7 +45,7 @@ const agents = {
  * Open a session over dsh's own commands, on the default model.
  * @returns the open session, and dsh's command registry.
  */
-async function opened(): Promise<{ readonly session: OpenedSession, readonly registry: Context['commands'] }> {
+async function opened(): Promise<{ readonly session: OpenedSession; readonly registry: Context['commands'] }> {
   const ctx = new Context()
   await ctx.plugin(commands)
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
@@ -55,13 +55,22 @@ async function opened(): Promise<{ readonly session: OpenedSession, readonly reg
 
 test('a command whose handler threw still ran: dsh logs its failure as its done, and the grant resolves true', async () => {
   const { session, registry } = await opened()
-  registry.register({ name: 'boom', description: 'goes bang', handler: () => { throw new Error('kaput') } })
+  registry.register({
+    name: 'boom',
+    description: 'goes bang',
+    handler: () => {
+      throw new Error('kaput')
+    },
+  })
   assert.equal(await session.command('/boom now'), true)
-  assert.deepEqual(logged.map(event => event.type), ['command/run', 'command/done'])
+  assert.deepEqual(
+    logged.map((event) => event.type),
+    ['command/run', 'command/done'],
+  )
   const done = logged.at(-1)
   assert.ok(done !== undefined && done.type === 'command/done')
   // dsh pairs the done with its run by an id it minted; what the grant hands a person is the pair, not the id.
-  const { commandId: _commandId, ...failure } = done.data as { readonly commandId: unknown, readonly kind: unknown, readonly text: unknown }
+  const { commandId: _commandId, ...failure } = done.data as { readonly commandId: unknown; readonly kind: unknown; readonly text: unknown }
   assert.deepEqual(failure, { kind: 'error', text: 'kaput' })
 })
 
@@ -78,20 +87,30 @@ interface Sent {
   readonly message: UserMessage
 }
 
-test('a line sent steers the agent with the person\'s message; interrupt cancels as the user, keeping the inbox', async () => {
+test("a line sent steers the agent with the person's message; interrupt cancels as the user, keeping the inbox", async () => {
   const ctx = new Context()
   const sent: Sent[] = []
-  const cancels: { readonly cause: unknown, readonly options: unknown }[] = []
+  const cancels: { readonly cause: unknown; readonly options: unknown }[] = []
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
   ctx.provide('agents', {
     create: async () => ({
       agent: {
         session: {},
-        get status() { return 'idle' as const },
-        steer: (message: UserMessage) => { sent.push({ method: 'steer', message }) },
-        followup: (message: UserMessage) => { sent.push({ method: 'followup', message }) },
-        inject: (message: UserMessage) => { sent.push({ method: 'inject', message }) },
-        cancel: (cause: unknown, options: unknown) => { cancels.push({ cause, options }) },
+        get status() {
+          return 'idle' as const
+        },
+        steer: (message: UserMessage) => {
+          sent.push({ method: 'steer', message })
+        },
+        followup: (message: UserMessage) => {
+          sent.push({ method: 'followup', message })
+        },
+        inject: (message: UserMessage) => {
+          sent.push({ method: 'inject', message })
+        },
+        cancel: (cause: unknown, options: unknown) => {
+          cancels.push({ cause, options })
+        },
       },
       dispose: async () => {},
     }),
@@ -112,7 +131,7 @@ test('a line sent steers the agent with the person\'s message; interrupt cancels
   assert.deepEqual(cancels, [{ cause: { kind: 'user' }, options: { keepInbox: true } }])
 })
 
-test('where the session stands is heard again as the agent\'s status flips, which dsh says only after the turn\'s last event is logged', async () => {
+test("where the session stands is heard again as the agent's status flips, which dsh says only after the turn's last event is logged", async () => {
   const ctx = new Context()
   const agentCtx = new Context()
   const agent = { session: {} }
@@ -125,7 +144,9 @@ test('where the session stands is heard again as the agent\'s status flips, whic
   } as never)
   const session = await openSession(ctx)
   let heard = 0
-  const stop = session.onStanding(() => { heard++ })
+  const stop = session.onStanding(() => {
+    heard++
+  })
   agentCtx.emit('agent/status', { agent: agent as never, status: 'idle' })
   assert.equal(heard, 1)
   stop()
@@ -142,7 +163,9 @@ test('following a session hears what it logged before, then what it logs after, 
   ctx.provide('agents', { create: async () => ({ agent: { session: log }, dispose: async () => {} }) } as never)
   const session = await openSession(ctx)
   const heard: SessionEvent[] = []
-  session.follow((event) => { heard.push(event) })
+  session.follow((event) => {
+    heard.push(event)
+  })
   ctx.emit('session/event', log as never, later)
   ctx.emit('session/event', {} as never, earlier)
   assert.deepEqual(heard, [earlier, later])
@@ -179,18 +202,22 @@ test('an event both in the log as it is read and on the feed is heard once', asy
   ctx.provide('agents', { create: async () => ({ agent: { session: log }, dispose: async () => {} }) } as never)
   const session = await openSession(ctx)
   const heard: SessionEvent[] = []
-  session.follow((event) => { heard.push(event) })
+  session.follow((event) => {
+    heard.push(event)
+  })
   assert.deepEqual(heard, [first])
 })
 
-test('the answer streaming is heard for the session\'s own agent, and never for another', async () => {
+test("the answer streaming is heard for the session's own agent, and never for another", async () => {
   const ctx = new Context()
   const agent = { session: { snapshotEvents: (): readonly SessionEvent[] => [] } }
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
   ctx.provide('agents', { create: async () => ({ agent, dispose: async () => {} }) } as never)
   const session = await openSession(ctx)
   const heard: unknown[] = []
-  const stop = session.onStream((frame) => { heard.push(frame) })
+  const stop = session.onStream((frame) => {
+    heard.push(frame)
+  })
   const own = { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 }
   ctx.emit('agent/assistant-stream', { agent: agent as never, frame: own as never })
   ctx.emit('agent/assistant-stream', { agent: { session: {} } as never, frame: { ...own, attemptId: 'a2' } as never })

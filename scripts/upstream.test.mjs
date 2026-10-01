@@ -21,7 +21,15 @@ test('a pin at the newest release has nothing after it', () => {
 })
 
 test('a release waits on every package its pin would move that npm does not list at its version yet', () => {
-  const deps = { '@deepseek-ai/dsh-agent': '0.2.0-rc.1', '@deepseek-ai/dsh-tool-ask-user': '0.2.0-rc.1', '@deepseek-ai/cordis': '4.0.4', '@earendil-works/pi-tui': '0.99.1' }
+  const deps = {
+    '@deepseek-ai/dsh-agent': '0.2.0-rc.1',
+    '@deepseek-ai/dsh-tool-ask-user': '0.2.0-rc.1',
+    '@deepseek-ai/cordis': '4.0.4',
+    '@earendil-works/pi-tui': '0.99.1',
+  }
   const listed = { '@deepseek-ai/dsh-agent': ['0.2.0-rc.1', '0.2.0-rc.2'], '@deepseek-ai/dsh-tool-ask-user': ['0.2.0-rc.1'] }
-  assert.deepEqual(unpublished(deps, 'dsh', '0.2.0-rc.2', pkg => listed[pkg] ?? []), ['@deepseek-ai/dsh-tool-ask-user'])
+  assert.deepEqual(
+    unpublished(deps, 'dsh', '0.2.0-rc.2', (pkg) => listed[pkg] ?? []),
+    ['@deepseek-ai/dsh-tool-ask-user'],
+  )
 })

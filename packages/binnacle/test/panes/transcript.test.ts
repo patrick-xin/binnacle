@@ -21,11 +21,13 @@ const prompt = promptFact(1, 1, 'fix the build')
  * @param pane - the pane.
  * @returns its lines, plain.
  */
-const shown = (pane: TranscriptPane): string[] => pane.render(40).map(line => stripTerminalSequences(line).trimEnd())
+const shown = (pane: TranscriptPane): string[] => pane.render(40).map((line) => stripTerminalSequences(line).trimEnd())
 
 test('the pane draws the facts pushed into it, and asks for a frame each time', () => {
   let asked = 0
-  const pane = new TranscriptPane(() => { asked++ })
+  const pane = new TranscriptPane(() => {
+    asked++
+  })
   pane.push(prompt)
   assert.deepEqual(shown(pane), ['', ' › fix the build', ''])
   assert.equal(asked, 1)
@@ -104,8 +106,16 @@ test('a key bound to an affordance the focused thing does not offer is not answe
 
 test('a focus that lands on something reports the rows it covers, to be brought into view, and opening what is focused reports nothing', () => {
   const inView: [number, number][] = []
-  const reports: PaneReports = { inView: (top, height) => { inView.push([top, height]) } }
-  const pane = new TranscriptPane(() => {}, () => new Map(), reports)
+  const reports: PaneReports = {
+    inView: (top, height) => {
+      inView.push([top, height])
+    },
+  }
+  const pane = new TranscriptPane(
+    () => {},
+    () => new Map(),
+    reports,
+  )
   pane.push(prompt)
   pane.push(context)
   pane.push({ ...context, seq: 3, time: 3 })
@@ -113,21 +123,50 @@ test('a focus that lands on something reports the rows it covers, to be brought 
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(inView, [[6, 1]])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  assert.deepEqual(inView, [[6, 1], [4, 1]])
+  assert.deepEqual(inView, [
+    [6, 1],
+    [4, 1],
+  ])
   pane.handleKey({ kind: 'key', binding: 'primary' })
-  assert.deepEqual(inView, [[6, 1], [4, 1]])
+  assert.deepEqual(inView, [
+    [6, 1],
+    [4, 1],
+  ])
 })
 
 test('on the main screen, focus below what was printed stays drawn there, and focus that reaches a printed entry asks for fullscreen', () => {
   const fullscreen: [number, number][] = []
-  const pane = new TranscriptPane(() => {}, () => new Map(), { fullscreen: (top, height) => { fullscreen.push([top, height]) } })
+  const pane = new TranscriptPane(
+    () => {},
+    () => new Map(),
+    {
+      fullscreen: (top, height) => {
+        fullscreen.push([top, height])
+      },
+    },
+  )
   pane.drawOn('regular')
   pane.push(sent(1, 'one'))
   pane.push(call)
   pane.push(result)
   pane.push(waiting)
   pane.push(below)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', '│ w', '│ x', '│ y', '│ … 1 more line', '', '● stat {}', '│ running 0s', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane), [
+    '',
+    ' › one',
+    '',
+    '',
+    '● read {}',
+    '│ w',
+    '│ x',
+    '│ y',
+    '│ … 1 more line',
+    '',
+    '● stat {}',
+    '│ running 0s',
+    '',
+    '⋯ added by goal · 2 lines',
+  ])
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
   assert.deepEqual(fullscreen, [])
   assert.deepEqual(shown(pane).slice(9), ['', '● stat {}', '│ running 0s', '', '▸ ⋯ added by goal · show 2 more lines'])
@@ -150,7 +189,22 @@ test('switching to the main screen drops focus that sits on a printed entry, and
   assert.equal(pane.focused, true)
   pane.drawOn('regular')
   assert.equal(pane.focused, false)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', '│ w', '│ x', '│ y', '│ … 1 more line', '', '● stat {}', '│ running 0s', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane), [
+    '',
+    ' › one',
+    '',
+    '',
+    '● read {}',
+    '│ w',
+    '│ x',
+    '│ y',
+    '│ … 1 more line',
+    '',
+    '● stat {}',
+    '│ running 0s',
+    '',
+    '⋯ added by goal · 2 lines',
+  ])
 })
 
 test('when what is focused settles into the printed rows, focus is dropped rather than a printed row changed', () => {
@@ -163,10 +217,35 @@ test('when what is focused settles into the printed rows, focus is dropped rathe
   pane.push(below)
   shown(pane)
   pane.handleKey({ kind: 'key', binding: 'focus.previous' })
-  const done: Fact = { kind: 'result', seq: 6, time: 6, turn: 1, step: 1, callId: 'c2', failed: false, blocks: [{ kind: 'text', text: 'done' }], meta: undefined }
+  const done: Fact = {
+    kind: 'result',
+    seq: 6,
+    time: 6,
+    turn: 1,
+    step: 1,
+    callId: 'c2',
+    failed: false,
+    blocks: [{ kind: 'text', text: 'done' }],
+    meta: undefined,
+  }
   pane.push(done)
   assert.equal(pane.focused, true)
-  assert.deepEqual(shown(pane), ['', ' › one', '', '', '● read {}', '│ w', '│ x', '│ y', '│ … 1 more line', '', '● stat {}', '│ done', '', '⋯ added by goal · 2 lines'])
+  assert.deepEqual(shown(pane), [
+    '',
+    ' › one',
+    '',
+    '',
+    '● read {}',
+    '│ w',
+    '│ x',
+    '│ y',
+    '│ … 1 more line',
+    '',
+    '● stat {}',
+    '│ done',
+    '',
+    '⋯ added by goal · 2 lines',
+  ])
   assert.equal(pane.focused, false)
 })
 
@@ -183,11 +262,11 @@ const sent = (seq: number, text: string): Fact => promptFact(seq, seq, text)
  * prompt's text, folded to its first line.
  * @returns the views to hand a pane, and the calls so far.
  */
-function counting(): { views: Views, calls: () => number } {
+function counting(): { views: Views; calls: () => number } {
   let calls = 0
   const view: View = (entry) => {
     calls++
-    const text = entry.kind === 'prompt' ? entry.fact.blocks.map(block => block.kind === 'unread' ? '' : block.text).join('\n') : ''
+    const text = entry.kind === 'prompt' ? entry.fact.blocks.map((block) => (block.kind === 'unread' ? '' : block.text)).join('\n') : ''
     return { kind: 'fold', id: `mine:${entry.kind === 'prompt' ? entry.fact.seq : 0}`, rows: 1, child: { kind: 'text', text } }
   }
   return { views: new Map([['prompt', [view]]]), calls: () => calls }
@@ -198,7 +277,10 @@ const alike: Views = new Map([['prompt', [foldedAlike]]])
 
 test('a view is called once for each entry, however many frames draw it', () => {
   const { views, calls } = counting()
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.push(sent(1, 'one'))
   pane.push(sent(2, 'two'))
   shown(pane)
@@ -212,7 +294,10 @@ test('a view is called once for each entry, however many frames draw it', () => 
 
 test('opening a fold draws its entry again, laid out anew, without calling its view', () => {
   const { views, calls } = counting()
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.push(sent(1, 'one\nmore'))
   pane.push(sent(2, 'two\nmore'))
   assert.deepEqual(shown(pane), ['one', '… 1 more line', '', 'two', '… 1 more line'])
@@ -224,7 +309,10 @@ test('opening a fold draws its entry again, laid out anew, without calling its v
 })
 
 test('a fold a person opened stays open when the adapters change and the log is read again', () => {
-  const pane = new TranscriptPane(() => {}, () => alike)
+  const pane = new TranscriptPane(
+    () => {},
+    () => alike,
+  )
   pane.push(sent(1, 'one\nmore'))
   pane.push(sent(2, 'two\nmore'))
   assert.deepEqual(shown(pane), ['one', '… 1 more line', '', 'two', '… 1 more line'])
@@ -235,7 +323,10 @@ test('a fold a person opened stays open when the adapters change and the log is 
 })
 
 test('a fold a person opened stays open across a switch of screens', () => {
-  const pane = new TranscriptPane(() => {}, () => alike)
+  const pane = new TranscriptPane(
+    () => {},
+    () => alike,
+  )
   pane.push(sent(1, 'one\nmore'))
   pane.push(sent(2, 'two\nmore'))
   assert.deepEqual(pane.handleMouse(pointer('click', 4)), { handled: true })
@@ -247,16 +338,25 @@ test('a fold a person opened stays open across a switch of screens', () => {
 
 test('a resize lays every entry out at the new width, without calling its view', () => {
   const { views, calls } = counting()
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.push(sent(1, 'fix the build and the tests'))
   assert.deepEqual(shown(pane), ['fix the build and the tests'])
-  assert.deepEqual(pane.render(16).map(line => stripTerminalSequences(line).trimEnd()), ['fix the build', '… 1 more line'])
+  assert.deepEqual(
+    pane.render(16).map((line) => stripTerminalSequences(line).trimEnd()),
+    ['fix the build', '… 1 more line'],
+  )
   assert.equal(calls(), 1)
 })
 
 test('invalidating the pane calls every view again, as pi-tui asks when the theme changes', () => {
   const { views, calls } = counting()
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.push(sent(1, 'one'))
   shown(pane)
   pane.invalidate()
@@ -310,8 +410,22 @@ const asked = called(1, 'read')
 
 /** Its result as dsh logs it. */
 const answered: SessionEvent<'tool/result'> = {
-  type: 'tool/result', seq: SessionSeq(2), time: 2, surfaceOp: 'append',
-  data: { turn: 1, step: 1, message: { role: 'tool', id: MessageId('m1'), source: { kind: 'tool', callId: ToolCallId('c1') }, toolCallId: ToolCallId('c1'), isError: false, content: [{ type: 'text', text: 'done' }] } },
+  type: 'tool/result',
+  seq: SessionSeq(2),
+  time: 2,
+  surfaceOp: 'append',
+  data: {
+    turn: 1,
+    step: 1,
+    message: {
+      role: 'tool',
+      id: MessageId('m1'),
+      source: { kind: 'tool', callId: ToolCallId('c1') },
+      toolCallId: ToolCallId('c1'),
+      isError: false,
+      content: [{ type: 'text', text: 'done' }],
+    },
+  },
 }
 
 /**
@@ -325,14 +439,19 @@ function tampered(tamper: (entry: Extract<Parameters<View>[0], { kind: 'tool' }>
     return { kind: 'text', text: 'drawn by an author' }
   }
   const views: Views = new Map([['tool', [view]]])
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.push(adapt(asked))
   shown(pane)
   return pane
 }
 
 test('a view that changes the entry it was handed is fenced, and the transcript goes on', () => {
-  const pane = tampered((entry) => { Object.assign(entry, { call: undefined }) })
+  const pane = tampered((entry) => {
+    Object.assign(entry, { call: undefined })
+  })
   pane.push(adapt(answered))
   const lines = shown(pane)
   assert.deepEqual(lines.slice(0, 2), ['● read {}', '│ done'])
@@ -340,7 +459,13 @@ test('a view that changes the entry it was handed is fenced, and the transcript 
 })
 
 test('a view that changes the fact in its entry is fenced, and the transcript goes on', () => {
-  const pane = tampered((entry) => { Object.defineProperty(entry.call, 'callId', { get: () => { throw new Error('no call') } }) })
+  const pane = tampered((entry) => {
+    Object.defineProperty(entry.call, 'callId', {
+      get: () => {
+        throw new Error('no call')
+      },
+    })
+  })
   pane.push(adapt(answered))
   const lines = shown(pane)
   assert.deepEqual(lines.slice(0, 2), ['● read {}', '│ done'])
@@ -360,15 +485,26 @@ test('a click on what offers nothing, a wheel, a drag and hovering are left to p
 /** An author's view that draws binnacle's drawing of an entry in a card. */
 const carded: View = (_, next) => ({ kind: 'ask', title: 'yours', child: next() })
 
-test('a click on a card\'s border is left to pi-tui, and one inside it reaches what the card holds', () => {
+test("a click on a card's border is left to pi-tui, and one inside it reaches what the card holds", () => {
   const views: Views = new Map([['context', [carded]]])
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.push(context)
-  assert.deepEqual(shown(pane), ["\u256d\u2500 yours \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e", "\u2502 \u22ef added by goal \u00b7 2 lines            \u2502", "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f"])
+  assert.deepEqual(shown(pane), [
+    '\u256d\u2500 yours \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e',
+    '\u2502 \u22ef added by goal \u00b7 2 lines            \u2502',
+    '\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f',
+  ])
   assert.equal(pane.handleMouse(pointer('click', 2, 0)), undefined)
   assert.equal(pane.handleMouse(pointer('click', 2, 2)), undefined, 'the border below, for the fold is one line in the card')
   assert.deepEqual(pane.handleMouse(pointer('click', 1, 2)), { handled: true })
-  assert.deepEqual(shown(pane).slice(1, 4), ["\u2502 \u22ef added by goal \u00b7 show less          \u2502", "\u2502 a                                    \u2502", "\u2502 b                                    \u2502"])
+  assert.deepEqual(shown(pane).slice(1, 4), [
+    '\u2502 \u22ef added by goal \u00b7 show less          \u2502',
+    '\u2502 a                                    \u2502',
+    '\u2502 b                                    \u2502',
+  ])
 })
 
 /**
@@ -376,11 +512,16 @@ test('a click on a card\'s border is left to pi-tui, and one inside it reaches w
  * @param word - what it draws.
  * @returns the view.
  */
-const drawing = (word: string): View => () => ({ kind: 'text', text: word })
+const drawing =
+  (word: string): View =>
+  () => ({ kind: 'text', text: word })
 
 test('on the main screen, what is printed stays as printed; a call still waiting, and what follows it, is drawn anew below until its result arrives', () => {
   const views = new Map<string, readonly View[]>()
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.drawOn('regular')
   pane.push(sent(1, 'one'))
   pane.push(call)
@@ -396,7 +537,10 @@ test('on the main screen, what is printed stays as printed; a call still waiting
 
 test('on the main screen, a visit to the alternate screen leaves what was printed, and a resize prints it again as it now draws', () => {
   const views = new Map<string, readonly View[]>()
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.drawOn('regular')
   pane.push(sent(1, 'one'))
   assert.deepEqual(shown(pane), ['', ' › one', ''])
@@ -405,12 +549,18 @@ test('on the main screen, a visit to the alternate screen leaves what was printe
   assert.deepEqual(shown(pane), ['mine'])
   pane.drawOn('regular')
   assert.deepEqual(shown(pane), ['', ' › one', ''])
-  assert.deepEqual(pane.render(30).map(line => stripTerminalSequences(line).trimEnd()), ['mine'])
+  assert.deepEqual(
+    pane.render(30).map((line) => stripTerminalSequences(line).trimEnd()),
+    ['mine'],
+  )
 })
 
 test('on the main screen, reading the log again or pi-tui invalidating the pane prints everything again, as it now draws', () => {
   const views = new Map<string, readonly View[]>()
-  const pane = new TranscriptPane(() => {}, () => views)
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
   pane.drawOn('regular')
   pane.push(sent(1, 'one'))
   shown(pane)
@@ -449,23 +599,45 @@ test('a call its turn left without a result is drawn that way on both screens', 
 })
 
 /** A view that asks a person to choose between two offers. */
-const asking: View = () => ({ kind: 'ask', child: { kind: 'stack', children: [
-  { kind: 'offer', id: 'a', affordances: [{ kind: 'choose', label: 'a' }], child: { kind: 'text', text: 'a' } },
-  { kind: 'offer', id: 'b', affordances: [{ kind: 'choose', label: 'b' }], child: { kind: 'text', text: 'b' } },
-] } })
+const asking: View = () => ({
+  kind: 'ask',
+  child: {
+    kind: 'stack',
+    children: [
+      { kind: 'offer', id: 'a', affordances: [{ kind: 'choose', label: 'a' }], child: { kind: 'text', text: 'a' } },
+      { kind: 'offer', id: 'b', affordances: [{ kind: 'choose', label: 'b' }], child: { kind: 'text', text: 'b' } },
+    ],
+  },
+})
 
 /** The keys a key table binds: enter for the primary, tab for the next, nothing else. */
-const boundKeys = (binding: string): readonly string[] => ({ primary: ['enter'], 'focus.next': ['tab'] } as Record<string, readonly string[]>)[binding] ?? []
+const boundKeys = (binding: string): readonly string[] =>
+  (({ primary: ['enter'], 'focus.next': ['tab'] }) as Record<string, readonly string[]>)[binding] ?? []
 
-test('an ask an author\'s view draws in the transcript names on its bottom edge the keys the pane is handed', () => {
-  const pane = new TranscriptPane(() => {}, () => new Map([['prompt', [asking]]]), {}, undefined, undefined, () => boundKeys)
+test("an ask an author's view draws in the transcript names on its bottom edge the keys the pane is handed", () => {
+  const pane = new TranscriptPane(
+    () => {},
+    () => new Map([['prompt', [asking]]]),
+    {},
+    undefined,
+    undefined,
+    () => boundKeys,
+  )
   pane.push(prompt)
   assert.equal(shown(pane).at(-1), '╰─ enter select · tab next ────────────╯')
 })
 
 test('a key bound to copy on a focused card hands the host all the card holds, and on nothing else hands it nothing', () => {
   const copied: string[] = []
-  const pane = new TranscriptPane(() => {}, () => new Map(), { copy: (text) => { copied.push(text) } })
+  const pane = new TranscriptPane(
+    () => {},
+    () => new Map(),
+    {
+      copy: (text) => {
+        copied.push(text)
+      },
+    },
+  )
   pane.push(callFact(1, 1, 'c1', 'read', '{}'))
   pane.push(returnedFact(2, 2, 'c1', 'w\nx\ny\nz'))
   shown(pane)

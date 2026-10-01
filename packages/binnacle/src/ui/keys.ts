@@ -50,18 +50,18 @@ export const KEYBINDINGS = {
 } as const satisfies KeybindingDefinitions
 
 export type ResolvedKey =
-  | { readonly kind: 'gesture', readonly binding: KeyBinding }
+  | { readonly kind: 'gesture'; readonly binding: KeyBinding }
   | { readonly kind: 'quit' }
   | { readonly kind: 'switch-screens' }
   | { readonly kind: 'interrupt' }
-  | { readonly kind: 'screen', readonly name: string }
+  | { readonly kind: 'screen'; readonly name: string }
   | { readonly kind: 'screen-close' }
 
 const bindingIds: Readonly<Partial<Record<KeyBinding, Keybinding>>> = {
   'focus.next': 'binnacle.focusNext',
   'focus.previous': 'binnacle.focusPrevious',
   'focus.out': 'binnacle.stepOut',
-  'primary': 'binnacle.primary',
+  primary: 'binnacle.primary',
 }
 
 const offeredBinding = (name: string): string => `binnacle.screen.${name}`
@@ -86,8 +86,10 @@ export function keyTable(): KeyTable {
     get manager(): KeybindingsManager {
       return manager
     },
-    bind: (bindings: KeybindingsConfig): void => { rebuild(bindings) },
-    offer: (name: string, definition: KeybindingDefinition): () => void => {
+    bind: (bindings: KeybindingsConfig): void => {
+      rebuild(bindings)
+    },
+    offer: (name: string, definition: KeybindingDefinition): (() => void) => {
       const id = offeredBinding(name)
       offered.set(id, definition)
       rebuild()
@@ -96,16 +98,17 @@ export function keyTable(): KeyTable {
         rebuild()
       }
     },
-    keysOf: (binding: KeyBinding): readonly KeyId[] => manager.getKeys(bindingIds[binding] ?? `binnacle.${binding}` as Keybinding),
+    keysOf: (binding: KeyBinding): readonly KeyId[] => manager.getKeys(bindingIds[binding] ?? (`binnacle.${binding}` as Keybinding)),
     resolve: (data: string, focused: boolean, open = false): ResolvedKey | undefined => {
       if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
       // Bindings are checked in order: quit and screen switching, then screen keys if open,
       // step in, then focus moves/primary/step-out if focused, then affordances, else interrupt.
-      const live: { readonly id: Keybinding, readonly to: ResolvedKey }[] = [
+      const live: { readonly id: Keybinding; readonly to: ResolvedKey }[] = [
         { id: 'binnacle.quit', to: { kind: 'quit' } },
         { id: 'binnacle.switchScreens', to: { kind: 'switch-screens' } },
       ]
-      for (const id of offered.keys()) live.push({ id: id as Keybinding, to: { kind: 'screen', name: id.slice(offeredBinding('').length) } })
+      for (const id of offered.keys())
+        live.push({ id: id as Keybinding, to: { kind: 'screen', name: id.slice(offeredBinding('').length) } })
       if (open) live.push({ id: 'binnacle.stepOut', to: { kind: 'screen-close' } })
       live.push({ id: 'binnacle.stepIn', to: { kind: 'gesture', binding: 'focus.previous' } })
       if (focused) {
@@ -115,7 +118,8 @@ export function keyTable(): KeyTable {
           { id: 'binnacle.primary', to: { kind: 'gesture', binding: 'primary' } },
           { id: 'binnacle.stepOut', to: { kind: 'gesture', binding: 'focus.out' } },
         )
-        for (const kind of Object.keys(affordances) as AffordanceKind[]) live.push({ id: `binnacle.${kind}` as Keybinding, to: { kind: 'gesture', binding: kind } })
+        for (const kind of Object.keys(affordances) as AffordanceKind[])
+          live.push({ id: `binnacle.${kind}` as Keybinding, to: { kind: 'gesture', binding: kind } })
       } else live.push({ id: 'binnacle.interrupt', to: { kind: 'interrupt' } })
       // Explicit bindings take precedence over defaults.
       const explicit = live.filter(({ id }) => Object.hasOwn(set, id) && set[id] !== undefined)
@@ -128,9 +132,11 @@ export function refusedBindings(bindings: KeybindingsConfig): string | undefined
   const screens: Record<string, KeybindingDefinition> = {}
   for (const [id, keys] of Object.entries(bindings)) {
     if (id.startsWith(offeredBinding(''))) screens[id] = { defaultKeys: [] }
-    else if (!Object.hasOwn(KEYBINDINGS, id)) return `${id} is no binding; bind one pi-tui or binnacle has, a placed screen's ${offeredBinding('<name>')}, or an affordance's binnacle.<kind>`
+    else if (!Object.hasOwn(KEYBINDINGS, id))
+      return `${id} is no binding; bind one pi-tui or binnacle has, a placed screen's ${offeredBinding('<name>')}, or an affordance's binnacle.<kind>`
     const named = Array.isArray(keys) ? keys : [keys]
-    if (named.some(key => typeof key !== 'string')) return `${id} is bound to ${String(keys)}; bind it to a key as pi-tui names one, such as ctrl+q, or a list of them`
+    if (named.some((key) => typeof key !== 'string'))
+      return `${id} is bound to ${String(keys)}; bind it to a key as pi-tui names one, such as ctrl+q, or a list of them`
   }
   const conflict = new KeybindingsManager({ ...KEYBINDINGS, ...screens }, bindings).getConflicts()[0]
   if (conflict === undefined) return undefined

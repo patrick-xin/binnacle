@@ -1,5 +1,10 @@
 import type { Context, Events } from '@deepseek-ai/cordis'
-import type { AskUserQuestionAnswer, AskUserQuestionAnswerItem, AskUserQuestionItem, AskUserQuestionOption } from '@deepseek-ai/dsh-user-questions'
+import type {
+  AskUserQuestionAnswer,
+  AskUserQuestionAnswerItem,
+  AskUserQuestionItem,
+  AskUserQuestionOption,
+} from '@deepseek-ai/dsh-user-questions'
 import type { Node, Placement } from '../../api.ts'
 
 type Asked = Parameters<Events['user-questions/request']>[0]
@@ -22,23 +27,23 @@ function optionLine(option: AskUserQuestionOption, multi: boolean, marked: boole
   return {
     kind: 'text',
     text: [
-      ...multi && marked ? [{ mark: 'done' } as const] : multi ? [' ' as const] : [],
+      ...(multi && marked ? [{ mark: 'done' } as const] : multi ? [' ' as const] : []),
       multi ? ` ${option.label}` : option.label,
-      ...option.description === undefined ? [] : [{ text: ` — ${option.description}`, tone: 'muted' } as const],
+      ...(option.description === undefined ? [] : [{ text: ` — ${option.description}`, tone: 'muted' } as const]),
     ],
   }
 }
 
 function offered(question: AskUserQuestionItem): readonly AskUserQuestionOption[] {
   const options = question.options ?? []
-  const approve = question.intent?.kind === 'plan-review' ? options.findIndex(option => option.label === question.intent?.approve) : -1
+  const approve = question.intent?.kind === 'plan-review' ? options.findIndex((option) => option.label === question.intent?.approve) : -1
   return approve > 0 ? [...options.slice(approve), ...options.slice(0, approve)] : options
 }
 
 function asked(question: AskUserQuestionItem): readonly Node[] {
   return [
     { kind: 'text', text: question.question },
-    ...question.detail === undefined ? [] : [{ kind: 'markdown' as const, text: question.detail }],
+    ...(question.detail === undefined ? [] : [{ kind: 'markdown' as const, text: question.detail }]),
   ]
 }
 
@@ -46,7 +51,7 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
   const multi = question.multiSelect === true
   return {
     kind: 'ask',
-    ...question.header === undefined ? {} : { title: question.header },
+    ...(question.header === undefined ? {} : { title: question.header }),
     edge: 'accent',
     child: {
       kind: 'stack',
@@ -58,8 +63,22 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
           affordances: [{ kind: 'choose', label: option.label }],
           child: optionLine(option, multi, marked.includes(option.label)),
         })),
-        ...multi ? [{ kind: 'offer' as const, id: DONE, affordances: [{ kind: 'choose' as const, label: 'done' }], child: { kind: 'text' as const, text: 'done' } }] : [],
-        { kind: 'offer', id: TYPING, affordances: [{ kind: 'answer', label: 'type an answer' }], child: { kind: 'text', text: 'type an answer' } },
+        ...(multi
+          ? [
+              {
+                kind: 'offer' as const,
+                id: DONE,
+                affordances: [{ kind: 'choose' as const, label: 'done' }],
+                child: { kind: 'text' as const, text: 'done' },
+              },
+            ]
+          : []),
+        {
+          kind: 'offer',
+          id: TYPING,
+          affordances: [{ kind: 'answer', label: 'type an answer' }],
+          child: { kind: 'text', text: 'type an answer' },
+        },
         { kind: 'offer', id: SKIP, affordances: [{ kind: 'choose', label: 'skip' }], child: { kind: 'text', text: 'skip' } },
         { kind: 'offer', id: CANCEL, affordances: [{ kind: 'dismiss', label: 'cancel' }], child: { kind: 'text', text: 'cancel' } },
       ],
@@ -83,7 +102,14 @@ class Ask {
   private unsit: (() => void) | undefined
   private unshow: (() => void) | undefined
 
-  constructor(ctx: Context, req: Asked, next: AnswerNext, settle: (answer: AskUserQuestionAnswer) => void, refuse: (reason: unknown) => void, leave: () => boolean) {
+  constructor(
+    ctx: Context,
+    req: Asked,
+    next: AnswerNext,
+    settle: (answer: AskUserQuestionAnswer) => void,
+    refuse: (reason: unknown) => void,
+    leave: () => boolean,
+  ) {
     this.ctx = ctx
     this.req = req
     this.next = next
@@ -94,11 +120,15 @@ class Ask {
   }
 
   private readonly withdrawn = (): void => {
-    this.finish(() => { this.refuse(refused('ASK_ABORTED', 'ask_user_question was aborted before the user answered')) })
+    this.finish(() => {
+      this.refuse(refused('ASK_ABORTED', 'ask_user_question was aborted before the user answered'))
+    })
   }
 
   handOver(): void {
-    this.finish(() => { this.next().then(this.settle, this.refuse) })
+    this.finish(() => {
+      this.next().then(this.settle, this.refuse)
+    })
   }
 
   private get question(): AskUserQuestionItem {
@@ -117,23 +147,26 @@ class Ask {
     const question = this.question
     this.marks.length = 0
     this.acts.clear()
-    ;offered(question).forEach((option, index) => this.acts.set(`option ${index + 1}`, () => this.choose(index)))
+    offered(question).forEach((option, index) => this.acts.set(`option ${index + 1}`, () => this.choose(index)))
     if (question.multiSelect === true) this.acts.set(DONE, () => this.answerWith({ id: question.id, selected: [...this.marks] }))
     this.acts.set(TYPING, () => this.typeAnswer())
     this.acts.set(SKIP, () => this.answerWith({ id: question.id, selected: [] }))
     this.acts.set(CANCEL, () => {
-      this.finish(() => { this.refuse(refused('ASK_CANCELLED', 'the user cancelled ask_user_question')) })
+      this.finish(() => {
+        this.refuse(refused('ASK_CANCELLED', 'the user cancelled ask_user_question'))
+      })
     })
     this.unseat?.()
     const seated: Placement = {
       kind: 'lines',
       draw: () => card(question, this.marks),
-      invoke: (region, _affordance) => { this.acts.get(region)?.() },
+      invoke: (region, _affordance) => {
+        this.acts.get(region)?.()
+      },
     }
     this.seated = seated
     this.unseat = this.ctx.binnacle.place('composer', seated)
   }
-
 
   private redraw(): void {
     const seated = this.seated
@@ -142,7 +175,6 @@ class Ask {
     this.unseat?.()
     this.unseat = unseat
   }
-
 
   private typeAnswer(): void {
     this.unsit?.()
@@ -168,13 +200,12 @@ class Ask {
       kind: 'lines',
       draw: () => ({
         kind: 'ask',
-        ...question.header === undefined ? {} : { title: question.header },
+        ...(question.header === undefined ? {} : { title: question.header }),
         edge: 'accent',
         child: { kind: 'stack', children: asked(question) },
       }),
     })
   }
-
 
   private choose(index: number): void {
     const option = offered(this.question)[index]
@@ -192,7 +223,9 @@ class Ask {
     this.answers.push(item)
     this.index += 1
     if (this.index >= this.req.questions.length) {
-      this.finish(() => { this.settle({ answers: this.answers }) })
+      this.finish(() => {
+        this.settle({ answers: this.answers })
+      })
       return
     }
     this.seat()
@@ -222,14 +255,21 @@ export const questions = {
   inject: ['binnacle'] satisfies (keyof Context)[],
   apply(ctx: Context): void {
     const standing = new Set<Ask>()
-    ctx.effect(() => () => {
-      // Set iteration proceeds past deletions.
-      for (const ask of standing) ask.handOver()
-    }, 'questions: what still stands, handed to the next answerer')
-    ctx.on('user-questions/request', (req, next) => new Promise<AskUserQuestionAnswer>((resolve, reject) => {
-      const ask = new Ask(ctx, req, next, resolve, reject, () => standing.delete(ask))
-      standing.add(ask)
-      ask.seat()
-    }))
+    ctx.effect(
+      () => () => {
+        // Set iteration proceeds past deletions.
+        for (const ask of standing) ask.handOver()
+      },
+      'questions: what still stands, handed to the next answerer',
+    )
+    ctx.on(
+      'user-questions/request',
+      (req, next) =>
+        new Promise<AskUserQuestionAnswer>((resolve, reject) => {
+          const ask = new Ask(ctx, req, next, resolve, reject, () => standing.delete(ask))
+          standing.add(ask)
+          ask.seat()
+        }),
+    )
   },
 }

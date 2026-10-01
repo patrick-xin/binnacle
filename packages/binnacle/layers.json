@@ -1,156 +1,49 @@
 {
   "root": "src",
-  "entry": [
-    "host",
-    "api.ts"
-  ],
+  "entry": ["host", "api.ts"],
   "layers": {
     "contract": [],
-    "facts": [
-      "contract"
-    ],
-    "models": [
-      "contract",
-      "facts"
-    ],
-    "ui": [
-      "contract"
-    ],
-    "views": [
-      "contract",
-      "facts",
-      "models",
-      "ui"
-    ],
-    "panes": [
-      "contract",
-      "facts",
-      "models",
-      "ui",
-      "views"
-    ],
-    "api.ts": [
-      "contract",
-      "facts",
-      "models",
-      "ui",
-      "views"
-    ],
-    "plugins": [
-      "api.ts"
-    ],
-    "host": [
-      "contract",
-      "facts",
-      "models",
-      "ui",
-      "views",
-      "panes",
-      "api.ts",
-      "plugins"
-    ]
+    "facts": ["contract"],
+    "models": ["contract", "facts"],
+    "ui": ["contract"],
+    "views": ["contract", "facts", "models", "ui"],
+    "panes": ["contract", "facts", "models", "ui", "views"],
+    "api.ts": ["contract", "facts", "models", "ui", "views"],
+    "plugins": ["api.ts"],
+    "host": ["contract", "facts", "models", "ui", "views", "panes", "api.ts", "plugins"]
   },
-  "isolated": [
-    "plugins"
-  ],
-  "typeOnly": [
-    "plugins"
-  ],
+  "isolated": ["plugins"],
+  "typeOnly": ["plugins"],
   "external": {
-    "@deepseek-ai/cordis": [
-      "host",
-      "plugins"
-    ],
-    "@deepseek-ai/dsh-agent": [
-      "facts",
-      "api.ts",
-      "host"
-    ],
-    "@deepseek-ai/dsh-agent-default-model": [
-      "host"
-    ],
-    "@deepseek-ai/dsh-cmdline": [
-      "host"
-    ],
-    "@deepseek-ai/dsh-llm": [
-      "facts",
-      "host"
-    ],
-    "@deepseek-ai/dsh-session": [
-      "facts",
-      "host"
-    ],
-    "@deepseek-ai/dsh-session-projection": [
-      "plugins"
-    ],
-    "@deepseek-ai/dsh-token-meter": [
-      "plugins"
-    ],
-    "@deepseek-ai/dsh-scope": [
-      "host"
-    ],
-    "@deepseek-ai/dsh-tools": [
-      "facts",
-      "plugins"
-    ],
-    "@earendil-works/pi-tui": [
-      "ui",
-      "panes",
-      "host"
-    ],
-    "commander": [
-      "host"
-    ],
-    "node:": [
-      "host"
-    ],
-    "@deepseek-ai/dsh-commands": [
-      "host",
-      "facts"
-    ],
-    "@deepseek-ai/dsh-compaction": [
-      "facts"
-    ],
-    "@deepseek-ai/dsh-llm-retry": [
-      "facts"
-    ],
-    "@deepseek-ai/dsh-tool-present": [
-      "facts"
-    ],
-    "@deepseek-ai/dsh-tool-workflow": [
-      "facts"
-    ],
-    "@deepseek-ai/dsh-workflow": [
-      "facts"
-    ],
-    "@deepseek-ai/dsh-skill": [
-      "host"
-    ],
-    "@deepseek-ai/dsh-user-approval": [
-      "facts",
-      "plugins"
-    ],
-    "@deepseek-ai/dsh-user-questions": [
-      "plugins"
-    ]
+    "@deepseek-ai/cordis": ["host", "plugins"],
+    "@deepseek-ai/dsh-agent": ["facts", "api.ts", "host"],
+    "@deepseek-ai/dsh-agent-default-model": ["host"],
+    "@deepseek-ai/dsh-cmdline": ["host"],
+    "@deepseek-ai/dsh-llm": ["facts", "host"],
+    "@deepseek-ai/dsh-session": ["facts", "host"],
+    "@deepseek-ai/dsh-session-projection": ["plugins"],
+    "@deepseek-ai/dsh-token-meter": ["plugins"],
+    "@deepseek-ai/dsh-scope": ["host"],
+    "@deepseek-ai/dsh-tools": ["facts", "plugins"],
+    "@earendil-works/pi-tui": ["ui", "panes", "host"],
+    "commander": ["host"],
+    "node:": ["host"],
+    "@deepseek-ai/dsh-commands": ["host", "facts"],
+    "@deepseek-ai/dsh-compaction": ["facts"],
+    "@deepseek-ai/dsh-llm-retry": ["facts"],
+    "@deepseek-ai/dsh-tool-present": ["facts"],
+    "@deepseek-ai/dsh-tool-workflow": ["facts"],
+    "@deepseek-ai/dsh-workflow": ["facts"],
+    "@deepseek-ai/dsh-skill": ["host"],
+    "@deepseek-ai/dsh-user-approval": ["facts", "plugins"],
+    "@deepseek-ai/dsh-user-questions": ["plugins"]
   },
   "owners": {
     "@earendil-works/pi-tui": {
-      "TuiMouseEvent": [
-        "ui/pointer.ts",
-        "panes/transcript.ts",
-        "panes/screen.ts"
-      ],
-      "stripTerminalSequences": [
-        "ui/readable.ts"
-      ],
-      "KeybindingsManager": [
-        "ui/keys.ts"
-      ],
-      "setKeybindings": [
-        "ui/keys.ts",
-        "host/index.ts"
-      ]
+      "TuiMouseEvent": ["ui/pointer.ts", "panes/transcript.ts", "panes/screen.ts"],
+      "stripTerminalSequences": ["ui/readable.ts"],
+      "KeybindingsManager": ["ui/keys.ts"],
+      "setKeybindings": ["ui/keys.ts", "host/index.ts"]
     }
   },
   "services": {

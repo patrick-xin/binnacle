@@ -51,9 +51,22 @@ function literals(node, found = [], bindings = new Set()) {
   }
   if (node === null || typeof node !== 'object') return found
   // A screen's key is the binding its plugin offers the key table (`binnacle:packages/binnacle/src/api.ts#PlacedScreen`), which a person rebinds there: a key id, not a word. It is one only in the object a `.screen(name, {...})` call places; a `key` anywhere else says what its value says.
-  if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.name === 'screen' && node.arguments[1]?.type === 'ObjectExpression') {
+  if (
+    node.type === 'CallExpression' &&
+    node.callee.type === 'MemberExpression' &&
+    !node.callee.computed &&
+    node.callee.property.name === 'screen' &&
+    node.arguments[1]?.type === 'ObjectExpression'
+  ) {
     for (const property of node.arguments[1].properties) {
-      if (property.type === 'Property' && !property.computed && property.key.type === 'Identifier' && property.key.name === 'key' && property.value.type === 'Literal') bindings.add(property)
+      if (
+        property.type === 'Property' &&
+        !property.computed &&
+        property.key.type === 'Identifier' &&
+        property.key.name === 'key' &&
+        property.value.type === 'Literal'
+      )
+        bindings.add(property)
     }
   }
   if (bindings.has(node)) return found
@@ -66,7 +79,8 @@ function literals(node, found = [], bindings = new Set()) {
   // A property's name is the code's; its value is what may be said.
   if (node.type === 'Property' && !node.computed) return literals(node.value, found, bindings)
   if (node.type === 'Literal' && typeof node.value === 'string') found.push({ start: node.start, end: node.end, says: [node.value] })
-  if (node.type === 'TemplateLiteral') found.push({ start: node.start, end: node.end, says: node.quasis.map(quasi => quasi.value.cooked ?? quasi.value.raw) })
+  if (node.type === 'TemplateLiteral')
+    found.push({ start: node.start, end: node.end, says: node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw) })
   for (const value of Object.values(node)) literals(value, found, bindings)
   return found
 }
@@ -79,17 +93,21 @@ function literals(node, found = [], bindings = new Set()) {
  */
 export function spelledKeys(path, text) {
   const { program } = parseSync(path, text)
-  const lineOf = offset => text.slice(0, offset).split('\n').length
-  return literals(program).flatMap(literal => {
-    const key = literal.says.map(says => KEY.exec(says)?.[0]).find(found => found !== undefined)
-    return key === undefined ? [] : [`${path}:${lineOf(literal.start)}: ${text.slice(literal.start, literal.end)} names the key ${key}; a plugin spells no key — which keys answer something is the key table's, and an ask names them on its edge — so say what it does, and leave the key to the table`]
+  const lineOf = (offset) => text.slice(0, offset).split('\n').length
+  return literals(program).flatMap((literal) => {
+    const key = literal.says.map((says) => KEY.exec(says)?.[0]).find((found) => found !== undefined)
+    return key === undefined
+      ? []
+      : [
+          `${path}:${lineOf(literal.start)}: ${text.slice(literal.start, literal.end)} names the key ${key}; a plugin spells no key — which keys answer something is the key table's, and an ask names them on its edge — so say what it does, and leave the key to the table`,
+        ]
   })
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const files = repositoryFiles(root).filter(file => /^packages\/binnacle\/src\/plugins\/.*\.ts$/.test(file.path))
-  const problems = files.flatMap(file => spelledKeys(file.path, file.text))
+  const files = repositoryFiles(root).filter((file) => /^packages\/binnacle\/src\/plugins\/.*\.ts$/.test(file.path))
+  const problems = files.flatMap((file) => spelledKeys(file.path, file.text))
   for (const problem of problems) console.error(problem)
   console.log(problems.length === 0 ? `check-words: ok (${files.length} modules)` : `check-words: ${problems.length} keys spelled`)
   process.exitCode = problems.length === 0 ? 0 : 1

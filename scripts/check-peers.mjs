@@ -37,40 +37,56 @@ export function checkPeers({ manifest, files, patch, services = {}, provided = (
   for (const [service, provider] of Object.entries(services)) {
     const declared = provided(provider)
     if (declared === undefined) {
-      problems.push(`${provider} is named in the services table of layers.json as the provider of ${service}, but it is not installed to read — add it to devDependencies`)
+      problems.push(
+        `${provider} is named in the services table of layers.json as the provider of ${service}, but it is not installed to read — add it to devDependencies`,
+      )
     } else if (!declared.has(service)) {
-      problems.push(`${provider} is named in the services table of layers.json as the provider of ${service}, but its types do not declare ${service} on Context — name the package that does`)
+      problems.push(
+        `${provider} is named in the services table of layers.json as the provider of ${service}, but its types do not declare ${service} on Context — name the package that does`,
+      )
     }
   }
   for (const [service, path] of injectsOf(files)) {
     const provider = services[service]
     if (provider === undefined) {
-      problems.push(`${service} is named by ${path}'s inject, but the services table in layers.json has no row for it — name the package that provides it there`)
+      problems.push(
+        `${service} is named by ${path}'s inject, but the services table in layers.json has no row for it — name the package that provides it there`,
+      )
       continue
     }
     providers.add(provider)
     if (!manifest.peerDependencies?.[provider]) {
-      problems.push(`${provider} provides ${service}, which ${path}'s inject names, but is not a peerDependency — add it to peerDependencies, for the dsh install must provide it`)
+      problems.push(
+        `${provider} provides ${service}, which ${path}'s inject names, but is not a peerDependency — add it to peerDependencies, for the dsh install must provide it`,
+      )
     }
   }
   for (const name of rows) {
     if (!manifest.peerDependencies?.[name]) {
-      problems.push(`${name} is a row binnacle's patch inserts, but is not a peerDependency — add it to peerDependencies, for the dsh install must provide it`)
+      problems.push(
+        `${name} is a row binnacle's patch inserts, but is not a peerDependency — add it to peerDependencies, for the dsh install must provide it`,
+      )
     }
   }
   for (const name of Object.keys(manifest.peerDependencies ?? {})) {
     if (!runs.has(name) && !rows.has(name) && !providers.has(name)) {
-      problems.push(`${name} is a peerDependency, but binnacle runs none of its code and its patch inserts no row of it — move it to devDependencies, where a package whose types alone are read belongs`)
+      problems.push(
+        `${name} is a peerDependency, but binnacle runs none of its code and its patch inserts no row of it — move it to devDependencies, where a package whose types alone are read belongs`,
+      )
     }
   }
   for (const [name, path] of runs) {
     if (!manifest.dependencies?.[name] && !manifest.peerDependencies?.[name]) {
-      problems.push(`${name} is imported by ${path} and its code runs, but it is in neither dependencies nor peerDependencies — move it to peerDependencies if the dsh install provides it, or to dependencies to bundle it`)
+      problems.push(
+        `${name} is imported by ${path} and its code runs, but it is in neither dependencies nor peerDependencies — move it to peerDependencies if the dsh install provides it, or to dependencies to bundle it`,
+      )
     }
   }
   for (const [name, path] of types) {
     if (!runs.has(name) && !manifest.devDependencies?.[name] && !manifest.dependencies?.[name] && !manifest.peerDependencies?.[name]) {
-      problems.push(`${name} is imported by ${path} for its types only, but is in none of devDependencies, dependencies and peerDependencies — add it to devDependencies`)
+      problems.push(
+        `${name} is imported by ${path} for its types only, but is in none of devDependencies, dependencies and peerDependencies — add it to devDependencies`,
+      )
     }
   }
   return problems.toSorted()
@@ -87,13 +103,16 @@ export function servicesProvidedBy(dir) {
   const provided = new Set()
   if (typeof entry !== 'string') return provided
   const seen = new Set()
-  const read = path => {
+  const read = (path) => {
     if (seen.has(path)) return
     seen.add(path)
-    const file = [path, path.replace(/\.ts$/, '.d.ts'), `${path}.d.ts`].find(candidate => existsSync(candidate) && statSync(candidate).isFile())
+    const file = [path, path.replace(/\.ts$/, '.d.ts'), `${path}.d.ts`].find(
+      (candidate) => existsSync(candidate) && statSync(candidate).isFile(),
+    )
     if (file === undefined) return
     for (const node of parseSync(file, readFileSync(file, 'utf8')).program.body) {
-      if (node.source && typeof node.source.value === 'string' && node.source.value.startsWith('.')) read(join(dirname(file), node.source.value))
+      if (node.source && typeof node.source.value === 'string' && node.source.value.startsWith('.'))
+        read(join(dirname(file), node.source.value))
       if (node.type !== 'TSModuleDeclaration' || node.id?.value !== '@deepseek-ai/cordis') continue
       for (const member of node.body?.body ?? []) {
         if (member.type !== 'TSInterfaceDeclaration' || member.id.name !== 'Context') continue
@@ -113,17 +132,26 @@ export function servicesProvidedBy(dir) {
 function injectsOf(files) {
   const services = new Map()
   for (const { path, text } of files) {
-    const walk = node => {
+    const walk = (node) => {
       if (Array.isArray(node)) return node.forEach(walk)
       if (typeof node !== 'object' || node === null) return
-      const bound = node.type === 'VariableDeclarator' && node.id?.name === 'inject' ? node.init
-        : node.type === 'Property' && node.key?.name === 'inject' ? node.value
-          : undefined
+      const bound =
+        node.type === 'VariableDeclarator' && node.id?.name === 'inject'
+          ? node.init
+          : node.type === 'Property' && node.key?.name === 'inject'
+            ? node.value
+            : undefined
       let array = bound
       while (array?.type === 'TSSatisfiesExpression' || array?.type === 'TSAsExpression') array = array.expression
       if (array?.type === 'ArrayExpression') {
         for (const element of array.elements) {
-          if (element?.type === 'Literal' && typeof element.value === 'string' && element.value !== 'binnacle' && !services.has(element.value)) services.set(element.value, path)
+          if (
+            element?.type === 'Literal' &&
+            typeof element.value === 'string' &&
+            element.value !== 'binnacle' &&
+            !services.has(element.value)
+          )
+            services.set(element.value, path)
         }
       }
       for (const value of Object.values(node)) walk(value)
@@ -142,7 +170,7 @@ function injectsOf(files) {
 function rowsOf(patch, own) {
   const names = new Set()
   const walk = (node, inserted) => {
-    if (Array.isArray(node)) return node.forEach(item => walk(item, inserted))
+    if (Array.isArray(node)) return node.forEach((item) => walk(item, inserted))
     if (typeof node !== 'object' || node === null) return
     const name = inserted && typeof node.name === 'string' ? packageOf(node.name) : undefined
     if (name !== undefined && name !== own) names.add(name)
@@ -178,8 +206,11 @@ function importsOf(files, own) {
       if (!node.source) continue
       const name = packageOf(node.source.value)
       if (name === undefined || name === own) continue
-      const typeOnly = node.importKind === 'type' || node.exportKind === 'type'
-        || (node.specifiers?.length > 0 && node.specifiers.every(specifier => specifier.importKind === 'type' || specifier.exportKind === 'type'))
+      const typeOnly =
+        node.importKind === 'type' ||
+        node.exportKind === 'type' ||
+        (node.specifiers?.length > 0 &&
+          node.specifiers.every((specifier) => specifier.importKind === 'type' || specifier.exportKind === 'type'))
       const seen = typeOnly ? types : runs
       if (!seen.has(name)) seen.set(name, path)
     }
@@ -190,10 +221,11 @@ function importsOf(files, own) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
   const bundle = join(root, 'packages', 'binnacle')
-  const files = repositoryFiles(root).filter(file => /^packages\/binnacle\/src\/.*\.ts$/.test(file.path))
+  const files = repositoryFiles(root).filter((file) => /^packages\/binnacle\/src\/.*\.ts$/.test(file.path))
   const manifest = JSON.parse(readFileSync(join(bundle, 'package.json'), 'utf8'))
   const { services } = JSON.parse(readFileSync(join(bundle, 'layers.json'), 'utf8'))
-  const provided = name => existsSync(join(bundle, 'node_modules', name, 'package.json')) ? servicesProvidedBy(join(bundle, 'node_modules', name)) : undefined
+  const provided = (name) =>
+    existsSync(join(bundle, 'node_modules', name, 'package.json')) ? servicesProvidedBy(join(bundle, 'node_modules', name)) : undefined
   const problems = checkPeers({ manifest, files, patch: readFileSync(join(bundle, 'cordis.patch.yml'), 'utf8'), services, provided })
   for (const problem of problems) console.error(problem)
   console.log(problems.length === 0 ? `check-peers: ok (${files.length} modules)` : `check-peers: ${problems.length} problems`)

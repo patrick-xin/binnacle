@@ -26,7 +26,7 @@ test('dropping focus keeps what was opened, and leaves a screen with nothing foc
   assert.equal(act(initial, { kind: 'unfocus' }, BOUNDS), initial)
 })
 
-test('selecting, scrolling, and an affordance that is not the screen\'s own, leave the screen as it was', () => {
+test("selecting, scrolling, and an affordance that is not the screen's own, leave the screen as it was", () => {
   assert.equal(act(initial, { kind: 'select' }, BOUNDS), initial)
   assert.equal(act(initial, { kind: 'scroll', region: 'transcript', delta: -3 }, BOUNDS), initial)
   assert.equal(act(initial, { kind: 'invoke', region: 'answer:8', affordance: 'copy' }, BOUNDS), initial)
