@@ -39,6 +39,16 @@ test('an empty stage formats nothing and skips nothing', () => {
   assert.deepEqual(select({ staged: [], unstaged: [], exists: () => true }), { format: [], skipped: [] })
 })
 
+test("a commit through git's temporary index — `git commit -- <paths>` — formats nothing: a format staged into it is reverted by the next commit", () => {
+  const chosen = select({
+    staged: [{ status: 'M', path: 'packages/binnacle/src/ui/node.ts' }],
+    unstaged: [],
+    exists: () => true,
+    index: 'temporary',
+  })
+  assert.deepEqual(chosen, { format: [], skipped: [] })
+})
+
 test("a staged rename's -z record carries the old path as a bare second record, which is not parsed", () => {
   const parsed = parseStatus('R  packages/binnacle/src/ui/node.ts\0packages/binnacle/src/ui/old.ts\0')
   assert.deepEqual(parsed, {

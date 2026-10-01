@@ -7,15 +7,18 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Which staged files to format, and which to leave alone because they carry unstaged edits.
- * @param {{ staged: readonly { status: string, path: string }[], unstaged: readonly string[], exists: (path: string) => boolean }} change - the staged entries git reports, the paths with unstaged edits, and what is on disk.
+ * Which staged files to format, and which to leave alone because they carry unstaged edits. A commit
+ * through git's temporary index — `git commit -- <paths>` — formats nothing: a format staged into that
+ * index is gone with it, and the next commit reverts it.
+ * @param {{ staged: readonly { status: string, path: string }[], unstaged: readonly string[], exists: (path: string) => boolean, index: 'real' | 'temporary' }} change - the staged entries git reports, the paths with unstaged edits, what is on disk, and which index git commits through.
  * @returns {{ format: string[], skipped: string[] }} the paths to format, and the partially-staged ones left alone.
  */
-export function select({ staged, unstaged, exists }) {
+export function select({ staged, unstaged, exists, index = 'real' }) {
+  if (index === 'temporary') return { format: [], skipped: [] }
   const carried = new Set(unstaged)
   const format = []
   const skipped = []
@@ -54,7 +57,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.env.GITHUB_ACTIONS) process.exit(0)
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
   const { staged, unstaged } = parseStatus(execFileSync('git', ['-C', root, 'status', '--porcelain=v1', '-z'], { encoding: 'utf8' }))
-  const { format, skipped } = select({ staged, unstaged, exists: (path) => existsSync(join(root, path)) })
+  // `git commit -- <paths>` commits through `next-index-<pid>.lock`, and a format staged into it is reverted by the next commit.
+  const named = basename(process.env.GIT_INDEX_FILE ?? '')
+  const index = /^next-index-\d+\.lock$/.test(named) ? 'temporary' : 'real'
+  if (index === 'temporary')
+    console.warn(
+      'format-staged: git commit with paths commits through a temporary index, so nothing is formatted; run pnpm fmt and stage it yourself',
+    )
+  const { format, skipped } = select({ staged, unstaged, exists: (path) => existsSync(join(root, path)), index })
   for (const path of skipped) console.warn(`format-staged: ${path} is staged in part; stage it whole to format it`)
   if (format.length === 0) process.exit(0)
   const run = spawnSync('pnpm', ['exec', 'oxfmt', ...format], { stdio: 'inherit' })
