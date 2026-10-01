@@ -60,7 +60,7 @@ export function materialized(lock) {
   const section = lock.split(/^packages:$/m)[1]?.split(/^snapshots:$/m)[0] ?? ''
   const tree = {}
   for (const [, name, version] of section.matchAll(/^ {2}'(@deepseek-ai\/[^@']+)@([^'(]+)':$/gm)) {
-    tree[name] = [...new Set([...tree[name] ?? [], version])].toSorted()
+    tree[name] = [...new Set([...(tree[name] ?? []), version])].toSorted()
   }
   return tree
 }
@@ -76,7 +76,9 @@ export function checkTree(tree, deps) {
   for (const [name, versions] of Object.entries(tree)) {
     const declared = deps[name]
     if (declared === undefined) {
-      problems.push(`${name}@${versions.join(', ')} is in the tree but not declared; declare it in devDependencies at ${versions.join(', ')}`)
+      problems.push(
+        `${name}@${versions.join(', ')} is in the tree but not declared; declare it in devDependencies at ${versions.join(', ')}`,
+      )
     } else if (versions.length !== 1 || versions[0] !== declared) {
       problems.push(`${name} is declared ${declared}, but the tree resolves ${versions.join(', ')}`)
     }
@@ -109,7 +111,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for (const manifest of [read(), read('packages', 'binnacle')]) {
     Object.assign(deps, manifest.dependencies, manifest.peerDependencies, manifest.devDependencies)
   }
-  const refs = Object.fromEntries(references(root).map(ref => [ref.name, ref]))
+  const refs = Object.fromEntries(references(root).map((ref) => [ref.name, ref]))
   const problems = [
     ...checkPins(deps, refs, vendoredBy(join(root, '.refs', 'dsh'))),
     ...checkTree(materialized(readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')), deps),

@@ -383,7 +383,7 @@ export interface Style {
     readonly underline?: boolean;
 }
 // ui/theme.d.ts
-export type Colour = typeof colours[number];
+export type Colour = (typeof colours)[number];
 // ui/theme.d.ts
 export declare const colours: readonly ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'];
 // ui/theme.d.ts

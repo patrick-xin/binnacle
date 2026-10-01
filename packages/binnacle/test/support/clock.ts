@@ -7,12 +7,16 @@
 /** A clock that moves only when a test advances it. */
 export class FakeClock {
   #now = 0
-  readonly #waiting = new Set<{ readonly at: number, readonly call: () => void }>()
-  now(): number { return this.#now }
+  readonly #waiting = new Set<{ readonly at: number; readonly call: () => void }>()
+  now(): number {
+    return this.#now
+  }
   after(ms: number, then: () => void): () => void {
     const timer = { at: this.#now + ms, call: then }
     this.#waiting.add(timer)
-    return () => { this.#waiting.delete(timer) }
+    return () => {
+      this.#waiting.delete(timer)
+    }
   }
   /**
    * Move time on, calling back each timer it passes, in the order they fall due.

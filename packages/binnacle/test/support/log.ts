@@ -22,7 +22,11 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
  */
 export function logged(): SessionEvent[] {
   const text = readFileSync(new URL('../fixtures/session.v4.jsonl', import.meta.url), 'utf8')
-  return text.split('\n').filter(Boolean).slice(1).map(line => eventOf(JSON.parse(line)))
+  return text
+    .split('\n')
+    .filter(Boolean)
+    .slice(1)
+    .map((line) => eventOf(JSON.parse(line)))
 }
 
 /**

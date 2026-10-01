@@ -33,8 +33,10 @@ export function profileFiles(bundleDir) {
   }
   return {
     'package.json': `${JSON.stringify(manifest, null, 2)}\n`,
-    'cordis.yml': '# The profile root: an empty entry list. The tree is the bundles in\n# package.json, then cordis.patch.yml. Edit cordis.patch.yml, not this file.\n[]\n',
-    'cordis.patch.yml': '# Your layer over binnacle: model, provider, anything you override.\n# A YAML list of patch entries, applied after every bundle.\n[]\n',
+    'cordis.yml':
+      '# The profile root: an empty entry list. The tree is the bundles in\n# package.json, then cordis.patch.yml. Edit cordis.patch.yml, not this file.\n[]\n',
+    'cordis.patch.yml':
+      '# Your layer over binnacle: model, provider, anything you override.\n# A YAML list of patch entries, applied after every bundle.\n[]\n',
   }
 }
 
@@ -54,7 +56,10 @@ function mainCheckout(root) {
     // Git that cannot speak for the directory — no repository, or no git — cannot know it as a linked worktree; it stands as the main checkout.
     return null
   }
-  const main = listed.split('\n').find(line => line.startsWith('worktree '))?.slice('worktree '.length)
+  const main = listed
+    .split('\n')
+    .find((line) => line.startsWith('worktree '))
+    ?.slice('worktree '.length)
   if (main === undefined || realpathSync(root) === realpathSync(main)) return null
   return realpathSync(main)
 }
@@ -69,7 +74,9 @@ function mainCheckout(root) {
 export function writeProfile(root, profile) {
   const main = mainCheckout(root)
   if (main !== null) {
-    throw new Error(`this checkout is a linked worktree; a profile made here breaks when the worktree goes — run \`pnpm dsh:profile\` from the main checkout, ${main}`)
+    throw new Error(
+      `this checkout is a linked worktree; a profile made here breaks when the worktree goes — run \`pnpm dsh:profile\` from the main checkout, ${main}`,
+    )
   }
   mkdirSync(profile, { recursive: true })
   for (const [file, text] of Object.entries(profileFiles(join(root, 'packages', 'binnacle')))) {

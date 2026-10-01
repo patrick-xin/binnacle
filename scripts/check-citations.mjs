@@ -34,7 +34,7 @@ import { fetchedAt, references } from './refs.mjs'
 /** The name this repository is cited by. */
 export const SELF = 'binnacle'
 
-const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const CODE = /\.[cm]?[jt]sx?$/
 
@@ -48,7 +48,13 @@ export function findCitations(text, names) {
   if (names.length === 0) return []
   const pattern = new RegExp('`(' + names.map(escape).join('|') + '):([^`\\s#]+)(?:#([^`\\s]*))?`', 'g')
   return text.split('\n').flatMap((line, index) =>
-    [...line.matchAll(pattern)].map(match => ({ name: match[1], path: match[2], ...match[3] ? { symbol: match[3] } : {}, line: index + 1 })))
+    [...line.matchAll(pattern)].map((match) => ({
+      name: match[1],
+      path: match[2],
+      ...(match[3] ? { symbol: match[3] } : {}),
+      line: index + 1,
+    })),
+  )
 }
 
 /**
@@ -61,7 +67,7 @@ export function findCitations(text, names) {
  */
 function exportsOf(path, text, read, seen = new Set([path])) {
   const names = new Set()
-  for (const entry of parseSync(path, text).module.staticExports.flatMap(item => item.entries)) {
+  for (const entry of parseSync(path, text).module.staticExports.flatMap((item) => item.entries)) {
     if (entry.exportName.kind === 'Name') names.add(entry.exportName.name)
     else if (entry.exportName.kind === 'Default') names.add('default')
     else if (entry.moduleRequest?.value.startsWith('.')) {
@@ -90,7 +96,9 @@ export function checkCitations(files, manifest, read) {
       const where = `${file.path}:${citation.line}`
       const cited = `${citation.name}:${citation.path}`
       if (file.path.startsWith(RECORDS)) {
-        problems.push(`${where}: ${cited} is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words`)
+        problems.push(
+          `${where}: ${cited} is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words`,
+        )
         continue
       }
       const text = read(citation.name, citation.path)
@@ -103,7 +111,7 @@ export function checkCitations(files, manifest, read) {
         const exported = ref.self === true && CODE.test(citation.path)
         const pin = ref.self ? '' : ` at ${ref.commit.slice(0, 10)}`
         const held = exported
-          ? exportsOf(citation.path, text, path => read(citation.name, path) ?? null).has(citation.symbol)
+          ? exportsOf(citation.path, text, (path) => read(citation.name, path) ?? null).has(citation.symbol)
           : new RegExp(`(?<![\\w$])${escape(citation.symbol)}(?![\\w$])`).test(text)
         if (!held) problems.push(`${where}: ${cited} ${exported ? 'does not export' : 'has no'} ${citation.symbol}${pin}`)
       }
@@ -116,16 +124,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
   const refs = references(root)
   const files = repositoryFiles(root)
-  const manifest = { ...Object.fromEntries(refs.map(ref => [ref.name, ref])), [SELF]: { self: true } }
-  const clash = refs.some(ref => ref.name === SELF) ? [`references.json names ${SELF}, the name this repository is cited by; rename the reference`] : []
-  const stale = refs.flatMap(ref => {
+  const manifest = { ...Object.fromEntries(refs.map((ref) => [ref.name, ref])), [SELF]: { self: true } }
+  const clash = refs.some((ref) => ref.name === SELF)
+    ? [`references.json names ${SELF}, the name this repository is cited by; rename the reference`]
+    : []
+  const stale = refs.flatMap((ref) => {
     const at = fetchedAt(join(root, '.refs', ref.name))
-    return at === undefined || at.startsWith(ref.commit) ? [] : [`${ref.name} is fetched at ${at.slice(0, 10)}, pinned ${ref.commit.slice(0, 10)}; run \`pnpm refs\``]
+    return at === undefined || at.startsWith(ref.commit)
+      ? []
+      : [`${ref.name} is fetched at ${at.slice(0, 10)}, pinned ${ref.commit.slice(0, 10)}; run \`pnpm refs\``]
   })
-  const own = new Map(files.map(file => [file.path, file.text]))
+  const own = new Map(files.map((file) => [file.path, file.text]))
   const read = (name, path) => {
     const bare = path.replace(/\/$/, '')
-    if (name === SELF) return own.get(bare) ?? (files.some(file => file.path.startsWith(`${bare}/`)) ? '' : null)
+    if (name === SELF) return own.get(bare) ?? (files.some((file) => file.path.startsWith(`${bare}/`)) ? '' : null)
     const dir = join(root, '.refs', name)
     if (fetchedAt(dir) === undefined) return undefined
     try {
@@ -138,6 +150,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { problems, skipped } = checkCitations(files, manifest, read)
   for (const problem of [...clash, ...stale, ...problems]) console.error(problem)
   const failed = clash.length + stale.length + problems.length
-  console.log(failed === 0 ? `check-citations: ok${skipped ? ` (${skipped} into unfetched local references skipped)` : ''}` : `check-citations: ${failed} problems`)
+  console.log(
+    failed === 0
+      ? `check-citations: ok${skipped ? ` (${skipped} into unfetched local references skipped)` : ''}`
+      : `check-citations: ${failed} problems`,
+  )
   process.exitCode = failed === 0 ? 0 : 1
 }

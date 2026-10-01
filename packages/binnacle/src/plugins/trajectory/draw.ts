@@ -14,11 +14,12 @@ function shown(value: unknown): string {
 }
 
 function recordOf(fact: Fact): Node {
-  const text = fact.kind === 'quiet'
-    ? shown(fact.record)
-    : fact.kind === 'unknown'
-      ? `${fact.problem === undefined ? '' : `${fact.problem}\n\n`}${shown(fact.record)}`
-      : shown(fact)
+  const text =
+    fact.kind === 'quiet'
+      ? shown(fact.record)
+      : fact.kind === 'unknown'
+        ? `${fact.problem === undefined ? '' : `${fact.problem}\n\n`}${shown(fact.record)}`
+        : shown(fact)
   return { kind: 'text', text }
 }
 
@@ -29,20 +30,42 @@ function lineOf(fact: Fact, words: readonly Span[], mark?: Mark): readonly Span[
 }
 
 function firstLine(blocks: Blocks): string {
-  return blocks.map(block => block.kind === 'unread' ? `[${block.type}]` : block.text).join('\n').split('\n')[0] ?? ''
+  return (
+    blocks
+      .map((block) => (block.kind === 'unread' ? `[${block.type}]` : block.text))
+      .join('\n')
+      .split('\n')[0] ?? ''
+  )
 }
 
 /** `tools` is each call's name by its id, so a result says what it answered. */
 function eventOf(fact: Fact, tools: ReadonlyMap<string, string>): Node {
   const said = wordsOf(fact, tools)
   const line = lineOf(fact, said.words, said.mark)
-  return { kind: 'fold', id: `${fact.seq}`, rows: 0, title: line, ...said.tone === undefined ? {} : { tone: said.tone }, child: recordOf(fact) }
+  return {
+    kind: 'fold',
+    id: `${fact.seq}`,
+    rows: 0,
+    title: line,
+    ...(said.tone === undefined ? {} : { tone: said.tone }),
+    child: recordOf(fact),
+  }
 }
 
-function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly words: readonly Span[], readonly mark?: Mark, readonly tone?: 'muted' | 'dim' } {
+function wordsOf(
+  fact: Fact,
+  tools: ReadonlyMap<string, string>,
+): { readonly words: readonly Span[]; readonly mark?: Mark; readonly tone?: 'muted' | 'dim' } {
   switch (fact.kind) {
     case 'turn':
-      return { words: [fact.phase === 'start' ? `turn ${fact.turn} begins` : `turn ${fact.turn} ended${fact.ending === undefined ? '' : ` · ${fact.ending}`}`], tone: 'muted' }
+      return {
+        words: [
+          fact.phase === 'start'
+            ? `turn ${fact.turn} begins`
+            : `turn ${fact.turn} ended${fact.ending === undefined ? '' : ` · ${fact.ending}`}`,
+        ],
+        tone: 'muted',
+      }
     case 'step':
       return { words: [`step ${fact.step} ${fact.phase === 'start' ? 'begins' : 'ends'}`], tone: 'dim' }
     case 'prompt':
@@ -100,7 +123,7 @@ function wordsOf(fact: Fact, tools: ReadonlyMap<string, string>): { readonly wor
 export function drawTrajectory(facts: readonly Fact[]): Node {
   const tools = new Map<string, string>()
   for (const fact of facts) if (fact.kind === 'call') tools.set(fact.callId, fact.name)
-  const groups: { readonly heading: Node, lines: Node[] }[] = []
+  const groups: { readonly heading: Node; lines: Node[] }[] = []
   for (const fact of facts) {
     if (fact.kind === 'turn' && fact.phase === 'start') {
       groups.push({ heading: { kind: 'text', text: `turn ${fact.turn}`, tone: 'accent' }, lines: [] })
@@ -111,10 +134,6 @@ export function drawTrajectory(facts: readonly Fact[]): Node {
   }
   return {
     kind: 'stack',
-    children: groups.flatMap((group, index) => [
-      ...(index === 0 ? [] : [{ kind: 'blank' } as const]),
-      group.heading,
-      ...group.lines,
-    ]),
+    children: groups.flatMap((group, index) => [...(index === 0 ? [] : [{ kind: 'blank' } as const]), group.heading, ...group.lines]),
   }
 }

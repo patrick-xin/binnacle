@@ -61,36 +61,36 @@ export type Slot = 'transcript' | 'above-composer' | 'composer' | 'below-compose
 export type Placement =
   | { readonly kind: 'transcript' }
   | {
-    readonly kind: 'composer'
-    /**
-     * What a line does once the person submits it: handed the line as
-     * pi-tui's Editor submits it, trimmed of the whitespace around it, a
-     * blank line included. binnacle's composer clears itself either way.
-     * The built-in Composer plugin sends a line that is not blank.
-     */
-    readonly submit: (text: string) => void
-  }
+      readonly kind: 'composer'
+      /**
+       * What a line does once the person submits it: handed the line as
+       * pi-tui's Editor submits it, trimmed of the whitespace around it, a
+       * blank line included. binnacle's composer clears itself either way.
+       * The built-in Composer plugin sends a line that is not blank.
+       */
+      readonly submit: (text: string) => void
+    }
   | {
-    readonly kind: 'lines'
-    /**
-     * How the lines draw, with nodes as a view draws, handed the session's
-     * facts and what binnacle says, both read-only. It is called again as the
-     * session logs anything, as its agent starts or ends a turn, as a notice
-     * comes or goes, and as the width, the theme or the registrations change —
-     * not at every frame — so it is a function of what it is handed, of what
-     * dsh holds for the agent on screen, and of what its plugin read at the
-     * last of those.
-     */
-    readonly draw: (facts: readonly Fact[], surface: Surface) => Node
-    /**
-     * What an offer the lines draw does once a person invokes it: handed the
-     * offer's id and the kind invoked. Any kind but `expand`, which opens a
-     * fold where the lines draw one, reaches it. Lines in the composer's slot
-     * that offer something take the keyboard while they stand; lines
-     * elsewhere take no focus, and answer only the pointer.
-     */
-    readonly invoke?: (region: string, affordance: AffordanceKind) => void
-  }
+      readonly kind: 'lines'
+      /**
+       * How the lines draw, with nodes as a view draws, handed the session's
+       * facts and what binnacle says, both read-only. It is called again as the
+       * session logs anything, as its agent starts or ends a turn, as a notice
+       * comes or goes, and as the width, the theme or the registrations change —
+       * not at every frame — so it is a function of what it is handed, of what
+       * dsh holds for the agent on screen, and of what its plugin read at the
+       * last of those.
+       */
+      readonly draw: (facts: readonly Fact[], surface: Surface) => Node
+      /**
+       * What an offer the lines draw does once a person invokes it: handed the
+       * offer's id and the kind invoked. Any kind but `expand`, which opens a
+       * fold where the lines draw one, reaches it. Lines in the composer's slot
+       * that offer something take the keyboard while they stand; lines
+       * elsewhere take no focus, and answer only the pointer.
+       */
+      readonly invoke?: (region: string, affordance: AffordanceKind) => void
+    }
 
 /** The `binnacle` service, `ctx.binnacle`: each registration is an effect of the plugin that made it, gone when that plugin is disposed. */
 export interface Registrations {

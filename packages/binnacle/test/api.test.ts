@@ -20,7 +20,7 @@ interface Declarations {
   /** Each declared name's statements, comments dropped; a function's overloads are its several statements. */
   readonly declared: ReadonlyMap<string, string>
   /** Each imported or re-exported name: the module it names and the name it has there. */
-  readonly imported: ReadonlyMap<string, { readonly module: string, readonly name: string }>
+  readonly imported: ReadonlyMap<string, { readonly module: string; readonly name: string }>
   /** The names the file exports, in source order. */
   readonly exported: readonly string[]
 }
@@ -36,16 +36,19 @@ function read(file: string): Declarations {
   const bare = (start: number, end: number): string => {
     let kept = ''
     let at = start
-    for (const comment of comments.filter(each => each.start >= start && each.end <= end)) {
+    for (const comment of comments.filter((each) => each.start >= start && each.end <= end)) {
       kept += text.slice(at, comment.start)
       at = comment.end
     }
-    return (kept + text.slice(at, end)).split('\n').filter(line => line.trim() !== '').join('\n')
+    return (kept + text.slice(at, end))
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      .join('\n')
   }
   const declared = new Map<string, string>()
-  const imported = new Map<string, { module: string, name: string }>()
+  const imported = new Map<string, { module: string; name: string }>()
   const exported: string[] = []
-  const localExports: { readonly name: string, readonly local: string }[] = []
+  const localExports: { readonly name: string; readonly local: string }[] = []
   const declare = (name: string, statement: string): void => {
     const before = declared.get(name)
     declared.set(name, before === undefined ? statement : `${before}\n${statement}`)
@@ -82,9 +85,12 @@ function read(file: string): Declarations {
       continue
     }
     if (declaration === null || declaration === undefined) continue
-    const names = 'id' in declaration && declaration.id !== null && declaration.id !== undefined && 'name' in declaration.id
-      ? [declaration.id.name]
-      : 'declarations' in declaration ? declaration.declarations.map(each => each.id.type === 'Identifier' ? each.id.name : '?') : []
+    const names =
+      'id' in declaration && declaration.id !== null && declaration.id !== undefined && 'name' in declaration.id
+        ? [declaration.id.name]
+        : 'declarations' in declaration
+          ? declaration.declarations.map((each) => (each.id.type === 'Identifier' ? each.id.name : '?'))
+          : []
     for (const name of names) {
       declare(name, bare(node.start, node.end))
       if (exporting && !exported.includes(name)) exported.push(name)
@@ -105,7 +111,7 @@ function read(file: string): Declarations {
  * @param named - the specifier's identifier or string literal.
  * @returns the name.
  */
-function nameOf(named: { readonly type: string, readonly name?: string, readonly value?: string }): string {
+function nameOf(named: { readonly type: string; readonly name?: string; readonly value?: string }): string {
   const name = named.name ?? named.value
   if (typeof name !== 'string') throw new Error(`a specifier with no name: ${named.type}`)
   return name
@@ -153,11 +159,17 @@ test('an author reaches exactly these declarations: changing one changes what au
 })
 
 test('an author reaches ctx.binnacle through the Context declaration api.ts augments, so it is part of the surface', () => {
-  assert.match(surface(join(dist, 'api.d.ts')), /declare module '@deepseek-ai\/cordis' \{\n\s+interface Context \{\n\s+binnacle: Registrations;/)
+  assert.match(
+    surface(join(dist, 'api.d.ts')),
+    /declare module '@deepseek-ai\/cordis' \{\n\s+interface Context \{\n\s+binnacle: Registrations;/,
+  )
 })
 
 test('a name a declaration file exports from a local list, under its own name or another, is surface too', () => {
   const at = mkdtempSync(join(tmpdir(), 'binnacle-surface-'))
   writeFileSync(join(at, 'entry.d.ts'), 'declare const kept: number;\ntype Hidden = string;\nexport { kept, Hidden as Shown };\n')
-  assert.equal(surface(join(at, 'entry.d.ts')), `// ${relative(dist, join(at, 'entry.d.ts'))}\ndeclare const kept: number;\n// ${relative(dist, join(at, 'entry.d.ts'))}\ntype Hidden = string;\n`)
+  assert.equal(
+    surface(join(at, 'entry.d.ts')),
+    `// ${relative(dist, join(at, 'entry.d.ts'))}\ndeclare const kept: number;\n// ${relative(dist, join(at, 'entry.d.ts'))}\ntype Hidden = string;\n`,
+  )
 })

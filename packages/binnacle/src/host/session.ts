@@ -16,7 +16,7 @@ export interface OpenedSession {
   send(text: string): void
   onStanding(listener: () => void): () => void
   command(line: string): Promise<boolean>
-  offers(): Promise<readonly { readonly name: string, readonly description: string }[]>
+  offers(): Promise<readonly { readonly name: string; readonly description: string }[]>
   onOffers(listener: () => void): () => void
   interrupt(): void
   close(): Promise<void>
@@ -26,7 +26,9 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
   const defaults: AgentDefaultModelConfig = ctx.agentDefaultModel
   const selection = defaults.currentSelection()
   const standsChanged = new Set<() => void>()
-  const restand = (): void => { for (const listener of standsChanged) listener() }
+  const restand = (): void => {
+    for (const listener of standsChanged) listener()
+  }
   const handle: AgentHandle = await ctx.agents.create({
     sessionId: SessionId(`session-${randomUUID()}`),
     meta: { cwd: process.cwd() },
@@ -60,33 +62,45 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
       replaying = false
       return off
     },
-    onStream: listener => ctx.on('agent/assistant-stream', ({ agent, frame }) => { if (agent === handle.agent) listener(frame) }),
+    onStream: (listener) =>
+      ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+        if (agent === handle.agent) listener(frame)
+      }),
     send: (text) => {
       handle.agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
     },
     onStanding: (listener) => {
       standsChanged.add(listener)
-      const off = ctx.on('session/event', (from) => { if (from === session) listener() })
-      return () => { standsChanged.delete(listener); off() }
+      const off = ctx.on('session/event', (from) => {
+        if (from === session) listener()
+      })
+      return () => {
+        standsChanged.delete(listener)
+        off()
+      }
     },
     offers: async () => {
       const named = commands.list(handle.agent).map(({ name, description }) => ({ name, description }))
-      const skills = await ctx.get('skills')?.list({ cwd: process.cwd(), scope: handle.agent }) ?? []
+      const skills = (await ctx.get('skills')?.list({ cwd: process.cwd(), scope: handle.agent })) ?? []
       return [...named, ...skills.filter(isUserInvocable).map(({ name, description }) => ({ name, description }))]
     },
     onOffers: (listener) => {
       const stops = [ctx.on('commands/change', listener), ctx.on('skills/change', listener)]
-      return () => { for (const stop of stops) stop() }
+      return () => {
+        for (const stop of stops) stop()
+      }
     },
     command: async (line) => {
       try {
-        return await commands.execute(handle.agent, line, [], new AbortController().signal) !== undefined
+        return (await commands.execute(handle.agent, line, [], new AbortController().signal)) !== undefined
       } catch {
         // Command ran and logged its failure, so the contract holds.
         return true
       }
     },
-    interrupt: () => { handle.agent.cancel({ kind: 'user' }, { keepInbox: true }) },
+    interrupt: () => {
+      handle.agent.cancel({ kind: 'user' }, { keepInbox: true })
+    },
     close: () => handle.dispose(),
   }
 }

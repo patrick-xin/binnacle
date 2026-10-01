@@ -12,18 +12,25 @@ export const inject = ['binnacle', 'tools'] satisfies (keyof Context)[]
 
 export function apply(ctx: Context): void {
   ctx.binnacle.card('generic', genericCard)
-  ctx.binnacle.view('tool', viewOf(ctx.tools, kind => ctx.binnacle.cards(kind)))
+  ctx.binnacle.view(
+    'tool',
+    viewOf(ctx.tools, (kind) => ctx.binnacle.cards(kind)),
+  )
 }
 
 /** Each call a `run_code` program made, a line marked as a call is, indented beneath the sub-call that made it. */
 function made(held: NonNullable<Extract<Entry, { readonly kind: 'tool' }>['subCalls']>): Node[] {
   const depth = (parent: string, seen: number): number => {
-    const maker = held.find(sub => sub.call.subCallId === parent)
+    const maker = held.find((sub) => sub.call.subCallId === parent)
     return maker === undefined || seen > held.length ? 0 : 1 + depth(maker.call.parentCallId, seen + 1)
   }
   return held.map(({ call, result }) => ({
     kind: 'text',
-    text: ['  '.repeat(depth(call.parentCallId, 0)), result === undefined ? { mark: 'running' } : result.failed ? { mark: 'failed' } : { mark: 'done' }, ` ${call.name} ${call.arguments}`],
+    text: [
+      '  '.repeat(depth(call.parentCallId, 0)),
+      result === undefined ? { mark: 'running' } : result.failed ? { mark: 'failed' } : { mark: 'done' },
+      ` ${call.name} ${call.arguments}`,
+    ],
   }))
 }
 
@@ -59,20 +66,20 @@ function viewOf(tools: ToolRuntime, rowsOf: (kind: CardKind) => readonly CardRow
       } catch (error) {
         return refused(next(), `${entry.call.name}.presentResult threw: ${readable(error)}`)
       }
-      if (completed !== undefined && 'why' in completed) return refused(next(), `${entry.call.name}.presentResult returned no drawable view: ${completed.why}`)
+      if (completed !== undefined && 'why' in completed)
+        return refused(next(), `${entry.call.name}.presentResult returned no drawable view: ${completed.why}`)
       shown = completed?.view
     }
     const parts: CardParts = {
       call,
       result: shown,
-      mark: result === undefined
-        ? { mark: 'running' }
-        : result.failed === true ? { mark: 'failed' } : { mark: 'done' },
-      waiting: result === undefined
-        ? (entry.left === undefined
+      mark: result === undefined ? { mark: 'running' } : result.failed === true ? { mark: 'failed' } : { mark: 'done' },
+      waiting:
+        result === undefined
+          ? entry.left === undefined
             ? { kind: 'text', text: ['running ', { since: entry.call.time }], tone: 'muted' }
-            : { kind: 'text', text: `the turn ended without it: ${entry.left}`, tone: 'muted' })
-        : undefined,
+            : { kind: 'text', text: `the turn ended without it: ${entry.left}`, tone: 'muted' }
+          : undefined,
       reason: result?.failure?.reason,
       resultText: result === undefined ? '' : textOfBlocks(result.blocks),
       took: result === undefined ? undefined : result.time - entry.call.time,
@@ -81,7 +88,7 @@ function viewOf(tools: ToolRuntime, rowsOf: (kind: CardKind) => readonly CardRow
       fold: (child: Node, rows?: number) => ({
         kind: 'part',
         part: { kind: 'output', tool: entry.call.name, text: result === undefined ? '' : textOfBlocks(result.blocks) },
-        child: { kind: 'fold', id: 'output', ...rows === undefined ? {} : { rows }, child },
+        child: { kind: 'fold', id: 'output', ...(rows === undefined ? {} : { rows }), child },
       }),
     }
     return drawCard(rowsOf, shown?.card ?? call.card, parts, next)

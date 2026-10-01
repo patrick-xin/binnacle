@@ -6,7 +6,7 @@ import type { Bounds, UiState } from './state.ts'
 export interface Answer {
   readonly state: UiState
   readonly focus?: string
-  readonly invoked?: { readonly region: string, readonly affordance: AffordanceKind }
+  readonly invoked?: { readonly region: string; readonly affordance: AffordanceKind }
 }
 
 export function answer(state: UiState, gesture: Gesture, landing: readonly Region[], bounds: Bounds): Answer | undefined {
@@ -15,7 +15,9 @@ export function answer(state: UiState, gesture: Gesture, landing: readonly Regio
   const next = act(state, action, bounds)
   return {
     state: next,
-    ...next.focus !== undefined && next.focus !== state.focus ? { focus: next.focus } : {},
-    ...action.kind === 'invoke' && action.affordance !== 'expand' ? { invoked: { region: action.region, affordance: action.affordance } } : {},
+    ...(next.focus !== undefined && next.focus !== state.focus ? { focus: next.focus } : {}),
+    ...(action.kind === 'invoke' && action.affordance !== 'expand'
+      ? { invoked: { region: action.region, affordance: action.affordance } }
+      : {}),
   }
 }

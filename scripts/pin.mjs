@@ -43,12 +43,14 @@ export function movePin(manifest, name, tag, commit) {
  * @throws when dsh moves and a declared `@deepseek-ai` package is one it no longer vendors.
  */
 export function moveDeps(deps, name, version, vendored) {
-  return Object.fromEntries(Object.entries(deps).map(([dep, pinned]) => {
-    if (follows(name, dep)) return [dep, version]
-    if (name !== 'dsh' || !dep.startsWith('@deepseek-ai/')) return [dep, pinned]
-    if (!(dep in vendored)) throw new Error(`${dep}: dsh at ${version} vendors no such package; drop it or read why`)
-    return [dep, vendored[dep]]
-  }))
+  return Object.fromEntries(
+    Object.entries(deps).map(([dep, pinned]) => {
+      if (follows(name, dep)) return [dep, version]
+      if (name !== 'dsh' || !dep.startsWith('@deepseek-ai/')) return [dep, pinned]
+      if (!(dep in vendored)) throw new Error(`${dep}: dsh at ${version} vendors no such package; drop it or read why`)
+      return [dep, vendored[dep]]
+    }),
+  )
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -64,7 +66,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (commit === undefined) throw new Error(`${name}: ${url} has no tag ${tag}`)
   writeFileSync(refsFile, `${JSON.stringify(movePin(manifest, name, tag, commit), null, 2)}\n`)
   execFileSync('node', [join(root, 'scripts', 'refs.mjs'), name], { stdio: 'inherit' })
-  const vendored = name === 'dsh' ? vendoredBy(join(root, '.refs', 'dsh')) ?? {} : {}
+  const vendored = name === 'dsh' ? (vendoredBy(join(root, '.refs', 'dsh')) ?? {}) : {}
   for (const file of [join(root, 'package.json'), join(root, 'packages', 'binnacle', 'package.json')]) {
     const pkg = JSON.parse(readFileSync(file, 'utf8'))
     for (const block of ['dependencies', 'peerDependencies', 'devDependencies']) {

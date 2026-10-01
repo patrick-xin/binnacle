@@ -14,13 +14,26 @@ export class FakeTerminal implements Terminal {
   written = ''
   started = false
   #onInput: ((data: string) => void) | undefined
-  start(onInput: (data: string) => void): void { this.started = true; this.#onInput = onInput }
-  stop(): void { this.started = false }
+  start(onInput: (data: string) => void): void {
+    this.started = true
+    this.#onInput = onInput
+  }
+  stop(): void {
+    this.started = false
+  }
   async drainInput(): Promise<void> {}
-  write(data: string): void { this.written += data }
-  get columns(): number { return 80 }
-  get rows(): number { return 24 }
-  get kittyProtocolActive(): boolean { return false }
+  write(data: string): void {
+    this.written += data
+  }
+  get columns(): number {
+    return 80
+  }
+  get rows(): number {
+    return 24
+  }
+  get kittyProtocolActive(): boolean {
+    return false
+  }
   moveBy(): void {}
   hideCursor(): void {}
   showCursor(): void {}
@@ -29,7 +42,9 @@ export class FakeTerminal implements Terminal {
   clearScreen(): void {}
   setTitle(): void {}
   setProgress(): void {}
-  type(data: string): void { this.#onInput?.(data) }
+  type(data: string): void {
+    this.#onInput?.(data)
+  }
 }
 
 /**
@@ -46,15 +61,24 @@ export class XtermTerminal extends FakeTerminal {
     this.#rows = rows
     this.#xterm = new xterm.Terminal({ cols: columns, rows, allowProposedApi: true })
   }
-  override write(data: string): void { super.write(data); this.#xterm.write(data) }
-  override get columns(): number { return this.#columns }
-  override get rows(): number { return this.#rows }
+  override write(data: string): void {
+    super.write(data)
+    this.#xterm.write(data)
+  }
+  override get columns(): number {
+    return this.#columns
+  }
+  override get rows(): number {
+    return this.#rows
+  }
   /**
    * What the main screen holds, its scrollback first, once everything written has landed.
    * @returns each row, plain, with the empty rows under the last dropped.
    */
   async mainScreen(): Promise<string[]> {
-    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
+    await new Promise<void>((resolve) => {
+      this.#xterm.write('', resolve)
+    })
     const buffer = this.#xterm.buffer.normal
     const rows = Array.from({ length: buffer.length }, (_, row) => buffer.getLine(row)?.translateToString(true).trimEnd() ?? '')
     while (rows.at(-1) === '') rows.pop()
@@ -65,7 +89,9 @@ export class XtermTerminal extends FakeTerminal {
    * @returns true when it is.
    */
   async onAlternateScreen(): Promise<boolean> {
-    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
+    await new Promise<void>((resolve) => {
+      this.#xterm.write('', resolve)
+    })
     return this.#xterm.buffer.active.type === 'alternate'
   }
 
@@ -75,7 +101,9 @@ export class XtermTerminal extends FakeTerminal {
    * @throws when the alternate screen is not showing.
    */
   async altScreen(): Promise<string[]> {
-    await new Promise<void>((resolve) => { this.#xterm.write('', resolve) })
+    await new Promise<void>((resolve) => {
+      this.#xterm.write('', resolve)
+    })
     if (this.#xterm.buffer.active.type !== 'alternate') throw new Error('the alternate screen is not showing')
     return Array.from({ length: this.#rows }, (_, row) => this.#xterm.buffer.active.getLine(row)?.translateToString(true).trimEnd() ?? '')
   }

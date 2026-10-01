@@ -14,7 +14,9 @@ export function readable(node: Node): Node {
     case 'offer':
       return {
         ...node,
-        affordances: node.affordances.map(affordance => affordance.label === undefined ? affordance : { ...affordance, label: treated(affordance.label) }),
+        affordances: node.affordances.map((affordance) =>
+          affordance.label === undefined ? affordance : { ...affordance, label: treated(affordance.label) },
+        ),
         child: readable(node.child),
       }
     case 'ask': {
@@ -48,8 +50,7 @@ function treated(text: string): string {
     // A carriage return before a newline is the line ending; anywhere else it is drawn ␍.
     else if (code === 0x0d) {
       if (stripped.charCodeAt(index + 1) !== 0x0a) read += '␍'
-    }
-    else if (code < 0x20) read += String.fromCharCode(0x2400 + code)
+    } else if (code < 0x20) read += String.fromCharCode(0x2400 + code)
     else if (code === 0x7f) read += '␡'
     else read += '�'
   }

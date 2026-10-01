@@ -12,5 +12,8 @@ export const foldedAlike: View = (entry) => ({
   kind: 'fold',
   id: 'mine',
   rows: 1,
-  child: { kind: 'text', text: entry.kind === 'prompt' ? entry.fact.blocks.map(block => block.kind === 'unread' ? '' : block.text).join('\n') : '' },
+  child: {
+    kind: 'text',
+    text: entry.kind === 'prompt' ? entry.fact.blocks.map((block) => (block.kind === 'unread' ? '' : block.text)).join('\n') : '',
+  },
 })

@@ -15,11 +15,12 @@ export interface Streamed {
 
 /** The attempt streaming now, read from dsh's frames. */
 export class AnswerStream {
-  #open: { readonly attemptId: string, readonly turn: number, readonly step: number, readonly assembler: BlockAssembler } | undefined
+  #open: { readonly attemptId: string; readonly turn: number; readonly step: number; readonly assembler: BlockAssembler } | undefined
   #answer: Streamed | undefined
 
   read(frame: AssistantStreamFrame): void {
-    if (frame.type === 'start') this.#open = { attemptId: frame.attemptId, turn: frame.turn, step: frame.step, assembler: new BlockAssembler() }
+    if (frame.type === 'start')
+      this.#open = { attemptId: frame.attemptId, turn: frame.turn, step: frame.step, assembler: new BlockAssembler() }
     else if (frame.attemptId !== this.#open?.attemptId) return
     else if (frame.type === 'chunk') this.#open.assembler.push(frame.chunk)
     else this.#open = undefined
@@ -29,7 +30,11 @@ export class AnswerStream {
   get answer(): Streamed | undefined {
     const open = this.#open
     if (open === undefined) return undefined
-    this.#answer ??= Object.freeze({ turn: open.turn, step: open.step, blocks: Object.freeze(open.assembler.interruptedBlocks().map(blockOf)) })
+    this.#answer ??= Object.freeze({
+      turn: open.turn,
+      step: open.step,
+      blocks: Object.freeze(open.assembler.interruptedBlocks().map(blockOf)),
+    })
     return this.#answer
   }
 }

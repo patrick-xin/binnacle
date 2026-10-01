@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { checkPeers, servicesProvidedBy } from './check-peers.mjs'
 
 const manifest = (fields = {}) => ({ name: 'binnacle', ...fields })
-const check = ({ files = [], patch = '', services, provided, ...fields } = {}) => checkPeers({ manifest: manifest(fields), files, patch, services, provided })
+const check = ({ files = [], patch = '', services, provided, ...fields } = {}) =>
+  checkPeers({ manifest: manifest(fields), files, patch, services, provided })
 
 test('a package whose code is imported, declared nowhere, is named with its file', () => {
   const files = [{ path: 'src/a.ts', text: "import { x } from '@deepseek-ai/dsh-session/surface'\n" }]
@@ -41,7 +42,8 @@ test('a peerDependency binnacle runs no code of, and inserts no row of, is told 
   ])
 })
 
-const PATCH = "- id: hmr\n  disabled: true\n- insert:\n    - id: binnacle\n      name: 'binnacle'\n    - id: ask\n      name: '@deepseek-ai/dsh-tool-ask-user'\n"
+const PATCH =
+  "- id: hmr\n  disabled: true\n- insert:\n    - id: binnacle\n      name: 'binnacle'\n    - id: ask\n      name: '@deepseek-ai/dsh-tool-ask-user'\n"
 
 test('a row the patch inserts is a peerDependency, and makes one needed', () => {
   assert.deepEqual(check({ patch: PATCH, peerDependencies: { '@deepseek-ai/dsh-tool-ask-user': '1' } }), [])
@@ -50,14 +52,18 @@ test('a row the patch inserts is a peerDependency, and makes one needed', () => 
   ])
 })
 
-test('a row naming a subpath of binnacle is binnacle\'s own, and a row naming another package\'s subpath needs that package', () => {
-  const patch = "- insert:\n    - id: binnacle-status-line\n      name: 'binnacle/plugins/status-line'\n    - id: deep\n      name: '@scope/a/deep'\n"
+test("a row naming a subpath of binnacle is binnacle's own, and a row naming another package's subpath needs that package", () => {
+  const patch =
+    "- insert:\n    - id: binnacle-status-line\n      name: 'binnacle/plugins/status-line'\n    - id: deep\n      name: '@scope/a/deep'\n"
   assert.deepEqual(check({ patch, peerDependencies: { '@scope/a': '1' } }), [])
 })
 
 test('problems come in a stable order, sorted, however the files and lists are ordered', () => {
   const files = [{ path: 'src/b.ts', text: "import 'z'\nimport 'a'\n" }]
-  assert.deepEqual(check({ files }).map(line => line.split(' ')[0]), ['a', 'z'])
+  assert.deepEqual(
+    check({ files }).map((line) => line.split(' ')[0]),
+    ['a', 'z'],
+  )
 })
 
 const INJECT = "export const inject = ['binnacle', 'tools'] satisfies (keyof Context)[]\n"
@@ -69,8 +75,9 @@ test('a service an inject names, with no row in the services table, is told to n
   ])
 })
 
-const provides = table => name => table[name] === undefined ? undefined : new Set(table[name])
-const withServices = (fields = {}) => check({ files: [injecting], services: { tools: '@scope/tools' }, provided: provides({ '@scope/tools': ['tools'] }), ...fields })
+const provides = (table) => (name) => (table[name] === undefined ? undefined : new Set(table[name]))
+const withServices = (fields = {}) =>
+  check({ files: [injecting], services: { tools: '@scope/tools' }, provided: provides({ '@scope/tools': ['tools'] }), ...fields })
 
 test('a provider of a service an inject names is a peerDependency, told with the service and the module', () => {
   assert.deepEqual(withServices({ devDependencies: { '@scope/tools': '1' } }), [
@@ -95,7 +102,7 @@ test('a services row no module names is held to upstream too', () => {
   ])
 })
 
-const install = files => {
+const install = (files) => {
   const dir = mkdtempSync(join(tmpdir(), 'check-peers-'))
   for (const [name, text] of Object.entries(files)) {
     mkdirSync(join(dir, name, '..'), { recursive: true })

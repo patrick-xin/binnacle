@@ -43,8 +43,8 @@ export function checkPatch(layers) {
 function findPackage(root, name) {
   const packages = join(root, 'packages')
   if (!existsSync(packages)) return undefined
-  for (const group of readdirSync(packages, { withFileTypes: true }).filter(entry => entry.isDirectory())) {
-    for (const dir of readdirSync(join(packages, group.name), { withFileTypes: true }).filter(entry => entry.isDirectory())) {
+  for (const group of readdirSync(packages, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
+    for (const dir of readdirSync(join(packages, group.name), { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
       const manifest = join(packages, group.name, dir.name, 'package.json')
       if (existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).name === name) return dirname(manifest)
     }
@@ -69,6 +69,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   if (problems.length === 0) problems.push(...checkPatch(layers))
   for (const problem of problems) console.error(problem)
-  console.log(problems.length === 0 ? `check-patch: ok (${layers.map(layer => layer.name).join(' → ')})` : `check-patch: ${problems.length} problems`)
+  console.log(
+    problems.length === 0
+      ? `check-patch: ok (${layers.map((layer) => layer.name).join(' → ')})`
+      : `check-patch: ${problems.length} problems`,
+  )
   process.exitCode = problems.length === 0 ? 0 : 1
 }

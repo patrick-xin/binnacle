@@ -69,7 +69,7 @@ export function releasesAfter(pinned, tags) {
   const pin = splitTag(pinned)
   if (pin === undefined) return []
   return tags
-    .map(tag => ({ tag, split: splitTag(tag) }))
+    .map((tag) => ({ tag, split: splitTag(tag) }))
     .filter(({ split }) => split?.prefix === pin.prefix && compareVersions(split.version, pin.version) > 0)
     .toSorted((a, b) => compareVersions(a.split.version, b.split.version))
     .map(({ tag }) => tag)
@@ -84,7 +84,7 @@ export function releasesAfter(pinned, tags) {
  * @returns {string[]} each package still to be published, in declaration order.
  */
 export function unpublished(deps, name, version, versionsOf) {
-  return Object.keys(deps).filter(dep => follows(name, dep) && !versionsOf(dep).includes(version))
+  return Object.keys(deps).filter((dep) => follows(name, dep) && !versionsOf(dep).includes(version))
 }
 
 /**
@@ -112,7 +112,7 @@ export function mailBranch(name, tag) {
  * @param {string[]} args - the arguments.
  * @returns {string} what git printed.
  */
-const git = args => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+const git = (args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 
 /**
  * Every version npm lists for a package.
@@ -133,29 +133,43 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const manifest = JSON.parse(readFileSync(join(root, 'references.json'), 'utf8'))
   let branches = []
   try {
-    branches = git(['-C', root, 'ls-remote', '--heads', 'origin', 'refs/heads/upstream/*']).split('\n').filter(Boolean).map(line => line.split('\t')[1].replace('refs/heads/', ''))
+    branches = git(['-C', root, 'ls-remote', '--heads', 'origin', 'refs/heads/upstream/*'])
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.split('\t')[1].replace('refs/heads/', ''))
   } catch {
     // No origin, or no network to it: every release reads as not yet carried.
   }
-  const deps = Object.assign({}, ...['package.json', join('packages', 'binnacle', 'package.json')].flatMap((file) => {
-    const pkg = JSON.parse(readFileSync(join(root, file), 'utf8'))
-    return [pkg.dependencies, pkg.peerDependencies, pkg.devDependencies]
-  }).filter(Boolean))
-  const reading = Object.entries(manifest).filter(([, ref]) => ref.tag !== undefined).map(([name, ref]) => {
-    const tags = git(['ls-remote', '--tags', '--refs', ref.url]).split('\n').filter(Boolean).map(line => line.split('\t')[1].replace('refs/tags/', ''))
-    const newer = releasesAfter(ref.tag, tags)
-    const newest = newer.at(-1)
-    const branch = newest === undefined ? undefined : mailBranch(name, newest)
-    const waiting = newest === undefined ? [] : unpublished(deps, name, splitTag(newest)?.version ?? newest, versionsOf)
-    return { name, pinned: ref.tag, newer, newest, branch, carried: branch !== undefined && branches.includes(branch), waiting }
-  })
+  const deps = Object.assign(
+    {},
+    ...['package.json', join('packages', 'binnacle', 'package.json')]
+      .flatMap((file) => {
+        const pkg = JSON.parse(readFileSync(join(root, file), 'utf8'))
+        return [pkg.dependencies, pkg.peerDependencies, pkg.devDependencies]
+      })
+      .filter(Boolean),
+  )
+  const reading = Object.entries(manifest)
+    .filter(([, ref]) => ref.tag !== undefined)
+    .map(([name, ref]) => {
+      const tags = git(['ls-remote', '--tags', '--refs', ref.url])
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => line.split('\t')[1].replace('refs/tags/', ''))
+      const newer = releasesAfter(ref.tag, tags)
+      const newest = newer.at(-1)
+      const branch = newest === undefined ? undefined : mailBranch(name, newest)
+      const waiting = newest === undefined ? [] : unpublished(deps, name, splitTag(newest)?.version ?? newest, versionsOf)
+      return { name, pinned: ref.tag, newer, newest, branch, carried: branch !== undefined && branches.includes(branch), waiting }
+    })
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(reading))
   } else {
     for (const ref of reading) {
       if (ref.newest === undefined) console.log(`${ref.name}: ${ref.pinned}, the newest release`)
       else if (ref.carried) console.log(`${ref.name}: ${ref.pinned}; newer: ${ref.newer.join(', ')} — ${ref.branch} carries ${ref.newest}`)
-      else if (ref.waiting.length > 0) console.log(`${ref.name}: ${ref.pinned}; newer: ${ref.newer.join(', ')} — ${ref.newest} waits on npm for ${ref.waiting.join(', ')}`)
+      else if (ref.waiting.length > 0)
+        console.log(`${ref.name}: ${ref.pinned}; newer: ${ref.newer.join(', ')} — ${ref.newest} waits on npm for ${ref.waiting.join(', ')}`)
       else console.log(`${ref.name}: ${ref.pinned}; newer: ${ref.newer.join(', ')} — ${ref.newest} not carried yet`)
     }
   }

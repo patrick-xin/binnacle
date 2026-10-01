@@ -46,8 +46,8 @@ export function resultViewOf(value: unknown): Read<PresentedResult> | undefined 
   return {
     view: {
       card: card as PresentedResult['card'],
-      ...title === undefined ? {} : { title },
-      ...content === undefined ? {} : { content },
+      ...(title === undefined ? {} : { title }),
+      ...(content === undefined ? {} : { content }),
       returned: frozenCopy(value),
     },
   }
@@ -61,30 +61,32 @@ function frozenCopy(value: object): Readonly<Record<string, unknown>> {
 /** Each later line is indented two columns, so a command written on more than one line does not read as output. */
 export function titled(title: string): string {
   const lines = title.split('\n')
-  return lines.length === 1 ? title : [lines[0], ...lines.slice(1).map(line => `  ${line}`)].join('\n')
+  return lines.length === 1 ? title : [lines[0], ...lines.slice(1).map((line) => `  ${line}`)].join('\n')
 }
 
 /** The result's `content` is rebuilt from its text blocks, a block binnacle cannot read left out; `meta` is as logged. */
 export function handedResult(fact: Result): ToolResult {
   return {
-    content: fact.blocks.flatMap(block => block.kind === 'unread' ? [] : [block.kind === 'text'
-      ? { type: 'text', text: block.text }
-      : { type: 'reasoning', text: block.text }]),
+    content: fact.blocks.flatMap((block) =>
+      block.kind === 'unread' ? [] : [block.kind === 'text' ? { type: 'text', text: block.text } : { type: 'reasoning', text: block.text }],
+    ),
     isError: fact.failed,
-    ...fact.meta === undefined ? {} : { meta: fact.meta as NonNullable<ToolResult['meta']> },
+    ...(fact.meta === undefined ? {} : { meta: fact.meta as NonNullable<ToolResult['meta']> }),
   }
 }
 
 export function textOfBlocks(blocks: Result['blocks']): string {
-  return blocks.map(block => block.kind === 'unread' ? `[${block.type}]` : block.text).join('\n')
+  return blocks.map((block) => (block.kind === 'unread' ? `[${block.type}]` : block.text)).join('\n')
 }
 
 /** Whatever is not a block at all is left out. */
 export function textOfPresented(content: readonly unknown[]): string {
-  return content.flatMap(block => {
-    if (typeof block !== 'object' || block === null) return []
-    const record = block as Record<string, unknown>
-    if ((record.type === 'text' || record.type === 'reasoning') && typeof record.text === 'string') return [record.text]
-    return typeof record.type === 'string' ? [`[${record.type}]`] : []
-  }).join('\n')
+  return content
+    .flatMap((block) => {
+      if (typeof block !== 'object' || block === null) return []
+      const record = block as Record<string, unknown>
+      if ((record.type === 'text' || record.type === 'reasoning') && typeof record.text === 'string') return [record.text]
+      return typeof record.type === 'string' ? [`[${record.type}]`] : []
+    })
+    .join('\n')
 }

@@ -6,13 +6,13 @@ body:
     id: what
     attributes:
       label: 'What is wrong'
-      description: 'From the person''s side of the screen, and how to see it: the input, what is drawn, what should be. Cite a reading as `name:path`.'
+      description: "From the person's side of the screen, and how to see it: the input, what is drawn, what should be. Cite a reading as `name:path`."
     validations:
       required: true
   - type: textarea
     id: decisions
     attributes:
-      label: 'How it works (the maintainer''s decisions)'
+      label: "How it works (the maintainer's decisions)"
       description: 'What the maintainer decided, each a bullet. Where a decision is widened, reconcile Out of scope in the same edit.'
     validations:
       required: true
@@ -27,7 +27,7 @@ body:
     id: behaviours
     attributes:
       label: 'Behaviours'
-      description: 'One sentence each, as a person or a caller would say it; each is a test''s name.'
+      description: "One sentence each, as a person or a caller would say it; each is a test's name."
     validations:
       required: true
   - type: textarea

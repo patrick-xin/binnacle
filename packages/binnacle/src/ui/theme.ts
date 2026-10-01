@@ -48,12 +48,12 @@ export const marks = {
   presented: { glyph: '▤', tone: 'accent' }, // files the agent handed the person
   retry: { glyph: '↻', tone: 'muted' },
   workflow: { glyph: '◇', tone: 'accent' }, // a workflow run and the agents it set working // a model request dsh tries again after it failed
-} as const satisfies Record<string, { readonly glyph: string, readonly tone: Tone }>
+} as const satisfies Record<string, { readonly glyph: string; readonly tone: Tone }>
 
 /** A mark of the theme's, named by what it stands for: binnacle's own, or one an author's theme adds. */
 export type Mark = keyof typeof marks | (string & {})
 
-const lineWord = (count: number): string => count === 1 ? 'line' : 'lines'
+const lineWord = (count: number): string => (count === 1 ? 'line' : 'lines')
 
 /**
  * The theme's words: what a fold says of itself, named by what the words
@@ -85,12 +85,26 @@ export const words = {
   'offer.answer': 'answer',
   'offer.grant': 'allow',
   'offer.dismiss': 'dismiss',
-} as const satisfies { readonly [kind in AffordanceKind as `offer.${kind}`]: string } & Readonly<Record<string, string | ((count: number) => string)>>
+} as const satisfies { readonly [kind in AffordanceKind as `offer.${kind}`]: string } & Readonly<
+  Record<string, string | ((count: number) => string)>
+>
 
 /** The words that say no count: each is said as it is, where the rest are templates of a count. */
-const plainWords = ['less', 'away', 'select', 'next', 'offer.expand', 'offer.choose', 'offer.open', 'offer.copy', 'offer.answer', 'offer.grant', 'offer.dismiss'] as const
+const plainWords = [
+  'less',
+  'away',
+  'select',
+  'next',
+  'offer.expand',
+  'offer.choose',
+  'offer.open',
+  'offer.copy',
+  'offer.answer',
+  'offer.grant',
+  'offer.dismiss',
+] as const
 
-type PlainWord = typeof plainWords[number]
+type PlainWord = (typeof plainWords)[number]
 
 /**
  * The theme's chrome: the glyphs the chrome — the focus row, a cut fold, a
@@ -147,16 +161,32 @@ function markdownIn(toned: Theme['tones']): MarkdownTheme {
 
 export const editorTheme: EditorTheme = {
   borderColor: tones.dim,
-  selectList: { selectedPrefix: tones.accent, selectedText: tones.accent, description: tones.muted, scrollInfo: tones.muted, noMatch: tones.muted },
+  selectList: {
+    selectedPrefix: tones.accent,
+    selectedText: tones.accent,
+    description: tones.muted,
+    scrollInfo: tones.muted,
+    noMatch: tones.muted,
+  },
 }
 
 /** A theme: each part of binnacle's own, or as registrations changed it. */
 export interface Theme {
-  readonly tones: { readonly [name in keyof typeof tones]: (text: string) => string } & { readonly [name: string]: ((text: string) => string) | undefined }
-  readonly backgrounds: { readonly [name in keyof typeof backgrounds]: (text: string) => string } & { readonly [name: string]: ((text: string) => string) | undefined }
-  readonly marks: { readonly [name in keyof typeof marks]: { readonly glyph: string, readonly tone: Tone } } & { readonly [name: string]: { readonly glyph: string, readonly tone: Tone } | undefined }
-  readonly chrome: { readonly [part in Exclude<keyof typeof chrome, 'border'>]: string } & { readonly border: { readonly [piece in keyof typeof chrome.border]: string } }
-  readonly words: { readonly [word in Exclude<keyof typeof words, PlainWord>]: (count: number) => string } & { readonly [word in PlainWord]: string }
+  readonly tones: { readonly [name in keyof typeof tones]: (text: string) => string } & {
+    readonly [name: string]: ((text: string) => string) | undefined
+  }
+  readonly backgrounds: { readonly [name in keyof typeof backgrounds]: (text: string) => string } & {
+    readonly [name: string]: ((text: string) => string) | undefined
+  }
+  readonly marks: { readonly [name in keyof typeof marks]: { readonly glyph: string; readonly tone: Tone } } & {
+    readonly [name: string]: { readonly glyph: string; readonly tone: Tone } | undefined
+  }
+  readonly chrome: { readonly [part in Exclude<keyof typeof chrome, 'border'>]: string } & {
+    readonly border: { readonly [piece in keyof typeof chrome.border]: string }
+  }
+  readonly words: { readonly [word in Exclude<keyof typeof words, PlainWord>]: (count: number) => string } & {
+    readonly [word in PlainWord]: string
+  }
   readonly markdown: MarkdownTheme
   readonly folds: { readonly [key: string]: FoldStart | undefined }
 }
@@ -170,7 +200,25 @@ export interface FoldStart {
 }
 
 /** binnacle's own theme, which registrations change. */
-export const binnacleTheme: Theme = { tones, backgrounds, marks, chrome, words, markdown: markdownTheme, folds: { answer: { rows: 0 }, streaming: { rows: 0 }, context: { rows: 0 }, unknown: { rows: 0 }, authored: { rows: 0 }, compaction: { rows: 0 }, retry: { rows: 0 }, tool: { rows: 3 }, result: { rows: 3 } } }
+export const binnacleTheme: Theme = {
+  tones,
+  backgrounds,
+  marks,
+  chrome,
+  words,
+  markdown: markdownTheme,
+  folds: {
+    answer: { rows: 0 },
+    streaming: { rows: 0 },
+    context: { rows: 0 },
+    unknown: { rows: 0 },
+    authored: { rows: 0 },
+    compaction: { rows: 0 },
+    retry: { rows: 0 },
+    tool: { rows: 3 },
+    result: { rows: 3 },
+  },
+}
 
 /**
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.
@@ -181,7 +229,14 @@ export interface ThemeChanges {
   /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: one of the terminal's sixteen colours. */
   readonly backgrounds?: { readonly [name: string]: Colour }
   /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. The gutter and a border's pieces are each one column wide. */
-  readonly chrome?: { readonly focus?: string, readonly cut?: string, readonly separator?: string, readonly jump?: string, readonly gutter?: string, readonly border?: { readonly [piece in keyof typeof chrome.border]?: string } }
+  readonly chrome?: {
+    readonly focus?: string
+    readonly cut?: string
+    readonly separator?: string
+    readonly jump?: string
+    readonly gutter?: string
+    readonly border?: { readonly [piece in keyof typeof chrome.border]?: string }
+  }
   /**
    * What a fold says of itself, each a template: `{n}` is the count of lines, and `{lines}` the word for that many (`line` or `lines`). `less` and `away` count nothing.
    */
@@ -189,14 +244,31 @@ export interface ThemeChanges {
   /** How each kind of entry's folds start, by the key its views are registered under — an entry kind, a quiet kind's dsh type, an authored fact's name — falling back to its kind when no start is given for its key, when a fold does not say. */
   readonly folds?: { readonly [key: string]: FoldStart }
   /** Marks, by name: a glyph, a tone, or both. */
-  readonly marks?: { readonly [name: string]: { readonly glyph?: string, readonly tone?: Tone } }
+  readonly marks?: { readonly [name: string]: { readonly glyph?: string; readonly tone?: Tone } }
 }
 
 /** The terminal's sixteen colours, by the names a theme registration gives them, in the order their codes run. */
-export const colours = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'] as const
+export const colours = [
+  'black',
+  'red',
+  'green',
+  'yellow',
+  'blue',
+  'magenta',
+  'cyan',
+  'white',
+  'bright-black',
+  'bright-red',
+  'bright-green',
+  'bright-yellow',
+  'bright-blue',
+  'bright-magenta',
+  'bright-cyan',
+  'bright-white',
+] as const
 
 /** One of the terminal's sixteen colours, so a person's palette decides what it looks like. */
-export type Colour = typeof colours[number]
+export type Colour = (typeof colours)[number]
 
 /** How a tone draws, as data: a colour of the terminal's, and attributes, each drawn inside the colour. */
 export interface Style {
@@ -215,31 +287,31 @@ export interface Style {
 function styled(style: Style): (text: string) => string {
   const wraps: ((text: string) => string)[] = []
   if (style.bold === true) wraps.push(attributes.bold)
-  if (style.dim === true) wraps.push(text => `\x1b[2m${text}\x1b[22m`)
+  if (style.dim === true) wraps.push((text) => `\x1b[2m${text}\x1b[22m`)
   if (style.italic === true) wraps.push(attributes.italic)
   if (style.underline === true) wraps.push(attributes.underline)
   const colour = style.color
   if (colour !== undefined) {
     const index = colours.indexOf(colour)
     const code = index < 8 ? 30 + index : 90 + index - 8
-    wraps.push(text => `\x1b[${code}m${text}\x1b[39m`)
+    wraps.push((text) => `\x1b[${code}m${text}\x1b[39m`)
   }
-  return text => wraps.reduce((inner, wrap) => wrap(inner), text)
+  return (text) => wraps.reduce((inner, wrap) => wrap(inner), text)
 }
 
 function counting(template: string): (count: number) => string {
-  return count => template.replaceAll('{n}', String(count)).replaceAll('{lines}', lineWord(count))
+  return (count) => template.replaceAll('{n}', String(count)).replaceAll('{lines}', lineWord(count))
 }
 
 function filling(colour: Colour): (text: string) => string {
   const index = colours.indexOf(colour)
   const code = index < 8 ? 40 + index : 100 + index - 8
-  return text => `\x1b[${code}m${text}\x1b[49m`
+  return (text) => `\x1b[${code}m${text}\x1b[49m`
 }
 
 /** A theme with changes laid over it, oldest first, each over what the ones before it left. */
 export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
-  const marked: Record<string, { readonly glyph: string, readonly tone: Tone } | undefined> = { ...base.marks }
+  const marked: Record<string, { readonly glyph: string; readonly tone: Tone } | undefined> = { ...base.marks }
   for (const change of changes) {
     for (const [name, mark] of Object.entries(change.marks ?? {})) {
       const beneath = marked[name]
@@ -271,5 +343,14 @@ export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
     for (const [key, start] of Object.entries(change.folds ?? {})) starts = { ...starts, [key]: { ...starts[key], ...start } }
   }
   const tonesNow = toned as Theme['tones']
-  return { ...base, folds: starts, chrome: glyphs, words: said, tones: tonesNow, backgrounds: filled as Theme['backgrounds'], marks: marked as Theme['marks'], markdown: markdownIn(tonesNow) }
+  return {
+    ...base,
+    folds: starts,
+    chrome: glyphs,
+    words: said,
+    tones: tonesNow,
+    backgrounds: filled as Theme['backgrounds'],
+    marks: marked as Theme['marks'],
+    markdown: markdownIn(tonesNow),
+  }
 }

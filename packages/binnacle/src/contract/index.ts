@@ -36,16 +36,16 @@ export type KeyBinding = 'focus.next' | 'focus.previous' | 'focus.out' | 'primar
 
 export type Gesture =
   | { readonly kind: 'click' }
-  | { readonly kind: 'wheel', readonly delta: number }
+  | { readonly kind: 'wheel'; readonly delta: number }
   | { readonly kind: 'drag' }
   | { readonly kind: 'hover' }
-  | { readonly kind: 'key', readonly binding: KeyBinding }
+  | { readonly kind: 'key'; readonly binding: KeyBinding }
 
 export type Action =
-  | { readonly kind: 'invoke', readonly region: string, readonly affordance: AffordanceKind }
-  | { readonly kind: 'scroll', readonly region: string, readonly delta: number }
+  | { readonly kind: 'invoke'; readonly region: string; readonly affordance: AffordanceKind }
+  | { readonly kind: 'scroll'; readonly region: string; readonly delta: number }
   | { readonly kind: 'select' }
-  | { readonly kind: 'focus', readonly step: 1 | -1 }
+  | { readonly kind: 'focus'; readonly step: 1 | -1 }
   | { readonly kind: 'unfocus' }
 
 export function describe(value: unknown): string {

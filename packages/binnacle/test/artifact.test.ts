@@ -21,7 +21,7 @@ test('the manifest points dsh at the patch it ships, and the patch inserts the r
   assert.match(patch, new RegExp(`name: '${manifest.name}'`))
 })
 
-test('the patch loads dsh\'s ask-user tool, whose questions the built-in Questions plugin answers', () => {
+test("the patch loads dsh's ask-user tool, whose questions the built-in Questions plugin answers", () => {
   const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
   assert.match(patch, /name: '@deepseek-ai\/dsh-tool-ask-user'/)
 })
@@ -41,20 +41,24 @@ test('plain node loads the built entry as a Cordis row, with no default export a
 /** The built-in features the patch loads as rows of their own, in the order it inserts them. */
 const FEATURES = ['transcript', 'composer', 'status-line', 'tool-cards', 'trajectory']
 
-test('plain node loads each built-in feature\'s subpath, as the manifest exports it, as a Cordis row with no default export', () => {
+test("plain node loads each built-in feature's subpath, as the manifest exports it, as a Cordis row with no default export", () => {
   for (const feature of FEATURES) {
     const probe = `const m = await import('${manifest.name}/plugins/${feature}'); console.log(JSON.stringify({ keys: Object.keys(m).sort(), apply: typeof m.apply }))`
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], { cwd: packageDir, encoding: 'utf8' })
     assert.equal(run.status, 0, `${feature}: ${run.stderr}`)
     assert.deepEqual(JSON.parse(run.stdout), { keys: ['apply', 'inject', 'name'], apply: 'function' }, feature)
-    assert.deepEqual(manifest.exports[`./plugins/${feature}`], { types: `./dist/plugins/${feature}/index.d.ts`, default: `./dist/plugins/${feature}/index.js` }, feature)
+    assert.deepEqual(
+      manifest.exports[`./plugins/${feature}`],
+      { types: `./dist/plugins/${feature}/index.d.ts`, default: `./dist/plugins/${feature}/index.js` },
+      feature,
+    )
   }
 })
 
-test('the patch inserts a row for each built-in feature after binnacle\'s own, by an id a person disables it by, in order', () => {
+test("the patch inserts a row for each built-in feature after binnacle's own, by an id a person disables it by, in order", () => {
   const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
   const rows = [...patch.matchAll(/- id: (\S+)\n\s+name: '([^']+)'/g)].map(([, id, name]) => ({ id, name }))
-  const own = rows.findIndex(row => row.name === manifest.name)
+  const own = rows.findIndex((row) => row.name === manifest.name)
   assert.deepEqual(rows.slice(own, own + 1 + FEATURES.length), [
     { id: 'binnacle', name: 'binnacle' },
     { id: 'binnacle-transcript', name: 'binnacle/plugins/transcript' },

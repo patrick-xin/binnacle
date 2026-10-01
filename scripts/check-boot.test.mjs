@@ -15,9 +15,7 @@ test('a launcher off the pin is named, since the bundle compiles against the pin
 })
 
 test('no launcher, a failed boot, or a boot that never reports are named', () => {
-  assert.deepEqual(readBoot('dsh-v0.1.7-rc.2', { ...OK, launcher: undefined }), [
-    'dsh is not on PATH; install @deepseek-ai/dsh@0.1.7-rc.2',
-  ])
+  assert.deepEqual(readBoot('dsh-v0.1.7-rc.2', { ...OK, launcher: undefined }), ['dsh is not on PATH; install @deepseek-ai/dsh@0.1.7-rc.2'])
   assert.deepEqual(readBoot('dsh-v0.1.7-rc.2', { ...OK, status: 1, stdout: '' }), [
     'dsh --profile binnacle --check exited 1 without reporting `binnacle: ok`; run it to see why',
   ])

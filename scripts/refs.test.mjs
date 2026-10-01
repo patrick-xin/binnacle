@@ -30,7 +30,10 @@ test('a reference without a url or a pin is refused', () => {
 })
 
 test('only the named references are planned when names are given', () => {
-  assert.deepEqual(plan(MANIFEST, undefined, ['dsh']).map(ref => ref.name), ['dsh'])
+  assert.deepEqual(
+    plan(MANIFEST, undefined, ['dsh']).map((ref) => ref.name),
+    ['dsh'],
+  )
   assert.throws(() => plan(MANIFEST, undefined, ['nope']), /nope: not a reference/)
 })
 
@@ -48,5 +51,8 @@ test('a tag names the commit it peels to, whether annotated or not', () => {
 
 test('a tag its source does not name says which source, and to fetch the tag there', () => {
   const ref = { name: 'dsh', url: '/clones/dsh', commit: 'bbb', local: false, tag: 'dsh-v1.0.0' }
-  assert.equal(tagMismatch(ref, undefined), 'dsh: /clones/dsh has no tag dsh-v1.0.0; fetch its tags there, or check the pin in references.json')
+  assert.equal(
+    tagMismatch(ref, undefined),
+    'dsh: /clones/dsh has no tag dsh-v1.0.0; fetch its tags there, or check the pin in references.json',
+  )
 })

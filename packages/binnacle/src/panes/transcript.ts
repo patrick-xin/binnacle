@@ -43,13 +43,20 @@ export class TranscriptPane implements Component {
   #draw: DrawScreen
   readonly #now: () => number | undefined
   readonly #keys: () => LayoutState['keys']
-  #drawn: { readonly width: number, readonly screen: Screen } | undefined
+  #drawn: { readonly width: number; readonly screen: Screen } | undefined
   #on: TuiMode = 'fullscreen'
   // On the main screen the pane never changes a row it has printed.
   #printed: Printed | undefined
   #parked: string | undefined
 
-  constructor(changed: () => void, views: () => Views = () => new Map(), reports: PaneReports = {}, theme: () => Theme = () => binnacleTheme, now: () => number | undefined = () => undefined, keys: () => LayoutState['keys'] = () => undefined) {
+  constructor(
+    changed: () => void,
+    views: () => Views = () => new Map(),
+    reports: PaneReports = {},
+    theme: () => Theme = () => binnacleTheme,
+    now: () => number | undefined = () => undefined,
+    keys: () => LayoutState['keys'] = () => undefined,
+  ) {
     this.#changed = changed
     this.#keys = keys
     this.#draw = screens(keys)
@@ -94,7 +101,7 @@ export class TranscriptPane implements Component {
     const focus = this.#state.focus
     const drawn = this.#drawn
     if (focus === undefined || drawn === undefined) return
-    const placed = drawn.screen.regions.find(candidate => candidate.region.id === focus)
+    const placed = drawn.screen.regions.find((candidate) => candidate.region.id === focus)
     if (placed !== undefined && placed.top < this.#printedThrough(drawn.width, drawn.screen)) this.#park(drawn.screen)
   }
 
@@ -108,8 +115,8 @@ export class TranscriptPane implements Component {
     let screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme(), this.#now())
     if (this.#on === 'regular' && this.#state.focus !== undefined) {
       // Avoid changing already-printed rows.
-      const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
-      const placed = screen.regions.find(candidate => candidate.region.id === this.#state.focus)
+      const through = (entries: number): number => (entries === 0 ? 0 : (screen.ends[entries - 1] ?? screen.lines.length))
+      const placed = screen.regions.find((candidate) => candidate.region.id === this.#state.focus)
       if (placed !== undefined && placed.top < through(now)) {
         this.#park(screen)
         screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme(), this.#now())
@@ -117,11 +124,14 @@ export class TranscriptPane implements Component {
     }
     this.#drawn = { width, screen }
     if (this.#on === 'fullscreen') return [...screen.lines]
-    const through = (entries: number): number => entries === 0 ? 0 : screen.ends[entries - 1] ?? screen.lines.length
+    const through = (entries: number): number => (entries === 0 ? 0 : (screen.ends[entries - 1] ?? screen.lines.length))
     const was = this.#printed
-    const printed = was === undefined || was.width !== width
-      ? { width, entries: now, lines: screen.lines.slice(0, through(now)) }
-      : now > was.entries ? { width, entries: now, lines: [...was.lines, ...screen.lines.slice(through(was.entries), through(now))] } : was
+    const printed =
+      was === undefined || was.width !== width
+        ? { width, entries: now, lines: screen.lines.slice(0, through(now)) }
+        : now > was.entries
+          ? { width, entries: now, lines: [...was.lines, ...screen.lines.slice(through(was.entries), through(now))] }
+          : was
     this.#printed = printed
     return [...printed.lines, ...screen.lines.slice(through(printed.entries))]
   }
@@ -145,7 +155,10 @@ export class TranscriptPane implements Component {
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
     const gesture = gestureOf(event)
     if (gesture === undefined) return undefined
-    const drawn = this.#drawn?.width === event.width ? this.#drawn.screen : this.#draw(this.#transcript, this.#state, event.width, this.#views(), this.#theme(), this.#now())
+    const drawn =
+      this.#drawn?.width === event.width
+        ? this.#drawn.screen
+        : this.#draw(this.#transcript, this.#state, event.width, this.#views(), this.#theme(), this.#now())
     const next = answer(this.#state, gesture, under(drawn.regions, event.y, event.x), drawn)
     if (next === undefined || next.state === this.#state) return undefined
     this.#state = next.state
@@ -157,7 +170,7 @@ export class TranscriptPane implements Component {
     const drawn = this.#drawn
     if (drawn === undefined) return false
     const focus = this.#state.focus
-    const focused = focus === undefined ? undefined : drawn.screen.regions.find(placed => placed.region.id === focus)
+    const focused = focus === undefined ? undefined : drawn.screen.regions.find((placed) => placed.region.id === focus)
     const next = answer(this.#state, gesture, focused === undefined ? [] : [focused.region], drawn.screen)
     if (next === undefined) return false
     if (next.invoked?.affordance === 'copy' && focused?.region.text !== undefined) this.#copy(focused.region.text)
@@ -180,7 +193,7 @@ export class TranscriptPane implements Component {
   #printedThrough(width: number, screen: Screen): number {
     const printed = this.#printed
     if (printed === undefined || printed.width !== width) return 0
-    return printed.entries === 0 ? 0 : screen.ends[printed.entries - 1] ?? screen.lines.length
+    return printed.entries === 0 ? 0 : (screen.ends[printed.entries - 1] ?? screen.lines.length)
   }
 
   invalidate(): void {

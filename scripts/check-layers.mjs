@@ -75,9 +75,13 @@ function dynamicImports(node, text, found = []) {
   if (node === null || typeof node !== 'object') return found
   if (node.type === 'ImportExpression') {
     const { source } = node
-    const module = source.type === 'Literal' && typeof source.value === 'string' ? source.value
-      : source.type === 'TemplateLiteral' && source.expressions.length === 0 ? source.quasis[0].value.cooked : undefined
-    found.push({ ...module === undefined ? {} : { module }, source: text.slice(source.start, source.end) })
+    const module =
+      source.type === 'Literal' && typeof source.value === 'string'
+        ? source.value
+        : source.type === 'TemplateLiteral' && source.expressions.length === 0
+          ? source.quasis[0].value.cooked
+          : undefined
+    found.push({ ...(module === undefined ? {} : { module }), source: text.slice(source.start, source.end) })
   }
   for (const value of Object.values(node)) dynamicImports(value, text, found)
   return found
@@ -109,28 +113,41 @@ function specifiers(path, text) {
   for (const node of program.body) {
     if (node.type !== 'ImportDeclaration') continue
     for (const specifier of node.specifiers) {
-      const name = specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : ALL
+      const name =
+        specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : ALL
       bound.set(specifier.local.name, { spec: node.source.value, name })
     }
   }
-  const reexports = program.body.flatMap(node => {
+  const reexports = program.body.flatMap((node) => {
     if (node.type === 'ExportAllDeclaration') return [{ spec: node.source.value, name: ALL }]
     if (node.type !== 'ExportNamedDeclaration') return []
-    if (node.source) return node.specifiers.map(specifier => ({ spec: node.source.value, name: nameOf(specifier.local) }))
-    return node.specifiers.flatMap(specifier => bound.get(nameOf(specifier.local)) ?? [])
+    if (node.source) return node.specifiers.map((specifier) => ({ spec: node.source.value, name: nameOf(specifier.local) }))
+    return node.specifiers.flatMap((specifier) => bound.get(nameOf(specifier.local)) ?? [])
   })
-  const declared = program.body.flatMap(node => {
+  const declared = program.body.flatMap((node) => {
     if (node.type === 'ImportDeclaration') {
-      const names = node.specifiers.map(specifier => specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : ALL)
+      const names = node.specifiers.map((specifier) =>
+        specifier.type === 'ImportSpecifier' ? nameOf(specifier.imported) : specifier.type === 'ImportDefaultSpecifier' ? 'default' : ALL,
+      )
       return [{ spec: node.source.value, typeOnly: node.importKind === 'type', names }]
     }
-    if (node.type === 'ExportNamedDeclaration' && node.source) return [{ spec: node.source.value, typeOnly: node.exportKind === 'type', names: node.specifiers.map(specifier => nameOf(specifier.local)) }]
+    if (node.type === 'ExportNamedDeclaration' && node.source)
+      return [
+        {
+          spec: node.source.value,
+          typeOnly: node.exportKind === 'type',
+          names: node.specifiers.map((specifier) => nameOf(specifier.local)),
+        },
+      ]
     if (node.type === 'ExportAllDeclaration') return [{ spec: node.source.value, typeOnly: node.exportKind === 'type', names: [ALL] }]
     return []
   })
   return {
-    named: [...declared, ...dynamic.flatMap(entry => entry.module === undefined ? [] : [{ spec: entry.module, typeOnly: false, names: [ALL] }])],
-    unnamed: dynamic.flatMap(entry => entry.module === undefined ? [entry.source] : []),
+    named: [
+      ...declared,
+      ...dynamic.flatMap((entry) => (entry.module === undefined ? [] : [{ spec: entry.module, typeOnly: false, names: [ALL] }])),
+    ],
+    unnamed: dynamic.flatMap((entry) => (entry.module === undefined ? [entry.source] : [])),
     reexports,
   }
 }
@@ -160,7 +177,10 @@ function unowned(path, named, rules, reexports) {
     for (const [pkg, symbols] of Object.entries(rules.owners ?? {})) {
       if (!covers(pkg, spec)) continue
       for (const symbol of name === ALL ? Object.keys(symbols) : [name]) {
-        if (symbols[symbol]?.includes(self)) problems.push(`${path}: re-exports ${symbol} from ${pkg}, which lets any file import it from here; export what you make of it, and leave the symbol to its owners in layers.json`)
+        if (symbols[symbol]?.includes(self))
+          problems.push(
+            `${path}: re-exports ${symbol} from ${pkg}, which lets any file import it from here; export what you make of it, and leave the symbol to its owners in layers.json`,
+          )
       }
     }
   }
@@ -170,13 +190,18 @@ function unowned(path, named, rules, reexports) {
       for (const name of names) {
         if (name === ALL) {
           for (const [symbol, owners] of Object.entries(symbols)) {
-            if (!owners.includes(self)) problems.push(`${path}: imports all of ${pkg} at once, which reaches ${symbol}, which only ${owners.join(', ')} may; import by name what you need`)
+            if (!owners.includes(self))
+              problems.push(
+                `${path}: imports all of ${pkg} at once, which reaches ${symbol}, which only ${owners.join(', ')} may; import by name what you need`,
+              )
           }
           continue
         }
         const owners = symbols[name]
         if (owners === undefined || owners.includes(self)) continue
-        problems.push(`${path}: imports ${name} from ${pkg}, which only ${owners.join(', ')} may; take what you need from one of them, or name this file among its owners in layers.json`)
+        problems.push(
+          `${path}: imports ${name} from ${pkg}, which only ${owners.join(', ')} may; take what you need from one of them, or name this file among its owners in layers.json`,
+        )
       }
     }
   }
@@ -199,9 +224,10 @@ export function checkLayers(files, rules) {
       problems.push(`${file.path}: is in no layer; move it under ${rules.root}/<layer>/`)
       continue
     }
-    const allowed = layer === 'entry' ? rules.entry : rules.layers[layer] ?? []
+    const allowed = layer === 'entry' ? rules.entry : (rules.layers[layer] ?? [])
     const who = layer === 'entry' ? 'the entry' : layer
-    for (const source of unnamed) problems.push(`${file.path}: imports a module named at run time (${source}); name it with a string so layers.json can hold it`)
+    for (const source of unnamed)
+      problems.push(`${file.path}: imports a module named at run time (${source}); name it with a string so layers.json can hold it`)
     for (const { spec, typeOnly } of named) {
       if (spec.startsWith('.')) {
         const resolved = normalize(join(dirname(file.path), spec))
@@ -209,24 +235,34 @@ export function checkLayers(files, rules) {
         if (target === layer) {
           const unit = unitOf(resolved, rules)
           if (rules.isolated?.includes(layer) && unit !== unitOf(file.path, rules)) {
-            problems.push(`${file.path}: imports ${unit}, another unit of ${layer} (${spec}); a unit of ${layer} imports only its own files — see layers.json`)
+            problems.push(
+              `${file.path}: imports ${unit}, another unit of ${layer} (${spec}); a unit of ${layer} imports only its own files — see layers.json`,
+            )
           }
           continue
         }
         if (target === undefined || !allowed.includes(target)) {
-          problems.push(`${file.path}: imports ${target ?? 'a file in no layer'} (${spec}); ${who} may import ${allowed.join(', ') || 'no other layer'} — see layers.json`)
+          problems.push(
+            `${file.path}: imports ${target ?? 'a file in no layer'} (${spec}); ${who} may import ${allowed.join(', ') || 'no other layer'} — see layers.json`,
+          )
         } else if (!typeOnly && rules.typeOnly?.includes(layer)) {
-          problems.push(`${file.path}: loads ${target} at run time (${spec}); ${layer} reaches other layers only through import type or export type — see layers.json`)
+          problems.push(
+            `${file.path}: loads ${target} at run time (${spec}); ${layer} reaches other layers only through import type or export type — see layers.json`,
+          )
         }
         continue
       }
-      const key = Object.keys(rules.external).filter(candidate => covers(candidate, spec)).toSorted((a, b) => b.length - a.length)[0]
+      const key = Object.keys(rules.external)
+        .filter((candidate) => covers(candidate, spec))
+        .toSorted((a, b) => b.length - a.length)[0]
       if (key === undefined) {
         problems.push(`${file.path}: imports ${spec}, which no layer is allowed; add it to layers.json if ${who} should know it`)
       } else if (!rules.external[key].includes(layer)) {
         problems.push(`${file.path}: imports ${spec}; only ${rules.external[key].join(', ')} may — see layers.json`)
       } else if (!typeOnly && rules.typeOnly?.includes(layer)) {
-        problems.push(`${file.path}: loads ${key} at run time (${spec}); ${layer} reaches external packages only through import type or export type — see layers.json`)
+        problems.push(
+          `${file.path}: loads ${key} at run time (${spec}); ${layer} reaches external packages only through import type or export type — see layers.json`,
+        )
       }
     }
   }
@@ -238,8 +274,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const packageDir = join(root, 'packages', 'binnacle')
   const rules = JSON.parse(readFileSync(join(packageDir, 'layers.json'), 'utf8'))
   const files = repositoryFiles(root)
-    .filter(file => file.path.startsWith('packages/binnacle/src/') && file.path.endsWith('.ts'))
-    .map(file => ({ path: relative('packages/binnacle', file.path), text: file.text }))
+    .filter((file) => file.path.startsWith('packages/binnacle/src/') && file.path.endsWith('.ts'))
+    .map((file) => ({ path: relative('packages/binnacle', file.path), text: file.text }))
   const problems = checkLayers(files, rules)
   for (const problem of problems) console.error(`packages/binnacle/${problem}`)
   console.log(problems.length === 0 ? `check-layers: ok (${files.length} modules)` : `check-layers: ${problems.length} problems`)

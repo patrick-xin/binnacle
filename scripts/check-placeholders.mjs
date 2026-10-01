@@ -33,7 +33,10 @@ export function findPlaceholders(files) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const found = findPlaceholders(repositoryFiles(join(dirname(fileURLToPath(import.meta.url)), '..')))
-  for (const each of found) console.error(`${each.path}:${each.line}: ${each.found} is a privacy tool's placeholder; write the value it stood for, read from where it lives`)
+  for (const each of found)
+    console.error(
+      `${each.path}:${each.line}: ${each.found} is a privacy tool's placeholder; write the value it stood for, read from where it lives`,
+    )
   console.log(found.length === 0 ? 'check-placeholders: ok' : `check-placeholders: ${found.length} placeholders`)
   process.exitCode = found.length === 0 ? 0 : 1
 }

@@ -19,7 +19,12 @@ test('the screen is drawn and laid out again as its facts arrive, and not otherw
   const facts: Fact[] = [prompt(1, 1, 'fix the build')]
   const handed: (readonly Fact[])[] = []
   const pane = new ScreenPane(() => facts)
-  pane.place('trajectory', { draw: (given) => { handed.push([...given]); return { kind: 'text', text: `lines ${given.length}` } } })
+  pane.place('trajectory', {
+    draw: (given) => {
+      handed.push([...given])
+      return { kind: 'text', text: `lines ${given.length}` }
+    },
+  })
   drawText(pane, 40)
   drawText(pane, 40)
   assert.deepEqual(handed, [[prompt(1, 1, 'fix the build')]], 'the same facts, width and state draw once, however many frames pass')
@@ -28,12 +33,20 @@ test('the screen is drawn and laid out again as its facts arrive, and not otherw
   assert.deepEqual(handed, [[prompt(1, 1, 'fix the build')]], 'facts the pane was not told of change nothing')
   pane.factsChanged()
   assert.deepEqual(drawText(pane, 40), ['lines 2'])
-  assert.deepEqual(handed.at(-1), [prompt(1, 1, 'fix the build'), prompt(2, 2, 'and the tests')], 'told of its facts, the screen draws them as they now stand')
+  assert.deepEqual(
+    handed.at(-1),
+    [prompt(1, 1, 'fix the build'), prompt(2, 2, 'and the tests')],
+    'told of its facts, the screen draws them as they now stand',
+  )
 })
 
 test('the screen is drawn in the theme as it stands, and laid out again when it changes', () => {
   let theme = binnacleTheme
-  const pane = new ScreenPane(() => [], {}, () => theme)
+  const pane = new ScreenPane(
+    () => [],
+    {},
+    () => theme,
+  )
   pane.place('trajectory', { draw: () => ({ kind: 'text', text: [{ mark: 'prompt' }, ' asked'] }) })
   assert.deepEqual(drawText(pane, 40), ['› asked'])
   theme = themed(binnacleTheme, [{ marks: { prompt: { glyph: '>' } } }])
@@ -42,7 +55,11 @@ test('the screen is drawn in the theme as it stands, and laid out again when it 
 
 test('a drawing that throws draws what went wrong, naming its registration, and the pane stays up', () => {
   const pane = new ScreenPane(() => [])
-  pane.place('trajectory', { draw: () => { throw new Error('no phone') } })
+  pane.place('trajectory', {
+    draw: () => {
+      throw new Error('no phone')
+    },
+  })
   assert.deepEqual(drawText(pane, 60), ['✗ binnacle.screen(trajectory) threw: no phone'])
 })
 
@@ -91,7 +108,11 @@ test('enter opens the fold a person focused, and the focus row says what it will
 
 test('focus moved by a key is reported with its rows, to be brought into view', () => {
   const inView: [number, number][] = []
-  const pane = new ScreenPane(() => [], { inView: (top, height) => { inView.push([top, height]) } })
+  const pane = new ScreenPane(() => [], {
+    inView: (top, height) => {
+      inView.push([top, height])
+    },
+  })
   pane.place('screened', foldScreen())
   drawText(pane, 40)
   assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
@@ -103,9 +124,7 @@ function offerScreen(): { readonly draw: () => Node } {
   return {
     draw: () => ({
       kind: 'stack',
-      children: [
-        { kind: 'offer', id: 'reply', affordances: [{ kind: 'answer', label: 'reply' }], child: { kind: 'text', text: 'reply' } },
-      ],
+      children: [{ kind: 'offer', id: 'reply', affordances: [{ kind: 'answer', label: 'reply' }], child: { kind: 'text', text: 'reply' } }],
     }),
   }
 }
@@ -138,8 +157,22 @@ test('an offer invoked by a key or a click reaches the registration’s invoke, 
 test('a key bound to copy on a focused show on a placed screen hands the host all it holds, not the placement', () => {
   const copied: string[] = []
   const invoked: string[] = []
-  const pane = new ScreenPane(() => [], { copy: (text) => { copied.push(text) }, invoked: (_region, affordance) => { invoked.push(affordance) } })
-  pane.place('cards', { draw: () => ({ kind: 'show', title: ['● pnpm test'], opens: 'output', child: { kind: 'fold', id: 'output', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } } }) })
+  const pane = new ScreenPane(() => [], {
+    copy: (text) => {
+      copied.push(text)
+    },
+    invoked: (_region, affordance) => {
+      invoked.push(affordance)
+    },
+  })
+  pane.place('cards', {
+    draw: () => ({
+      kind: 'show',
+      title: ['● pnpm test'],
+      opens: 'output',
+      child: { kind: 'fold', id: 'output', rows: 1, child: { kind: 'text', text: 'a\nb\nc' } },
+    }),
+  })
   drawText(pane, 40)
   pane.handleKey({ kind: 'key', binding: 'focus.next' })
   drawText(pane, 40)

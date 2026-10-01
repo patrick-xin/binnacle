@@ -26,20 +26,28 @@ test('a line naming no command whose session closes under it sends nothing and r
   const gate: { resolve?: (ran: boolean) => void } = {}
   const sent: string[] = []
   const close = registrations.open({
-    send: (text) => { sent.push(text); throw new Error('binnacle.send: no session is open') },
-    command: () => new Promise<boolean>(resolve => { gate.resolve = resolve }),
+    send: (text) => {
+      sent.push(text)
+      throw new Error('binnacle.send: no session is open')
+    },
+    command: () =>
+      new Promise<boolean>((resolve) => {
+        gate.resolve = resolve
+      }),
     agent: {} as Agent,
   })
 
   // What the process holds against a plugin that leaves a rejection unhandled: heard here, so the test can name it.
   const unhandled: unknown[] = []
-  const heard = (reason: unknown): void => { unhandled.push(reason) }
+  const heard = (reason: unknown): void => {
+    unhandled.push(reason)
+  }
   process.on('unhandledRejection', heard)
   try {
     placed.submit('/nothing here')
     close()
     gate.resolve?.(false)
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await new Promise((resolve) => setTimeout(resolve, 20))
   } finally {
     process.off('unhandledRejection', heard)
   }
