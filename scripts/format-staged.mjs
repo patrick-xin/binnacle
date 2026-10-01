@@ -28,13 +28,16 @@ export function select({ staged, unstaged, exists }) {
   return { format, skipped }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  // CI commits its own prose (the upstream job's pin moves, changesets' version commits); the hook stands aside there, as pre-push does.
-  if (process.env.GITHUB_ACTIONS) process.exit(0)
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const records = execFileSync('git', ['-C', root, 'status', '--porcelain=v1', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean)
+/**
+ * What is staged and what carries unstaged edits, read from `git status --porcelain=v1 -z`: a rename's or
+ * copy's old path arrives as a bare record after the new, and is consumed, never parsed.
+ * @param {string} listed - the status output, NUL-separated.
+ * @returns {{ staged: { status: string, path: string }[], unstaged: string[] }} the staged entries, and the paths with unstaged edits.
+ */
+export function parseStatus(listed) {
   const staged = []
   const unstaged = []
+  const records = listed.split('\0').filter(Boolean)
   for (let at = 0; at < records.length; at++) {
     const record = records[at]
     const status = record.slice(0, 2)
@@ -43,6 +46,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (status[1] !== ' ' && status[1] !== '?') unstaged.push(path)
     if ('ACMR'.includes(status[0])) staged.push({ status: status[0], path })
   }
+  return { staged, unstaged }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // CI commits its own prose (the upstream job's pin moves, changesets' version commits); the hook stands aside there, as pre-push does.
+  if (process.env.GITHUB_ACTIONS) process.exit(0)
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const { staged, unstaged } = parseStatus(execFileSync('git', ['-C', root, 'status', '--porcelain=v1', '-z'], { encoding: 'utf8' }))
   const { format, skipped } = select({ staged, unstaged, exists: (path) => existsSync(join(root, path)) })
   for (const path of skipped) console.warn(`format-staged: ${path} is staged in part; stage it whole to format it`)
   if (format.length === 0) process.exit(0)
