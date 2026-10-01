@@ -13,6 +13,8 @@ Standing orders — the one page here that binds. A record is evidence, never a 
 | `pnpm install && pnpm refs` | install, point git at [`.githooks`](.githooks) (a push runs `pnpm test` first), and fetch every reference into `.refs/` |
 | `pnpm test` | every gate, then every test — what CI runs |
 | `pnpm build` | build the bundle into `packages/binnacle/dist/` |
+| `pnpm fmt` | format the tree with oxfmt; `fmt:check`, inside `pnpm test`, holds it |
+| `pnpm changeset` | describe a change the published package's person or author would notice; merged ones become a version PR |
 | `pnpm dsh:profile` | create the `binnacle` dsh profile linking this checkout |
 | `pnpm check:boot` | boot it under the real `dsh` at the pin, draw nothing, exit |
 | `dsh --profile binnacle` | run it |
