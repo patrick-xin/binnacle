@@ -67,8 +67,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { format, skipped } = select({ staged, unstaged, exists: (path) => existsSync(join(root, path)), index })
   for (const path of skipped) console.warn(`format-staged: ${path} is staged in part; stage it whole to format it`)
   if (format.length === 0) process.exit(0)
-  const run = spawnSync('pnpm', ['exec', 'oxfmt', ...format], { stdio: 'inherit' })
-  if (run.status === 2) process.exit(0)
-  if (run.status !== 0) process.exit(run.status ?? 1)
+  const run = spawnSync('pnpm', ['exec', 'oxfmt', ...format], { encoding: 'utf8' })
+  // A clean run and "no target files" (exit 2) say nothing; anything else is printed in oxfmt's own words.
+  if (run.status === 0 || run.status === 2) process.exit(0)
+  process.stderr.write(`${run.stderr ?? ''}${run.stdout ?? ''}`)
+  process.exit(run.status ?? 1)
   execFileSync('git', ['-C', root, 'add', '--', ...format])
 }
