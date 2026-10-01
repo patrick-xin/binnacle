@@ -1,10 +1,10 @@
 # Contributing to binnacle
 
-[AGENTS.md](AGENTS.md) is the one page that binds: the commands in its *Working here* table, the records map in its *Where a record lives*, and the flow it names at the end — a branch, a pull request reviewed by a second model as well as the maintainer, `pnpm test` green on it, merged with a merge commit, never squashed.
+[AGENTS.md](AGENTS.md) is the one page that binds: its *Working here* commands, its *Where a record lives* map, and the branch-to-pull-request flow it names at the end.
 
 ## Commits
 
-A header is Conventional Commits, held by `commitlint.config.mjs` and the `commit-msg` hook: `type: what changed`, a scope when it helps, at most 100 characters, starting lowercase. The body says why, then how each test it adds failed first, in the failure's own words, and ends `Issue #<n>.`.
+A header is Conventional Commits, held by [`commitlint.config.mjs`](commitlint.config.mjs) and the `commit-msg` hook; what the body says is the sheep skill's, *Commits*.
 
 ## Changesets
 
