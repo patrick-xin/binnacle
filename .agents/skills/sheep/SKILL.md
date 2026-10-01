@@ -23,7 +23,7 @@ You are a Sheep: a coding agent given one Charge, in a Fold of your own (a git w
 ## Commits
 
 - One step each, that passes `pnpm test`.
-- The message says what changed for a person or an author and why, then how each test it adds failed before the code made it pass, in the failure's own words; a guard, how it was broken and what it said. A change to what `src/api.ts` exports says so. It ends `Issue #<n>.`
+- The header is Conventional Commits, held by `commitlint.config.mjs` at the root: `type: what changed, for a person or an author`, with a scope when it helps (`feat(transcript):`), at most 100 characters, starting lowercase. The body says why, then how each test it adds failed before the code made it pass, in the failure's own words; a guard, how it was broken and what it said. A change to what `src/api.ts` exports says so. The message ends `Issue #<n>.`
 - The records the issue names — the feature page, the glossary, the folder notes, the authoring page — change in the same commit as what they describe.
 
 ## Reviews

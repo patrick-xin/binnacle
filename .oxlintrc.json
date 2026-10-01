@@ -18,6 +18,12 @@
   },
   "overrides": [
     {
+      "files": ["commitlint.config.mjs"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
       "files": ["packages/binnacle/src/{contract,facts,models,ui,views,panes,plugins}/**/*.ts", "packages/binnacle/src/api.ts"],
       "rules": {
         "no-restricted-globals": [

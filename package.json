@@ -12,6 +12,7 @@
     "build": "pnpm --filter binnacle run build",
     "typecheck": "tsc -p packages/binnacle/tsconfig.json --noEmit",
     "lint": "oxlint",
+    "lint:commits": "commitlint --from origin/main --to HEAD",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "check:paths": "node scripts/check-paths.mjs",
@@ -33,6 +34,8 @@
     "test": "pnpm run check && node --test \"scripts/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
     "@deepseek-ai/cordis-plugin-include": "1.0.9",
     "@types/node": "24.19.0",
     "js-yaml": "4.3.1",

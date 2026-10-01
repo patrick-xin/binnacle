@@ -86,7 +86,7 @@ The loop, a cycle at a time, is the `tdd` skill ([`.agents/skills/tdd`](.agents/
 | what a person can do with a feature, how its parts work together, and its choices | its page in [`docs/features/`](docs/features/), listed in [the feature map](docs/features.md) |
 | what a term means, and whose word it is | [`docs/glossary.md`](docs/glossary.md) |
 | what is wrong, missing, being read, or not built yet | a GitHub issue |
-| what one change did and why | its commit message |
+| what one change did and why | its commit message, headed as Conventional Commits (`commitlint.config.mjs`) |
 
 - **Each fact has one home; everywhere else links to it.** What code or config states — the layers, the affordances, what a gate refuses — is linked or cited, never restated.
 - **No implementation status or progress in prose, and no inventory restated from code or config.** The architecture states commitments, which may run ahead of the code; where the code falls short, that is an issue.
