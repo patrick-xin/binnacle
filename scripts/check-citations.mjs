@@ -16,8 +16,8 @@
  * repository's TypeScript and JavaScript it must be a name the module exports,
  * its star re-exports followed.
  *
- * A decision record cites nothing. It is never edited to follow a move, so it
- * names what it read, and at which version, in words.
+ * A decision record cites nothing. It stands on its own, read years later with
+ * nothing else in hand, so what was read to decide it goes on its issue.
  *
  * A reference only this machine declares is skipped where it is not fetched,
  * which is everywhere but here; a public one that is not fetched fails.
@@ -97,7 +97,7 @@ export function checkCitations(files, manifest, read) {
       const cited = `${citation.name}:${citation.path}`
       if (file.path.startsWith(RECORDS)) {
         problems.push(
-          `${where}: ${cited} is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words`,
+          `${where}: ${cited} is cited in a decision record, which stands on its own; say what forced it in its own words, and put the reading on its issue`,
         )
         continue
       }

@@ -13,7 +13,7 @@ The layers and what each may import are `packages/binnacle/layers.json`'s and [t
 
 - **The blocks a view returns** (`binnacle:packages/binnacle/src/ui/node.ts#Node`). A block promises how it is drawn **and how it answers**: whether it scrolls, where focus goes, how it is dismissed, what it does when it overflows its room. That promise is kept by the block, wherever it is placed; no placement decides it again. The host once gave placed screens a scroll and placed lines none, so an ask in the composer's place was cut off (#85).
 - **The registrations** (`binnacle:packages/binnacle/src/api.ts#Registrations`): one interface an author and every built-in feature share, stacking and disposing the same way for both.
-- **The key table** (ADR 13) and **the transcript model**: one answer each to what a key means, and what a session holds.
+- **The key table** (ADR 8) and **the transcript model**: one answer each to what a key means, and what a session holds.
 
 **The host is shallow on purpose**: it touches the terminal, the process and the clock, and passes the rest on. Behaviour that grows in the host — state held in its closures, a rule it decides for one slot — is behaviour a deeper module has not taken yet, and it is tested only through the most expensive seam there is. Move it down, and the host shrinks.
 

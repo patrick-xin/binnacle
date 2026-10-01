@@ -10,4 +10,4 @@ The host reads the invocation through dsh's command line. Once the launcher comm
 
 - The agent is composed as dsh's headless bundle composes one, with no preset roster: its rows come from the global layer, and its model from the default selection.
 - `--check` draws nothing, so the boot check (`binnacle:scripts/check-boot.mjs`) and a person can each see that the profile opens a session without a terminal.
-- Quitting is answered by the host, whatever is placed ([ADR 11](../adr/0011-placements-reach-the-whole-screen-and-the-built-in-surface-is-placed-through-them.md)), and asks twice: the notice saying what a second does stands three seconds, then goes.
+- Quitting is answered by the host, whatever is placed ([ADR 13](../adr/0013-placements-reach-the-whole-screen.md)), and asks twice: the notice saying what a second does stands three seconds, then goes.
