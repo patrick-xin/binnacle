@@ -92,13 +92,13 @@ test('a symbol is exported through a star re-export too, and a namespace re-expo
 
 const everywhere = (name, path) => (name === 'pi' ? onlyTui(name, path) : here(name, path))
 
-test('a decision record cites nothing, as it is never edited to follow a move: a citation in one is a problem, resolved or not', () => {
+test('a decision record cites nothing, as it stands on its own: a citation in one is a problem, resolved or not', () => {
   const files = [
     { path: 'docs/adr/0001-x.md', text: cite('as pi draws (^pi:packages/tui/src/tui.ts^)\nand ^binnacle:docs/glossary.md#fact^') },
     { path: 'docs/glossary.md', text: cite('^pi:packages/tui/src/tui.ts^') },
   ]
   assert.deepEqual(checkCitations(files, { pi: { commit: 'abc' }, binnacle: { self: true } }, everywhere).problems, [
-    'docs/adr/0001-x.md:1: pi:packages/tui/src/tui.ts is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words',
-    'docs/adr/0001-x.md:2: binnacle:docs/glossary.md is cited in a decision record, which is never edited to follow it; name what was read, and its version, in words',
+    'docs/adr/0001-x.md:1: pi:packages/tui/src/tui.ts is cited in a decision record, which stands on its own; say what forced it in its own words, and put the reading on its issue',
+    'docs/adr/0001-x.md:2: binnacle:docs/glossary.md is cited in a decision record, which stands on its own; say what forced it in its own words, and put the reading on its issue',
   ])
 })
