@@ -21,4 +21,4 @@ Where each record lives, and what it may hold, is `AGENTS.md`'s *Where a record 
 
 - **A term settled goes into the glossary now**, in its table's shape: the term in bold, what it means in a sentence or two, whose word it is, and a citation where it names code. No implementation detail, and no change history.
 - **Which block, placement or registration to use for what**, and how each answers, is a record a person and an author both read: it goes on its feature page, which the glossary's row links. A rule an agent could learn only from code is a gap in the records, fixed where it is found.
-- **A decision is offered as a record only when all three hold**: it binds beyond one feature (a seam, a layer, the author API, what every view or plugin keeps); a later reader would ask why; and a real alternative lost. Offer it; the maintainer decides. It is written from [the template](../../../docs/adr/template.md), numbered after the highest in `docs/adr/`.
+- **A decision is offered as a record only when it passes [the template's](../../../docs/adr/template.md) three tests.** Offer it; the maintainer decides.
