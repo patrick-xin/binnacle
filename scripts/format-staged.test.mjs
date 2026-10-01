@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -79,24 +79,23 @@ test('the two-column statuses parse: MM both, AD both, " A" worktree only, ?? ne
 test("the hook's entry path: a misformatted .ts staged whole is formatted and staged into the index", () => {
   const root = join(here, '..')
   const repo = mkdtempSync(join(tmpdir(), 'binnacle-hook-'))
-  const git = (args) =>
-    execFileSync('git', ['-C', repo, ...args], {
-      encoding: 'utf8',
-      env: { ...process.env, GIT_CEILING_DIRECTORIES: repo, GIT_DIR: join(repo, '.git'), GIT_WORK_TREE: repo },
-    })
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: repo }
+  delete env.GIT_DIR
+  delete env.GIT_WORK_TREE
+  delete env.GIT_INDEX_FILE
+  const git = (args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', env })
   try {
     git(['init', '-q'])
     git(['config', 'user.email', 'test@example.com'])
     git(['config', 'user.name', 'test'])
     writeFileSync(join(repo, 'a.ts'), 'const   a   =   "x";\n')
+    mkdirSync(join(repo, 'scripts'))
+    writeFileSync(join(repo, 'scripts', 'format-staged.mjs'), readFileSync(join(here, 'format-staged.mjs')))
     symlinkSync(join(root, 'node_modules'), join(repo, 'node_modules'))
     writeFileSync(join(repo, '.oxfmtrc.json'), readFileSync(join(root, '.oxfmtrc.json')))
     git(['add', 'a.ts'])
-    const run = spawnSync(process.execPath, [join(here, 'format-staged.mjs')], {
-      encoding: 'utf8',
-      cwd: repo,
-      env: { ...process.env, GIT_CEILING_DIRECTORIES: repo, GIT_DIR: join(repo, '.git'), GIT_WORK_TREE: repo, GIT_INDEX_FILE: join(repo, '.git', 'index') },
-    })
+    // By relative path, as the hook runs it: an absolute /var path and the module's /private/var URL disagree under macOS's symlink.
+    const run = spawnSync(process.execPath, ['scripts/format-staged.mjs'], { encoding: 'utf8', cwd: repo, env })
     assert.equal(run.status, 0, run.stderr)
     assert.equal(git(['show', ':a.ts']), "const a = 'x'\n")
   } finally {

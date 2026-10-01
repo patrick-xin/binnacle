@@ -67,10 +67,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { format, skipped } = select({ staged, unstaged, exists: (path) => existsSync(join(root, path)), index })
   for (const path of skipped) console.warn(`format-staged: ${path} is staged in part; stage it whole to format it`)
   if (format.length === 0) process.exit(0)
-  const run = spawnSync('pnpm', ['exec', 'oxfmt', ...format], { encoding: 'utf8' })
-  // A clean run and "no target files" (exit 2) say nothing; anything else is printed in oxfmt's own words.
-  if (run.status === 0 || run.status === 2) process.exit(0)
-  process.stderr.write(`${run.stderr ?? ''}${run.stdout ?? ''}`)
-  process.exit(run.status ?? 1)
+  // The root's own binary, not `pnpm exec`, which needs a package.json at hand; the hook may run from a root that has none.
+  const run = spawnSync(join(root, 'node_modules', '.bin', 'oxfmt'), [...format], { encoding: 'utf8' })
+  // "No target files" (exit 2) says nothing; a clean run stages what it formatted; anything else is printed in oxfmt's own words.
+  if (run.status === 2) process.exit(0)
+  if (run.status !== 0) {
+    process.stderr.write(`${run.stderr ?? ''}${run.stdout ?? ''}`)
+    process.exit(run.status ?? 1)
+  }
   execFileSync('git', ['-C', root, 'add', '--', ...format])
 }
