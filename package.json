@@ -12,6 +12,8 @@
     "build": "pnpm --filter binnacle run build",
     "typecheck": "tsc -p packages/binnacle/tsconfig.json --noEmit",
     "lint": "oxlint",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "check:paths": "node scripts/check-paths.mjs",
     "check:placeholders": "node scripts/check-placeholders.mjs",
     "check:citations": "node scripts/check-citations.mjs",
@@ -35,6 +37,7 @@
     "@types/node": "24.19.0",
     "js-yaml": "4.3.1",
     "oxc-parser": "0.151.0",
+    "oxfmt": "0.71.0",
     "oxlint": "1.85.0",
     "typescript": "7.0.2"
   },
