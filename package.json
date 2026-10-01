@@ -29,7 +29,7 @@
     "check:skills": "node scripts/check-skills.mjs",
     "map": "node scripts/map.mjs",
     "check:boot": "node scripts/check-boot.mjs",
-    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:peers && pnpm run check:layers && pnpm run check:jsdoc && pnpm run check:comments && pnpm run check:notes && pnpm run check:words && pnpm run check:skills && pnpm run lint && pnpm run typecheck",
+    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:peers && pnpm run check:layers && pnpm run check:jsdoc && pnpm run check:comments && pnpm run check:notes && pnpm run check:words && pnpm run check:skills && pnpm run lint && pnpm run fmt:check && pnpm run typecheck",
     "test": "pnpm run check && node --test \"scripts/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {
