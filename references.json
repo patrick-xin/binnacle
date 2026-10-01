@@ -7,8 +7,8 @@
   },
   "pi": {
     "url": "https://github.com/earendil-works/pi.git",
-    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
-    "tag": "v0.99.1",
+    "commit": "005af57d88ee23b33778f343a9595b32e67ff788",
+    "tag": "v0.99.2",
     "role": "pi-tui, the library this surface renders with, and pi's own product composed from it."
   },
   "codex": {
