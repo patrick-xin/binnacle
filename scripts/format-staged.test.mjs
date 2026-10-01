@@ -1,6 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseStatus, select } from './format-staged.mjs'
+
+const here = dirname(fileURLToPath(import.meta.url))
 
 test('a file staged whole is chosen to format', () => {
   const chosen = select({
@@ -66,5 +73,33 @@ test('the two-column statuses parse: MM both, AD both, " A" worktree only, ?? ne
   ]
   for (const [listed, staged, unstaged] of cases) {
     assert.deepEqual(parseStatus(listed), { staged, unstaged }, listed.trim())
+  }
+})
+
+test("the hook's entry path: a misformatted .ts staged whole is formatted and staged into the index", () => {
+  const root = join(here, '..')
+  const repo = mkdtempSync(join(tmpdir(), 'binnacle-hook-'))
+  const git = (args) =>
+    execFileSync('git', ['-C', repo, ...args], {
+      encoding: 'utf8',
+      env: { ...process.env, GIT_CEILING_DIRECTORIES: repo, GIT_DIR: join(repo, '.git'), GIT_WORK_TREE: repo },
+    })
+  try {
+    git(['init', '-q'])
+    git(['config', 'user.email', 'test@example.com'])
+    git(['config', 'user.name', 'test'])
+    writeFileSync(join(repo, 'a.ts'), 'const   a   =   "x";\n')
+    symlinkSync(join(root, 'node_modules'), join(repo, 'node_modules'))
+    writeFileSync(join(repo, '.oxfmtrc.json'), readFileSync(join(root, '.oxfmtrc.json')))
+    git(['add', 'a.ts'])
+    const run = spawnSync(process.execPath, [join(here, 'format-staged.mjs')], {
+      encoding: 'utf8',
+      cwd: repo,
+      env: { ...process.env, GIT_CEILING_DIRECTORIES: repo, GIT_DIR: join(repo, '.git'), GIT_WORK_TREE: repo, GIT_INDEX_FILE: join(repo, '.git', 'index') },
+    })
+    assert.equal(run.status, 0, run.stderr)
+    assert.equal(git(['show', ':a.ts']), "const a = 'x'\n")
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
   }
 })
