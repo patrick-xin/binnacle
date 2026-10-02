@@ -14,6 +14,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { applyEntryPatches, entryListSchema } from '@deepseek-ai/cordis-plugin-include'
+import { bundlePatchFiles } from '@deepseek-ai/dsh-app-boot'
 import { load } from 'js-yaml'
 import { profileFiles } from './profile.mjs'
 
@@ -32,6 +33,20 @@ export function checkPatch(layers) {
     tree = applyEntryPatches(tree, load(layer.text, { schema: entryListSchema }) ?? [], warn)
   }
   return problems
+}
+
+/**
+ * The patch files a bundle declares, read as dsh's own launcher reads them
+ * (`bundlePatchFiles`, `dsh:packages/boot/app-boot/src/profile.ts`); a package
+ * that declares no bundle at all contributes no layer.
+ * @param {any} manifest - the bundle's parsed package.json.
+ * @returns {string[]} the package-relative patch file paths in application order.
+ * @throws {Error} when `patch` is neither a string nor a list of strings, as the loader refuses it.
+ */
+export function patchFilesOf(manifest) {
+  const bundle = manifest.dsh?.bundle
+  if (bundle === undefined) return []
+  return bundlePatchFiles(bundle)
 }
 
 /**
@@ -64,8 +79,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       problems.push(`${name}: not found in the dsh reference; run \`pnpm refs\``)
       continue
     }
-    const patch = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dsh?.bundle?.patch
-    if (patch !== undefined) layers.push({ name, text: readFileSync(join(dir, patch), 'utf8') })
+    for (const file of patchFilesOf(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')))) {
+      if (!existsSync(join(dir, file))) {
+        problems.push(`${name}: ${file} is declared in dsh.bundle.patch but not shipped`)
+        continue
+      }
+      layers.push({ name: `${name} ${file}`, text: readFileSync(join(dir, file), 'utf8') })
+    }
   }
   if (problems.length === 0) problems.push(...checkPatch(layers))
   for (const problem of problems) console.error(problem)

@@ -181,6 +181,11 @@ async function mount(
   } as never)
   // dsh's default model, which opening a session reads; the host's tests fake the session, so nothing here varies it.
   ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  // dsh's preset registry, whose default a session opens on and whose roster the check reports; the host's tests fake the session, so a stand-in binds nothing and holds the five binnacle ships.
+  ctx.provide('agentPresets', {
+    mount: async () => ({ id: 'standard' }),
+    list: async () => ['standard', 'ptc', 'minimal', 'cordis', 'author'].map((id) => ({ id })),
+  } as never)
   // dsh's commands, which the row names; the host's tests fake the session, whose commands a test names, so nothing reads this.
   ctx.provide('commands', {} as never)
   const fiber = ctx.plugin(host)
@@ -456,9 +461,9 @@ test('disposing the theme row gives the theme back and closes the watch', async 
   assert.equal(terminal.written.includes('\u001b[32m›'), false, 'the watch is closed: a write after it draws nothing')
 })
 
-test('the row is named binnacle and needs the command line, the agents, the default model and the commands', () => {
+test('the row is named binnacle and needs the command line, the agents, the default model, the preset registry and the commands', () => {
   assert.equal(host.name, 'binnacle')
-  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'])
+  assert.deepEqual(host.inject, ['cmdlineArgs', 'agents', 'agentDefaultModel', 'agentPresets', 'commands'])
 })
 
 test('the host alone draws no built-in feature a patch row loads: no transcript, no status line, and no composer takes typing', async () => {
@@ -493,12 +498,12 @@ test('the host alone draws no built-in feature a patch row loads: no transcript,
   assert.deepEqual(session.sent, [], 'no composer takes typing')
 })
 
-test('--check opens a session on the default model once startup commits, reports it, closes it, and exits 0 drawing nothing', async () => {
+test('--check opens a session on the default model once startup commits, reports it with the roster of presets it mounted, closes it, and exits 0 drawing nothing', async () => {
   const { exits, out, terminal, session, commit } = await mount(['--check'])
   assert.deepEqual(exits, [])
   commit()
   await settle()
-  assert.deepEqual(out, ['binnacle: ok (deepseek/deepseek-v4)\n'])
+  assert.deepEqual(out, ['binnacle: ok (deepseek/deepseek-v4, presets: standard, ptc, minimal, cordis, author)\n'])
   assert.equal(session.closed, true)
   assert.deepEqual(exits, [0])
   assert.equal(terminal.started, false)

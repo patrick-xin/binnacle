@@ -4,9 +4,9 @@
  *
  * A package binnacle runs code from must be a dependency (bundled) or a
  * peerDependency (provided by the dsh install); so must a package whose row
- * the patch inserts, which must be a peer. A peerDependency that is neither
- * belongs in devDependencies. A package read for its types alone is declared
- * in some list.
+ * any of the bundle's patch files inserts, which must be a peer. A
+ * peerDependency that is neither belongs in devDependencies. A package read
+ * for its types alone is declared in some list.
  *
  * A row that names a Cordis service in `inject` needs the package that provides
  * that service installed beside it, so that package is a peerDependency too
@@ -21,17 +21,19 @@ import { dirname, join } from 'node:path'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { load } from 'js-yaml'
+import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import { parseSync } from 'oxc-parser'
 import { repositoryFiles } from './check-paths.mjs'
+import { patchFilesOf } from './check-patch.mjs'
 
 /**
  * Derive what binnacle needs from other packages and compare it to its manifest.
- * @param {{ manifest: any, files: { path: string, text: string }[], patch: string, services?: Record<string, string>, provided?: (name: string) => Set<string> | undefined }} input - the parsed package.json, the source files, the patch text, layers.json's services table, and what a package's own types say it provides.
+ * @param {{ manifest: any, files: { path: string, text: string }[], patches: string[], services?: Record<string, string>, provided?: (name: string) => Set<string> | undefined }} input - the parsed package.json, the source files, every patch file's YAML text, layers.json's services table, and what a package's own types say it provides.
  * @returns {string[]} one line per problem, sorted.
  */
-export function checkPeers({ manifest, files, patch, services = {}, provided = () => undefined }) {
+export function checkPeers({ manifest, files, patches, services = {}, provided = () => undefined }) {
   const { runs, types } = importsOf(files, manifest.name)
-  const rows = rowsOf(patch, manifest.name)
+  const rows = new Set(patches.flatMap((patch) => [...rowsOf(patch, manifest.name)]))
   const problems = []
   const providers = new Set()
   for (const [service, provider] of Object.entries(services)) {
@@ -165,7 +167,7 @@ function injectsOf(files) {
  * The packages a patch inserts rows of.
  * @param {string} patch - the patch's YAML text.
  * @param {string} own - binnacle's own package name, skipped.
- * @returns {Set<string>} the package each row under an `insert` names, at any depth: a row may name a subpath of one.
+ * @returns {Set<string>} the package each row under an `insert` names, at any depth: a row may name a subpath of one. A loader builtin (`cordis:`) names none.
  */
 function rowsOf(patch, own) {
   const names = new Set()
@@ -176,17 +178,18 @@ function rowsOf(patch, own) {
     if (name !== undefined && name !== own) names.add(name)
     for (const [key, value] of Object.entries(node)) walk(value, inserted || key === 'insert')
   }
-  walk(load(patch) ?? [], false)
+  walk(load(patch, { schema: entryListSchema }) ?? [], false)
   return names
 }
 
 /**
  * The package a module specifier names.
  * @param {string} specifier - an import specifier.
- * @returns {string | undefined} `@scope/name` or `name`; undefined for a relative specifier or a `node:` builtin.
+ * @returns {string | undefined} `@scope/name` or `name`; undefined for a relative specifier, a `node:` builtin, or a loader builtin (`cordis:`).
  */
 function packageOf(specifier) {
-  if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:')) return undefined
+  if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:') || specifier.startsWith('cordis:'))
+    return undefined
   const parts = specifier.split('/')
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]
 }
@@ -226,7 +229,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { services } = JSON.parse(readFileSync(join(bundle, 'layers.json'), 'utf8'))
   const provided = (name) =>
     existsSync(join(bundle, 'node_modules', name, 'package.json')) ? servicesProvidedBy(join(bundle, 'node_modules', name)) : undefined
-  const problems = checkPeers({ manifest, files, patch: readFileSync(join(bundle, 'cordis.patch.yml'), 'utf8'), services, provided })
+  const patches = patchFilesOf(manifest).map((file) => readFileSync(join(bundle, file), 'utf8'))
+  const problems = checkPeers({ manifest, files, patches, services, provided })
   for (const problem of problems) console.error(problem)
   console.log(problems.length === 0 ? `check-peers: ok (${files.length} modules)` : `check-peers: ${problems.length} problems`)
   process.exitCode = problems.length === 0 ? 0 : 1

@@ -5,12 +5,15 @@ import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentHandle, AssistantStreamFrame, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-model'
+// Type-only: the `agentPresets` service the registry declares, whose default the session opens on.
+import type { AgentPreset } from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 export interface OpenedSession {
   readonly agent: Agent
+  readonly preset: string
   follow(listener: (event: SessionEvent) => void): () => void
   onStream(listener: (frame: AssistantStreamFrame) => void): () => void
   send(text: string): void
@@ -29,11 +32,13 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
   const restand = (): void => {
     for (const listener of standsChanged) listener()
   }
+  let bound: AgentPreset | undefined
   const handle: AgentHandle = await ctx.agents.create({
     sessionId: SessionId(`session-${randomUUID()}`),
     meta: { cwd: process.cwd() },
     agentOptions: { provider: selection.provider, model: selection.model },
-    setup: (agentCtx) => {
+    setup: async (agentCtx) => {
+      bound = await ctx.agentPresets.mount(agentCtx)
       const selected: ModelSelectionRef = { current: selection, assembled: undefined }
       installModelSelection(agentCtx, selected)
       agentCtx.on('agent/status', restand)
@@ -43,6 +48,7 @@ export async function openSession(ctx: Context): Promise<OpenedSession> {
   const commands: CommandRuntime = ctx.commands
   return {
     agent: handle.agent,
+    preset: bound?.id ?? '',
     follow: (listener) => {
       const held: SessionEvent[] = []
       let replaying = true

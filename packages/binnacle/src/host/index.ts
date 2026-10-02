@@ -49,7 +49,7 @@ import type { Scope } from '@deepseek-ai/dsh-scope'
 
 export const name = 'binnacle'
 
-export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'] satisfies (keyof Context)[]
+export const inject = ['cmdlineArgs', 'agents', 'agentDefaultModel', 'agentPresets', 'commands'] satisfies (keyof Context)[]
 
 export const internals: {
   terminal: () => Terminal
@@ -554,8 +554,15 @@ export function apply(ctx: Context): void {
     }
     session = opened
     if (mode === 'check') {
-      internals.stdout.write(`binnacle: ok (${opened.agent.options.provider}/${opened.agent.options.model})\n`)
-      quit()
+      // The roster the registry mounted is part of what the boot check holds (`check:boot`), read once with the ok line.
+      void ctx.agentPresets
+        .list()
+        .then((roster) => {
+          const ids = roster.map((preset) => preset.id).join(', ')
+          internals.stdout.write(`binnacle: ok (${opened.agent.options.provider}/${opened.agent.options.model}, presets: ${ids})\n`)
+          quit()
+        })
+        .catch(fail('could not open a session on the default model'))
       return
     }
     agentScope = createScope(ctx, opened.agent)

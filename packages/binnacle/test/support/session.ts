@@ -13,6 +13,8 @@ import type { OpenedSession } from '../../src/host/session.ts'
 export class FakeSession implements OpenedSession {
   readonly sent: string[] = []
   closed = false
+  /** The preset the session's agent is composed by: the registry's default, unless a test names another. */
+  preset = 'standard'
   /** Whether a turn runs, as the agent's status says it: a test changes it and says so. */
   running = false
   interrupted = 0

@@ -96,7 +96,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **profile** | A directory under `$DSH_HOME/profiles/` stacking bundles; `binnacle` stacks `dsh-base`, then binnacle. |
 | **dsh-base** | The bundle below binnacle: the harness's own rows. |
 | **row** | One entry in the composed tree: a plugin, its id and its config. A patch inserts, configures or disables rows by id. |
-| **preset** | A named agent configuration; a preset can run a different tool loop, logging kinds binnacle has never seen. |
+| **preset** | A named agent configuration; a preset can run a different tool loop, logging kinds binnacle has never seen. [Presets](features/presets.md). |
 | **session log** | A session's events in order: what was sent, streamed, called and decided. |
 | **event kind** | The `type` of a session log event; dsh packages add kinds by augmenting `SessionEventMap`. |
 | **skill** | Instructions the agent can load by name: found in a directory, or registered by a plugin (`dsh:packages/skill/skill/src/index.ts#SkillRegistration`). |
