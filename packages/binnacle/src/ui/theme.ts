@@ -246,6 +246,8 @@ export interface Spacing {
   readonly band: number
   /** Columns an ask's content is padded by inside its border, on each side. */
   readonly ask: number
+  /** Columns between a show's gutter and what it holds. */
+  readonly show: number
   /** Columns a call another call made is indented by, for each call it is made beneath. */
   readonly indent: number
   /** Blank rows between one entry and the next. */
@@ -268,7 +270,7 @@ export const binnacleTheme: Theme = {
   chrome,
   words,
   markdown: markdownTheme,
-  spacing: { band: 1, ask: 1, indent: 2, gap: 1 },
+  spacing: { band: 1, ask: 1, show: 1, indent: 2, gap: 1 },
   folds: {
     answer: { rows: 0 },
     streaming: { rows: 0 },
@@ -308,7 +310,7 @@ export interface ThemeVariant {
     readonly jump?: string
     readonly gutter?: string
     readonly border?: { readonly [piece in keyof typeof chrome.border]?: string }
-    /** The whole border by one word, its pieces then changed one at a time by `border` beside it; `none` draws each piece blank. */
+    /** The whole border by one word, an ask's and a show's gutter alike, its pieces then changed one at a time by `border` and `gutter` beside it; `none` draws each piece blank. */
     readonly frame?: FrameStyle
   }
   /**
@@ -463,7 +465,12 @@ export function themed(base: Theme, registered: readonly ThemeChanges[], look: T
   let said: Theme['words'] = base.words
   for (const change of changes) {
     const { border, frame, ...rest } = change.chrome ?? {}
-    glyphs = { ...glyphs, ...rest, border: { ...glyphs.border, ...(frame === undefined ? {} : frames[frame]), ...border } }
+    glyphs = {
+      ...glyphs,
+      ...(frame === undefined ? {} : { gutter: frames[frame].side }),
+      ...rest,
+      border: { ...glyphs.border, ...(frame === undefined ? {} : frames[frame]), ...border },
+    }
     for (const [word, template] of Object.entries(change.words ?? {})) {
       if (template === undefined) continue
       said = (plainWords as readonly string[]).includes(word) ? { ...said, [word]: template } : { ...said, [word]: counting(template) }

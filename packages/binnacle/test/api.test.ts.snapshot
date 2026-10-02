@@ -509,6 +509,7 @@ export interface FoldStart {
 export interface Spacing {
     readonly band: number;
     readonly ask: number;
+    readonly show: number;
     readonly indent: number;
     readonly gap: number;
 }

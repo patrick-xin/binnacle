@@ -379,6 +379,19 @@ test("an ask is padded inside its border by the theme's spacing, and what it hol
   )
 })
 
+test("a show's gutter is the theme's frame's side, as many columns from what it holds as the theme's spacing gives, and what it holds is a region there", () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'out' } } as const
+  const shown = (changes: Parameters<typeof themed>[1][number]) =>
+    layout({ kind: 'show', title: ['t'], child: held }, 10, OPEN, themed(binnacleTheme, [changes]))
+  assert.deepEqual(plain(shown({ chrome: { frame: 'heavy' } })).lines, ['t', '┃ out'])
+  assert.deepEqual(plain(shown({ chrome: { frame: 'none' } })).lines, ['t', '  out'])
+  assert.deepEqual(plain(shown({ spacing: { show: 3 } })).lines, ['t', '│   out'])
+  assert.deepEqual(
+    [shown({ spacing: { show: 0 } }), shown({ spacing: { show: 3 } })].map(({ regions }) => regions.map(({ top, left }) => [top, left])),
+    [[[1, 1]], [[1, 4]]],
+  )
+})
+
 test('what an ask holds is a region inside its border, by its rows and by its columns', () => {
   const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
   const { regions } = layout({ kind: 'ask', child: held }, 20, OPEN)

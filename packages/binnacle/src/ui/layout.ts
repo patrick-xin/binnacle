@@ -21,8 +21,6 @@ export interface Placed {
   readonly width: number
 }
 
-const SHOW_GUTTER = 2
-
 export interface Frame {
   readonly lines: readonly string[]
   readonly regions: readonly Placed[]
@@ -265,7 +263,8 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
     0,
     0,
   ).render(width)
-  const inner = width - SHOW_GUTTER
+  const aside = 1 + theme.spacing.show
+  const inner = width - aside
   const frame = drawn(node.child, inner < 1 ? width : inner, state, theme)
   const gutter = inTone(theme.chrome.gutter, 'borderMuted', theme)
   const opened = frame.regions.find((placed) => placed.region.id === node.opens)
@@ -290,10 +289,10 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
     placed.region.id === node.opens ? { ...placed, region: { ...placed.region, affordances: [] } } : placed,
   )
   return {
-    lines: [...title, ...(inner < 1 ? frame.lines : frame.lines.map((row) => `${gutter} ${row}`))],
+    lines: [...title, ...(inner < 1 ? frame.lines : frame.lines.map((row) => `${gutter}${' '.repeat(theme.spacing.show)}${row}`))],
     regions: [
       ...head,
-      ...held.map((placed) => ({ ...placed, top: placed.top + title.length, left: placed.left + (inner < 1 ? 0 : SHOW_GUTTER) })),
+      ...held.map((placed) => ({ ...placed, top: placed.top + title.length, left: placed.left + (inner < 1 ? 0 : aside) })),
     ],
   }
 }

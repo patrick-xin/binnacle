@@ -406,7 +406,7 @@ test('a theme that names what binnacle cannot draw is refused where it is regist
     message: 'binnacle.theme: spacing.gap is 1.5, not a whole number of columns or rows',
   })
   assert.throws(() => registrations.theme({ spacing: { margin: 1 } } as never), {
-    message: 'binnacle.theme: spacing.margin is no part of spacing: band, ask, indent, gap',
+    message: 'binnacle.theme: spacing.margin is no part of spacing: band, ask, show, indent, gap',
   })
   assert.throws(() => registrations.theme({ chrome: { frame: 'wavy' } } as never), {
     message: 'binnacle.theme: chrome.frame is "wavy", not a frame: rounded, square, heavy, double, none',
