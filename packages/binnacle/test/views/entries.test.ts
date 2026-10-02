@@ -8,7 +8,7 @@ import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../support/draw.ts'
 import { screens } from '../../src/views/screen.ts'
 import { drawEntry } from '../../src/views/entries.ts'
-import { layout } from '../../src/ui/layout.ts'
+import { componentOf } from '../support/drawn.ts'
 import { binnacleTheme, themed } from '../../src/ui/theme.ts'
 import type { View, Views } from '../../src/views/entries.ts'
 import {
@@ -457,10 +457,12 @@ test("a call made by a call a run_code program made is indented by the theme's s
   } as const
   const theme = themed(binnacleTheme, [{ spacing: { indent: 4 } }])
   const node = drawEntry({ kind: 'tool', call: code, subCalls: [{ call: outer }, { call: inner }] }, new Map(), theme)
-  assert.deepEqual(
-    layout(node, 40, { toggled: new Set() }, theme).lines.map((line) => stripTerminalSequences(line).trimEnd()),
-    ['● run_code {}', '│ ● run_code {}', '│     ● read {}', '│ running 0s'],
-  )
+  assert.deepEqual(drawText(componentOf(node, { toggled: new Set() }, theme), 40), [
+    '● run_code {}',
+    '│ ● run_code {}',
+    '│     ● read {}',
+    '│ running 0s',
+  ])
 })
 
 test('a finished tool shows its output, folded to three rows', () => {

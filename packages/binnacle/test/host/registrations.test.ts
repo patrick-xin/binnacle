@@ -267,7 +267,7 @@ test("entries are as many rows apart as the theme's spacing gives", async () => 
   const facts = [prompt, promptFact(2, 2, 'again')]
   const apart = (gap: number) => {
     const theme = themed(registrations.currentTheme, [{ spacing: { gap } }])
-    return screen(facts, initial, 4, registrations.views, theme).lines.map((line) => line.trimEnd())
+    return drawText({ render: (width) => [...screen(facts, initial, width, registrations.views, theme).lines], invalidate: () => {} }, 4)
   }
   assert.deepEqual(apart(0), ['p1', 'p2'])
   assert.deepEqual(apart(2), ['p1', '', '', 'p2'])
