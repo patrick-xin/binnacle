@@ -3,6 +3,6 @@
   "singleQuote": true,
   "semi": false,
   "sortPackageJson": false,
-  "ignorePatterns": ["pnpm-lock.yaml", "**/*.md", ".refs/**", "**/dist/**"],
+  "ignorePatterns": ["pnpm-lock.yaml", "**/*.md", ".refs/**", "**/dist/**", ".agents/reports/**"],
   "printWidth": 140
 }
