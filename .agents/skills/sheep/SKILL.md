@@ -25,7 +25,7 @@ Leave every change in the Fold's working tree; the Sheepdog commits it once, as 
 
 ## The reviewer
 
-1. When every behaviour is built and `pnpm test` is green, tell the reviewer: `herdr agent prompt binnacle-review-<n> "ready: <what was built, in a few lines>" --wait --until working --timeout 20000`, and wait for its answer.
+1. When every behaviour is built and `pnpm test` is green, tell the reviewer: `herdr agent prompt binnacle-review-<n> "ready: <what was built, in a few lines>" --wait --until working --timeout 20000`, then **end your turn**: its answer arrives as your next message. Never wait for it inside a tool call — `herdr agent wait`, a sleep, a poll: a message arriving while a tool call runs is queued as steering and reaches you only when that call ends, so the two of you wait on each other (#96).
 2. Its findings are defects against the issue: fix each red-first, then tell it you are ready again.
 3. A finding that would take you outside the issue is a decision: ask the Sheepdog with `ask_shepherd` rather than follow it.
 

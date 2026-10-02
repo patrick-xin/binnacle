@@ -89,11 +89,11 @@ What each call returns stays in the context for every call after it, and a held 
 
 ## Rounds with the Sheep
 
-1. **Wait for the Sheep to say it is ready**: it prompts you when every behaviour is built and `pnpm test` is green.
+1. **Wait for the Sheep to say it is ready** by ending your turn: it prompts you when every behaviour is built and `pnpm test` is green, and that prompt is your next message. Never wait inside a tool call — `herdr agent wait`, a sleep, a poll: a message arriving while a tool call runs is queued as steering and reaches you only when that call ends.
 2. **Review the Fold** as above, from the issue's design.
 3. **Send the Sheep its defects, all at once**: `herdr agent prompt binnacle-<n> "<findings>" --wait --until working --timeout 20000`, each with where, what, and how it fails, ending "fix each red-first, and tell me when it is ready." Then wait for it again.
 4. **When a round finds nothing**, write the final report and end with its verdict line; the Sheep then settles.
 
 After three rounds with findings, the approach is what fails: stop, and write the final report with what is still open, for the Sheepdog to take to the maintainer.
 
-**What goes to the Sheep is only a defect against the issue as written**: a bug, a missing or wrong test, a gate, a record left behind. **What is a decision goes to the Sheepdog, never to the Sheep**: work outside the issue's scope, the issue contradicting itself or the code, a choice the design leaves open, anything that changes the author API beyond what the issue says. Ask with `ask_shepherd` where you have it, or say so in the final report; never tell a Sheep to widen or narrow its scope.
+**What goes to the Sheep is only a defect against the issue as written**: a bug, a missing or wrong test, a gate, a record left behind. **What is a decision goes to the Sheepdog, never to the Sheep**: work outside the issue's scope, the issue contradicting itself or the code, a choice the design leaves open, anything that changes the author API beyond what the issue says. You are no Charge and have no `ask_shepherd`: write the decisions, each with a recommendation, to `/tmp/review-<n>-ask.md`, which wakes the Sheepdog's watcher, and end your turn; the answer arrives as your next message, and the Sheepdog posts it on the issue. Never tell a Sheep to widen or narrow its scope.

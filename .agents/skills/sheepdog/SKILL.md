@@ -60,13 +60,15 @@ From a clean checkout of `main`, dispatch the Sheep, then start its reviewer in 
 shepherd dispatch --charge <n> --spec '#<n>' --issue <n> \
   --verify 'pnpm install --frozen-lockfile && pnpm refs && pnpm build' \
   --brief "Load the sheep skill first. Your reviewer is binnacle-review-<n>, in this Fold. <only what the issue cannot say>"
-fold=$(jq -r .worktree ~/.shepherd/<pasture>/charges/<n>.json)   # the Fold, as the Charge record names it
-pane=$(herdr pane split --pane <the Sheep's pane> --direction down --cwd "$fold" --no-focus)
+rec=~/.shepherd/<pasture>/charges/<n>.json   # dispatch prints its path
+pane=$(herdr pane split --pane "$(jq -r .pane_id $rec)" --direction down --cwd "$(jq -r .fold $rec)" --no-focus | jq -r .result.pane.pane_id)
 herdr agent start binnacle-review-<n> --kind pi --pane "$pane" -- --model openai-codex/gpt-6.1-sol --thinking medium
-herdr agent prompt binnacle-review-<n> "<the review skill's brief>"
+herdr agent prompt binnacle-review-<n> "<the review skill's brief>" --wait --until working --timeout 20000
 ```
 
-**Watch** with `.agents/skills/sheepdog/scripts/watch.sh`, run in the background by your harness so its exit wakes you — never with `&` in a shell that returns, which wakes no one. It exits when a Charge settles or asks; the reviewer is no Charge, and reaches you through the Sheep's settlement and its report file. Answer a question with `shepherd answer`; a Charge you have read and left settled goes in `HANDLED`, and `HANDLED` is emptied once you prompt that Charge again.
+Check the pane's `cwd` is the Fold before starting the reviewer (`herdr pane get "$pane"`): a key the record lacks gives `null`, and the pane opens in the home directory.
+
+**Watch** with `.agents/skills/sheepdog/scripts/watch.sh`, run in the background by your harness so its exit wakes you — never with `&` in a shell that returns, which wakes no one. It exits when a Charge settles or asks, or when a reviewer asks: the reviewer is no Charge, and writes its decisions to `/tmp/review-<n>-ask.md`. Answer a Sheep with `shepherd answer`; answer a reviewer with `herdr agent prompt binnacle-review-<n> "…" --wait --until working --timeout 20000`, post the decisions on the issue, and remove the file, or the watcher wakes on it again; a Charge you have read and left settled goes in `HANDLED`, and `HANDLED` is emptied once you prompt that Charge again.
 
 ## Review
 
@@ -122,6 +124,7 @@ A question whose answer is in a reference, or why something broke, is a reading:
 - A checkout under `/tmp` installs with `CI=true`, or pnpm waits on a prompt no one answers.
 - A pin of a new dsh package asks `check-pins` to declare the rest of its tree; declare what it names, at the pin.
 - A question a Sheep asked stays listed a moment after you answer it; a watcher that wakes on it again is not a new question.
+- A Sheep and its reviewer each wait for the other by ending their turn, never inside a tool call: a prompt arriving while a tool call runs is queued as steering until the call ends, and #96's Sheep sat nine minutes in `herdr agent wait` while the reviewer's findings queued behind it. A pane showing `Steering:` lines under a running command is that: end the command (`pkill -f '<the command>'`), and the queue is delivered.
 - A prompt to a settled Charge goes with `--wait --until working --timeout 20000`: `herdr agent prompt` has acknowledged a prompt that never reached the pane, twice on one round (#86), and a watcher then woke on the Charge's last settlement as if it were this one. `agent_prompt_stalled` or a timeout means it did not land: send it again.
 
 ## Keep
