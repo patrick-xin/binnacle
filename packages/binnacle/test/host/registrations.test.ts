@@ -18,7 +18,6 @@ import { called, seed as seedEvent } from '../support/events.ts'
 import { pointer } from '../support/pointer.ts'
 import { foldedAlike } from '../support/views.ts'
 import { mocha, rgb } from '../support/palettes.ts'
-import { deriveColours } from '../../src/ui/derived-colours.ts'
 
 const prompt = promptFact(1, 1, 'fix the build')
 const seed = seedEvent(2, 2)
@@ -242,8 +241,11 @@ test("binnacle's own theme takes its colours from the palette a terminal reports
     }))
   })
   const drawn = () => screen([prompt], initial, 3, registrations.views, registrations.currentTheme).lines.map((line) => line.trimEnd())
-  const reported = deriveColours({ background: rgb('#1E1E2E'), foreground: rgb('#CDD6F4'), palette: mocha })
-  registrations.drawOn({ mode: 'truecolor', appearance: 'dark', derived: reported })
+  registrations.drawOn({
+    mode: 'truecolor',
+    appearance: 'dark',
+    reported: { background: rgb('#1E1E2E'), foreground: rgb('#CDD6F4'), palette: mocha },
+  })
   assert.deepEqual(drawn(), [
     '\x1b[38;2;232;104;205ma\x1b[39m',
     '\x1b[38;2;193;154;59m\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m\x1b[39m',
@@ -252,7 +254,7 @@ test("binnacle's own theme takes its colours from the palette a terminal reports
     ctx.binnacle.theme({ tones: { accent: { color: 'red' } } })
   })
   assert.equal(drawn()[0], '\x1b[31ma\x1b[39m')
-  registrations.drawOn({ mode: 'truecolor', derived: deriveColours({}) })
+  registrations.drawOn({ mode: 'truecolor', appearance: 'dark', reported: {} })
   assert.deepEqual(drawn(), ['\x1b[31ma\x1b[39m', '\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m'])
 })
 

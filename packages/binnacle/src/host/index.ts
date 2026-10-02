@@ -474,9 +474,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   let reported: TerminalColors = {}
   let unscheme: (() => void) | undefined
   const look = (): void => {
-    const derived = deriveColours(reported, appearance)
-    const seen = derived.appearance ?? appearance
-    registrations.drawOn({ mode: internals.colourMode(), derived, ...(seen === undefined ? {} : { appearance: seen }) })
+    const seen = deriveColours(reported, appearance).appearance ?? appearance
+    registrations.drawOn({ mode: internals.colourMode(), reported, ...(seen === undefined ? {} : { appearance: seen }) })
   }
   // A terminal that answers late is still read; one that fails to answer leaves binnacle's own colours.
   const heard = (colours: TerminalColors): void => {
