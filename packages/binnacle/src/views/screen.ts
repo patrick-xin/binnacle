@@ -159,7 +159,7 @@ export function screens(keys: () => LayoutState['keys'] = () => undefined): Draw
         const frame = frameOf(entry, state, width, views, theme, now)
         timed = timed || drawings.get(entry)?.timed === true
         const draws = frame.lines.length > 0
-        if (draws && drew) lines.push('')
+        if (draws && drew) for (let row = 0; row < theme.spacing.gap; row++) lines.push('')
         drew = drew || draws
         const top = lines.length
         for (const placed of frame.regions) regions.push({ ...placed, top: placed.top + top })

@@ -23,10 +23,6 @@ export interface Placed {
 
 const SHOW_GUTTER = 2
 
-const ASK_SIDE = 2
-
-const BAND_PAD = 1
-
 export interface Frame {
   readonly lines: readonly string[]
   readonly regions: readonly Placed[]
@@ -225,7 +221,9 @@ function refilled(line: string, fill: (text: string) => string): string {
 const DEFAULT_BACKGROUND = '\x1b[49m'
 
 function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state: LayoutState, theme: Theme): Frame {
-  const inner = width - 2 * ASK_SIDE
+  const pad = theme.spacing.ask
+  const side = 1 + pad
+  const inner = width - 2 * side
   if (inner < 1) return drawn(node.child, width, state, theme)
   const frame = drawn(node.child, inner, state, theme)
   const edge = (text: string): string => inTone(text, node.edge ?? 'border', theme)
@@ -238,7 +236,7 @@ function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state
       ? edge(`${border.topLeft}${border.horizontal.repeat(width - 2)}${border.topRight}`)
       : `${edge(`${border.topLeft}${border.horizontal} `)}${title}${edge(` ${border.horizontal.repeat(width - 5 - visibleWidth(title))}${border.topRight}`)}`
   const body = frame.lines.map(
-    (row) => `${edge(border.side)} ${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)))} ${edge(border.side)}`,
+    (row) => `${edge(border.side)}${' '.repeat(pad)}${row}${' '.repeat(Math.max(0, inner - visibleWidth(row)) + pad)}${edge(border.side)}`,
   )
   const hint = answeredBy(frame, state, theme)
   const named = hint !== undefined && visibleWidth(hint) <= width - 6 ? hint : undefined
@@ -249,7 +247,7 @@ function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state
   const lines = [top, ...body, bottom]
   return {
     lines: fill === undefined ? lines : lines.map((line) => fill(refilled(line, fill))),
-    regions: frame.regions.map((placed) => ({ ...placed, top: placed.top + 1, left: placed.left + ASK_SIDE })),
+    regions: frame.regions.map((placed) => ({ ...placed, top: placed.top + 1, left: placed.left + side })),
   }
 }
 
@@ -304,15 +302,16 @@ function answeredBy(frame: Frame, state: LayoutState, theme: Theme): string | un
 }
 
 function band(node: Extract<Node, { readonly kind: 'band' }>, width: number, state: LayoutState, theme: Theme): Frame {
-  const inner = width - 2 * BAND_PAD
+  const pad = theme.spacing.band
+  const inner = width - 2 * pad
   if (inner < 1) return drawn(node.child, width, state, theme)
   const frame = drawn(node.child, inner, state, theme)
-  const box = new Box(BAND_PAD, BAND_PAD, theme.backgrounds[node.background])
+  const box = new Box(pad, pad, theme.backgrounds[node.background])
   // Box renders the frame's lines directly; nothing is cached since bands are laid out anew each time.
   box.addChild({ render: () => [...frame.lines], invalidate: () => {} })
   return {
     lines: box.render(width),
-    regions: frame.regions.map((placed) => ({ ...placed, top: placed.top + BAND_PAD, left: placed.left + BAND_PAD })),
+    regions: frame.regions.map((placed) => ({ ...placed, top: placed.top + pad, left: placed.left + pad })),
   }
 }
 

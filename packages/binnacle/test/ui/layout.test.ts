@@ -358,6 +358,27 @@ test('an ask draws what it holds inside a rounded border, its title on the top e
   })
 })
 
+test('a theme names the frame an ask is drawn in by one word: square, heavy, double, or none, its edges then blank', () => {
+  const ask = { kind: 'ask', title: 'bash', child: { kind: 'text', text: 'exit 0' } } as const
+  const drawnIn = (frame: string) => plain(layout(ask, 14, OPEN, themed(binnacleTheme, [{ chrome: { frame } as never }]))).lines
+  assert.deepEqual(drawnIn('square'), ['┌─ bash ─────┐', '│ exit 0     │', '└────────────┘'])
+  assert.deepEqual(drawnIn('heavy'), ['┏━ bash ━━━━━┓', '┃ exit 0     ┃', '┗━━━━━━━━━━━━┛'])
+  assert.deepEqual(drawnIn('double'), ['╔═ bash ═════╗', '║ exit 0     ║', '╚════════════╝'])
+  assert.deepEqual(drawnIn('none'), ['   bash', '  exit 0', ''])
+  assert.deepEqual(drawnIn('rounded'), ['╭─ bash ─────╮', '│ exit 0     │', '╰────────────╯'])
+})
+
+test("an ask is padded inside its border by the theme's spacing, and what it holds is a region where it is drawn", () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
+  const padded = (ask: number) => layout({ kind: 'ask', child: held }, 14, OPEN, themed(binnacleTheme, [{ spacing: { ask } }]))
+  assert.deepEqual(plain(padded(0)).lines, ['╭────────────╮', '│exit 0      │', '╰────────────╯'])
+  assert.deepEqual(plain(padded(3)).lines, ['╭────────────╮', '│   exit 0   │', '╰────────────╯'])
+  assert.deepEqual(
+    [padded(0), padded(3)].map(({ regions }) => regions.map(({ top, left, width }) => [top, left, width])),
+    [[[1, 1, 12]], [[1, 4, 6]]],
+  )
+})
+
 test('what an ask holds is a region inside its border, by its rows and by its columns', () => {
   const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
   const { regions } = layout({ kind: 'ask', child: held }, 20, OPEN)
@@ -396,6 +417,18 @@ test('what a band holds is a region inside its padding, by its rows and by its c
     [[], ['o'], ['o'], []],
   )
   assert.deepEqual(under(regions, 0, 1), [])
+})
+
+test("a band is padded inside its background by the theme's spacing, in rows and columns alike, and what it holds is a region where it is drawn", () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'ok' } } as const
+  const padded = (band: number) =>
+    layout({ kind: 'band', background: 'userMessageBg', child: held }, 6, OPEN, themed(binnacleTheme, [{ spacing: { band } }]))
+  assert.deepEqual(plain(padded(0)).lines, ['ok'])
+  assert.deepEqual(plain(padded(2)).lines, ['', '', '  ok', '', ''])
+  assert.deepEqual(
+    [padded(0), padded(2)].map(({ regions }) => regions.map(({ top, left }) => [top, left])),
+    [[[0, 0]], [[2, 2]]],
+  )
 })
 
 test('a band with no column inside it draws what it holds without its padding', () => {

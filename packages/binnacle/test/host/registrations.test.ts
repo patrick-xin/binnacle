@@ -13,6 +13,7 @@ import { TranscriptPane } from '../../src/panes/transcript.ts'
 import { drawText } from '../support/draw.ts'
 import { initial } from '../../src/ui/state.ts'
 import { screen } from '../../src/views/screen.ts'
+import { themed } from '../../src/ui/theme.ts'
 import { prompt as promptFact, call, returned } from '../support/facts.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
 import { pointer } from '../support/pointer.ts'
@@ -256,6 +257,20 @@ test("binnacle's own theme takes its colours from the palette a terminal reports
   assert.deepEqual(drawn(), ['\x1b[31ma\x1b[39m', '\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m'])
 })
 
+test("entries are as many rows apart as the theme's spacing gives", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', (entry) => ({ kind: 'text', text: entry.kind === 'prompt' ? `p${entry.fact.seq}` : '' }))
+  })
+  const facts = [prompt, promptFact(2, 2, 'again')]
+  const apart = (gap: number) => {
+    const theme = themed(registrations.currentTheme, [{ spacing: { gap } }])
+    return screen(facts, initial, 4, registrations.views, theme).lines.map((line) => line.trimEnd())
+  }
+  assert.deepEqual(apart(0), ['p1', 'p2'])
+  assert.deepEqual(apart(2), ['p1', '', '', 'p2'])
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {
@@ -286,6 +301,15 @@ test('a theme that names what binnacle cannot draw is refused where it is regist
   })
   assert.throws(() => registrations.theme({ words: { less: 'less\x07' } }), {
     message: 'binnacle.theme: words.less holds a control character, which would reach the terminal as one',
+  })
+  assert.throws(() => registrations.theme({ spacing: { gap: 1.5 } }), {
+    message: 'binnacle.theme: spacing.gap is 1.5, not a whole number of columns or rows',
+  })
+  assert.throws(() => registrations.theme({ spacing: { margin: 1 } } as never), {
+    message: 'binnacle.theme: spacing.margin is no part of spacing: band, ask, indent, gap',
+  })
+  assert.throws(() => registrations.theme({ chrome: { frame: 'wavy' } } as never), {
+    message: 'binnacle.theme: chrome.frame is "wavy", not a frame: rounded, square, heavy, double, none',
   })
   assert.throws(() => registrations.theme({ chrome: { border: { side: '||' } } }), {
     message: 'binnacle.theme: chrome.border.side is "||", not one column wide',

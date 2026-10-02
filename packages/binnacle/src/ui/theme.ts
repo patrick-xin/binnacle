@@ -146,6 +146,18 @@ export const chrome = {
   gutter: '│',
 } as const
 
+/** The borders an ask may be framed in, each by its name. */
+export const frames = {
+  rounded: chrome.border,
+  square: { topLeft: '┌', horizontal: '─', topRight: '┐', side: '│', bottomLeft: '└', bottomRight: '┘' },
+  heavy: { topLeft: '┏', horizontal: '━', topRight: '┓', side: '┃', bottomLeft: '┗', bottomRight: '┛' },
+  double: { topLeft: '╔', horizontal: '═', topRight: '╗', side: '║', bottomLeft: '╚', bottomRight: '╝' },
+  none: { topLeft: ' ', horizontal: ' ', topRight: ' ', side: ' ', bottomLeft: ' ', bottomRight: ' ' },
+} as const satisfies Record<string, { readonly [piece in keyof typeof chrome.border]: string }>
+
+/** A border an ask may be framed in, by its name. */
+export type FrameStyle = keyof typeof frames
+
 /**
  * The theme's attributes, each closed by the parameter that ends it alone, so
  * one attribute laid inside another leaves the other standing.
@@ -223,6 +235,19 @@ export interface Theme {
   }
   readonly markdown: MarkdownTheme
   readonly folds: { readonly [key: string]: FoldStart | undefined }
+  readonly spacing: Spacing
+}
+
+/** The room the layout leaves, in columns or rows, each a whole number. */
+export interface Spacing {
+  /** Columns and rows a band is padded by inside its background. */
+  readonly band: number
+  /** Columns an ask's content is padded by inside its border, on each side. */
+  readonly ask: number
+  /** Columns a call another call made is indented by, for each call it is made beneath. */
+  readonly indent: number
+  /** Blank rows between one entry and the next. */
+  readonly gap: number
 }
 
 /** How a kind of entry's folds start, when a fold does not say. */
@@ -241,6 +266,7 @@ export const binnacleTheme: Theme = {
   chrome,
   words,
   markdown: markdownTheme,
+  spacing: { band: 1, ask: 1, indent: 2, gap: 1 },
   folds: {
     answer: { rows: 0 },
     streaming: { rows: 0 },
@@ -280,6 +306,8 @@ export interface ThemeVariant {
     readonly jump?: string
     readonly gutter?: string
     readonly border?: { readonly [piece in keyof typeof chrome.border]?: string }
+    /** The whole border by one word, its pieces then changed one at a time by `border` beside it; `none` draws each piece blank. */
+    readonly frame?: FrameStyle
   }
   /**
    * What a fold says of itself, each a template: `{n}` is the count of lines, and `{lines}` the word for that many (`line` or `lines`). `less` and `away` count nothing.
@@ -287,6 +315,8 @@ export interface ThemeVariant {
   readonly words?: { readonly [word in keyof typeof words]?: string }
   /** How each kind of entry's folds start, by the key its views are registered under — an entry kind, a quiet kind's dsh type, an authored fact's name — falling back to its kind when no start is given for its key, when a fold does not say. */
   readonly folds?: { readonly [key: string]: FoldStart }
+  /** The room the layout leaves, each part named replacing the one beneath. */
+  readonly spacing?: { readonly [part in keyof Spacing]?: number }
   /** Marks, by name: a glyph, a tone, or both. */
   readonly marks?: { readonly [name: string]: { readonly glyph?: string; readonly tone?: Tone } }
 }
@@ -430,13 +460,15 @@ export function themed(base: Theme, registered: readonly ThemeChanges[], look: T
   let glyphs: Theme['chrome'] = base.chrome
   let said: Theme['words'] = base.words
   for (const change of changes) {
-    const { border, ...rest } = change.chrome ?? {}
-    glyphs = { ...glyphs, ...rest, border: { ...glyphs.border, ...border } }
+    const { border, frame, ...rest } = change.chrome ?? {}
+    glyphs = { ...glyphs, ...rest, border: { ...glyphs.border, ...(frame === undefined ? {} : frames[frame]), ...border } }
     for (const [word, template] of Object.entries(change.words ?? {})) {
       if (template === undefined) continue
       said = (plainWords as readonly string[]).includes(word) ? { ...said, [word]: template } : { ...said, [word]: counting(template) }
     }
   }
+  let room: Spacing = base.spacing
+  for (const change of changes) room = { ...room, ...change.spacing }
   let starts: Theme['folds'] = base.folds
   for (const change of changes) {
     for (const [key, start] of Object.entries(change.folds ?? {})) starts = { ...starts, [key]: { ...starts[key], ...start } }
@@ -445,6 +477,7 @@ export function themed(base: Theme, registered: readonly ThemeChanges[], look: T
   return {
     ...base,
     folds: starts,
+    spacing: room,
     chrome: glyphs,
     words: said,
     tones: tonesNow,
