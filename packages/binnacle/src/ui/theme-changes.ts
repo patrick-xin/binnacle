@@ -27,6 +27,26 @@ function isControl(character: string): boolean {
   return code < 0x20 || (code >= 0x7f && code <= 0x9f)
 }
 
+/** A theme's vars, each following the names it gives, among them or the ones beneath, to a colour. */
+function resolved(given: Readonly<Record<string, unknown>>, outer: Vars): Vars {
+  const read: Record<string, Colour> = {}
+  const follow = (name: string, through: readonly string[]): Colour => {
+    const done = read[name]
+    if (done !== undefined) return done
+    const value = given[name]
+    if (typeof value === 'string' && Object.hasOwn(given, value)) {
+      if (value === name || through.includes(value))
+        throw new Error(`vars.${through[0] ?? name} names itself, through ${[...through.slice(1), name].join(', ')}`)
+      read[name] = follow(value, [...through, name])
+      return read[name]
+    }
+    read[name] = colour(value, `vars.${name}`, outer)
+    return read[name]
+  }
+  for (const name of Object.keys(given)) follow(name, [])
+  return read
+}
+
 function piece(value: unknown, at: string): string {
   const read = text(value, at)
   if (visibleWidth(read) !== 1) throw new Error(`${at} is ${named(read)}, not one column wide`)
@@ -105,10 +125,7 @@ function parsed(
   varied: boolean,
 ): ThemeChanges {
   const read: Record<string, unknown> = {}
-  const vars: Vars =
-    given.vars === undefined
-      ? outer
-      : { ...outer, ...known(given.vars, 'vars', Object.keys(record(given.vars, 'vars')), (field, at) => colour(field, at, outer)) }
+  const vars: Vars = given.vars === undefined ? outer : { ...outer, ...resolved(record(given.vars, 'vars'), outer) }
   for (const [part, field] of Object.entries(given)) {
     switch (part) {
       case 'vars':

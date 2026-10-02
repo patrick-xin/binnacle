@@ -277,6 +277,18 @@ test("ordinary prose is drawn in pi's text token, a markdown answer's and a view
   )
 })
 
+test("a variable may name another, before or after it, as pi's themes do, and one that names itself through others is refused", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ vars: { brand: 'ink', ink: 'base', base: '#ff0000' }, tones: { accent: { color: 'brand' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'a', tone: 'accent' }))
+  })
+  assert.deepEqual(screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines, ['\x1b[38;2;255;0;0ma\x1b[39m'])
+  assert.throws(() => registrations.theme({ vars: { a: 'b', b: 'a' } }), {
+    message: 'binnacle.theme: vars.a names itself, through b',
+  })
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {
