@@ -50,7 +50,7 @@
     "test": "pnpm run build && node --test \"test/**/*.test.ts\""
   },
   "dependencies": {
-    "@earendil-works/pi-tui": "0.99.1",
+    "@earendil-works/pi-tui": "1.0.0",
     "commander": "15.0.0"
   },
   "peerDependencies": {
