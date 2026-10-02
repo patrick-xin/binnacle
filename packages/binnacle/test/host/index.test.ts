@@ -31,6 +31,7 @@ import { FakeClock } from '../support/clock.ts'
 import { FakeSession } from '../support/session.ts'
 import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
 import type { Node, Placement } from '../../src/api.ts'
+import type { Entry } from '../../src/models/transcript.ts'
 import type { Fact } from '../../src/facts/adapt.ts'
 
 /** A person's line, as dsh logs it. */
@@ -1838,6 +1839,30 @@ const chosen = (id: string): Node => ({
   child: { kind: 'text', text: id },
 })
 
+/** What a prompt entry holds, as an ask's title names it. */
+const sent = (entry: Entry): string => (entry.kind === 'prompt' && entry.fact.blocks[0]?.kind === 'text' ? entry.fact.blocks[0].text : '')
+
+/** An ask a placement draws, naming the prompt's mark, the facts it is handed, and — where its place gives them — the keys that answer it. */
+const seatedAsk =
+  (what: string): ((facts: readonly Fact[]) => Node) =>
+  (facts) => ({
+    kind: 'ask',
+    title: what,
+    child: {
+      kind: 'stack',
+      children: [{ kind: 'text', text: [{ mark: 'prompt' }, ` ${what} ${facts.length}`] }, chosen(`on ${what}`)],
+    },
+  })
+
+/** A titled fold holding three lines folded away, one row while it stands. */
+const held = (id: string): Node => ({
+  kind: 'fold',
+  id,
+  rows: 0,
+  title: [{ mark: 'prompt' }, ` ${id}`],
+  child: { kind: 'text', text: 'w\nx\ny' },
+})
+
 test('an ask a plugin places in the dialog names on its bottom edge the keys the one key table binds, as a person rebinds them', async () => {
   const terminal = new XtermTerminal(50, 12)
   const session = new FakeSession([prompt(1, 'fix the build')])
@@ -3168,4 +3193,154 @@ test("on the fullscreen, an open search's matches are drawn in pi's searchMatchT
   terminal.written = ''
   await author.dispose()
   await until(() => drawnIn('\x1b[36m'))
+})
+
+test('a lines placement below the composer is drawn again after a key is rebound and after a theme change', async () => {
+  const terminal = new XtermTerminal(50, 12)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  let drew = 0
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('below-composer', {
+        kind: 'lines',
+        draw: () => ({ kind: 'text', text: [{ mark: 'prompt' }, ` drew ${++drew}`] }),
+      })
+    },
+  })
+  commit()
+  const drawings = async (): Promise<number> =>
+    Number((await terminal.altScreen()).find((row) => row.includes('drew '))?.match(/drew (\d+)/)?.[1] ?? 0)
+  await until(async () => (await drawings()) === 1)
+  // Let the terminal's colour query settle first, so a re-theme in its own moment cannot move the count below.
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  const beforeRebind = await drawings()
+  await ctx.plugin({
+    name: 'rebinder',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.keys({ 'binnacle.primary': 'space' })
+    },
+  })
+  await until(async () => (await drawings()) > beforeRebind)
+  const beforeTheme = await drawings()
+  await ctx.plugin({
+    name: 'themer',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.theme({ marks: { prompt: { glyph: '>' } } })
+    },
+  })
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some((row) => row.includes('> drew ')) && (await drawings()) > beforeTheme
+  })
+})
+
+test("a placed screen's focus is brought into view after switching to the transcript and back", async () => {
+  const terminal = new XtermTerminal(50, 10)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await placesAScreen(ctx, () => ({
+    kind: 'stack',
+    children: ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'].map(held),
+  }))
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('› one · 3 lines')))
+  terminal.type('\x1b[Z')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some((row) => row.includes('▸ › eight · show 3 more lines')) && rows.every((row) => !row.includes('› one ·'))
+  })
+  terminal.type('\x1bOQ')
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('fix the build')))
+  terminal.type('\x1bOQ')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some((row) => row.includes('▸ › eight · show 3 more lines')) && rows.every((row) => !row.includes('› one ·'))
+  })
+  for (let step = 0; step < 7; step++) terminal.type('\x1b[A')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some((row) => row.includes('▸ › one · show 3 more lines')) && rows.every((row) => !row.includes('› eight ·'))
+  })
+})
+
+test('a pane seated in any place is invalidated by a theme change, a key table change and a fact, through one walk', async () => {
+  const terminal = new XtermTerminal(60, 20)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.view('prompt', (entry) => ({
+        kind: 'ask',
+        title: 'the session',
+        child: {
+          kind: 'stack',
+          children: [{ kind: 'text', text: [{ mark: 'prompt' }, ` ${sent(entry)}`] }, chosen('a')],
+        },
+      }))
+      author.binnacle.place('above-composer', { kind: 'lines', draw: seatedAsk('above') })
+      author.binnacle.place('composer', { kind: 'lines', draw: seatedAsk('seated') })
+      author.binnacle.screen('board', { key: 'f3', description: 'the board', draw: seatedAsk('board') })
+    },
+  })
+  commit()
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return (
+      rows.some((row) => row.includes('› fix the build')) &&
+      rows.some((row) => row.includes('› above 1')) &&
+      rows.some((row) => row.includes('› seated 1')) &&
+      rows.some((row) => row.includes('enter select'))
+    )
+  })
+  // Let the terminal's colour query settle first, so a re-theme in its own moment cannot drop a cache below.
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  terminal.type('\x1bOR')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some((row) => row.includes('› board 1')) && rows.some((row) => row.includes('enter select'))
+  })
+  session.log(prompt(2, 'and the tests'))
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('› board 2')))
+  await ctx.plugin({
+    name: 'themer',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.theme({ marks: { prompt: { glyph: '>' } } })
+    },
+  })
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('> board 2')))
+  terminal.type('\x1bOR')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return (
+      rows.some((row) => row.includes('> and the tests')) &&
+      rows.some((row) => row.includes('> above 2')) &&
+      rows.some((row) => row.includes('enter select'))
+    )
+  })
+  await ctx.plugin({
+    name: 'rebinder',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.keys({ 'binnacle.primary': 'space' })
+    },
+  })
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some((row) => row.includes('space select')) && rows.every((row) => !row.includes('enter select'))
+  })
+  terminal.type('\x1bOR')
+  await until(async () => {
+    const rows = await terminal.altScreen()
+    return rows.some((row) => row.includes('> board 2')) && rows.some((row) => row.includes('space select'))
+  })
 })

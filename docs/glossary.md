@@ -34,6 +34,7 @@ Every term the code and the docs use, whose word it is, and what it means here. 
 | **contract** | The layer holding what otherwise-independent layers share. |
 | **ui** | The nodes views draw with, layout, the gesture table and UI state. |
 | **pane** | A pi-tui component that draws views and holds UI state, deterministic in what it was given ([ADR 4](adr/0004-layers-each-know-only-what-is-below-them.md)); the transcript is one. |
+| **seats** | The host's one owner of every pane mounted in a place — the transcript, placed screens, placed lines — reading one table of what each place gives its pane: keys, and the scroll focus is brought into view on. The placed panes are kept, invalidated and ticked in one walk; the transcript's own cache the host still calls (`binnacle:packages/binnacle/src/host/seats.ts#Seats`). Ours. |
 | **host** | The one layer that touches the terminal and the process. |
 | **author API** | What an author may depend on: the `binnacle` service and the types its registrations take (`binnacle:packages/binnacle/src/api.ts#Registrations`). |
 | **feature** | What a person can do with binnacle, named as they would ask for it, wherever it is built: the host, a pane, or a built-in feature. Each has a page, listed in the feature map; its own choices are a person's to change ([ADR 0](adr/0000-everything-is-a-plugin-a-person-changes-by-asking-an-author-agent.md)). |

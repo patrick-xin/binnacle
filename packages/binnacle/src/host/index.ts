@@ -9,7 +9,6 @@ import {
   getNativeClipboard,
   getTerminalColorMode,
   ProcessTerminal,
-  ScrollView,
   setKeybindings,
   TuiAltScreen,
   TuiMainScreen,
@@ -20,6 +19,7 @@ import type {
   Keybinding,
   NativeClipboard,
   OverlayHandle,
+  ScrollView,
   Terminal,
   TerminalColorMode,
   TerminalColorScheme,
@@ -37,12 +37,12 @@ import { editorThemeOf, searchStylesOf } from '../ui/theme.ts'
 import { deriveColours } from '../ui/derived-colours.ts'
 import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
-import { TranscriptPane } from '../panes/transcript.ts'
 import { ScreenPane } from '../panes/screen.ts'
-import type { Placement, Slot, Surface } from '../api.ts'
+import type { Slot, Surface } from '../api.ts'
 import { approvals } from '../plugins/approvals/index.ts'
 import { questions } from '../plugins/questions/index.ts'
 import { RegistrationService } from './registrations.ts'
+import { Seats } from './seats.ts'
 import { openSession } from './session.ts'
 import type { OpenedSession } from './session.ts'
 import type { Scope } from '@deepseek-ai/dsh-scope'
@@ -139,14 +139,6 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   const facts: Fact[] = []
   let tui: TuiMainScreen | TuiAltScreen
   let left: TuiMainScreenRenderState | undefined
-  let scroll: ScrollView | undefined
-  const intoView = (top: number, height: number): void => {
-    const view = scroll
-    if (view === undefined) return
-    tui.renderNow()
-    if (top < view.scrollTop) view.scrollTo(top)
-    else if (top + height > view.scrollTop + view.viewportHeight) view.scrollTo(top + height - view.viewportHeight)
-  }
   const copy = (text: string): void => {
     const byTerminal = (): void => {
       terminal.write(`\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`)
@@ -155,34 +147,28 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (native?.setText === undefined) byTerminal()
     else native.setText(text).catch(byTerminal)
   }
-  const transcript = new TranscriptPane(
-    () => {
-      tui.requestRender()
-    },
-    () => registrations.views,
+  const seats = new Seats(
     {
-      inView: intoView,
+      render: () => {
+        tui.requestRender()
+      },
+      renderNow: () => {
+        tui.renderNow()
+      },
+      copy,
       fullscreen: () => {
         show('fullscreen')
       },
-      copy,
     },
+    () => registrations.views,
     () => registrations.currentTheme,
     () => internals.clock.now(),
     () => table.keysOf,
+    () => facts,
+    () => surface(),
   )
-  const screenPanes = new Map<string, ScreenPane>()
-  const screenViews = new Map<string, ScrollView>()
-  let followed: ScrollView | undefined
+  const transcript = seats.transcript
   let open: { readonly name: string; readonly pane: ScreenPane; readonly on: TuiMode } | undefined
-  // Kept to preserve scroll state across screen switches.
-  function transcriptView(): ScrollView {
-    if (followed === undefined) {
-      followed = new ScrollView(transcript, { follow: 'end', primary: true })
-      scroll = followed
-    }
-    return followed
-  }
   const readBelowComposer = (reading: ScrollView | undefined): VStack =>
     new VStack([
       { component: reading ?? nothing, basis: 0, grow: 1, shrink: 1, minSize: reading === undefined ? 0 : 1 },
@@ -195,61 +181,22 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
       })),
     ])
   function readOn(alternate: TuiAltScreen): void {
-    const reading =
-      open === undefined
-        ? page.transcript
-          ? transcriptView()
-          : undefined
-        : (screenViews.get(open.name) ?? new ScrollView(open.pane, { primary: true }))
-    if (open !== undefined && reading !== undefined) screenViews.set(open.name, reading)
-    // What is being read is what focus is brought into view on: the transcript, or the placed screen that is open.
-    scroll = reading
-    alternate.setLayoutRoot(readBelowComposer(reading))
+    alternate.setLayoutRoot(readBelowComposer(seats.reading(open?.name, page.transcript)))
   }
-  const linesPanes = new Map<Slot, Map<Placement, ScreenPane>>()
   let dialog: OverlayHandle | undefined
-  const linesPane = (slot: Slot, placement: Extract<Placement, { readonly kind: 'lines' }>): ScreenPane => {
-    const inSlot = linesPanes.get(slot) ?? new Map<Placement, ScreenPane>()
-    linesPanes.set(slot, inSlot)
-    const kept = inSlot.get(placement)
-    if (kept !== undefined) return kept
-    const answered = slot === 'composer' || slot === 'dialog'
-    const pane = new ScreenPane(
-      () => facts,
-      {
-        copy,
-        changed: () => {
-          tui.requestRender()
-        },
-        invoked: (region, affordance) => {
-          placement.invoke?.(region, affordance)
-        },
-      },
-      () => registrations.currentTheme,
-      () => internals.clock.now(),
-      () => (answered ? table.keysOf : undefined),
-    )
-    pane.place(slot, { draw: (drawn) => placement.draw(drawn, surface()) }, `binnacle.place(${slot})`)
-    inSlot.set(placement, pane)
-    return pane
-  }
   function arrange(): Page {
     const lines = (slot: Slot): readonly ScreenPane[] =>
-      registrations.placed(slot).flatMap((placement) => (placement.kind === 'lines' ? [linesPane(slot, placement)] : []))
+      registrations.placed(slot).flatMap((placement) => (placement.kind === 'lines' ? [seats.linesPane(slot, placement)] : []))
     const inComposer = registrations.placed('composer').at(-1)
     const inDialog = registrations.placed('dialog').at(-1)
     const arranged: Page = {
       transcript: registrations.placed('transcript').at(-1)?.kind === 'transcript',
       above: lines('above-composer'),
-      composer: inComposer === undefined ? undefined : inComposer.kind === 'lines' ? linesPane('composer', inComposer) : composer,
+      composer: inComposer === undefined ? undefined : inComposer.kind === 'lines' ? seats.linesPane('composer', inComposer) : composer,
       below: lines('below-composer'),
-      dialog: inDialog?.kind === 'lines' ? linesPane('dialog', inDialog) : undefined,
+      dialog: inDialog?.kind === 'lines' ? seats.linesPane('dialog', inDialog) : undefined,
     }
-    const standing = new Set<Component | undefined>([...arranged.above, arranged.composer, ...arranged.below, arranged.dialog])
-    for (const [slot, panes] of linesPanes) {
-      for (const [placement, pane] of panes) if (!standing.has(pane)) panes.delete(placement)
-      if (panes.size === 0) linesPanes.delete(slot)
-    }
+    seats.unseatLines(new Set<Component | undefined>([...arranged.above, arranged.composer, ...arranged.below, arranged.dialog]))
     return arranged
   }
   const around = (): readonly Component[] => [...page.above, ...(page.composer === undefined ? [] : [page.composer]), ...page.below]
@@ -279,23 +226,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const placed = registrations.screens.get(id)
     if (placed === undefined) return
     open = undefined
-    let pane = screenPanes.get(id)
-    if (pane === undefined) {
-      pane = new ScreenPane(
-        () => facts,
-        {
-          copy,
-          changed: () => {
-            tui.requestRender()
-          },
-          inView: intoView,
-        },
-        () => registrations.currentTheme,
-        () => internals.clock.now(),
-        () => table.keysOf,
-      )
-      screenPanes.set(id, pane)
-    }
+    const pane = seats.screenPane(id)
     pane.place(id, placed)
     open = { name: id, pane, on: tui.mode }
     if (tui instanceof TuiAltScreen) readOn(tui)
@@ -303,42 +234,35 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   // Adapters change the facts, so the log is read again; views and the theme need only a frame.
   const unregister = registrations.onChange((changed) => {
-    for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
     if (changed === 'facts') {
       facts.length = 0
       for (const event of events) facts.push(adapt(event, registrations.adapters))
       transcript.reset(facts)
-      for (const pane of screenPanes.values()) pane.factsChanged()
-    } else if (changed === 'screens') offerScreens()
-    else if (changed === 'keys') {
+      seats.changed('facts')
+      return
+    }
+    if (changed === 'keys') {
       table.bind(registrations.bindings)
       setKeybindings(table.manager)
       transcript.invalidate()
-      for (const pane of screenPanes.values()) pane.invalidate()
-      tui.requestRender()
-    } else if (changed === 'drawn') {
-      for (const pane of screenPanes.values()) pane.invalidate()
-      tui.requestRender()
-    } else if (changed === 'placements') {
+    } else if (changed === 'screens') offerScreens()
+    else if (changed === 'placements') {
       page = arrange()
       stack(tui)
-      tui.requestRender()
-    } else tui.requestRender()
+    }
+    seats.changed('drawn')
+    tui.requestRender()
   })
   let notice: string | undefined
   const surface = (): Surface => (notice === undefined ? {} : { notice })
   const restand = (): void => {
-    for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
+    seats.changed('drawn')
     tui.requestRender()
   }
   const unstand = session.onStanding(restand)
-  const ticking = (): boolean =>
-    transcript.ticking ||
-    [...screenPanes.values()].some((pane) => pane.ticking) ||
-    [...linesPanes.values()].some((panes) => [...panes.values()].some((pane) => pane.ticking))
   let untick: (() => void) | undefined
   const tick = (): void => {
-    if (ticking()) tui.requestRender()
+    if (seats.ticking) tui.requestRender()
     untick = internals.clock.after(1_000, tick)
   }
   untick = internals.clock.after(1_000, tick)
@@ -400,11 +324,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     offered.clear()
     for (const [id, screen] of registrations.screens)
       offered.set(id, table.offer(id, { defaultKeys: screen.key, description: screen.description }))
-    for (const id of screenPanes.keys()) {
-      if (registrations.screens.has(id)) continue
-      screenPanes.delete(id)
-      screenViews.delete(id)
-    }
+    seats.unseatScreens(registrations.screens)
     setKeybindings(table.manager)
     if (open === undefined) return
     const placed = registrations.screens.get(open.name)
@@ -495,7 +415,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
             ...searchStylesOf(() => registrations.currentTheme),
           })
     if (next instanceof TuiMainScreen && left !== undefined) next.restoreRenderState(left)
-    if (next instanceof TuiMainScreen) scroll = undefined
+    if (next instanceof TuiMainScreen) seats.onMainScreen()
     stack(next)
     next.addInputListener(keys)
     unscheme?.()
@@ -530,8 +450,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const fact = adapt(event, registrations.adapters)
     facts.push(fact)
     transcript.push(fact)
-    for (const pane of screenPanes.values()) pane.factsChanged()
-    for (const panes of linesPanes.values()) for (const pane of panes.values()) pane.invalidate()
+    seats.changed('facts')
   })
   const answering = new AnswerStream()
   const unstream = session.onStream((frame) => {
