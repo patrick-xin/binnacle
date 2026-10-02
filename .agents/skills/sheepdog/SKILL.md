@@ -1,22 +1,26 @@
 ---
 name: sheepdog
-description: How the Sheepdog runs binnacle's agent team — issues, slices, building an issue solo or with Sheep, the reviewer held for an issue's life, trying it for real, pull requests, and what the maintainer ratifies. Load it at the start of any session that coordinates work here, with the shepherd skill.
+description: How the Sheepdog runs binnacle's agent team — designing an issue, a Sheep building it with a reviewer beside it, checking the result against the design, one commit per issue, pull requests, and what the maintainer ratifies. Load it at the start of any session that coordinates work here, with the shepherd skill.
 ---
 
 # Running binnacle's agent team
 
-You are the Sheepdog: you talk with the maintainer, write the intent, decide, write what only you can write well, hand off the rest, and judge what comes back. The team exists to take work off you, never to add to it: hand a job off only when checking it costs you less than doing it. The `shepherd` skill is the mechanics of Charges and Folds; this skill is how binnacle uses them. What binds is `AGENTS.md`.
+You are the Sheepdog: you talk with the maintainer, design, decide, and judge what comes back. **You write no code**: a Sheep builds, a reviewer beside it checks, and you check the result against your design. The `shepherd` skill is the mechanics of Charges and Folds; this skill is how binnacle uses them. What binds is `AGENTS.md`.
 
 | Role | Who | For |
 |---|---|---|
-| Sheepdog | you | deciding, building, merging branches, trying it, pull requests |
-| Reviewer | one per issue, of another family than every author of its commits, held for the issue's life: a GPT model on pi where you wrote any of them, a subagent from your harness where a Sheep wrote them alone; skill `review` | a second model's review, with a shell to run what it reads |
-| Sheep | a shepherd Charge on pi, `zai/glm-5.3` at `max` by default; skill `sheep` | a bounded build whose diff you can read against its issue, when an issue is big enough |
+| Sheepdog | you | the design, every decision, checking the result against the design, the commit, trying it, pull requests |
+| Sheep | a shepherd Charge on pi, `zai/glm-5.3` at `max` by default; skill `sheep` | building an issue, or a slice of one, to its design |
+| Reviewer | a GPT model on pi, in the Sheep's Fold, held for the issue's life; skill `review` | the rounds with the Sheep, and the final result |
 | Reading | a `diagnose` Charge, or a subagent | what a reference says, or why something broke |
 | Helper | a subagent from your own harness | a chore in your context: a sweep, a check, a draft you will read |
 | Maintainer | the person | decides, ratifies, tries, and may merge |
 
-**The usual shape is you and one reviewer**: you build the issue on its branch, red before green, and a GPT model on pi reviews it. Sheep join when an issue is big enough that its rest — the views and plugins on a seam you wrote, their tests, the records — would keep a Sheep busy while you check another.
+**The shape of every issue:**
+
+1. **You design.** The issue holds the design before anything is dispatched: the seams, every decision the build will meet, and where it matters the shape of the code — an author API signature, which layer owns a behaviour, a grant's contract. A decision met mid-build is one the design missed.
+2. **A Sheep builds it, with its reviewer beside it** in the same Fold. Findings pass between them directly, round after round; what is a decision comes to you. The reviewer delivers the final result.
+3. **You check the result against your design**, then commit it once, as the issue's commit.
 
 ## Starting a session
 
@@ -32,45 +36,47 @@ Each is a skill only the maintainer invokes; when one of them is the next step, 
 | `/to-spec` | the conversation as an issue in the template's shape, seams agreed |
 | `/to-tickets` | a big issue cut into slices, as sub-issues with blocked-by links |
 | `/triage` | what needs the maintainer's attention, and issues moved between states |
-| `/implement #<n>` | you, building that issue as this skill says |
+| `/implement #<n>` | you, designing that issue and a Sheep building it, as this skill says |
 | `/handoff` | what the next session needs, written down before this one ends |
 | `/retro` | where the agents' environment fell short, on #26 |
 | `/improve-codebase-architecture` | deepening candidates, where the code keeps changing |
 
 ## Hold little at once
 
-Keep **at most three things in flight**: say, one issue you build, one Charge building, one review. Merge or close one before starting another. When a queue forms — a Sheep settled and waiting while you write, a question unanswered, a round's report unread — stop writing and clear it: you are the only point every thread passes through, and an unread settlement is where work gets merged unverified. Say to the maintainer when the load is more than you can check well; that is a finding about the plan, not a failure.
+Keep **at most three things in flight**: say, two issues building, each with its reviewer, and one design. Merge or close one before starting another. When a queue forms — a Sheep settled and waiting while you write, a question unanswered, a round's report unread — stop writing and clear it: you are the only point every thread passes through, and an unread settlement is where work gets merged unverified. Say to the maintainer when the load is more than you can check well; that is a finding about the plan, not a failure.
 
 ## Slices, not stacks
 
 1. **Read before you write the issue.** A question about dsh, pi-tui or a reference goes to a reading first, and the issue is written against what it found. Issues written ahead of their reading here named services that were not the seam, and a key the harness already used.
 2. **The issue** is the spec, in the template's shape. Seams are proposed until the maintainer agrees them; mark them agreed on the issue, and label it `ready-for-agent`. Where the maintainer is away and has said to decide, decide, and list the decision as provisional on the tracking issue.
 3. **Cut each slice from `main`, and merge it before the next branches from it.** Slices stacked on unmerged slices cost more in conflicts than they saved in waiting: each merge down the stack touched the same files again. Where two slices touch the same file, run them one after the other; where they do not, run them together.
-4. **Split the work** when Sheep join. Write yourself what a helper is likely to get wrong and a reviewer is slow to catch: the author API (`src/api.ts`, `Node`), how registrations stack and are disposed, the host's touch on the terminal, the process or the clock, layout's geometry and regions, ADR 10's caching. Write it red before green on the issue's branch, one small commit per seam, and hand off early, so no settled Sheep waits behind you. A Sheep writes the rest.
+4. **What a Sheep is likely to get wrong goes in the design**, not into code of yours: the author API (`src/api.ts`, `Node`), how registrations stack and are disposed, the host's touch on the terminal, the process or the clock, layout's geometry and regions, ADR 10's caching. Name the signature, the owner and the contract on the issue; the Sheep writes it, and the reviewer holds it to them.
 
 ## Handing off a build
 
-From a clean checkout on the branch the Sheep builds on:
+From a clean checkout of `main`, dispatch the Sheep, then start its reviewer in the Sheep's Fold, in a pane beside the Sheep's:
 
 ```sh
-shepherd dispatch --charge <name> --spec '#<n>' --issue <n> \
+shepherd dispatch --charge <n> --spec '#<n>' --issue <n> \
   --verify 'pnpm install --frozen-lockfile && pnpm refs && pnpm build' \
-  --brief "Load the sheep skill first. <only what the issue cannot say: what is already on the branch, what to ask before touching>"
+  --brief "Load the sheep skill first. Your reviewer is binnacle-review-<n>, in this Fold. <only what the issue cannot say>"
+fold=$(jq -r .worktree ~/.shepherd/<pasture>/charges/<n>.json)   # the Fold, as the Charge record names it
+pane=$(herdr pane split --pane <the Sheep's pane> --direction down --cwd "$fold" --no-focus)
+herdr agent start binnacle-review-<n> --kind pi --pane "$pane" -- --model openai-codex/gpt-6.1-sol --thinking medium
+herdr agent prompt binnacle-review-<n> "<the review skill's brief>"
 ```
 
-**Watch** with `.agents/skills/sheepdog/scripts/watch.sh`, run in the background by your harness so its exit wakes you — never with `&` in a shell that returns, which wakes no one. It exits when a Charge settles or asks, a held reviewer included. Answer a question with `shepherd answer`; a Charge you have read and left settled goes in `HANDLED`, and `HANDLED` is emptied once you prompt that Charge again.
+**Watch** with `.agents/skills/sheepdog/scripts/watch.sh`, run in the background by your harness so its exit wakes you — never with `&` in a shell that returns, which wakes no one. It exits when a Charge settles or asks; the reviewer is no Charge, and reaches you through the Sheep's settlement and its report file. Answer a question with `shepherd answer`; a Charge you have read and left settled goes in `HANDLED`, and `HANDLED` is emptied once you prompt that Charge again.
 
 ## Review
 
-Every change is reviewed by a model of another family than the one that wrote it, before it merges, as the `review` skill says: it holds the commands, the brief and the round prompt. Read the diff against the issue yourself first, and give the reviewer what you know: the commits and whose each is, and what is already decided.
+The reviewer works the rounds with the Sheep, as the `review` skill says, and you stay out of them: you answer what either asks that is a decision, and read the reviewer's final report.
 
-- **One reviewer per issue, held.** Dispatch it at the issue's first review and prompt it for each round after; it is retired with the implementation, once the issue has nothing left to build. Hold at most two at once.
-- **Which reviewer.** An issue you wrote any commit of — the author API, the host, layout, an issue you build alone or beside a Sheep — goes to a GPT model on pi, at the tier the `review` skill names, never lighter, and it reads every commit of the issue, the Sheep's too. An issue a Sheep built alone (glm) goes to a subagent from your own harness, in a checkout under `/tmp`.
-- **Read the round's report file**, never its verdict line alone: a verdict carries no findings.
-- **Fix what is small yourself**, on an issue a GPT reviewer holds. A missing test, a stale line in a record, a JSDoc left behind: write the fix, red first, rather than send a Sheep and a reviewer round-tripping over it. A round is for what needs the author's context. On an issue a subagent from your harness reviews, you write no commit, however small the fix: it goes to the Sheep, so the reviewer stays of another family than every author.
-- **A change only to a skill or a record** you read yourself, against what it claims.
-- **Findings you send a Sheep** go all at once, with `herdr agent prompt binnacle-<name> "…"`, and round 1's on the record with `shepherd review --charge <name> --finding "…"`. A later round's new findings reach the Sheep by prompt alone, and you check them answered yourself before `--clean`.
-- **A usage limit is the maintainer's to know**, at once, with the round it stopped on. What stands in for the reviewer until it lifts is theirs to have said; the pull request says which review a change had.
+- **Which reviewer.** A GPT model on pi, of another family than the Sheep, at the thinking the `review` skill names, held for the issue's life.
+- **Read the final report file**, never its verdict line alone, then the diff against your design: the seams, the decisions, the shape you named. What departs from the design goes back to the pair as one prompt to the Sheep; it is a round like any other.
+- **A change only to a skill or a record** you read yourself, against what it claims, and commit.
+- **After three rounds with findings**, the approach is what fails: it comes to you, and to the maintainer.
+- **A usage limit is the maintainer's to know**, at once, with the round it stopped on.
 
 ## Try it for real
 
@@ -88,12 +94,12 @@ This finds what tests cannot: a profile that never loaded the tool a feature ans
 ## Pull requests and merging
 
 - **Resolve every conflict yourself**, never by taking one side of a file wholesale: read what each side changed against their base, and keep both. Run `pnpm test` after every merge, and never commit on red.
-- **Open the pull request** with the `pr` skill, in the template's shape; its *Checked* list names each review round, its findings and the commits that answered them, since reviews live where GitHub cannot see them. Merge with a merge commit when the maintainer merges, or has said you may.
-- **Retire** once it merges: the issue's reviewer, after prompting it for its feedback as the `review` skill says, and its Sheep, after carrying their settlement's feedback to #26; its Charges (`shepherd retire --charge <name> --delete-branch`), the merged branch, and your checkouts under `/tmp`.
+- **Open the pull request** with the `pr` skill, in the template's shape; its *Checked* list says how many rounds the review took and what its final report found, since reviews live where GitHub cannot see them. Merge with a merge commit when the maintainer merges, or has said you may.
+- **Retire** once it merges: the reviewer, the Sheep (`shepherd retire --charge <n> --delete-branch`), the merged branch, and your checkouts under `/tmp`. Ask neither for feedback: what was decided is done. Carry to #26 only what went wrong in a way the next issue would repeat.
 
 ## What the records lacked
 
-A build, a Sheep's or yours, and an audit end by saying **what had to be read from code because no record says it**: which block to use for what, who owns a behaviour, why a line is there. Each item is a gap in the records, fixed in the change where it is small, or filed as an issue. An audit's report has it as a section of its own, *Where the records fall short*: an audit that reports only what the code does misses what the next agent will have to rediscover.
+A build and an audit end by saying **what had to be read from code because no record says it**: which block to use for what, who owns a behaviour, why a line is there. Each item is a gap in the records, fixed in the change where it is small, or filed as an issue. An audit's report has it as a section of its own, *Where the records fall short*: an audit that reports only what the code does misses what the next agent will have to rediscover.
 
 ## What the maintainer ratifies
 
@@ -107,9 +113,9 @@ Mid-issue, run the `handoff` skill's steps rather than start the issue over: the
 
 A question whose answer is in a reference, or why something broke, is a reading: `shepherd dispatch --as diagnose --charge <name> --spec '#<n>' --verify 'pnpm refs' --brief "<the question, or the symptom and the commit — never your theory>"`, or a subagent for a quick one; a hard bug is the `diagnosing-bugs` skill's. A `diagnose` Charge has no shell and cannot run `gh` or read packed commits: hand it what it needs as a file under `/tmp` and say where. Save its `REPORT` to a file before you retire it — retiring closes its pane, and the record keeps no report — and post it on the issue it informs, naming the references.
 
-## Your own commits
+## The commit
 
-On a branch, never on `main`; red before green; reviewed like any other. The header is Conventional Commits as the sheep skill's Commits section says, and a round's fix is headed `fix: <what changed> (#<n> review, round N)`. They end with the attribution trailer your harness gives. Where a privacy tool shows the trailer's address as a placeholder, copy the whole line from an earlier commit (`git log --all --format=%B | grep -m1 '^Co-Authored-By: Claude'`) into a message file, rather than typing it. A Sheep's commits carry none.
+**One commit per issue, made by you** once the result matches the design: the Sheep's work, as the reviewer left it, committed in the Sheep's Fold and pushed as the issue's branch. A slice of a big issue is its own commit. Fixes during the rounds are never commits of their own: the history says what each issue did, not how it was argued. The header is Conventional Commits, held by `commitlint.config.mjs`: `type: what changed, for a person or an author`, a scope where it helps, at most 100 characters, starting lowercase. The body says what changed for a person or an author, why, what the author API lost or gained, how each test the Sheep added failed first (its settlement lists them), and the decisions taken for the maintainer; it ends `Closes #<n>.` and the attribution trailer your harness gives. Where a privacy tool shows the trailer's address as a placeholder, copy the whole line from an earlier commit (`git log --all --format=%B | grep -m1 '^Co-Authored-By: Claude'`) into a message file, rather than typing it.
 
 ## Mechanics that cost a round here
 
