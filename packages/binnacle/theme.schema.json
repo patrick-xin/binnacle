@@ -1,0 +1,297 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "A binnacle theme",
+  "description": "One theme file of a binnacle profile, <profile>/themes/<name>.json: a theme registration's changes (vars, tones, backgrounds, marks, chrome, words, folds, spacing, light, dark), or a pi theme file as it is.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {},
+    "name": {},
+    "appearance": {},
+    "export": {},
+    "colors": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/colour"
+      },
+      "description": "pi's colors, translated by the theme row: an empty string leaves the token as binnacle has it."
+    },
+    "vars": {
+      "$ref": "#/$defs/colours"
+    },
+    "tones": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/style"
+      }
+    },
+    "backgrounds": {
+      "$ref": "#/$defs/colours"
+    },
+    "marks": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/mark"
+      }
+    },
+    "chrome": {
+      "$ref": "#/$defs/chrome"
+    },
+    "words": {
+      "$ref": "#/$defs/words"
+    },
+    "folds": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/foldStart"
+      }
+    },
+    "spacing": {
+      "$ref": "#/$defs/spacing"
+    },
+    "light": {
+      "$ref": "#/$defs/variant"
+    },
+    "dark": {
+      "$ref": "#/$defs/variant"
+    }
+  },
+  "$defs": {
+    "colour": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A colour: one of the terminal's sixteen by name, a 256-colour index, an exact colour as a string, or the name of one of the file's vars -- a string the reading resolves; what only the reading can check stays the reading's."
+    },
+    "text": {
+      "type": "string",
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+    },
+    "colours": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/colour"
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/colour"
+        },
+        "background": {
+          "$ref": "#/$defs/colour"
+        },
+        "bold": {
+          "type": "boolean"
+        },
+        "dim": {
+          "type": "boolean"
+        },
+        "italic": {
+          "type": "boolean"
+        },
+        "underline": {
+          "type": "boolean"
+        }
+      }
+    },
+    "mark": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "glyph": {
+          "$ref": "#/$defs/text"
+        },
+        "tone": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "foldStart": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open": {
+          "type": "boolean"
+        }
+      }
+    },
+    "chrome": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "focus": {
+          "$ref": "#/$defs/text"
+        },
+        "cut": {
+          "$ref": "#/$defs/text"
+        },
+        "separator": {
+          "$ref": "#/$defs/text"
+        },
+        "jump": {
+          "$ref": "#/$defs/text"
+        },
+        "gutter": {
+          "$ref": "#/$defs/text"
+        },
+        "frame": {
+          "enum": ["rounded", "square", "heavy", "double", "none"]
+        },
+        "border": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "topLeft": {
+              "$ref": "#/$defs/text"
+            },
+            "horizontal": {
+              "$ref": "#/$defs/text"
+            },
+            "topRight": {
+              "$ref": "#/$defs/text"
+            },
+            "side": {
+              "$ref": "#/$defs/text"
+            },
+            "bottomLeft": {
+              "$ref": "#/$defs/text"
+            },
+            "bottomRight": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        }
+      }
+    },
+    "words": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "holds": {
+          "$ref": "#/$defs/text"
+        },
+        "cut": {
+          "$ref": "#/$defs/text"
+        },
+        "less": {
+          "$ref": "#/$defs/text"
+        },
+        "show": {
+          "$ref": "#/$defs/text"
+        },
+        "away": {
+          "$ref": "#/$defs/text"
+        },
+        "to": {
+          "$ref": "#/$defs/text"
+        },
+        "select": {
+          "$ref": "#/$defs/text"
+        },
+        "next": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.expand": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.choose": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.open": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.copy": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.answer": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.grant": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.dismiss": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "band": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ask": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "show": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "indent": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gap": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vars": {
+          "$ref": "#/$defs/colours"
+        },
+        "tones": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/style"
+          }
+        },
+        "backgrounds": {
+          "$ref": "#/$defs/colours"
+        },
+        "marks": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/mark"
+          }
+        },
+        "chrome": {
+          "$ref": "#/$defs/chrome"
+        },
+        "words": {
+          "$ref": "#/$defs/words"
+        },
+        "folds": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/foldStart"
+          }
+        },
+        "spacing": {
+          "$ref": "#/$defs/spacing"
+        }
+      }
+    }
+  }
+}

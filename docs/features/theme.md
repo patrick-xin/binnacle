@@ -20,6 +20,26 @@ The files the agent presented are drawn under the `presented` mark in accent, an
 
 binnacle's own starts, a person's to change: the thinking fold, context, the fallback, authored facts, a compaction's summary and a retry's failure folded to nothing; a tool's and a result's output to three rows.
 
+## A theme file in the profile
+
+A theme is also a file: `<profile>/themes/<name>.json`, holding the changes of a theme registration as JSON — every part above, `vars` through `dark` — which an author agent writes and a person keeps, copies and changes ([ADR 17](../adr/0017-a-theme-is-a-file-drawn-as-soon-as-it-is-written.md)). Which files are used is the config of the built-in `binnacle-theme` row (`binnacle:packages/binnacle/cordis.patch.yml`), set in the profile's own patch as any row's is:
+
+```yaml
+- id: binnacle-theme
+  config:
+    theme: my-theme
+    light: my-theme-light
+    dark: my-theme-dark
+```
+
+`theme` names one file, which may hold its own variants; `light` and `dark` name one each, whose changes replace the theme file's own variant of that appearance (`binnacle:packages/binnacle/src/plugins/theme/index.ts`). A config naming no file registers nothing; a field that is not a file's name refuses the row where it loads, naming the field.
+
+The file is checked where it is registered, and an author agent can check it before writing: against the JSON Schema the package ships, `binnacle:packages/binnacle/theme.schema.json`, draft-07, named in a file's `$schema`. The schema is a structural and lexical preflight — the parts, the field types, the enumerations, whole numbers — never refusing what the profile's own reading accepts; what only the reading can check stays the reading's: a var a colour names, what a new mark needs, a glyph's cell width. What the file holds that binnacle cannot draw is drawn as a notice naming its path and what to change, and the theme beneath it stays.
+
+A pi theme file works as it is (`pi:packages/coding-agent/docs/themes.md`): every top-level field of pi's theme schema is either read — `vars` as the theme's own, `colors` as tones and backgrounds — or ignored: `$schema`, `name`, `export`, `appearance`. In `colors`, a token ending in `Bg` fills that background and every other token draws as that tone's colour; `""`, the terminal's own, leaves the token as binnacle has it; where the file's own `tones` or `backgrounds` name the same token, theirs wins.
+
+The host reads and watches the files through a named grant, `themeFile` ([Authoring](authoring.md)): a file written again is checked and registered again, and the redraw that already exists does the rest — no restart. A file removed, or text that is not JSON, is drawn as a notice naming its path while the last theme stays. On the main screen, rows already printed keep their theme ([ADR 14](../adr/0014-on-the-main-screen-a-printed-row-never-changes.md)): the alternate screen and what is drawn again change; the scrollback does not.
+
 ## Choices
 
 - The tones are pi's names for what content means (`pi:packages/coding-agent/docs/themes.md`).

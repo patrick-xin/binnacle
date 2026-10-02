@@ -1,0 +1,46 @@
+{
+  "$schema": "./theme.schema.json",
+  "name": "example",
+  "appearance": "dark",
+  "vars": {
+    "ink": "okhsl(234 3% 89%)",
+    "sea": "oklch(62% 0.1 200)"
+  },
+  "tones": {
+    "accent": { "color": "sea" },
+    "thinkingText": { "color": "ink", "dim": true }
+  },
+  "backgrounds": {
+    "userMessageBg": "#1c1c2e"
+  },
+  "colors": {
+    "muted": "ink",
+    "userMessageBg": "bright-black"
+  },
+  "marks": {
+    "prompt": { "glyph": "»", "tone": "accent" }
+  },
+  "chrome": {
+    "frame": "heavy",
+    "gutter": "┃"
+  },
+  "words": {
+    "holds": "{n} {lines}"
+  },
+  "folds": {
+    "tool": { "rows": 2, "open": false }
+  },
+  "spacing": {
+    "gap": 2
+  },
+  "light": {
+    "vars": { "ink": "okhsl(234 5% 20%)" },
+    "tones": { "accent": { "color": "blue" } }
+  },
+  "dark": {
+    "backgrounds": { "userMessageBg": 17 }
+  },
+  "export": {
+    "pageBg": "#101018"
+  }
+}

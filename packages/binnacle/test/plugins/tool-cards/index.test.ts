@@ -21,6 +21,7 @@ import { drawCard } from '../../../src/plugins/tool-cards/cards.ts'
 import * as toolCards from '../../../src/plugins/tool-cards/index.ts'
 import { call as callFact, returned as returnedFact } from '../../support/facts.ts'
 import { pointer } from '../../support/pointer.ts'
+import { FakeClock } from '../../support/clock.ts'
 
 /**
  * The cards applied in a Cordis context, with the `binnacle` service and a
@@ -30,7 +31,7 @@ import { pointer } from '../../support/pointer.ts'
  */
 async function withCards(...tools: ToolDefinition[]) {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   await ctx.plugin(SystemPrompt, {})
   const runtime = new ToolRuntime(ctx)
   for (const tool of tools) runtime.register(tool)

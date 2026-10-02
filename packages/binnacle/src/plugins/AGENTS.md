@@ -6,6 +6,7 @@ binnacle's built-in features, each a Cordis plugin beside the surface it draws o
 - `composer/` — the Composer: where a person types a line and sends it, or runs it as one of dsh's commands.
 - `questions/` — Questions: what the agent asks a person, answered in the composer's seat a question at a time.
 - `status-line/` — the Status line: the model, tokens used and share of context under the composer, or a notice in its place.
+- `theme/` — the Theme row: the theme files the profile's patch names, read and watched through the host's grant, registered and registered again as they change.
 - `tool-cards/` — the tool cards: each tool call drawn from what its tool presents, instead of its name and raw JSON.
 - `trajectory/` — the Trajectory: every event of a session on a screen of its own.
 - `transcript/` — the Transcript: the session log drawn as turns, in the transcript's place.

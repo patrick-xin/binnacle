@@ -18,6 +18,7 @@
     "@deepseek-ai/cordis": ["host", "plugins"],
     "@deepseek-ai/dsh-agent": ["facts", "api.ts", "host"],
     "@deepseek-ai/dsh-agent-default-model": ["host"],
+    "@deepseek-ai/dsh-app-boot": ["host"],
     "@deepseek-ai/dsh-cmdline": ["host"],
     "@deepseek-ai/dsh-llm": ["facts", "host"],
     "@deepseek-ai/dsh-session": ["facts", "host"],
@@ -51,6 +52,7 @@
     "agents": "@deepseek-ai/dsh-agent",
     "cmdlineArgs": "@deepseek-ai/dsh-cmdline",
     "commands": "@deepseek-ai/dsh-commands",
+    "profileContext": "@deepseek-ai/dsh-app-boot",
     "sessionProjections": "@deepseek-ai/dsh-session-projection",
     "tools": "@deepseek-ai/dsh-tools"
   }
