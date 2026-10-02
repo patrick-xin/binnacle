@@ -1,6 +1,7 @@
 import { backgroundAnsi, foregroundAnsi, parseColor } from '@earendil-works/pi-tui'
-import type { EditorTheme, MarkdownTheme, TerminalColorMode, TuiAltScreenOptions } from '@earendil-works/pi-tui'
+import type { EditorTheme, MarkdownTheme, TerminalColorMode, TerminalColors, TuiAltScreenOptions } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
+import { deriveColours } from './derived-colours.ts'
 import type { DerivedColour, DerivedColours } from './derived-colours.ts'
 
 /** The theme's colours for content, named by what the content means, in the names pi's themes use. */
@@ -14,6 +15,7 @@ export const tones = {
   border: (text: string): string => `\x1b[2m${text}\x1b[22m`,
   borderAccent: (text: string): string => `\x1b[36m${text}\x1b[39m`,
   borderMuted: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  text: (text: string): string => text,
   userMessageText: (text: string): string => text,
   searchMatchText: (text: string): string => `\x1b[36m${text}\x1b[39m`,
   toolTitle: (text: string): string => text,
@@ -292,11 +294,11 @@ export interface ThemeChanges extends ThemeVariant {
 
 /** What a theme registration changes on one appearance of the terminal, or on either. */
 export interface ThemeVariant {
-  /** Colours named once, so a tone, its background or a background may give one by its name; a name here is read before one of the sixteen's. */
+  /** Colours named once, so a tone, its background or a background may give one by its name; a name here is read before one of the sixteen's, and may name another var, before or after it. */
   readonly vars?: { readonly [name: string]: Colour }
   /** Tones, by name — binnacle's, or new ones a view may then name: the colour and attributes each is drawn in, replacing how the theme beneath drew it. */
   readonly tones?: { readonly [name: string]: Style }
-  /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: one of the terminal's sixteen colours. */
+  /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: a colour, in any form a colour may take. */
   readonly backgrounds?: { readonly [name: string]: Colour }
   /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. The gutter and a border's pieces are each one column wide. */
   readonly chrome?: {
@@ -406,8 +408,8 @@ export interface TerminalLook {
   readonly appearance?: 'light' | 'dark'
   /** How many colours an exact colour may be drawn in. */
   readonly mode: TerminalColorMode
-  /** The colours derived from the palette the terminal reported, which binnacle's own tones and backgrounds take where it reported its background. */
-  readonly derived?: DerivedColours
+  /** What the terminal reported of its colours; binnacle's own tones and backgrounds are derived from it where it reported its background. */
+  readonly reported?: TerminalColors
 }
 
 /** binnacle's own tones and backgrounds in the colours derived for a terminal, each keeping its attributes. */
@@ -435,7 +437,7 @@ function derivedChanges(derived: DerivedColours): ThemeChanges {
  */
 export function themed(base: Theme, registered: readonly ThemeChanges[], look: TerminalLook = { mode: 'truecolor' }): Theme {
   const variant = look.appearance
-  const derived = look.derived?.appearance === undefined ? [] : [derivedChanges(look.derived)]
+  const derived = look.reported?.background === undefined ? [] : [derivedChanges(deriveColours(look.reported, look.appearance))]
   const changes: readonly ThemeVariant[] = [...derived, ...registered].flatMap((change) => {
     const varied = variant === undefined ? undefined : change[variant]
     return varied === undefined ? [change] : [change, varied]

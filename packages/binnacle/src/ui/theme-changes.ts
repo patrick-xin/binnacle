@@ -1,5 +1,5 @@
 import { parseColor, visibleWidth } from '@earendil-works/pi-tui'
-import { binnacleTheme, chrome, colours, frames, words } from './theme.ts'
+import { binnacleTheme, chrome, colours, frames, themed, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
 const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds', 'spacing', 'light', 'dark'] as const
@@ -30,6 +30,24 @@ function isControl(character: string): boolean {
 function oneOf(value: unknown, at: string, allowed: readonly string[], what: string): string {
   if (typeof value !== 'string' || !allowed.includes(value)) throw new Error(`${at} is ${named(value)}, not ${what}: ${allowed.join(', ')}`)
   return value
+}
+
+/** A theme's vars, each following the names it gives, among them or the ones beneath, to a colour. */
+function resolved(given: Readonly<Record<string, unknown>>, outer: Vars): Vars {
+  const read = new Map<string, Colour>()
+  const follow = (name: string, through: readonly string[]): Colour => {
+    const done = read.get(name)
+    if (done !== undefined) return done
+    const value = given[name]
+    const aliased = typeof value === 'string' && Object.hasOwn(given, value)
+    if (aliased && (value === name || through.includes(value)))
+      throw new Error(`vars.${through[0] ?? name} names itself, through ${[...through.slice(1), name].join(', ')}`)
+    const found = aliased ? follow(value, [...through, name]) : colour(value, `vars.${name}`, outer)
+    read.set(name, found)
+    return found
+  }
+  for (const name of Object.keys(given)) follow(name, [])
+  return Object.fromEntries(read)
 }
 
 function piece(value: unknown, at: string): string {
@@ -110,10 +128,7 @@ function parsed(
   varied: boolean,
 ): ThemeChanges {
   const read: Record<string, unknown> = {}
-  const vars: Vars =
-    given.vars === undefined
-      ? outer
-      : { ...outer, ...known(given.vars, 'vars', Object.keys(record(given.vars, 'vars')), (field, at) => colour(field, at, outer)) }
+  const vars: Vars = given.vars === undefined ? outer : { ...outer, ...resolved(record(given.vars, 'vars'), outer) }
   for (const [part, field] of Object.entries(given)) {
     switch (part) {
       case 'vars':
@@ -121,11 +136,6 @@ function parsed(
       case 'light':
       case 'dark':
         if (!varied) throw new Error(`${part} is no part of a variant, which holds no variant of its own`)
-        try {
-          read[part] = parsed(record(field, part), theme, vars, false)
-        } catch (error) {
-          throw new Error(`${part}.${error instanceof Error ? error.message : String(error)}`, { cause: error })
-        }
         break
       case 'tones':
         read.tones = Object.fromEntries(
@@ -187,6 +197,16 @@ function parsed(
         break
       default:
         throw new Error(`${part} is no part of a theme: ${parts.join(', ')}`)
+    }
+  }
+  // A variant is laid over the rest of its theme, so it is read against the theme with the rest laid over it.
+  const beneath = themed(theme, [read as ThemeChanges])
+  for (const part of ['light', 'dark'] as const) {
+    if (given[part] === undefined) continue
+    try {
+      read[part] = parsed(record(given[part], part), beneath, vars, false)
+    } catch (error) {
+      throw new Error(`${part}.${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }
   }
   return read as ThemeChanges

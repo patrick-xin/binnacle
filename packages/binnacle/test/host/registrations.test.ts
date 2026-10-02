@@ -19,7 +19,6 @@ import { called, seed as seedEvent } from '../support/events.ts'
 import { pointer } from '../support/pointer.ts'
 import { foldedAlike } from '../support/views.ts'
 import { mocha, rgb } from '../support/palettes.ts'
-import { deriveColours } from '../../src/ui/derived-colours.ts'
 
 const prompt = promptFact(1, 1, 'fix the build')
 const seed = seedEvent(2, 2)
@@ -243,8 +242,11 @@ test("binnacle's own theme takes its colours from the palette a terminal reports
     }))
   })
   const drawn = () => screen([prompt], initial, 3, registrations.views, registrations.currentTheme).lines.map((line) => line.trimEnd())
-  const reported = deriveColours({ background: rgb('#1E1E2E'), foreground: rgb('#CDD6F4'), palette: mocha })
-  registrations.drawOn({ mode: 'truecolor', appearance: 'dark', derived: reported })
+  registrations.drawOn({
+    mode: 'truecolor',
+    appearance: 'dark',
+    reported: { background: rgb('#1E1E2E'), foreground: rgb('#CDD6F4'), palette: mocha },
+  })
   assert.deepEqual(drawn(), [
     '\x1b[38;2;232;104;205ma\x1b[39m',
     '\x1b[38;2;193;154;59m\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m\x1b[39m',
@@ -253,7 +255,7 @@ test("binnacle's own theme takes its colours from the palette a terminal reports
     ctx.binnacle.theme({ tones: { accent: { color: 'red' } } })
   })
   assert.equal(drawn()[0], '\x1b[31ma\x1b[39m')
-  registrations.drawOn({ mode: 'truecolor', derived: deriveColours({}) })
+  registrations.drawOn({ mode: 'truecolor', appearance: 'dark', reported: {} })
   assert.deepEqual(drawn(), ['\x1b[31ma\x1b[39m', '\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m'])
 })
 
@@ -269,6 +271,104 @@ test("entries are as many rows apart as the theme's spacing gives", async () => 
   }
   assert.deepEqual(apart(0), ['p1', 'p2'])
   assert.deepEqual(apart(2), ['p1', '', '', 'p2'])
+})
+
+test("ordinary prose is drawn in pi's text token, a markdown answer's and a view's untoned text alike", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { text: { color: 'red' } } })
+    ctx.binnacle.view('prompt', () => ({
+      kind: 'stack',
+      children: [
+        { kind: 'markdown', text: 'ordinary prose' },
+        { kind: 'text', text: 'plain' },
+        { kind: 'text', text: 'warned', tone: 'warning' },
+      ],
+    }))
+  })
+  assert.deepEqual(
+    screen([prompt], initial, 14, registrations.views, registrations.currentTheme).lines.map((line) => line.trimEnd()),
+    ['\x1b[31mordinary prose\x1b[39m', '\x1b[31mplain\x1b[39m', '\x1b[33mwarned\x1b[39m'],
+  )
+})
+
+test("a variable may name another, before or after it, as pi's themes do, and one that names itself through others is refused", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ vars: { brand: 'ink', ink: 'base', base: '#ff0000' }, tones: { accent: { color: 'brand' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'a', tone: 'accent' }))
+  })
+  assert.deepEqual(screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines, ['\x1b[38;2;255;0;0ma\x1b[39m'])
+  assert.throws(() => registrations.theme({ vars: { a: 'b', b: 'a' } }), {
+    message: 'binnacle.theme: vars.a names itself, through b',
+  })
+})
+
+test('a variant may name a tone or change a mark its own theme adds beneath it', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({
+      tones: { brand: { color: 'red' } },
+      marks: { pinned: { glyph: '*', tone: 'brand' } },
+      light: { marks: { prompt: { tone: 'brand' }, pinned: { glyph: '+' } } },
+    })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: [{ mark: 'prompt' }, ' ', { mark: 'pinned' }] }))
+  })
+  registrations.drawOn({ mode: 'truecolor', appearance: 'light' })
+  assert.deepEqual(screen([prompt], initial, 3, registrations.views, registrations.currentTheme).lines, [
+    '\x1b[31m›\x1b[39m \x1b[31m+\x1b[39m',
+  ])
+})
+
+/**
+ * The foreground a word is drawn in: the last colour the escape codes before it on its line set.
+ * @param lines - the lines drawn.
+ * @param word - the word, on one of them.
+ * @returns the code, as a string: `31` for red, `39` for the terminal's own.
+ */
+function colourOf(lines: readonly string[], word: string): string | undefined {
+  const line = lines.find((drawn) => drawn.includes(word)) ?? ''
+  const codes = [...line.slice(0, line.indexOf(word)).matchAll(/\[([0-9;]*)m/g)].flatMap((sgr) => (sgr[1] ?? '').split(';'))
+  return codes.filter((code) => /^(3[0-9]|9[0-7])$/.test(code)).at(-1)
+}
+
+test('a link and a heading are drawn in their own markdown tokens, whatever colour ordinary prose is given', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { text: { color: 'red' }, mdLink: { color: 'blue' }, mdHeading: { color: 'green' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'markdown', text: '## head\n\nsee [link](https://example.invalid) now' }))
+  })
+  const lines = screen([prompt], initial, 40, registrations.views, registrations.currentTheme).lines
+  assert.deepEqual(
+    ['head', 'see', 'link', 'now'].map((word) => colourOf(lines, word)),
+    ['32', '31', '34', '31'],
+    JSON.stringify(lines),
+  )
+})
+
+test("a variable may take any name, an object's own names such as toString included", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ vars: { toString: '#ff0000', constructor: 'toString' }, tones: { accent: { color: 'constructor' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'a', tone: 'accent' }))
+  })
+  assert.deepEqual(screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines, ['\x1b[38;2;255;0;0ma\x1b[39m'])
+})
+
+test('every word of a formatted link keeps mdLink, and prose after it is prose again, at a width that wraps it too', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { text: { color: 'red' }, mdLink: { color: 'blue' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'markdown', text: '[one **two** three](https://example.invalid) after' }))
+  })
+  for (const width of [40, 9]) {
+    const lines = screen([prompt], initial, width, registrations.views, registrations.currentTheme).lines
+    assert.deepEqual(
+      ['one', 'two', 'three', 'after'].map((word) => colourOf(lines, word)),
+      ['34', '34', '34', '31'],
+      `at ${width}: ${JSON.stringify(lines)}`,
+    )
+  }
 })
 
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {

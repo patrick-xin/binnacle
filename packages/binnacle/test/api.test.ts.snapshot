@@ -395,6 +395,7 @@ export declare const tones: {
     readonly border: (text: string) => string;
     readonly borderAccent: (text: string) => string;
     readonly borderMuted: (text: string) => string;
+    readonly text: (text: string) => string;
     readonly userMessageText: (text: string) => string;
     readonly searchMatchText: (text: string) => string;
     readonly toolTitle: (text: string) => string;

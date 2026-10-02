@@ -28,8 +28,6 @@ import { FakeSession } from '../support/session.ts'
 import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
 import type { Node, Placement } from '../../src/api.ts'
 import type { Fact } from '../../src/facts/adapt.ts'
-import { deriveColours } from '../../src/ui/derived-colours.ts'
-import { rgb } from '../support/palettes.ts'
 
 /** A person's line, as dsh logs it. */
 const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
@@ -422,12 +420,22 @@ test("binnacle's own colours are derived from the background the terminal answer
   const { terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
   commit()
   await until(() => terminal.written.includes('\x1b[36m›'))
-  const accent = deriveColours({ background: rgb('#1e1e2e') }).colours.accent
-  assert.equal(accent.kind, 'hex')
-  const { r, g, b } = rgb(accent.kind === 'hex' ? accent.hex : '')
+  // Catppuccin Mocha's background and foreground, with no palette: the accent the derivation's worked example gives, #a494d6.
+  terminal.type('\x1b]10;rgb:cdcd/d6d6/f4f4\x1b\\')
   terminal.type('\x1b]11;rgb:1e1e/1e1e/2e2e\x1b\\')
   terminal.type('\x1b[?62c')
-  await until(() => terminal.written.includes(`\x1b[38;2;${r};${g};${b}m›`))
+  await until(() => terminal.written.includes('\x1b[38;2;164;148;214m›'))
+})
+
+test("a terminal that says it is dark but reports no background keeps binnacle's sixteen", async () => {
+  const { terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  await until(() => terminal.written.includes('\x1b[36m›'))
+  terminal.written = ''
+  terminal.type('\x1b[?997;1n')
+  // The colours asked again go unanswered, and are read as nothing once pi-tui stops waiting.
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  assert.equal(terminal.written.includes('\x1b[38;5;5m›'), false, "not drawn in pi's indexed fallback")
 })
 
 test("the terminal saying it turned dark or light draws the theme's variant for it, without a restart", async () => {
