@@ -268,11 +268,11 @@ export interface ThemeChanges extends ThemeVariant {
 
 /** What a theme registration changes on one appearance of the terminal, or on either. */
 export interface ThemeVariant {
-  /** Colours named once, so a tone, its background or a background may give one by its name; a name here is read before one of the sixteen's. */
+  /** Colours named once, so a tone, its background or a background may give one by its name; a name here is read before one of the sixteen's, and may name another var, before or after it. */
   readonly vars?: { readonly [name: string]: Colour }
   /** Tones, by name — binnacle's, or new ones a view may then name: the colour and attributes each is drawn in, replacing how the theme beneath drew it. */
   readonly tones?: { readonly [name: string]: Style }
-  /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: one of the terminal's sixteen colours. */
+  /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: a colour, in any form a colour may take. */
   readonly backgrounds?: { readonly [name: string]: Colour }
   /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. The gutter and a border's pieces are each one column wide. */
   readonly chrome?: {
