@@ -7,6 +7,7 @@ import {
   CombinedAutocompleteProvider,
   Editor,
   getNativeClipboard,
+  getTerminalColorMode,
   ProcessTerminal,
   ScrollView,
   setKeybindings,
@@ -20,6 +21,9 @@ import type {
   NativeClipboard,
   OverlayHandle,
   Terminal,
+  TerminalColorMode,
+  TerminalColorScheme,
+  TerminalColors,
   TUI,
   TuiInputListenerResult,
   TuiMainScreenRenderState,
@@ -30,6 +34,7 @@ import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { AnswerStream } from '../facts/stream.ts'
 import { editorThemeOf, searchStylesOf } from '../ui/theme.ts'
+import { deriveColours } from '../ui/derived-colours.ts'
 import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
@@ -53,7 +58,9 @@ export const internals: {
   open: (ctx: Context) => Promise<OpenedSession>
   clock: { now(): number; after(ms: number, then: () => void): () => void }
   clipboard: () => NativeClipboard | undefined
+  colourMode: () => TerminalColorMode
 } = {
+  colourMode: () => getTerminalColorMode(),
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
   stderr: process.stderr,
@@ -463,6 +470,21 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const theme = registrations.currentTheme
     return theme.tones.accent(` ${theme.chrome.jump} Jump to latest · ${bound} `)
   }
+  let appearance: TerminalColorScheme | undefined
+  let reported: TerminalColors = {}
+  let unscheme: (() => void) | undefined
+  const look = (): void => {
+    const seen = deriveColours(reported, appearance).appearance ?? appearance
+    registrations.drawOn({ mode: internals.colourMode(), reported, ...(seen === undefined ? {} : { appearance: seen }) })
+  }
+  // A terminal that answers late is still read; one that fails to answer leaves binnacle's own colours.
+  const heard = (colours: TerminalColors): void => {
+    reported = colours
+    look()
+  }
+  const askColours = (): void => {
+    tui.queryTerminalColors({ timeoutMs: 100, onLateReply: heard }).then(heard, () => heard({}))
+  }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)
     const next =
@@ -476,6 +498,13 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (next instanceof TuiMainScreen) scroll = undefined
     stack(next)
     next.addInputListener(keys)
+    unscheme?.()
+    unscheme = next.onTerminalColorSchemeChange((scheme) => {
+      appearance = scheme
+      look()
+      askColours()
+    })
+    next.setTerminalColorSchemeNotifications(true)
     return next
   }
   const leave = (): void => {
@@ -493,6 +522,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (mode === 'fullscreen') transcript.reveal()
   }
   tui = build(first)
+  look()
   const unfollow = session.follow((event) => {
     events.push(event)
     const fact = adapt(event, registrations.adapters)
@@ -518,6 +548,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     unraise?.()
     arming?.()
     untick?.()
+    unscheme?.()
     unoffer()
     closeGrants()
     unregister()
@@ -537,6 +568,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   try {
     tui.start()
     started = true
+    askColours()
   } catch (error) {
     release()
     throw error

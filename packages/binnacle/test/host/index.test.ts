@@ -141,6 +141,8 @@ async function mount(
   }
   host.internals.open = open
   host.internals.clock = clock
+  // Exact colours are drawn as the test's terminal would, never as the machine's.
+  host.internals.colourMode = () => 'truecolor'
   // No test writes the machine's own clipboard.
   host.internals.clipboard = () => undefined
   const ctx = new Context()
@@ -396,7 +398,7 @@ test('a theme an author registers after its entries were drawn draws them again,
   await until(() => /› fix the build/.test(shown()))
 })
 
-test("the composer's frame is drawn in the theme's dim tone, as a registration changes it and until it is disposed", async () => {
+test("the composer's frame is drawn in pi's borderMuted token, as a registration changes it and until it is disposed", async () => {
   const { ctx, terminal, commit } = await mount([])
   commit()
   await until(() => terminal.written.includes('\x1b[2m─'))
@@ -404,7 +406,7 @@ test("the composer's frame is drawn in the theme's dim tone, as a registration c
     name: 'author',
     inject: ['binnacle'],
     apply: (plugin: Context) => {
-      plugin.binnacle.theme({ tones: { dim: { color: 'red' } } })
+      plugin.binnacle.theme({ tones: { borderMuted: { color: 'red' } } })
     },
   })
   await author
@@ -412,6 +414,45 @@ test("the composer's frame is drawn in the theme's dim tone, as a registration c
   terminal.written = ''
   await author.dispose()
   await until(() => terminal.written.includes('\x1b[2m─'))
+})
+
+test("binnacle's own colours are derived from the background the terminal answers with, and stay its sixteen while it answers nothing", async () => {
+  const { terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  await until(() => terminal.written.includes('\x1b[36m›'))
+  // Catppuccin Mocha's background and foreground, with no palette: the accent the derivation's worked example gives, #a494d6.
+  terminal.type('\x1b]10;rgb:cdcd/d6d6/f4f4\x1b\\')
+  terminal.type('\x1b]11;rgb:1e1e/1e1e/2e2e\x1b\\')
+  terminal.type('\x1b[?62c')
+  await until(() => terminal.written.includes('\x1b[38;2;164;148;214m›'))
+})
+
+test("a terminal that says it is dark but reports no background keeps binnacle's sixteen", async () => {
+  const { terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  await until(() => terminal.written.includes('\x1b[36m›'))
+  terminal.written = ''
+  terminal.type('\x1b[?997;1n')
+  // The colours asked again go unanswered, and are read as nothing once pi-tui stops waiting.
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  assert.equal(terminal.written.includes('\x1b[38;5;5m›'), false, "not drawn in pi's indexed fallback")
+})
+
+test("the terminal saying it turned dark or light draws the theme's variant for it, without a restart", async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.theme({ dark: { tones: { accent: { color: 'blue' } } }, light: { tones: { accent: { color: 'green' } } } })
+    },
+  })
+  commit()
+  await until(() => terminal.written.includes('\x1b[36m›'))
+  terminal.type('\x1b[?997;1n')
+  await until(() => terminal.written.includes('\x1b[34m›'))
+  terminal.type('\x1b[?997;2n')
+  await until(() => terminal.written.includes('\x1b[32m›'))
 })
 
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
@@ -2839,7 +2880,7 @@ test('what / offers follows dsh: a command registered after the session opened i
   await until(async () => (await terminal.altScreen()).some((row) => row.includes('plan before acting')))
 })
 
-test("on the fullscreen, an open search's matches are drawn in the theme's accent tone, the current one bold too, as a registration comes and goes", async () => {
+test("on the fullscreen, an open search's matches are drawn in pi's searchMatchText on searchMatchBg, the current one bold too, as a registration comes and goes", async () => {
   const terminal = new XtermTerminal(40, 30)
   const session = new FakeSession(folded)
   const { ctx, commit } = await mount([], session, async () => session, terminal)
@@ -2848,21 +2889,22 @@ test("on the fullscreen, an open search's matches are drawn in the theme's accen
   terminal.type('\x1b[102;6u')
   terminal.type('read')
   const drawnIn = (code: string) => {
-    const current = `\x1b[1m\x1b[${code}mread\x1b[39m\x1b[22m`
-    return terminal.written.includes(current) && terminal.written.replaceAll(current, '').includes(`\x1b[${code}mread\x1b[39m`)
+    const current = `\x1b[1m${code}read\x1b[39m${code.includes('[4') ? '\x1b[49m' : ''}\x1b[22m`
+    const other = `${code}read\x1b[39m${code.includes('[4') ? '\x1b[49m' : ''}`
+    return terminal.written.includes(current) && terminal.written.replaceAll(current, '').includes(other)
   }
-  await until(() => drawnIn('36'))
+  await until(() => drawnIn('\x1b[36m'))
   terminal.written = ''
   const author = ctx.plugin({
     name: 'author',
     inject: ['binnacle'],
     apply: (plugin: Context) => {
-      plugin.binnacle.theme({ tones: { accent: { color: 'magenta' } } })
+      plugin.binnacle.theme({ tones: { searchMatchText: { color: 'magenta' } }, backgrounds: { searchMatchBg: 'blue' } })
     },
   })
   await author
-  await until(() => drawnIn('35'))
+  await until(() => drawnIn('\x1b[44m\x1b[35m'))
   terminal.written = ''
   await author.dispose()
-  await until(() => drawnIn('36'))
+  await until(() => drawnIn('\x1b[36m'))
 })

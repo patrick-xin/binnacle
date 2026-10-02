@@ -3,6 +3,7 @@
 What a view draws with and how a person's input changes what is shown: nodes laid out through pi-tui, the theme, the key table, the gesture table and UI state. The input vocabulary (gestures, actions, regions) is `contract`'s; scrolling, search and selection are pi-tui's; installing the key table and the merged theme, and touching the terminal, are the host's.
 
 - `answer.ts` — a landed gesture answered: its meaning from the gesture table, applied to UI state, saying what changed and what was invoked.
+- `derived-colours.ts` — the theme's default colours, derived from the palette the terminal reports: each colour's hue from one of its sixteen, at a lightness that keeps its contrast on the background it reported, and its sixteen by index when it reports nothing; a port of pi's own (MIT, [`NOTICE`](../../NOTICE)), ours from here on.
 - `gestures.ts` — the gesture table: what a gesture means on the regions it lands on, or nothing.
 - `keys.ts` — the key table: binnacle's and pi-tui's bindings in one manager, the keys plugins offer for their screens, and what key bytes resolve to.
 - `layout.ts` — a node at a width as a frame: the lines it draws and the regions placed on them; `under` finds the regions at a point.
@@ -18,4 +19,4 @@ What a view draws with and how a person's input changes what is shown: nodes lai
 - The gesture table is the one place a gesture is given a meaning, and `answer.ts` the one place a landed gesture becomes a change of UI state.
 - `keys.ts` is the one place key bytes are matched to what they do; `pointer.ts` the one place pi-tui's mouse vocabulary is read; `readable.ts` the one place terminal sequences are stripped. The `owners` of `layers.json` hold each, naming the pi-tui symbols only these files, and the panes and the host that hand them on, may import.
 - The container roles, `ask` and `show`, are a closed set in `node.ts`: a new one joins there, never in a plugin.
-- A tone or a background is drawn in one of the terminal's own sixteen colours, so a person's palette decides what it looks like, as their terminal already does.
+- binnacle's own tones and backgrounds follow the palette the terminal reports, and are its sixteen where it reports nothing, so a person's palette decides what they look like; an author's theme may give any colour.

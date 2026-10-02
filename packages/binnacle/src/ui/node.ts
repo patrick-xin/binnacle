@@ -27,7 +27,7 @@ export type Node =
       readonly kind: 'text'
       /** What it says, as one string or as spans, each in a tone; wrapped at the width it is given. */
       readonly text: string | readonly Span[]
-      /** The theme's colour it is drawn in; the terminal's own when it has none. */
+      /** The theme's colour it is drawn in; `text`, ordinary prose's, when it has none. */
       readonly tone?: Tone
     }
   | {
@@ -55,7 +55,7 @@ export type Node =
       readonly title?: string
       /** The theme's background every line of it is filled with, border included; the terminal's own when absent. */
       readonly background?: Background
-      /** The theme's tone its border is drawn in; dim when absent. */
+      /** The theme's tone its border is drawn in; `border` when absent. */
       readonly edge?: Tone
       /** What it holds, inside a rounded border; drawn without one where the width leaves no room inside it. */
       readonly child: Node
@@ -64,7 +64,7 @@ export type Node =
       readonly kind: 'show'
       /** The line above what it holds, saying what is shown: a call's name and what it was asked, a document's title. */
       readonly title: readonly Span[]
-      /** The theme's tone the title is drawn in; the terminal's own when it has none. */
+      /** The theme's tone the title is drawn in; `text` when it has none. */
       readonly tone?: Tone
       /** The id of a fold it holds that its title opens and folds, as the line that fold folds under; that fold's content then answers no click. */
       readonly opens?: string
@@ -84,7 +84,7 @@ export type Node =
       readonly id: string
       /** The line it folds under, drawn above what it holds: while the fold shows no rows its marker rides this line — `title · N lines` — so the fold costs that one line alone. */
       readonly title?: readonly Span[]
-      /** The theme's colour the title is drawn in; the terminal's own when it has none. */
+      /** The theme's colour the title is drawn in; `text` when it has none. */
       readonly tone?: Tone
       /** How many rows it shows while folded; when absent, what the theme gives the kind of entry it is drawn in, or three. */
       readonly rows?: number

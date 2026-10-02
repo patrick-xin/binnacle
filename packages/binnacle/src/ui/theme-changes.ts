@@ -1,8 +1,8 @@
-import { visibleWidth } from '@earendil-works/pi-tui'
-import { chrome, colours, words } from './theme.ts'
+import { parseColor, visibleWidth } from '@earendil-works/pi-tui'
+import { chrome, colours, themed, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
-const parts = ['tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds'] as const
+const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds', 'light', 'dark'] as const
 
 function named(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value)
@@ -27,27 +27,58 @@ function isControl(character: string): boolean {
   return code < 0x20 || (code >= 0x7f && code <= 0x9f)
 }
 
+/** A theme's vars, each following the names it gives, among them or the ones beneath, to a colour. */
+function resolved(given: Readonly<Record<string, unknown>>, outer: Vars): Vars {
+  const read = new Map<string, Colour>()
+  const follow = (name: string, through: readonly string[]): Colour => {
+    const done = read.get(name)
+    if (done !== undefined) return done
+    const value = given[name]
+    const aliased = typeof value === 'string' && Object.hasOwn(given, value)
+    if (aliased && (value === name || through.includes(value)))
+      throw new Error(`vars.${through[0] ?? name} names itself, through ${[...through.slice(1), name].join(', ')}`)
+    const found = aliased ? follow(value, [...through, name]) : colour(value, `vars.${name}`, outer)
+    read.set(name, found)
+    return found
+  }
+  for (const name of Object.keys(given)) follow(name, [])
+  return Object.fromEntries(read)
+}
+
 function piece(value: unknown, at: string): string {
   const read = text(value, at)
   if (visibleWidth(read) !== 1) throw new Error(`${at} is ${named(read)}, not one column wide`)
   return read
 }
 
-function colour(value: unknown, at: string): Colour {
-  if (typeof value !== 'string' || !(colours as readonly string[]).includes(value))
-    throw new Error(`${at} is ${named(value)}, not one of the terminal's sixteen colours: ${colours.join(', ')}`)
-  return value as Colour
+type Vars = Readonly<Record<string, Colour>>
+
+function colour(value: unknown, at: string, vars: Vars = {}): Colour {
+  if (typeof value === 'string' && Object.hasOwn(vars, value)) return vars[value] as Colour
+  if (typeof value === 'string' && (colours as readonly string[]).includes(value)) return value
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255) return value
+  if (typeof value === 'string') {
+    try {
+      parseColor(value)
+      return value
+    } catch {
+      // Refused below, naming every form a colour may take.
+    }
+  }
+  throw new Error(
+    `${at} is ${named(value)}, not a colour: one of the terminal's sixteen (${colours.join(', ')}), a 256-colour index from 0 to 255, #rrggbb, okhsl(h s% l%), oklch(l c h), or a name among the theme's vars`,
+  )
 }
 
-function style(value: unknown, at: string): Style {
+function style(value: unknown, at: string, vars: Vars): Style {
   const given = record(value, at)
-  const read: { color?: Colour; bold?: boolean; dim?: boolean; italic?: boolean; underline?: boolean } = {}
+  const read: { color?: Colour; background?: Colour; bold?: boolean; dim?: boolean; italic?: boolean; underline?: boolean } = {}
   for (const [key, field] of Object.entries(given)) {
-    if (key === 'color') read.color = colour(field, `${at}.color`)
+    if (key === 'color' || key === 'background') read[key] = colour(field, `${at}.${key}`, vars)
     else if (key === 'bold' || key === 'dim' || key === 'italic' || key === 'underline') {
       if (typeof field !== 'boolean') throw new Error(`${at}.${key} is ${named(field)}, not true or false`)
       read[key] = field
-    } else throw new Error(`${at}.${key} is no part of a tone's style: color, bold, dim, italic, underline`)
+    } else throw new Error(`${at}.${key} is no part of a tone's style: color, background, bold, dim, italic, underline`)
   }
   return read
 }
@@ -79,66 +110,91 @@ function known<T>(value: unknown, at: string, allowed: readonly string[], read: 
 
 export function parseThemeChanges(value: unknown, theme: Theme): ThemeChanges {
   try {
-    const given = record(value, 'the theme') as Readonly<Record<string, unknown>> & { readonly tones?: object }
-    const read: Record<string, unknown> = {}
-    for (const [part, field] of Object.entries(given)) {
-      switch (part) {
-        case 'tones':
-          read.tones = Object.fromEntries(
-            Object.entries(record(field, 'tones')).map(([name, tone]) => [name, style(tone, `tones.${name}`)]),
-          )
-          break
-        case 'backgrounds':
-          read.backgrounds = Object.fromEntries(
-            Object.entries(record(field, 'backgrounds')).map(([name, fill]) => [name, colour(fill, `backgrounds.${name}`)]),
-          )
-          break
-        case 'marks':
-          read.marks = Object.fromEntries(
-            Object.entries(record(field, 'marks')).map(([name, mark]) => {
-              const at = `marks.${name}`
-              const { glyph, tone, ...rest } = record(mark, at)
-              const extra = Object.keys(rest)[0]
-              if (extra !== undefined) throw new Error(`${at}.${extra} is no part of a mark: glyph, tone`)
-              if (theme.marks[name] === undefined && (glyph === undefined || tone === undefined))
-                throw new Error(`${at} is a mark the theme has none of, so it needs a glyph and a tone`)
-              const toned = tone === undefined ? undefined : text(tone, `${at}.tone`)
-              if (toned !== undefined && theme.tones[toned] === undefined && !Object.hasOwn(given.tones ?? {}, toned))
-                throw new Error(`${at}.tone is ${named(toned)}, a tone the theme does not give`)
-              return [
-                name,
-                { ...(glyph === undefined ? {} : { glyph: text(glyph, `${at}.glyph`) }), ...(toned === undefined ? {} : { tone: toned }) },
-              ]
-            }),
-          )
-          break
-        case 'chrome': {
-          const { border, ...rest } = record(field, 'chrome')
-          // The gutter is measured one column wide, as a border's pieces are.
-          const glyphs = known(
-            rest,
-            'chrome',
-            Object.keys(chrome).filter((key) => key !== 'border'),
-            (glyph, at) => (at === 'chrome.gutter' ? piece(glyph, at) : text(glyph, at)),
-          )
-          read.chrome =
-            border === undefined ? glyphs : { ...glyphs, border: known(border, 'chrome.border', Object.keys(chrome.border), piece) }
-          break
-        }
-        case 'words':
-          read.words = known(field, 'words', Object.keys(words), text)
-          break
-        case 'folds':
-          read.folds = Object.fromEntries(
-            Object.entries(record(field, 'folds')).map(([key, start]) => [key, foldStart(start, `folds.${key}`)]),
-          )
-          break
-        default:
-          throw new Error(`${part} is no part of a theme: ${parts.join(', ')}`)
-      }
-    }
-    return read as ThemeChanges
+    return parsed(record(value, 'the theme'), theme, {}, true)
   } catch (error) {
     throw new Error(`binnacle.theme: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
   }
+}
+
+function parsed(
+  given: Readonly<Record<string, unknown>> & { readonly tones?: object },
+  theme: Theme,
+  outer: Vars,
+  varied: boolean,
+): ThemeChanges {
+  const read: Record<string, unknown> = {}
+  const vars: Vars = given.vars === undefined ? outer : { ...outer, ...resolved(record(given.vars, 'vars'), outer) }
+  for (const [part, field] of Object.entries(given)) {
+    switch (part) {
+      case 'vars':
+        break
+      case 'light':
+      case 'dark':
+        if (!varied) throw new Error(`${part} is no part of a variant, which holds no variant of its own`)
+        break
+      case 'tones':
+        read.tones = Object.fromEntries(
+          Object.entries(record(field, 'tones')).map(([name, tone]) => [name, style(tone, `tones.${name}`, vars)]),
+        )
+        break
+      case 'backgrounds':
+        read.backgrounds = Object.fromEntries(
+          Object.entries(record(field, 'backgrounds')).map(([name, fill]) => [name, colour(fill, `backgrounds.${name}`, vars)]),
+        )
+        break
+      case 'marks':
+        read.marks = Object.fromEntries(
+          Object.entries(record(field, 'marks')).map(([name, mark]) => {
+            const at = `marks.${name}`
+            const { glyph, tone, ...rest } = record(mark, at)
+            const extra = Object.keys(rest)[0]
+            if (extra !== undefined) throw new Error(`${at}.${extra} is no part of a mark: glyph, tone`)
+            if (theme.marks[name] === undefined && (glyph === undefined || tone === undefined))
+              throw new Error(`${at} is a mark the theme has none of, so it needs a glyph and a tone`)
+            const toned = tone === undefined ? undefined : text(tone, `${at}.tone`)
+            if (toned !== undefined && theme.tones[toned] === undefined && !Object.hasOwn(given.tones ?? {}, toned))
+              throw new Error(`${at}.tone is ${named(toned)}, a tone the theme does not give`)
+            return [
+              name,
+              { ...(glyph === undefined ? {} : { glyph: text(glyph, `${at}.glyph`) }), ...(toned === undefined ? {} : { tone: toned }) },
+            ]
+          }),
+        )
+        break
+      case 'chrome': {
+        const { border, ...rest } = record(field, 'chrome')
+        // The gutter is measured one column wide, as a border's pieces are.
+        const glyphs = known(
+          rest,
+          'chrome',
+          Object.keys(chrome).filter((key) => key !== 'border'),
+          (glyph, at) => (at === 'chrome.gutter' ? piece(glyph, at) : text(glyph, at)),
+        )
+        read.chrome =
+          border === undefined ? glyphs : { ...glyphs, border: known(border, 'chrome.border', Object.keys(chrome.border), piece) }
+        break
+      }
+      case 'words':
+        read.words = known(field, 'words', Object.keys(words), text)
+        break
+      case 'folds':
+        read.folds = Object.fromEntries(
+          Object.entries(record(field, 'folds')).map(([key, start]) => [key, foldStart(start, `folds.${key}`)]),
+        )
+        break
+      default:
+        throw new Error(`${part} is no part of a theme: ${parts.join(', ')}`)
+    }
+  }
+  // A variant is laid over the rest of its theme, so it is read against the theme with the rest laid over it.
+  const beneath = themed(theme, [read as ThemeChanges])
+  for (const part of ['light', 'dark'] as const) {
+    if (given[part] === undefined) continue
+    try {
+      read[part] = parsed(record(given[part], part), beneath, vars, false)
+    } catch (error) {
+      throw new Error(`${part}.${error instanceof Error ? error.message : String(error)}`, { cause: error })
+    }
+  }
+  return read as ThemeChanges
 }

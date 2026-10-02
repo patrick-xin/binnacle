@@ -332,10 +332,19 @@ export declare const marks: {
 export type Background = keyof typeof backgrounds | (string & {});
 // ui/theme.d.ts
 export declare const backgrounds: {
-    readonly prompt: (text: string) => string;
+    readonly userMessageBg: (text: string) => string;
+    readonly searchMatchBg: (text: string) => string;
 };
 // ui/theme.d.ts
-export interface ThemeChanges {
+export interface ThemeChanges extends ThemeVariant {
+    readonly light?: ThemeVariant;
+    readonly dark?: ThemeVariant;
+}
+// ui/theme.d.ts
+export interface ThemeVariant {
+    readonly vars?: {
+        readonly [name: string]: Colour;
+    };
     readonly tones?: {
         readonly [name: string]: Style;
     };
@@ -366,6 +375,12 @@ export interface ThemeChanges {
     };
 }
 // ui/theme.d.ts
+export type Colour = Sixteen | number | (string & {});
+// ui/theme.d.ts
+export type Sixteen = (typeof colours)[number];
+// ui/theme.d.ts
+export declare const colours: readonly ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'];
+// ui/theme.d.ts
 export declare const tones: {
     readonly accent: (text: string) => string;
     readonly muted: (text: string) => string;
@@ -373,19 +388,35 @@ export declare const tones: {
     readonly success: (text: string) => string;
     readonly warning: (text: string) => string;
     readonly error: (text: string) => string;
+    readonly border: (text: string) => string;
+    readonly borderAccent: (text: string) => string;
+    readonly borderMuted: (text: string) => string;
+    readonly text: (text: string) => string;
+    readonly userMessageText: (text: string) => string;
+    readonly searchMatchText: (text: string) => string;
+    readonly toolTitle: (text: string) => string;
+    readonly toolOutput: (text: string) => string;
+    readonly thinkingText: (text: string) => string;
+    readonly mdHeading: (text: string) => string;
+    readonly mdLink: (text: string) => string;
+    readonly mdLinkUrl: (text: string) => string;
+    readonly mdCode: (text: string) => string;
+    readonly mdCodeBlock: (text: string) => string;
+    readonly mdCodeBlockBorder: (text: string) => string;
+    readonly mdQuote: (text: string) => string;
+    readonly mdQuoteBorder: (text: string) => string;
+    readonly mdHr: (text: string) => string;
+    readonly mdListBullet: (text: string) => string;
 };
 // ui/theme.d.ts
 export interface Style {
     readonly color?: Colour;
+    readonly background?: Colour;
     readonly bold?: boolean;
     readonly dim?: boolean;
     readonly italic?: boolean;
     readonly underline?: boolean;
 }
-// ui/theme.d.ts
-export type Colour = (typeof colours)[number];
-// ui/theme.d.ts
-export declare const colours: readonly ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'];
 // ui/theme.d.ts
 export declare const chrome: {
     readonly focus: '▸';

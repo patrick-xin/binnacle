@@ -1,7 +1,8 @@
-import type { EditorTheme, MarkdownTheme, TuiAltScreenOptions } from '@earendil-works/pi-tui'
+import { backgroundAnsi, foregroundAnsi, parseColor } from '@earendil-works/pi-tui'
+import type { EditorTheme, MarkdownTheme, TerminalColorMode, TerminalColors, TuiAltScreenOptions } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
-
-const plain = (text: string): string => text
+import { deriveColours } from './derived-colours.ts'
+import type { DerivedColour, DerivedColours } from './derived-colours.ts'
 
 /** The theme's colours for content, named by what the content means, in the names pi's themes use. */
 export const tones = {
@@ -11,6 +12,25 @@ export const tones = {
   success: (text: string): string => `\x1b[32m${text}\x1b[39m`,
   warning: (text: string): string => `\x1b[33m${text}\x1b[39m`,
   error: (text: string): string => `\x1b[31m${text}\x1b[39m`,
+  border: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  borderAccent: (text: string): string => `\x1b[36m${text}\x1b[39m`,
+  borderMuted: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  text: (text: string): string => text,
+  userMessageText: (text: string): string => text,
+  searchMatchText: (text: string): string => `\x1b[36m${text}\x1b[39m`,
+  toolTitle: (text: string): string => text,
+  toolOutput: (text: string): string => text,
+  thinkingText: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdHeading: (text: string): string => `\x1b[1m${text}\x1b[22m`,
+  mdLink: (text: string): string => `\x1b[36m${text}\x1b[39m`,
+  mdLinkUrl: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdCode: (text: string): string => `\x1b[33m${text}\x1b[39m`,
+  mdCodeBlock: (text: string): string => text,
+  mdCodeBlockBorder: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdQuote: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdQuoteBorder: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdHr: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdListBullet: (text: string): string => `\x1b[36m${text}\x1b[39m`,
 } as const satisfies Record<string, (text: string) => string>
 
 /** A colour of the theme's, by what the content drawn in it means: binnacle's own, or one an author's theme adds. */
@@ -22,7 +42,8 @@ export type Tone = keyof typeof tones | (string & {})
  * means.
  */
 export const backgrounds = {
-  prompt: (text: string): string => `\x1b[100m${text}\x1b[49m`, // what the person sent, headed in a band
+  userMessageBg: (text: string): string => `\x1b[100m${text}\x1b[49m`, // what the person sent, headed in a band
+  searchMatchBg: (text: string): string => text, // a search's match, on the fullscreen
 } as const satisfies Record<string, (text: string) => string>
 
 /** A background of the theme's, by what the content drawn on it means: binnacle's own, or one an author's theme adds. */
@@ -142,16 +163,16 @@ export const markdownTheme: MarkdownTheme = markdownIn(tones)
 
 function markdownIn(toned: Theme['tones']): MarkdownTheme {
   return {
-    heading: attributes.bold,
-    link: toned.accent,
-    linkUrl: toned.dim,
-    code: toned.warning,
-    codeBlock: plain,
-    codeBlockBorder: toned.dim,
-    quote: toned.dim,
-    quoteBorder: toned.dim,
-    hr: toned.dim,
-    listBullet: toned.accent,
+    heading: toned.mdHeading,
+    link: toned.mdLink,
+    linkUrl: toned.mdLinkUrl,
+    code: toned.mdCode,
+    codeBlock: toned.mdCodeBlock,
+    codeBlockBorder: toned.mdCodeBlockBorder,
+    quote: toned.mdQuote,
+    quoteBorder: toned.mdQuoteBorder,
+    hr: toned.mdHr,
+    listBullet: toned.mdListBullet,
     bold: attributes.bold,
     italic: attributes.italic,
     underline: attributes.underline,
@@ -166,7 +187,7 @@ export function editorThemeOf(current: () => Theme): EditorTheme {
     (text: string): string =>
       current().tones[name](text)
   return {
-    borderColor: tone('dim'),
+    borderColor: tone('borderMuted'),
     selectList: {
       selectedPrefix: tone('accent'),
       selectedText: tone('accent'),
@@ -180,8 +201,8 @@ export function editorThemeOf(current: () => Theme): EditorTheme {
 /** How the fullscreen draws a search's matches, read from the current theme each time it draws. */
 export function searchStylesOf(current: () => Theme): Required<Pick<TuiAltScreenOptions, 'searchMatchStyle' | 'searchCurrentMatchStyle'>> {
   return {
-    searchMatchStyle: (text) => current().tones.accent(text),
-    searchCurrentMatchStyle: (text) => attributes.bold(current().tones.accent(text)),
+    searchMatchStyle: (text) => current().backgrounds.searchMatchBg(current().tones.searchMatchText(text)),
+    searchCurrentMatchStyle: (text) => attributes.bold(current().backgrounds.searchMatchBg(current().tones.searchMatchText(text))),
   }
 }
 
@@ -238,10 +259,20 @@ export const binnacleTheme: Theme = {
 /**
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.
  */
-export interface ThemeChanges {
+export interface ThemeChanges extends ThemeVariant {
+  /** What changes on a light terminal, laid over the rest; its vars may name the rest's. */
+  readonly light?: ThemeVariant
+  /** What changes on a dark terminal, laid over the rest; its vars may name the rest's. */
+  readonly dark?: ThemeVariant
+}
+
+/** What a theme registration changes on one appearance of the terminal, or on either. */
+export interface ThemeVariant {
+  /** Colours named once, so a tone, its background or a background may give one by its name; a name here is read before one of the sixteen's, and may name another var, before or after it. */
+  readonly vars?: { readonly [name: string]: Colour }
   /** Tones, by name — binnacle's, or new ones a view may then name: the colour and attributes each is drawn in, replacing how the theme beneath drew it. */
   readonly tones?: { readonly [name: string]: Style }
-  /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: one of the terminal's sixteen colours. */
+  /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: a colour, in any form a colour may take. */
   readonly backgrounds?: { readonly [name: string]: Colour }
   /** The chrome's glyphs, each named part replacing the one beneath; a border's pieces one at a time. The gutter and a border's pieces are each one column wide. */
   readonly chrome?: {
@@ -283,12 +314,21 @@ export const colours = [
 ] as const
 
 /** One of the terminal's sixteen colours, so a person's palette decides what it looks like. */
-export type Colour = (typeof colours)[number]
+export type Sixteen = (typeof colours)[number]
+
+/**
+ * A colour: one of the terminal's sixteen by name, which the person's palette
+ * decides; a 256-colour index, 0 to 255; or an exact colour, as `#rrggbb`,
+ * `#rgb`, `okhsl(h s% l%)` or `oklch(l c h)`.
+ */
+export type Colour = Sixteen | number | (string & {})
 
 /** How a tone draws, as data: a colour of the terminal's, and attributes, each drawn inside the colour. */
 export interface Style {
   /** The colour; the terminal's own foreground when absent. */
   readonly color?: Colour
+  /** The colour behind it; the terminal's own background when absent. */
+  readonly background?: Colour
   /** Drawn bold. */
   readonly bold?: boolean
   /** Drawn dim. */
@@ -299,7 +339,7 @@ export interface Style {
   readonly underline?: boolean
 }
 
-function styled(style: Style): (text: string) => string {
+function styled(style: Style, mode: TerminalColorMode): (text: string) => string {
   const wraps: ((text: string) => string)[] = []
   if (style.bold === true) wraps.push(attributes.bold)
   if (style.dim === true) wraps.push((text) => `\x1b[2m${text}\x1b[22m`)
@@ -307,25 +347,71 @@ function styled(style: Style): (text: string) => string {
   if (style.underline === true) wraps.push(attributes.underline)
   const colour = style.color
   if (colour !== undefined) {
-    const index = colours.indexOf(colour)
-    const code = index < 8 ? 30 + index : 90 + index - 8
-    wraps.push((text) => `\x1b[${code}m${text}\x1b[39m`)
+    const opening = foreground(colour, mode)
+    wraps.push((text) => `${opening}${text}\x1b[39m`)
   }
+  if (style.background !== undefined) wraps.push(filling(style.background, mode))
   return (text) => wraps.reduce((inner, wrap) => wrap(inner), text)
+}
+
+/** The opening of a colour: the sixteen keep their own codes, which a terminal of sixteen colours draws in its palette. */
+function foreground(colour: Colour, mode: TerminalColorMode): string {
+  const index = (colours as readonly unknown[]).indexOf(colour)
+  if (index >= 0) return `\x1b[${index < 8 ? 30 + index : 90 + index - 8}m`
+  return foregroundAnsi(parseColor(colour as string | number), mode)
 }
 
 function counting(template: string): (count: number) => string {
   return (count) => template.replaceAll('{n}', String(count)).replaceAll('{lines}', lineWord(count))
 }
 
-function filling(colour: Colour): (text: string) => string {
-  const index = colours.indexOf(colour)
-  const code = index < 8 ? 40 + index : 100 + index - 8
-  return (text) => `\x1b[${code}m${text}\x1b[49m`
+function filling(colour: Colour, mode: TerminalColorMode): (text: string) => string {
+  const index = (colours as readonly unknown[]).indexOf(colour)
+  const opening =
+    index >= 0 ? `\x1b[${index < 8 ? 40 + index : 100 + index - 8}m` : backgroundAnsi(parseColor(colour as string | number), mode)
+  return (text) => `${opening}${text}\x1b[49m`
 }
 
-/** A theme with changes laid over it, oldest first, each over what the ones before it left. */
-export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
+/** What binnacle knows of the terminal it draws on. */
+export interface TerminalLook {
+  /** Whether the terminal is light or dark; unknown until it says, or binnacle reads it. */
+  readonly appearance?: 'light' | 'dark'
+  /** How many colours an exact colour may be drawn in. */
+  readonly mode: TerminalColorMode
+  /** What the terminal reported of its colours; binnacle's own tones and backgrounds are derived from it where it reported its background. */
+  readonly reported?: TerminalColors
+}
+
+/** binnacle's own tones and backgrounds in the colours derived for a terminal, each keeping its attributes. */
+function derivedChanges(derived: DerivedColours): ThemeChanges {
+  const colour = (token: string): Colour | undefined => {
+    const given = (derived.colours as Readonly<Record<string, DerivedColour | undefined>>)[token]
+    return given?.kind === 'hex' ? given.hex : given?.kind === 'index' ? given.index : undefined
+  }
+  const tonesNow: Record<string, Style> = {}
+  for (const token of Object.keys(tones)) {
+    const given = colour(token)
+    tonesNow[token] = { ...(given === undefined ? {} : { color: given }), ...(token === 'mdHeading' ? { bold: true } : {}) }
+  }
+  const filled: Record<string, Colour> = {}
+  for (const token of Object.keys(backgrounds)) {
+    const given = colour(token)
+    if (given !== undefined) filled[token] = given
+  }
+  return { tones: tonesNow, backgrounds: filled }
+}
+
+/**
+ * A theme with changes laid over it, oldest first, each over what the ones before it left, and each change's
+ * variant for the terminal's appearance over that change.
+ */
+export function themed(base: Theme, registered: readonly ThemeChanges[], look: TerminalLook = { mode: 'truecolor' }): Theme {
+  const variant = look.appearance
+  const derived = look.reported?.background === undefined ? [] : [derivedChanges(deriveColours(look.reported, look.appearance))]
+  const changes: readonly ThemeVariant[] = [...derived, ...registered].flatMap((change) => {
+    const varied = variant === undefined ? undefined : change[variant]
+    return varied === undefined ? [change] : [change, varied]
+  })
   const marked: Record<string, { readonly glyph: string; readonly tone: Tone } | undefined> = { ...base.marks }
   for (const change of changes) {
     for (const [name, mark] of Object.entries(change.marks ?? {})) {
@@ -337,11 +423,11 @@ export function themed(base: Theme, changes: readonly ThemeChanges[]): Theme {
   }
   const toned: Record<string, ((text: string) => string) | undefined> = { ...base.tones }
   for (const change of changes) {
-    for (const [name, style] of Object.entries(change.tones ?? {})) if (style !== undefined) toned[name] = styled(style)
+    for (const [name, style] of Object.entries(change.tones ?? {})) if (style !== undefined) toned[name] = styled(style, look.mode)
   }
   const filled: Record<string, ((text: string) => string) | undefined> = { ...base.backgrounds }
   for (const change of changes) {
-    for (const [name, colour] of Object.entries(change.backgrounds ?? {})) filled[name] = filling(colour)
+    for (const [name, colour] of Object.entries(change.backgrounds ?? {})) filled[name] = filling(colour, look.mode)
   }
   let glyphs: Theme['chrome'] = base.chrome
   let said: Theme['words'] = base.words

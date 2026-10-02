@@ -2,7 +2,7 @@
 
 The one layer that touches the terminal and the process: it reads the invocation, opens the session, provides the `binnacle` service and mounts the panes in pi-tui's screens. The built-in features are rows of their own, started once it provides the service; it applies only those bound to the session's agent, Approvals and Questions, on that agent's scope once the session opens. Every layer below it is a function of facts, UI state and a size; this is where those meet a real process, dsh's services and the launcher.
 
-- `index.ts` — the Cordis row: parses the invocation, then reports the model (`--check`) or takes the terminal until the person quits, on the alternate or main screen; reads the log again when an adapter comes or goes.
+- `index.ts` — the Cordis row: parses the invocation, then reports the model (`--check`) or takes the terminal until the person quits, on the alternate or main screen; reads the log again when an adapter comes or goes; asks the terminal its colours, and listens for it turning light or dark, so the theme is drawn for it.
 - `registrations.ts` — the `binnacle` service: the author API's registrations, kept for the host to adapt and draw with.
 - `session.ts` — the session the surface draws: one agent on the default model, its log followed from the first event, and its answer heard as it streams.
 

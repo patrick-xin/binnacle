@@ -50,7 +50,7 @@ function drawAnswer(fact: { readonly blocks: readonly Block[]; readonly interrup
                 id: `reasoning-${reasoning++}`,
                 title: [{ mark: 'thinking' } as const, ' thinking'],
                 tone: 'muted',
-                child: { kind: 'text', text: block.text, tone: 'dim' },
+                child: { kind: 'text', text: block.text, tone: 'thinkingText' },
               },
             },
           ]
@@ -171,7 +171,7 @@ function drawTool(
   subCalls?: Extract<Entry, { readonly kind: 'tool' }>['subCalls'],
 ): Node {
   const mark: Span = result === undefined ? { mark: 'running' } : result.failed === true ? { mark: 'failed' } : { mark: 'done' }
-  const title: readonly Span[] = [mark, ` ${call.name} ${call.arguments}`]
+  const title: readonly Span[] = [mark, { text: ` ${call.name} ${call.arguments}`, tone: 'toolTitle' }]
   const made = drawnSubCalls(subCalls)
   if (result === undefined) {
     const waiting: Node =
@@ -185,7 +185,7 @@ function drawTool(
   const output: Node = {
     kind: 'part',
     part: { kind: 'output', tool: call.name, text },
-    child: { kind: 'fold', id: 'output', child: { kind: 'text', text } },
+    child: { kind: 'fold', id: 'output', child: { kind: 'text', text, tone: 'toolOutput' } },
   }
   return { kind: 'show', title, opens: 'output', child: { kind: 'stack', children: [...made, ...reason, output] } }
 }
@@ -299,8 +299,14 @@ function builtIn(entry: Entry, problem?: string): Node {
       return noted(
         {
           kind: 'band',
-          background: 'prompt',
-          child: { kind: 'text', text: [{ mark: entry.steer === true ? 'steer' : 'prompt' } as const, ` ${textOf(entry.fact.blocks)}`] },
+          background: 'userMessageBg',
+          child: {
+            kind: 'text',
+            text: [
+              { mark: entry.steer === true ? 'steer' : 'prompt' } as const,
+              { text: ` ${textOf(entry.fact.blocks)}`, tone: 'userMessageText' } as const,
+            ],
+          },
         },
         problem,
       )

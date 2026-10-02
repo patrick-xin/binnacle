@@ -9,7 +9,7 @@ function card(req: Asked): Node {
   return {
     kind: 'ask',
     title: `${req.toolName} asks`,
-    edge: 'accent',
+    edge: 'borderAccent',
     child: {
       kind: 'stack',
       children: [
