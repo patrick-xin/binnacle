@@ -1,4 +1,4 @@
-import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
+import type { EditorTheme, MarkdownTheme, TuiAltScreenOptions } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
 
 const plain = (text: string): string => text
@@ -178,10 +178,7 @@ export function editorThemeOf(current: () => Theme): EditorTheme {
 }
 
 /** How the fullscreen draws a search's matches, read from the current theme each time it draws. */
-export function searchStylesOf(current: () => Theme): {
-  readonly searchMatchStyle: (text: string) => string
-  readonly searchCurrentMatchStyle: (text: string) => string
-} {
+export function searchStylesOf(current: () => Theme): Required<Pick<TuiAltScreenOptions, 'searchMatchStyle' | 'searchCurrentMatchStyle'>> {
   return {
     searchMatchStyle: (text) => current().tones.accent(text),
     searchCurrentMatchStyle: (text) => attributes.bold(current().tones.accent(text)),
