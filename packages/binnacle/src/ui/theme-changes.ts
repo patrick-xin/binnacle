@@ -1,8 +1,8 @@
 import { parseColor, visibleWidth } from '@earendil-works/pi-tui'
-import { chrome, colours, themed, words } from './theme.ts'
+import { binnacleTheme, chrome, colours, frames, themed, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
-const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds', 'light', 'dark'] as const
+const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds', 'spacing', 'light', 'dark'] as const
 
 function named(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value)
@@ -25,6 +25,11 @@ function text(value: unknown, at: string): string {
 function isControl(character: string): boolean {
   const code = character.codePointAt(0) ?? 0
   return code < 0x20 || (code >= 0x7f && code <= 0x9f)
+}
+
+function oneOf(value: unknown, at: string, allowed: readonly string[], what: string): string {
+  if (typeof value !== 'string' || !allowed.includes(value)) throw new Error(`${at} is ${named(value)}, not ${what}: ${allowed.join(', ')}`)
+  return value
 }
 
 /** A theme's vars, each following the names it gives, among them or the ones beneath, to a colour. */
@@ -162,7 +167,7 @@ function parsed(
         )
         break
       case 'chrome': {
-        const { border, ...rest } = record(field, 'chrome')
+        const { border, frame, ...rest } = record(field, 'chrome')
         // The gutter is measured one column wide, as a border's pieces are.
         const glyphs = known(
           rest,
@@ -170,12 +175,20 @@ function parsed(
           Object.keys(chrome).filter((key) => key !== 'border'),
           (glyph, at) => (at === 'chrome.gutter' ? piece(glyph, at) : text(glyph, at)),
         )
+        const framed = frame === undefined ? glyphs : { ...glyphs, frame: oneOf(frame, 'chrome.frame', Object.keys(frames), 'a frame') }
         read.chrome =
-          border === undefined ? glyphs : { ...glyphs, border: known(border, 'chrome.border', Object.keys(chrome.border), piece) }
+          border === undefined ? framed : { ...framed, border: known(border, 'chrome.border', Object.keys(chrome.border), piece) }
         break
       }
       case 'words':
         read.words = known(field, 'words', Object.keys(words), text)
+        break
+      case 'spacing':
+        read.spacing = known(field, 'spacing', Object.keys(binnacleTheme.spacing), (room, at) => {
+          if (typeof room !== 'number' || !Number.isInteger(room) || room < 0)
+            throw new Error(`${at} is ${named(room)}, not a whole number of columns or rows`)
+          return room
+        })
         break
       case 'folds':
         read.folds = Object.fromEntries(

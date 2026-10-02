@@ -358,6 +358,55 @@ test('an ask draws what it holds inside a rounded border, its title on the top e
   })
 })
 
+test('a theme names the frame an ask is drawn in by one word: square, heavy, double, or none, its edges then blank', () => {
+  const ask = { kind: 'ask', title: 'bash', child: { kind: 'text', text: 'exit 0' } } as const
+  const drawnIn = (frame: string) => drawText(componentOf(ask, OPEN, themed(binnacleTheme, [{ chrome: { frame } as never }])), 14)
+  assert.deepEqual(drawnIn('square'), ['┌─ bash ─────┐', '│ exit 0     │', '└────────────┘'])
+  assert.deepEqual(drawnIn('heavy'), ['┏━ bash ━━━━━┓', '┃ exit 0     ┃', '┗━━━━━━━━━━━━┛'])
+  assert.deepEqual(drawnIn('double'), ['╔═ bash ═════╗', '║ exit 0     ║', '╚════════════╝'])
+  assert.deepEqual(drawnIn('none'), ['   bash', '  exit 0', ''])
+  assert.deepEqual(drawnIn('rounded'), ['╭─ bash ─────╮', '│ exit 0     │', '╰────────────╯'])
+})
+
+test("an ask is padded inside its border by the theme's spacing, and what it holds is a region where it is drawn", () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
+  const padded = (ask: number) => layout({ kind: 'ask', child: held }, 14, OPEN, themed(binnacleTheme, [{ spacing: { ask } }]))
+  const drawn = (ask: number, width: number) =>
+    drawText(componentOf({ kind: 'ask', child: held }, OPEN, themed(binnacleTheme, [{ spacing: { ask } }])), width)
+  assert.deepEqual(drawn(0, 14), ['╭────────────╮', '│exit 0      │', '╰────────────╯'])
+  assert.deepEqual(drawn(3, 14), ['╭────────────╮', '│   exit 0   │', '╰────────────╯'])
+  assert.deepEqual(drawn(3, 12), ['╭──────────╮', '│   exit   │', '│   0      │', '╰──────────╯'])
+  assert.deepEqual(
+    [padded(0), padded(3)].map(({ regions }) => regions.map(({ top, left, width }) => [top, left, width])),
+    [[[1, 1, 12]], [[1, 4, 6]]],
+  )
+})
+
+/**
+ * A show of one line titled `t`, drawn in a theme with changes laid over binnacle's.
+ * @param changes - the theme's changes.
+ * @param width - the width it is drawn at.
+ * @param text - what it shows.
+ * @returns its lines, as the terminal reads them.
+ */
+const drawnShow = (changes: Parameters<typeof themed>[1][number], width: number, text = 'out'): string[] =>
+  drawText(componentOf({ kind: 'show', title: ['t'], child: { kind: 'text', text } }, OPEN, themed(binnacleTheme, [changes])), width)
+
+test("a show's gutter is the theme's frame's side, as many columns from what it holds as the theme's spacing gives, and what it holds is a region there", () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'out' } } as const
+  const shown = (changes: Parameters<typeof themed>[1][number]) =>
+    layout({ kind: 'show', title: ['t'], child: held }, 10, OPEN, themed(binnacleTheme, [changes]))
+  assert.deepEqual(drawnShow({ chrome: { frame: 'heavy' } }, 10), ['t', '┃ out'])
+  assert.deepEqual(drawnShow({ chrome: { frame: 'double' } }, 10), ['t', '║ out'])
+  assert.deepEqual(drawnShow({ chrome: { frame: 'none' } }, 10), ['t', '  out'])
+  assert.deepEqual(drawnShow({ spacing: { show: 3 } }, 10), ['t', '│   out'])
+  assert.deepEqual(drawnShow({ spacing: { show: 3 } }, 10, 'out and more'), ['t', '│   out', '│   and', '│   more'])
+  assert.deepEqual(
+    [shown({ spacing: { show: 0 } }), shown({ spacing: { show: 3 } })].map(({ regions }) => regions.map(({ top, left }) => [top, left])),
+    [[[1, 1]], [[1, 4]]],
+  )
+})
+
 test('what an ask holds is a region inside its border, by its rows and by its columns', () => {
   const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
   const { regions } = layout({ kind: 'ask', child: held }, 20, OPEN)
@@ -396,6 +445,23 @@ test('what a band holds is a region inside its padding, by its rows and by its c
     [[], ['o'], ['o'], []],
   )
   assert.deepEqual(under(regions, 0, 1), [])
+})
+
+test("a band is padded inside its background by the theme's spacing, in rows and columns alike, and what it holds is a region where it is drawn", () => {
+  const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'ok' } } as const
+  const padded = (band: number) =>
+    layout({ kind: 'band', background: 'userMessageBg', child: held }, 6, OPEN, themed(binnacleTheme, [{ spacing: { band } }]))
+  const drawn = (band: number) =>
+    drawText(
+      componentOf({ kind: 'band', background: 'userMessageBg', child: held }, OPEN, themed(binnacleTheme, [{ spacing: { band } }])),
+      6,
+    )
+  assert.deepEqual(drawn(0), ['ok'])
+  assert.deepEqual(drawn(2), ['', '', '  ok', '', ''])
+  assert.deepEqual(
+    [padded(0), padded(2)].map(({ regions }) => regions.map(({ top, left }) => [top, left])),
+    [[[0, 0]], [[2, 2]]],
+  )
 })
 
 test('a band with no column inside it draws what it holds without its padding', () => {

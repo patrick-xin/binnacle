@@ -360,12 +360,16 @@ export interface ThemeVariant {
         readonly border?: {
             readonly [piece in keyof typeof chrome.border]?: string;
         };
+        readonly frame?: FrameStyle;
     };
     readonly words?: {
         readonly [word in keyof typeof words]?: string;
     };
     readonly folds?: {
         readonly [key: string]: FoldStart;
+    };
+    readonly spacing?: {
+        readonly [part in keyof Spacing]?: number;
     };
     readonly marks?: {
         readonly [name: string]: {
@@ -434,6 +438,51 @@ export declare const chrome: {
     readonly gutter: '│';
 };
 // ui/theme.d.ts
+export type FrameStyle = keyof typeof frames;
+// ui/theme.d.ts
+export declare const frames: {
+    readonly rounded: {
+        readonly topLeft: '╭';
+        readonly horizontal: '─';
+        readonly topRight: '╮';
+        readonly side: '│';
+        readonly bottomLeft: '╰';
+        readonly bottomRight: '╯';
+    };
+    readonly square: {
+        readonly topLeft: '┌';
+        readonly horizontal: '─';
+        readonly topRight: '┐';
+        readonly side: '│';
+        readonly bottomLeft: '└';
+        readonly bottomRight: '┘';
+    };
+    readonly heavy: {
+        readonly topLeft: '┏';
+        readonly horizontal: '━';
+        readonly topRight: '┓';
+        readonly side: '┃';
+        readonly bottomLeft: '┗';
+        readonly bottomRight: '┛';
+    };
+    readonly double: {
+        readonly topLeft: '╔';
+        readonly horizontal: '═';
+        readonly topRight: '╗';
+        readonly side: '║';
+        readonly bottomLeft: '╚';
+        readonly bottomRight: '╝';
+    };
+    readonly none: {
+        readonly topLeft: ' ';
+        readonly horizontal: ' ';
+        readonly topRight: ' ';
+        readonly side: ' ';
+        readonly bottomLeft: ' ';
+        readonly bottomRight: ' ';
+    };
+};
+// ui/theme.d.ts
 export declare const words: {
     readonly holds: (count: number) => string;
     readonly cut: (count: number) => string;
@@ -455,6 +504,14 @@ export declare const words: {
 export interface FoldStart {
     readonly rows?: number;
     readonly open?: boolean;
+}
+// ui/theme.d.ts
+export interface Spacing {
+    readonly band: number;
+    readonly ask: number;
+    readonly show: number;
+    readonly indent: number;
+    readonly gap: number;
 }
 // ui/theme.d.ts
 export type Tone = keyof typeof tones | (string & {});

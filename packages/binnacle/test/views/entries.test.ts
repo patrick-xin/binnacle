@@ -7,6 +7,9 @@ import type { UiState } from '../../src/ui/state.ts'
 import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../support/draw.ts'
 import { screens } from '../../src/views/screen.ts'
+import { drawEntry } from '../../src/views/entries.ts'
+import { componentOf } from '../support/drawn.ts'
+import { binnacleTheme, themed } from '../../src/ui/theme.ts'
 import type { View, Views } from '../../src/views/entries.ts'
 import {
   prompt as promptFact,
@@ -426,6 +429,38 @@ test('a call made by a call a run_code program made is drawn beneath the one tha
     '● run_code {}',
     '│ ● run_code {}',
     '│   ● read {}',
+    '│ running 0s',
+  ])
+})
+
+test("a call made by a call a run_code program made is indented by the theme's spacing", () => {
+  const code = callFact(3, 3, 'c1', 'run_code', '{}')
+  const outer = {
+    kind: 'sub-call',
+    seq: 4,
+    time: 4,
+    rootCallId: 'c1',
+    parentCallId: 'c1',
+    subCallId: 'c1:ptc:0',
+    name: 'run_code',
+    arguments: '{}',
+  } as const
+  const inner = {
+    kind: 'sub-call',
+    seq: 5,
+    time: 5,
+    rootCallId: 'c1',
+    parentCallId: 'c1:ptc:0',
+    subCallId: 'c1:ptc:0:ptc:0',
+    name: 'read',
+    arguments: '{}',
+  } as const
+  const theme = themed(binnacleTheme, [{ spacing: { indent: 4 } }])
+  const node = drawEntry({ kind: 'tool', call: code, subCalls: [{ call: outer }, { call: inner }] }, new Map(), theme)
+  assert.deepEqual(drawText(componentOf(node, { toggled: new Set() }, theme), 40), [
+    '● run_code {}',
+    '│ ● run_code {}',
+    '│     ● read {}',
     '│ running 0s',
   ])
 })

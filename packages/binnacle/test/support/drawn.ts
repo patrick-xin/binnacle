@@ -7,6 +7,7 @@ import type { Component } from '@earendil-works/pi-tui'
 import type { Node } from '../../src/ui/node.ts'
 import { layout } from '../../src/ui/layout.ts'
 import type { LayoutState } from '../../src/ui/layout.ts'
+import type { Theme } from '../../src/ui/theme.ts'
 
 /**
  * A node in a UI state, as a component: laid out anew at each width it is
@@ -14,8 +15,9 @@ import type { LayoutState } from '../../src/ui/layout.ts'
  * terminal would be given.
  * @param node - what to draw.
  * @param state - the UI state it is drawn in.
+ * @param theme - the theme it is drawn in; binnacle's own when absent.
  * @returns the component.
  */
-export function componentOf(node: Node, state: LayoutState): Component {
-  return { render: (width) => [...layout(node, width, state).lines], invalidate: () => {} }
+export function componentOf(node: Node, state: LayoutState, theme?: Theme): Component {
+  return { render: (width) => [...layout(node, width, state, theme).lines], invalidate: () => {} }
 }

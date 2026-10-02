@@ -148,7 +148,7 @@ function drawCompaction(
 }
 
 /** Each call a `run_code` program made, a line marked as a call is, indented beneath the sub-call that made it. */
-function drawnSubCalls(subCalls: Extract<Entry, { readonly kind: 'tool' }>['subCalls']): Node[] {
+function drawnSubCalls(subCalls: Extract<Entry, { readonly kind: 'tool' }>['subCalls'], indent: number): Node[] {
   const held = subCalls ?? []
   const depth = (parent: string, seen: number): number => {
     const made = held.find((sub) => sub.call.subCallId === parent)
@@ -157,7 +157,7 @@ function drawnSubCalls(subCalls: Extract<Entry, { readonly kind: 'tool' }>['subC
   return held.map(({ call, result }) => ({
     kind: 'text',
     text: [
-      '  '.repeat(depth(call.parentCallId, 0)),
+      ' '.repeat(indent * depth(call.parentCallId, 0)),
       result === undefined ? { mark: 'running' } : result.failed ? { mark: 'failed' } : { mark: 'done' },
       ` ${call.name} ${call.arguments}`,
     ],
@@ -168,11 +168,12 @@ function drawTool(
   call: Extract<Fact, { readonly kind: 'call' }>,
   result: Extract<Fact, { readonly kind: 'result' }> | undefined,
   left: string | undefined,
-  subCalls?: Extract<Entry, { readonly kind: 'tool' }>['subCalls'],
+  subCalls: Extract<Entry, { readonly kind: 'tool' }>['subCalls'],
+  indent: number,
 ): Node {
   const mark: Span = result === undefined ? { mark: 'running' } : result.failed === true ? { mark: 'failed' } : { mark: 'done' }
   const title: readonly Span[] = [mark, { text: ` ${call.name} ${call.arguments}`, tone: 'toolTitle' }]
-  const made = drawnSubCalls(subCalls)
+  const made = drawnSubCalls(subCalls, indent)
   if (result === undefined) {
     const waiting: Node =
       left === undefined
@@ -227,12 +228,12 @@ export function drawEntry(entry: Entry, views: Views = new Map(), theme: Theme =
     entry.kind === 'authored' &&
     (Object.hasOwn(drawnHere, entry.fact.name) || (partKinds as readonly string[]).includes(entry.fact.name))
   ) {
-    return builtIn(entry, `${entry.fact.name} is a kind binnacle draws; the adapter must give its fact another name`)
+    return builtIn(entry, theme, `${entry.fact.name} is a kind binnacle draws; the adapter must give its fact another name`)
   }
   const key = keyOf(entry)
   const stack = views.get(key) ?? []
   return withParts(
-    drawnBy(entry, key, stack, stack.length, theme, (problem) => builtIn(entry, problem)),
+    drawnBy(entry, key, stack, stack.length, theme, (problem) => builtIn(entry, theme, problem)),
     views,
     theme,
   )
@@ -293,7 +294,7 @@ function drawnBy(
   }
 }
 
-function builtIn(entry: Entry, problem?: string): Node {
+function builtIn(entry: Entry, theme: Theme, problem?: string): Node {
   switch (entry.kind) {
     case 'prompt':
       return noted(
@@ -323,7 +324,7 @@ function builtIn(entry: Entry, problem?: string): Node {
     case 'streaming':
       return noted(drawAnswer(entry.answer), problem)
     case 'tool':
-      return noted(drawTool(entry.call, entry.result, entry.left, entry.subCalls), problem)
+      return noted(drawTool(entry.call, entry.result, entry.left, entry.subCalls, theme.spacing.indent), problem)
     case 'approval':
       return noted(drawApproval(entry.asked, entry.decided), problem)
     case 'command':
