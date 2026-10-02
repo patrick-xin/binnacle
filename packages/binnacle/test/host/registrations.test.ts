@@ -290,15 +290,19 @@ test("a variable may name another, before or after it, as pi's themes do, and on
 })
 
 test('a variant may name a tone or change a mark its own theme adds beneath it', async () => {
-  const { registrations } = surface()
-  registrations.theme({
-    tones: { brand: { color: 'red' } },
-    marks: { pinned: { glyph: '*', tone: 'brand' } },
-    light: { marks: { prompt: { tone: 'brand' }, pinned: { glyph: '+' } } },
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({
+      tones: { brand: { color: 'red' } },
+      marks: { pinned: { glyph: '*', tone: 'brand' } },
+      light: { marks: { prompt: { tone: 'brand' }, pinned: { glyph: '+' } } },
+    })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: [{ mark: 'prompt' }, ' ', { mark: 'pinned' }] }))
   })
   registrations.drawOn({ mode: 'truecolor', appearance: 'light' })
-  assert.deepEqual(registrations.currentTheme.marks.prompt, { glyph: '›', tone: 'brand' })
-  assert.deepEqual(registrations.currentTheme.marks.pinned, { glyph: '+', tone: 'brand' })
+  assert.deepEqual(screen([prompt], initial, 3, registrations.views, registrations.currentTheme).lines, [
+    '\x1b[31m›\x1b[39m \x1b[31m+\x1b[39m',
+  ])
 })
 
 test('a link and a heading are drawn in their own markdown tokens, whatever colour ordinary prose is given', async () => {
