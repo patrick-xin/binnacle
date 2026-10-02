@@ -4,10 +4,13 @@
 # Sheepdog again. Leave it empty after prompting a Sheep again: a Sheep that settles a second time needs the same pair
 # it did the first. A question always wakes it, whatever HANDLED holds: a Sheep's second question needs the same pair
 # as its first, and one skipped is a Sheep left waiting.
+# A reviewer beside a Sheep is no Charge: it asks by writing /tmp/review-<n>-ask.md, which wakes the Sheepdog too, until
+# the Sheepdog answers and removes the file.
 # Run it in the background, so its exit wakes the Sheepdog; never with & alone, which wakes no one.
 cd "$(git worktree list --porcelain | sed -n '1s/^worktree //p')" || exit 1
 end=$(( $(date +%s) + 1800 ))
 while [ "$(date +%s)" -lt "$end" ]; do
+  for ask in /tmp/review-*-ask.md; do [ -f "$ask" ] && { echo "reviewer asking: $ask"; exit 0; }; done
   out=$(shepherd watch --json --timeout 20000 2>/tmp/watch.err); status=$?
   # 3 is a quiet Flock; anything but 0 or 3 is shepherd failing to watch, said now rather than as a timeout later.
   [ "$status" -eq 3 ] && continue
