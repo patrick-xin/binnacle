@@ -24,6 +24,7 @@
     "check:links": "node scripts/check-links.mjs",
     "check:pins": "node scripts/check-pins.mjs",
     "check:patch": "node scripts/check-patch.mjs",
+    "check:presets": "node scripts/check-presets.mjs",
     "check:peers": "node scripts/check-peers.mjs",
     "check:layers": "node scripts/check-layers.mjs",
     "check:jsdoc": "node scripts/check-jsdoc.mjs",
@@ -33,7 +34,7 @@
     "check:skills": "node scripts/check-skills.mjs",
     "map": "node scripts/map.mjs",
     "check:boot": "node scripts/check-boot.mjs",
-    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:peers && pnpm run check:layers && pnpm run check:jsdoc && pnpm run check:comments && pnpm run check:notes && pnpm run check:words && pnpm run check:skills && pnpm run lint && pnpm run fmt:check && pnpm run typecheck",
+    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:pins && pnpm run check:patch && pnpm run check:presets && pnpm run check:peers && pnpm run check:layers && pnpm run check:jsdoc && pnpm run check:comments && pnpm run check:notes && pnpm run check:words && pnpm run check:skills && pnpm run lint && pnpm run fmt:check && pnpm run typecheck",
     "test": "pnpm run check && node --test \"scripts/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {
@@ -41,6 +42,7 @@
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
     "@deepseek-ai/cordis-plugin-include": "1.0.9",
+    "@deepseek-ai/dsh-app-boot": "0.2.0-rc.2",
     "@types/node": "24.19.0",
     "js-yaml": "4.3.1",
     "oxc-parser": "0.151.0",

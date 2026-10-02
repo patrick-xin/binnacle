@@ -7,24 +7,37 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const packageDir = fileURLToPath(new URL('..', import.meta.url))
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 
-test('the manifest points dsh at the patch it ships, and the patch inserts the row by the package name', () => {
-  assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')
-  assert.ok(manifest.files.includes('cordis.patch.yml'))
-  assert.ok(manifest.files.includes('theme.schema.json'), 'the schema a theme file is checked against ships with the package')
+test('the manifest points dsh at the patch files it ships, and the patch inserts the row by the package name', () => {
+  assert.deepEqual(manifest.dsh.bundle.patch, [
+    './cordis.patch.yml',
+    './presets/standard.patch.yml',
+    './presets/ptc.patch.yml',
+    './presets/minimal.patch.yml',
+    './presets/cordis.patch.yml',
+    './presets/author.patch.yml',
+  ])
+  for (const file of manifest.dsh.bundle.patch) {
+    const shipped = file.replace(/^\.\//, '')
+    assert.ok(manifest.files.includes(shipped), `${shipped} ships with the package`)
+    assert.ok(existsSync(new URL(`../${shipped}`, import.meta.url)), `${shipped} is in the package`)
+  }
   const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
   assert.match(patch, new RegExp(`name: '${manifest.name}'`))
+  assert.ok(manifest.files.includes('theme.schema.json'), 'the schema a theme file is checked against ships with the package')
 })
 
-test("the patch loads dsh's ask-user tool, whose questions the built-in Questions plugin answers", () => {
-  const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
-  assert.match(patch, /name: '@deepseek-ai\/dsh-tool-ask-user'/)
+test("the presets compose dsh's ask-user tool, whose questions the built-in Questions plugin answers", () => {
+  for (const preset of ['standard', 'author']) {
+    const patch = readFileSync(new URL(`../presets/${preset}.patch.yml`, import.meta.url), 'utf8')
+    assert.match(patch, /name: '@deepseek-ai\/dsh-tool-ask-user'/, preset)
+  }
 })
 
 test('plain node loads the built entry as a Cordis row, with no default export and no test hook', () => {
@@ -34,7 +47,7 @@ test('plain node loads the built entry as a Cordis row, with no default export a
   assert.deepEqual(JSON.parse(run.stdout), {
     keys: ['apply', 'inject', 'name'],
     name: 'binnacle',
-    inject: ['cmdlineArgs', 'agents', 'agentDefaultModel', 'commands'],
+    inject: ['cmdlineArgs', 'agents', 'agentDefaultModel', 'agentPresets', 'commands'],
     apply: 'function',
   })
 })

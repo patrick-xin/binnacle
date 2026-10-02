@@ -30,4 +30,5 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 ## Tune: can I make it mine?
 
 - [Theme](features/theme.md): the tones content is drawn in, a band's background, their colours, and how each kind's folds start — kept as files in the profile, one for a light terminal and one for a dark.
+- [Presets](features/presets.md): choose the composition a session's agent runs on — dsh's web presets copied byte for byte, and binnacle's own `author` — for now by editing the profile's patch.
 - [Authoring](features/authoring.md): a plugin in the profile reads the session's events its own way and draws any kind of entry its own way.

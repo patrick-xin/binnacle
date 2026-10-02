@@ -6,8 +6,8 @@ import { join } from 'node:path'
 import { checkPeers, servicesProvidedBy } from './check-peers.mjs'
 
 const manifest = (fields = {}) => ({ name: 'binnacle', ...fields })
-const check = ({ files = [], patch = '', services, provided, ...fields } = {}) =>
-  checkPeers({ manifest: manifest(fields), files, patch, services, provided })
+const check = ({ files = [], patch = '', patches, services, provided, ...fields } = {}) =>
+  checkPeers({ manifest: manifest(fields), files, patches: patches ?? [patch], services, provided })
 
 test('a package whose code is imported, declared nowhere, is named with its file', () => {
   const files = [{ path: 'src/a.ts', text: "import { x } from '@deepseek-ai/dsh-session/surface'\n" }]
@@ -56,6 +56,29 @@ test("a row naming a subpath of binnacle is binnacle's own, and a row naming ano
   const patch =
     "- insert:\n    - id: binnacle-status-line\n      name: 'binnacle/plugins/status-line'\n    - id: deep\n      name: '@scope/a/deep'\n"
   assert.deepEqual(check({ patch, peerDependencies: { '@scope/a': '1' } }), [])
+})
+
+test('a row any patch file of the bundle inserts needs its package as a peer, a preset file included', () => {
+  const patches = [
+    PATCH,
+    "- insert:\n    - id: preset-standard\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:\n        plugins:\n          - id: persona\n            name: '@deepseek-ai/dsh-persona'\n",
+  ]
+  assert.deepEqual(
+    check({
+      patches,
+      peerDependencies: { '@deepseek-ai/dsh-tool-ask-user': '1', '@deepseek-ai/dsh-agent-preset': '1', '@deepseek-ai/dsh-persona': '1' },
+    }),
+    [],
+  )
+  assert.deepEqual(check({ patches, peerDependencies: { '@deepseek-ai/dsh-tool-ask-user': '1', '@deepseek-ai/dsh-agent-preset': '1' } }), [
+    "@deepseek-ai/dsh-persona is a row binnacle's patch inserts, but is not a peerDependency — add it to peerDependencies, for the dsh install must provide it",
+  ])
+})
+
+test('a row naming a loader builtin, cordis:, names no package', () => {
+  const patch =
+    "- insert:\n    - id: planning\n      name: cordis:group\n      config:\n        - id: plan-mode\n          name: '@deepseek-ai/dsh-plan-mode'\n"
+  assert.deepEqual(check({ patch, peerDependencies: { '@deepseek-ai/dsh-plan-mode': '1' } }), [])
 })
 
 test('problems come in a stable order, sorted, however the files and lists are ordered', () => {
