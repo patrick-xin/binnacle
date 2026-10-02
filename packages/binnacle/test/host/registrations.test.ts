@@ -129,11 +129,68 @@ test("a view may name a tone its author's theme adds, drawn in the colour the th
   assert.deepEqual(screen(facts, initial, 10, registrations.views, registrations.currentTheme).lines, ['\x1b[35masked\x1b[39m     '])
 })
 
+test('a tone may be any colour: one of the sixteen, a 256-colour index, hex, or okhsl, drawn exactly', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({
+      tones: { sixteen: { color: 'red' }, indexed: { color: 208 }, hex: { color: '#ff8800' }, okhsl: { color: 'okhsl(0 0% 100%)' } },
+    })
+    ctx.binnacle.view('prompt', () => ({
+      kind: 'stack',
+      children: ['sixteen', 'indexed', 'hex', 'okhsl'].map((tone) => ({ kind: 'text' as const, text: tone, tone })),
+    }))
+  })
+  assert.deepEqual(screen([prompt], initial, 7, registrations.views, registrations.currentTheme).lines, [
+    '\x1b[31msixteen\x1b[39m',
+    '\x1b[38;5;208mindexed\x1b[39m',
+    '\x1b[38;2;255;136;0mhex\x1b[39m    ',
+    '\x1b[38;2;255;255;255mokhsl\x1b[39m  ',
+  ])
+})
+
+test('a tone may carry a background, of any colour, drawn behind its colour', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { code: { color: 'yellow', background: '#303030' }, band: { background: 'blue' } } })
+    ctx.binnacle.view('prompt', () => ({
+      kind: 'stack',
+      children: [
+        { kind: 'text', text: 'code', tone: 'code' },
+        { kind: 'text', text: 'band', tone: 'band' },
+      ],
+    }))
+  })
+  assert.deepEqual(screen([prompt], initial, 4, registrations.views, registrations.currentTheme).lines, [
+    '\x1b[48;2;48;48;48m\x1b[33mcode\x1b[39m\x1b[49m',
+    '\x1b[44mband\x1b[49m',
+  ])
+})
+
+test('a theme may name a colour once among its variables and give it by name, to a tone, its background, or a background', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({
+      vars: { brand: '#ff8800', ink: 'black' },
+      tones: { code: { color: 'brand', background: 'ink' } },
+    })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'code', tone: 'code' }))
+  })
+  assert.deepEqual(screen([prompt], initial, 4, registrations.views, registrations.currentTheme).lines, [
+    '\x1b[40m\x1b[38;2;255;136;0mcode\x1b[39m\x1b[49m',
+  ])
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {
     message:
-      'binnacle.theme: tones.accent.color is "purple", not one of the terminal\'s sixteen colours: black, red, green, yellow, blue, magenta, cyan, white, bright-black, bright-red, bright-green, bright-yellow, bright-blue, bright-magenta, bright-cyan, bright-white',
+      'binnacle.theme: tones.accent.color is "purple", not a colour: one of the terminal\'s sixteen (black, red, green, yellow, blue, magenta, cyan, white, bright-black, bright-red, bright-green, bright-yellow, bright-blue, bright-magenta, bright-cyan, bright-white), a 256-colour index from 0 to 255, #rrggbb, okhsl(h s% l%), oklch(l c h), or a name among the theme\'s vars',
+  })
+  assert.throws(() => registrations.theme({ tones: { accent: { color: 256 } } }), {
+    message: /^binnacle\.theme: tones\.accent\.color is 256, not a colour/,
+  })
+  assert.throws(() => registrations.theme({ tones: { accent: { color: '#ff88' } } }), {
+    message: /^binnacle\.theme: tones\.accent\.color is "#ff88", not a colour/,
   })
   assert.throws(() => registrations.theme({ marks: { pinned: { glyph: '★' } } }), {
     message: 'binnacle.theme: marks.pinned is a mark the theme has none of, so it needs a glyph and a tone',

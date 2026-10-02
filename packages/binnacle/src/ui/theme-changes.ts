@@ -1,8 +1,8 @@
-import { visibleWidth } from '@earendil-works/pi-tui'
+import { parseColor, visibleWidth } from '@earendil-works/pi-tui'
 import { chrome, colours, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
-const parts = ['tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds'] as const
+const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds'] as const
 
 function named(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value)
@@ -33,21 +33,34 @@ function piece(value: unknown, at: string): string {
   return read
 }
 
-function colour(value: unknown, at: string): Colour {
-  if (typeof value !== 'string' || !(colours as readonly string[]).includes(value))
-    throw new Error(`${at} is ${named(value)}, not one of the terminal's sixteen colours: ${colours.join(', ')}`)
-  return value as Colour
+type Vars = Readonly<Record<string, Colour>>
+
+function colour(value: unknown, at: string, vars: Vars = {}): Colour {
+  if (typeof value === 'string' && Object.hasOwn(vars, value)) return vars[value] as Colour
+  if (typeof value === 'string' && (colours as readonly string[]).includes(value)) return value
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255) return value
+  if (typeof value === 'string') {
+    try {
+      parseColor(value)
+      return value
+    } catch {
+      // Refused below, naming every form a colour may take.
+    }
+  }
+  throw new Error(
+    `${at} is ${named(value)}, not a colour: one of the terminal's sixteen (${colours.join(', ')}), a 256-colour index from 0 to 255, #rrggbb, okhsl(h s% l%), oklch(l c h), or a name among the theme's vars`,
+  )
 }
 
-function style(value: unknown, at: string): Style {
+function style(value: unknown, at: string, vars: Vars): Style {
   const given = record(value, at)
-  const read: { color?: Colour; bold?: boolean; dim?: boolean; italic?: boolean; underline?: boolean } = {}
+  const read: { color?: Colour; background?: Colour; bold?: boolean; dim?: boolean; italic?: boolean; underline?: boolean } = {}
   for (const [key, field] of Object.entries(given)) {
-    if (key === 'color') read.color = colour(field, `${at}.color`)
+    if (key === 'color' || key === 'background') read[key] = colour(field, `${at}.${key}`, vars)
     else if (key === 'bold' || key === 'dim' || key === 'italic' || key === 'underline') {
       if (typeof field !== 'boolean') throw new Error(`${at}.${key} is ${named(field)}, not true or false`)
       read[key] = field
-    } else throw new Error(`${at}.${key} is no part of a tone's style: color, bold, dim, italic, underline`)
+    } else throw new Error(`${at}.${key} is no part of a tone's style: color, background, bold, dim, italic, underline`)
   }
   return read
 }
@@ -81,16 +94,19 @@ export function parseThemeChanges(value: unknown, theme: Theme): ThemeChanges {
   try {
     const given = record(value, 'the theme') as Readonly<Record<string, unknown>> & { readonly tones?: object }
     const read: Record<string, unknown> = {}
+    const vars: Vars = given.vars === undefined ? {} : known(given.vars, 'vars', Object.keys(record(given.vars, 'vars')), colour)
     for (const [part, field] of Object.entries(given)) {
       switch (part) {
+        case 'vars':
+          break
         case 'tones':
           read.tones = Object.fromEntries(
-            Object.entries(record(field, 'tones')).map(([name, tone]) => [name, style(tone, `tones.${name}`)]),
+            Object.entries(record(field, 'tones')).map(([name, tone]) => [name, style(tone, `tones.${name}`, vars)]),
           )
           break
         case 'backgrounds':
           read.backgrounds = Object.fromEntries(
-            Object.entries(record(field, 'backgrounds')).map(([name, fill]) => [name, colour(fill, `backgrounds.${name}`)]),
+            Object.entries(record(field, 'backgrounds')).map(([name, fill]) => [name, colour(fill, `backgrounds.${name}`, vars)]),
           )
           break
         case 'marks':

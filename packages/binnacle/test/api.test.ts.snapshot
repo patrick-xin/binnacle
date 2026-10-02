@@ -336,6 +336,9 @@ export declare const backgrounds: {
 };
 // ui/theme.d.ts
 export interface ThemeChanges {
+    readonly vars?: {
+        readonly [name: string]: Colour;
+    };
     readonly tones?: {
         readonly [name: string]: Style;
     };
@@ -366,6 +369,12 @@ export interface ThemeChanges {
     };
 }
 // ui/theme.d.ts
+export type Colour = Sixteen | number | (string & {});
+// ui/theme.d.ts
+export type Sixteen = (typeof colours)[number];
+// ui/theme.d.ts
+export declare const colours: readonly ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'];
+// ui/theme.d.ts
 export declare const tones: {
     readonly accent: (text: string) => string;
     readonly muted: (text: string) => string;
@@ -377,15 +386,12 @@ export declare const tones: {
 // ui/theme.d.ts
 export interface Style {
     readonly color?: Colour;
+    readonly background?: Colour;
     readonly bold?: boolean;
     readonly dim?: boolean;
     readonly italic?: boolean;
     readonly underline?: boolean;
 }
-// ui/theme.d.ts
-export type Colour = (typeof colours)[number];
-// ui/theme.d.ts
-export declare const colours: readonly ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'bright-black', 'bright-red', 'bright-green', 'bright-yellow', 'bright-blue', 'bright-magenta', 'bright-cyan', 'bright-white'];
 // ui/theme.d.ts
 export declare const chrome: {
     readonly focus: '▸';

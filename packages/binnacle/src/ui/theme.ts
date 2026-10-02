@@ -1,3 +1,4 @@
+import { backgroundAnsi, foregroundAnsi, parseColor } from '@earendil-works/pi-tui'
 import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
 
@@ -224,6 +225,8 @@ export const binnacleTheme: Theme = {
  * What an author's theme registration changes: data alone, each part naming only what it changes, so what it leaves out is as the theme beneath it has it.
  */
 export interface ThemeChanges {
+  /** Colours named once, so a tone, its background or a background may give one by its name; a name here is read before one of the sixteen's. */
+  readonly vars?: { readonly [name: string]: Colour }
   /** Tones, by name — binnacle's, or new ones a view may then name: the colour and attributes each is drawn in, replacing how the theme beneath drew it. */
   readonly tones?: { readonly [name: string]: Style }
   /** Backgrounds, by name — binnacle's, or new ones a band or an ask may then be filled with: one of the terminal's sixteen colours. */
@@ -268,12 +271,21 @@ export const colours = [
 ] as const
 
 /** One of the terminal's sixteen colours, so a person's palette decides what it looks like. */
-export type Colour = (typeof colours)[number]
+export type Sixteen = (typeof colours)[number]
+
+/**
+ * A colour: one of the terminal's sixteen by name, which the person's palette
+ * decides; a 256-colour index, 0 to 255; or an exact colour, as `#rrggbb`,
+ * `#rgb`, `okhsl(h s% l%)` or `oklch(l c h)`.
+ */
+export type Colour = Sixteen | number | (string & {})
 
 /** How a tone draws, as data: a colour of the terminal's, and attributes, each drawn inside the colour. */
 export interface Style {
   /** The colour; the terminal's own foreground when absent. */
   readonly color?: Colour
+  /** The colour behind it; the terminal's own background when absent. */
+  readonly background?: Colour
   /** Drawn bold. */
   readonly bold?: boolean
   /** Drawn dim. */
@@ -292,11 +304,18 @@ function styled(style: Style): (text: string) => string {
   if (style.underline === true) wraps.push(attributes.underline)
   const colour = style.color
   if (colour !== undefined) {
-    const index = colours.indexOf(colour)
-    const code = index < 8 ? 30 + index : 90 + index - 8
-    wraps.push((text) => `\x1b[${code}m${text}\x1b[39m`)
+    const opening = foreground(colour)
+    wraps.push((text) => `${opening}${text}\x1b[39m`)
   }
+  if (style.background !== undefined) wraps.push(filling(style.background))
   return (text) => wraps.reduce((inner, wrap) => wrap(inner), text)
+}
+
+/** The opening of a colour: the sixteen keep their own codes, which a terminal of sixteen colours draws in its palette. */
+function foreground(colour: Colour): string {
+  const index = (colours as readonly unknown[]).indexOf(colour)
+  if (index >= 0) return `\x1b[${index < 8 ? 30 + index : 90 + index - 8}m`
+  return foregroundAnsi(parseColor(colour as string | number), 'truecolor')
 }
 
 function counting(template: string): (count: number) => string {
@@ -304,9 +323,10 @@ function counting(template: string): (count: number) => string {
 }
 
 function filling(colour: Colour): (text: string) => string {
-  const index = colours.indexOf(colour)
-  const code = index < 8 ? 40 + index : 100 + index - 8
-  return (text) => `\x1b[${code}m${text}\x1b[49m`
+  const index = (colours as readonly unknown[]).indexOf(colour)
+  const opening =
+    index >= 0 ? `\x1b[${index < 8 ? 40 + index : 100 + index - 8}m` : backgroundAnsi(parseColor(colour as string | number), 'truecolor')
+  return (text) => `${opening}${text}\x1b[49m`
 }
 
 /** A theme with changes laid over it, oldest first, each over what the ones before it left. */
