@@ -317,6 +317,15 @@ test('a link and a heading are drawn in their own markdown tokens, whatever colo
   assert.ok(linked.startsWith('\x1b[31msee'), `prose is red: ${JSON.stringify(linked)}`)
 })
 
+test("a variable may take any name, an object's own names such as toString included", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ vars: { toString: '#ff0000', constructor: 'toString' }, tones: { accent: { color: 'constructor' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'a', tone: 'accent' }))
+  })
+  assert.deepEqual(screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines, ['\x1b[38;2;255;0;0ma\x1b[39m'])
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {

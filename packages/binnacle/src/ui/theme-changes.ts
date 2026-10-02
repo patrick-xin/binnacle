@@ -29,22 +29,20 @@ function isControl(character: string): boolean {
 
 /** A theme's vars, each following the names it gives, among them or the ones beneath, to a colour. */
 function resolved(given: Readonly<Record<string, unknown>>, outer: Vars): Vars {
-  const read: Record<string, Colour> = {}
+  const read = new Map<string, Colour>()
   const follow = (name: string, through: readonly string[]): Colour => {
-    const done = read[name]
+    const done = read.get(name)
     if (done !== undefined) return done
     const value = given[name]
-    if (typeof value === 'string' && Object.hasOwn(given, value)) {
-      if (value === name || through.includes(value))
-        throw new Error(`vars.${through[0] ?? name} names itself, through ${[...through.slice(1), name].join(', ')}`)
-      read[name] = follow(value, [...through, name])
-      return read[name]
-    }
-    read[name] = colour(value, `vars.${name}`, outer)
-    return read[name]
+    const named = typeof value === 'string' && Object.hasOwn(given, value)
+    if (named && (value === name || through.includes(value)))
+      throw new Error(`vars.${through[0] ?? name} names itself, through ${[...through.slice(1), name].join(', ')}`)
+    const found = named ? follow(value, [...through, name]) : colour(value, `vars.${name}`, outer)
+    read.set(name, found)
+    return found
   }
   for (const name of Object.keys(given)) follow(name, [])
-  return read
+  return Object.fromEntries(read)
 }
 
 function piece(value: unknown, at: string): string {
