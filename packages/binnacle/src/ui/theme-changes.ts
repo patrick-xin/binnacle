@@ -1,5 +1,5 @@
 import { parseColor, visibleWidth } from '@earendil-works/pi-tui'
-import { chrome, colours, words } from './theme.ts'
+import { chrome, colours, themed, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
 const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds', 'light', 'dark'] as const
@@ -133,11 +133,6 @@ function parsed(
       case 'light':
       case 'dark':
         if (!varied) throw new Error(`${part} is no part of a variant, which holds no variant of its own`)
-        try {
-          read[part] = parsed(record(field, part), theme, vars, false)
-        } catch (error) {
-          throw new Error(`${part}.${error instanceof Error ? error.message : String(error)}`, { cause: error })
-        }
         break
       case 'tones':
         read.tones = Object.fromEntries(
@@ -191,6 +186,16 @@ function parsed(
         break
       default:
         throw new Error(`${part} is no part of a theme: ${parts.join(', ')}`)
+    }
+  }
+  // A variant is laid over the rest of its theme, so it is read against the theme with the rest laid over it.
+  const beneath = themed(theme, [read as ThemeChanges])
+  for (const part of ['light', 'dark'] as const) {
+    if (given[part] === undefined) continue
+    try {
+      read[part] = parsed(record(given[part], part), beneath, vars, false)
+    } catch (error) {
+      throw new Error(`${part}.${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }
   }
   return read as ThemeChanges

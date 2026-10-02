@@ -289,6 +289,18 @@ test("a variable may name another, before or after it, as pi's themes do, and on
   })
 })
 
+test('a variant may name a tone or change a mark its own theme adds beneath it', async () => {
+  const { registrations } = surface()
+  registrations.theme({
+    tones: { brand: { color: 'red' } },
+    marks: { pinned: { glyph: '*', tone: 'brand' } },
+    light: { marks: { prompt: { tone: 'brand' }, pinned: { glyph: '+' } } },
+  })
+  registrations.drawOn({ mode: 'truecolor', appearance: 'light' })
+  assert.deepEqual(registrations.currentTheme.marks.prompt, { glyph: '›', tone: 'brand' })
+  assert.deepEqual(registrations.currentTheme.marks.pinned, { glyph: '+', tone: 'brand' })
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {
