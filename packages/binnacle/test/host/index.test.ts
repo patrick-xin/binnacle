@@ -1,5 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { Events } from '@deepseek-ai/cordis'
 import { CommandId } from '@deepseek-ai/dsh-commands'
@@ -21,6 +24,7 @@ import * as composer from '../../src/plugins/composer/index.ts'
 import * as statusLine from '../../src/plugins/status-line/index.ts'
 import * as toolCards from '../../src/plugins/tool-cards/index.ts'
 import * as trajectory from '../../src/plugins/trajectory/index.ts'
+import * as theme from '../../src/plugins/theme/index.ts'
 import type { OpenedSession } from '../../src/host/session.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
 import { FakeClock } from '../support/clock.ts'
@@ -93,11 +97,14 @@ async function until(holds: () => boolean | Promise<boolean>, within = 2_000): P
   }
 }
 
-/** A Cordis row, as binnacle's patch loads one: its module. */
-type Row = { readonly name: string; readonly inject: readonly (keyof Context)[]; apply(ctx: Context): void }
+/** A Cordis row, as binnacle's patch loads one: its module, taking the config a person's patch sets on it. */
+type Row = { readonly name: string; readonly inject: readonly (keyof Context)[]; apply(ctx: Context, config: unknown): void }
+
+/** A Cordis row, as binnacle's patch loads one: its module, with the config a person's patch sets on it. */
+type Mounted = { readonly row: Row; readonly config?: unknown }
 
 /** The built-in features binnacle's patch loads as rows beside the host's, in the order it inserts them. */
-const ROWS: readonly Row[] = [transcript, composer, statusLine, toolCards, trajectory]
+const ROWS: readonly Mounted[] = [transcript, composer, statusLine, toolCards, trajectory, theme].map((row) => ({ row }))
 
 /** Mount the host on a real Context with the launcher's facts and dsh's services named, and commit startup. */
 async function mount(
@@ -107,7 +114,7 @@ async function mount(
   terminal = new FakeTerminal(),
   provide: (ctx: Context) => Promise<void> = async () => {},
   clock: { now(): number; after(ms: number, then: () => void): () => void } = new FakeClock(),
-  rows: readonly Row[] = ROWS,
+  rows: readonly Mounted[] = ROWS,
 ) {
   const exits: number[] = []
   const out: string[] = []
@@ -177,7 +184,7 @@ async function mount(
   ctx.provide('commands', {} as never)
   const fiber = ctx.plugin(host)
   await fiber
-  for (const row of rows) void ctx.plugin(row)
+  for (const { row, config } of rows) void ctx.plugin(row, config)
   return {
     ctx,
     fiber,
@@ -193,6 +200,260 @@ async function mount(
     },
   }
 }
+
+/** A profile directory with the theme files a test names written in it, as a person's profile holds them. */
+function themed(files: Readonly<Record<string, string>>): string {
+  const dir = mkdtempSync(join(tmpdir(), 'binnacle-theme-'))
+  mkdirSync(join(dir, 'themes'), { recursive: true })
+  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, 'themes', `${name}.json`), text)
+  return dir
+}
+
+/** The built-in rows with the theme row configured, through a profile whose directory a test made. */
+const themedRows = (config: unknown): readonly Mounted[] =>
+  ROWS.map((mounted) => (mounted.row === theme ? { row: theme, config } : mounted))
+
+/** Wait until something holds, passing the theme grant's window each time it polls. */
+async function drawing(clock: FakeClock, holds: () => boolean | Promise<boolean>): Promise<void> {
+  await until(() => {
+    clock.advance(50)
+    return holds()
+  }, 10_000)
+}
+
+/** The rows of the screen a person sees now, as literal lines. */
+const screenRows = (terminal: XtermTerminal): Promise<readonly string[]> => terminal.altScreen()
+
+/** What the host has said, unwrapped, as one text: a notice wraps where a terminal is narrow. */
+const said = (terminal: { readonly written: string }): string => stripTerminalSequences(terminal.written).replaceAll(/[\r\n]+/g, '')
+
+/**
+ * The host mounted on a terminal emulated at a width, over a profile whose theme files a test wrote, started.
+ * @param files - the theme files, by name.
+ * @param config - the theme row's config, as a person's patch sets it.
+ * @param columns - the terminal's width.
+ * @param session - the session on screen.
+ * @param rows - the rows to load, the theme row configured among them by default.
+ * @returns the mount's, the profile directory, the clock and the terminal.
+ */
+async function themedSurface(
+  files: Readonly<Record<string, string>>,
+  config: unknown,
+  columns = 80,
+  session: FakeSession = new FakeSession([prompt(1, 'fix the build')]),
+  rows: readonly Mounted[] = themedRows(config),
+) {
+  const dir = themed(files)
+  const clock = new FakeClock()
+  const terminal = new XtermTerminal(columns, 24)
+  const mounted = await mount(
+    [],
+    session,
+    async () => session,
+    terminal,
+    async (ctx) => {
+      ctx.provide('profileContext', { dir } as never)
+    },
+    clock,
+    rows,
+  )
+  mounted.commit()
+  await until(() => terminal.started)
+  return { ...mounted, dir, clock, terminal }
+}
+
+test('a theme row whose config is not the shape of { theme, light, dark } refuses to load, naming what to change, and contributes nothing', async () => {
+  const { ctx, terminal, clock } = await themedSurface(
+    { x: '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}' },
+    undefined,
+    80,
+    new FakeSession([prompt(1, 'fix the build')]),
+    ROWS.filter((mounted) => mounted.row !== theme),
+  )
+  const load = async (config: unknown): Promise<unknown> => {
+    await ctx.plugin(theme, config)
+    return undefined
+  }
+  await assert.rejects(load({ theme: 5 }), /binnacle-theme: config.theme is 5, not the name of a theme file/)
+  await assert.rejects(load({ colour: 'x' }), /binnacle-theme: config.colour is no part of the theme row’s config: theme, light, dark/)
+  await assert.rejects(load('x'), /binnacle-theme: config is "x", not \{ theme, light, dark \}/)
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build'))
+  assert.ok((await screenRows(terminal)).includes(' › fix the build'), 'the file’s glyph never draws: nothing was contributed')
+  assert.ok(terminal.written.includes('\u001b[36m›'), 'binnacle’s own accent draws')
+})
+
+test('a theme row with no config, or none of its fields, registers nothing', async () => {
+  for (const config of [undefined, {}]) {
+    const { terminal, clock } = await themedSurface({ x: '{"marks":{"prompt":{"glyph":">"}}}' }, config)
+    await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build'))
+    assert.ok(terminal.written.includes('\u001b[36m›'), 'binnacle’s own accent draws')
+  }
+})
+
+test("a theme row configured with a theme file draws in that file's colours and glyphs once the host reads it", async () => {
+  const file = '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}'
+  const wide = await themedSurface({ x: file }, { theme: 'x' }, 80)
+  await drawing(wide.clock, async () => (await screenRows(wide.terminal)).includes(' > fix the build'))
+  assert.ok(wide.terminal.written.includes('\u001b[31m>'), 'the mark draws in the file’s accent')
+  const narrow = await themedSurface({ x: file }, { theme: 'x' }, 12)
+  await drawing(narrow.clock, async () => (await screenRows(narrow.terminal)).includes(' > fix the'))
+  assert.ok((await screenRows(narrow.terminal)).includes(' build'), 'the wrapped line says it all')
+})
+
+test('writing the theme file again redraws in the new colours, with no restart', async () => {
+  const { dir, terminal, clock } = await themedSurface(
+    { x: '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}' },
+    { theme: 'x' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' > fix the build'))
+  writeFileSync(join(dir, 'themes', 'x.json'), '{"marks":{"prompt":{"glyph":"»"}},"tones":{"accent":{"color":"green"}}}')
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' » fix the build'))
+  assert.ok(terminal.written.includes('\u001b[32m»'), 'the new glyph draws in the new accent')
+})
+
+test("the theme row's light and dark files draw on a dark and a light terminal, without a restart", async () => {
+  const { terminal, clock } = await themedSurface(
+    { l: '{"tones":{"accent":{"color":"green"}}}', d: '{"tones":{"accent":{"color":"blue"}}}' },
+    { light: 'l', dark: 'd' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build'))
+  terminal.type('\u001b[?997;1n')
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build') && terminal.written.includes('\u001b[34m›'))
+  terminal.type('\u001b[?997;2n')
+  await drawing(clock, () => terminal.written.includes('\u001b[32m›'))
+  assert.ok((await screenRows(terminal)).includes(' › fix the build'), 'the line stands as it was, in the other variant’s colour')
+})
+
+test('the light and dark files replace the theme file’s own variants', async () => {
+  const { terminal, clock } = await themedSurface(
+    {
+      x: '{"tones":{"accent":{"color":"red"}},"light":{"tones":{"accent":{"color":"yellow"}}}}',
+      l: '{"tones":{"accent":{"color":"green"}}}',
+    },
+    { theme: 'x', light: 'l' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build'))
+  assert.ok(terminal.written.includes('\u001b[31m›'), 'the theme file’s own changes draw while the appearance is unknown')
+  terminal.type('\u001b[?997;2n')
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build') && terminal.written.includes('\u001b[32m›'))
+  assert.equal(terminal.written.includes('\u001b[33m›'), false, 'the theme file’s own light variant does not draw')
+})
+
+test('a pi theme file works as it is: its colors draw, "" leaves a token as binnacle has it, and the file’s own tones win', async () => {
+  const { terminal, clock } = await themedSurface(
+    {
+      pi: JSON.stringify({
+        $schema: './theme.schema.json',
+        name: 'pi',
+        appearance: 'dark',
+        export: { pageBg: '#000000' },
+        vars: { 'my ink': '#3c4148' },
+        colors: { accent: 'my ink', text: '', userMessageBg: 17, muted: '#3c4148' },
+        tones: { muted: { color: 'green' } },
+      }),
+    },
+    { theme: 'pi' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build'))
+  assert.ok((await screenRows(terminal)).includes('deepseek/deepseek-v4'), 'the status line stands beneath')
+  assert.ok(terminal.written.includes('\u001b[38;2;60;65;72m›'), 'a colors token may name a var, and draws as the tone')
+  assert.ok(terminal.written.includes('\u001b[48;5;17m'), 'a …Bg token fills a background')
+  assert.ok(terminal.written.includes('\u001b[32mdeepseek/deepseek-v4'), 'the file’s own tones win over its colors')
+})
+
+test('a theme file that is not there when the host reads it raises a notice naming its path, shown once the surface stands', async () => {
+  const { terminal, clock } = await themedSurface({}, { theme: 'x' })
+  await drawing(clock, () => said(terminal).includes('themes/x.json cannot be read'))
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build'))
+})
+
+test('a malformed theme file raises a notice naming its path, and the last theme stays', async () => {
+  const { dir, terminal, clock } = await themedSurface(
+    { x: '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}' },
+    { theme: 'x' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' > fix the build'))
+  writeFileSync(join(dir, 'themes', 'x.json'), '{oops')
+  await drawing(clock, () => said(terminal).includes('themes/x.json is not JSON'))
+  assert.ok((await screenRows(terminal)).includes(' > fix the build'), 'the theme beneath the refused file stays')
+  assert.equal(terminal.written.includes('\u001b[36m›'), false, 'the accent is not binnacle’s own again')
+})
+
+test('removing the theme file raises a notice naming its path, and the last theme stays', async () => {
+  const { dir, terminal, clock } = await themedSurface(
+    { x: '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}' },
+    { theme: 'x' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' > fix the build'))
+  rmSync(join(dir, 'themes', 'x.json'))
+  await drawing(clock, () => said(terminal).includes('themes/x.json cannot be read'))
+  assert.ok((await screenRows(terminal)).includes(' > fix the build'), 'the theme beneath the removed file stays')
+  assert.equal(terminal.written.includes('\u001b[36m›'), false, 'the accent is not binnacle’s own again')
+})
+
+test('a change the theme refuses is raised as a notice naming its path, and the last registration stands', async () => {
+  const { dir, terminal, clock } = await themedSurface(
+    { x: '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}' },
+    { theme: 'x' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' > fix the build'))
+  writeFileSync(join(dir, 'themes', 'x.json'), '{"tones":{"accent":{"color":"no such colour"}}}')
+  await drawing(clock, () => said(terminal).includes('themes/x.json was handed to a reader that threw'))
+  assert.ok((await screenRows(terminal)).includes(' > fix the build'), 'the last registration stands')
+})
+
+test('a refused file’s changes stay refused while the others go on registering: the row keeps each file’s last accepted changes', async () => {
+  const { dir, terminal, clock } = await themedSurface(
+    {
+      x: '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}',
+      l: '{"tones":{"accent":{"color":"yellow"}}}',
+    },
+    { theme: 'x', light: 'l' },
+  )
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' > fix the build'))
+  writeFileSync(join(dir, 'themes', 'l.json'), '{"tones":{"accent":{"color":"no such colour"}}}')
+  await drawing(clock, () => said(terminal).includes('themes/l.json was handed to a reader that threw'))
+  writeFileSync(join(dir, 'themes', 'x.json'), '{"marks":{"prompt":{"glyph":"»"}},"tones":{"accent":{"color":"blue"}}}')
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' » fix the build'))
+  assert.ok(terminal.written.includes('\u001b[34m»'), 'the other file’s change registers')
+  assert.equal(
+    said(terminal).includes('themes/x.json was handed'),
+    false,
+    'the notice names the file whose change was refused, not the one that registered',
+  )
+  terminal.type('\u001b[?997;2n')
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' » fix the build') && terminal.written.includes('\u001b[33m»'))
+})
+
+test('disposing the theme row gives the theme back and closes the watch', async () => {
+  const dir = themed({ x: '{"marks":{"prompt":{"glyph":">"}},"tones":{"accent":{"color":"red"}}}' })
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const clock = new FakeClock()
+  const terminal = new XtermTerminal(80, 24)
+  const { ctx, commit } = await mount(
+    [],
+    session,
+    async () => session,
+    terminal,
+    async (context) => {
+      context.provide('profileContext', { dir } as never)
+    },
+    clock,
+    ROWS.filter((mounted) => mounted.row !== theme),
+  )
+  const fiber = ctx.plugin(theme, { theme: 'x' })
+  await fiber
+  commit()
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' > fix the build'))
+  await fiber.dispose()
+  await drawing(clock, async () => (await screenRows(terminal)).includes(' › fix the build'))
+  assert.ok(terminal.written.includes('\u001b[36m›'), 'the theme is binnacle’s own again')
+  writeFileSync(join(dir, 'themes', 'x.json'), '{"tones":{"accent":{"color":"green"}}}')
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  clock.advance(1_000)
+  clock.advance(50)
+  assert.equal(terminal.written.includes('\u001b[32m›'), false, 'the watch is closed: a write after it draws nothing')
+})
 
 test('the row is named binnacle and needs the command line, the agents, the default model and the commands', () => {
   assert.equal(host.name, 'binnacle')

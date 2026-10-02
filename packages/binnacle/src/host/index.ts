@@ -523,6 +523,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   tui = build(first)
   look()
+  // Notices the host raised before the surface stood — a theme file's problems among them — are shown once it does.
+  const unnotify = registrations.notices((text) => raise(text, problemWindow))
   const unfollow = session.follow((event) => {
     events.push(event)
     const fact = adapt(event, registrations.adapters)
@@ -549,6 +551,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     arming?.()
     untick?.()
     unscheme?.()
+    unnotify()
     unoffer()
     closeGrants()
     unregister()
@@ -577,7 +580,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
 }
 
 export function apply(ctx: Context): void {
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, internals.clock)
   let parsed: Mode | undefined
   parseCmdline(
     ctx,

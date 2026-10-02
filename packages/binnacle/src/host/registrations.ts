@@ -19,6 +19,7 @@ import type {
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
+import { watchThemeFile, type Clock } from './theme-file.ts'
 import type { TerminalLook, Theme } from '../ui/theme.ts'
 
 export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys' | 'drawn'
@@ -63,13 +64,17 @@ export class RegistrationService extends Service implements Registrations {
   private readonly bindingTable = new Map<string, readonly Readonly<Record<string, KeyId | readonly KeyId[]>>[]>()
   private bound: KeybindingsConfig = {}
   private granted: GrantedSession | undefined
+  private readonly clock: Clock
+  private readonly standing: string[] = []
+  private noticeSink: ((text: string) => void) | undefined
   private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
   private drawnIn: Theme = binnacleTheme
   private look: TerminalLook = { mode: 'truecolor' }
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
 
-  constructor(ctx: Context) {
+  constructor(ctx: Context, clock: Clock) {
     super(ctx, 'binnacle')
+    this.clock = clock
   }
 
   get adapters(): ReadonlyMap<string, AuthorAdapter> {
@@ -126,6 +131,18 @@ export class RegistrationService extends Service implements Registrations {
   }
 
   /** @inheritDoc */
+  themeFile(name: string, listener: (data: unknown) => void): () => void {
+    if (name === '' || name.includes('/') || name.includes('\\') || name.includes('..'))
+      throw new Error(
+        `binnacle.themeFile: ${JSON.stringify(name)} is not a plain file name; name a file in the profile's themes directory, as x for themes/x.json`,
+      )
+    return this.ctx.effect(
+      () => watchThemeFile(this.ctx, name, listener, this.clock, (text) => this.raise(text)),
+      `binnacle.themeFile(${name})`,
+    )
+  }
+
+  /** @inheritDoc */
   screen(name: string, screen: PlacedScreen): () => void {
     return this.register(this.screenTable, name, screen, `binnacle.screen(${name})`, 'screens')
   }
@@ -175,6 +192,24 @@ export class RegistrationService extends Service implements Registrations {
     this.granted = session
     return () => {
       if (this.granted === session) this.granted = undefined
+    }
+  }
+
+  /** The host's: a notice for the person, raised wherever it comes from, shown at once when the surface stands and held until it does. */
+  raise(text: string): void {
+    const sink = this.noticeSink
+    if (sink === undefined) this.standing.push(text)
+    else sink(text)
+  }
+
+  /** Connect where notices go once the surface stands, showing each one already standing. */
+  notices(sink: (text: string) => void): () => void {
+    this.noticeSink = sink
+    const standing = [...this.standing]
+    this.standing.length = 0
+    for (const text of standing) sink(text)
+    return () => {
+      if (this.noticeSink === sink) this.noticeSink = undefined
     }
   }
 

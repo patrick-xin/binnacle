@@ -19,6 +19,7 @@ import { called, seed as seedEvent } from '../support/events.ts'
 import { pointer } from '../support/pointer.ts'
 import { foldedAlike } from '../support/views.ts'
 import { mocha, rgb } from '../support/palettes.ts'
+import { FakeClock } from '../support/clock.ts'
 
 const prompt = promptFact(1, 1, 'fix the build')
 const seed = seedEvent(2, 2)
@@ -29,7 +30,7 @@ const seed = seedEvent(2, 2)
  */
 function surface() {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   const author = async (apply: (ctx: Context) => void) => {
     const fiber = ctx.plugin({ name: 'author', inject: ['binnacle'], apply })
     await fiber

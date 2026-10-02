@@ -6,6 +6,7 @@ import { RegistrationService } from '../../../src/host/registrations.ts'
 import { ScreenPane } from '../../../src/panes/screen.ts'
 import * as statusLine from '../../../src/plugins/status-line/index.ts'
 import { drawText } from '../../support/draw.ts'
+import { FakeClock } from '../../support/clock.ts'
 
 /**
  * The line the Status line draws while dsh's token meter holds these projections, for an agent that has asked nothing yet.
@@ -14,7 +15,7 @@ import { drawText } from '../../support/draw.ts'
  */
 async function lineWith(values: Record<string, unknown>): Promise<string> {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   ctx.provide('sessionProjections', { snapshot: () => ({ values }), onChanged: () => () => {} } as never)
   await ctx.plugin(statusLine)
   registrations.open({

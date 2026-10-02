@@ -671,6 +671,7 @@ export interface Registrations {
     screen(name: string, screen: PlacedScreen): () => void;
     place(slot: Slot, placement: Placement): () => void;
     theme(changes: ThemeChanges): () => void;
+    themeFile(name: string, listener: (data: unknown) => void): () => void;
     keys(bindings: Readonly<Record<string, KeyId | readonly KeyId[]>>): () => void;
     send(text: string): void;
     command(line: string): Promise<boolean>;

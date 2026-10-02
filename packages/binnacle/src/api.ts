@@ -210,6 +210,21 @@ export interface Registrations {
    */
   theme(changes: ThemeChanges): () => void
   /**
+   * Read one theme file of the profile — `themes/<name>.json` under the
+   * profile's directory — and hand its parsed JSON to the listener now,
+   * synchronously when the file is there, and again on every change, without
+   * a restart. A problem is never handed over: a missing or removed file,
+   * text that is not JSON, and no profile loaded are raised by the host as a
+   * notice naming the file's path, and what was handed over before stays; so
+   * is a listener that throws, its message shown. A notice raised before the
+   * surface stands is shown once it does.
+   * @param name - the file's name, `x` for `themes/x.json`: a plain file name.
+   * @param listener - handed the file's parsed JSON.
+   * @returns a disposer, for closing the watch before the plugin is disposed; the plugin's fiber closes it too.
+   * @throws when `name` is not a plain file name — empty, or holding `/`, `\` or `..` — saying what to change.
+   */
+  themeFile(name: string, listener: (data: unknown) => void): () => void
+  /**
    * Bind keys as a person asks, over the defaults, by binding id, in the one
    * key table everything reads — the composer, the alternate screen and
    * binnacle's own keys alike. An id is pi-tui's own (`tui.input.submit`),

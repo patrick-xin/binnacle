@@ -28,6 +28,7 @@ import {
   ended as endedFact,
 } from '../../support/facts.ts'
 import { logged } from '../../support/log.ts'
+import { FakeClock } from '../../support/clock.ts'
 
 /**
  * The Trajectory applied in a Cordis context, with the `binnacle` service,
@@ -37,7 +38,7 @@ import { logged } from '../../support/log.ts'
  */
 async function trajectoryOver(facts: readonly Fact[]) {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   const fiber = await ctx.plugin(trajectory)
   const placed = registrations.screens.get('trajectory')
   const pane = new ScreenPane(() => facts)
@@ -145,7 +146,7 @@ test('a second turn opens under its own heading, a blank line between, and the k
 
 test('disposing the plugin takes its screen back', async () => {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   const fiber = await ctx.plugin(trajectory)
   assert.equal(registrations.screens.has('trajectory'), true)
   await fiber.dispose()

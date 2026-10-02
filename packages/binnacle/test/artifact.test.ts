@@ -17,6 +17,7 @@ const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.
 test('the manifest points dsh at the patch it ships, and the patch inserts the row by the package name', () => {
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')
   assert.ok(manifest.files.includes('cordis.patch.yml'))
+  assert.ok(manifest.files.includes('theme.schema.json'), 'the schema a theme file is checked against ships with the package')
   const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
   assert.match(patch, new RegExp(`name: '${manifest.name}'`))
 })
@@ -39,7 +40,7 @@ test('plain node loads the built entry as a Cordis row, with no default export a
 })
 
 /** The built-in features the patch loads as rows of their own, in the order it inserts them. */
-const FEATURES = ['transcript', 'composer', 'status-line', 'tool-cards', 'trajectory']
+const FEATURES = ['transcript', 'composer', 'status-line', 'tool-cards', 'trajectory', 'theme']
 
 test("plain node loads each built-in feature's subpath, as the manifest exports it, as a Cordis row with no default export", () => {
   for (const feature of FEATURES) {
@@ -66,5 +67,6 @@ test("the patch inserts a row for each built-in feature after binnacle's own, by
     { id: 'binnacle-status-line', name: 'binnacle/plugins/status-line' },
     { id: 'binnacle-tool-cards', name: 'binnacle/plugins/tool-cards' },
     { id: 'binnacle-trajectory', name: 'binnacle/plugins/trajectory' },
+    { id: 'binnacle-theme', name: 'binnacle/plugins/theme' },
   ])
 })

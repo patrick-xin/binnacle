@@ -14,10 +14,11 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { RegistrationService } from '../../../src/host/registrations.ts'
 import * as composer from '../../../src/plugins/composer/index.ts'
+import { FakeClock } from '../../support/clock.ts'
 
 test('a line naming no command whose session closes under it sends nothing and rejects nothing', async () => {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   await ctx.plugin(composer)
   const placed = registrations.placed('composer').at(-1)
   assert.ok(placed?.kind === 'composer')

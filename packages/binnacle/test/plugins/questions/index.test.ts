@@ -17,6 +17,7 @@ import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import { RegistrationService } from '../../../src/host/registrations.ts'
 import { questions } from '../../../src/plugins/questions/index.ts'
 import type { Placement } from '../../../src/api.ts'
+import { FakeClock } from '../../support/clock.ts'
 
 /**
  * The ask's question as the tests ask it: one option, so one invoked offer answers.
@@ -46,7 +47,7 @@ const seatedCard = (registrations: RegistrationService): Extract<Placement, { re
 
 test('an ask still standing when the plugin is disposed goes to the next answerer, and its card is gone', async () => {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   const fiber = await ctx.plugin(questions)
   const fellThrough = { count: 0 }
   const answer = ask(ctx, fellThrough)
@@ -69,7 +70,7 @@ test('an ask still standing when the plugin is disposed goes to the next answere
 
 test('an ask that finishes leaves what stands: disposing the plugin afterwards hands nothing over', async () => {
   const ctx = new Context()
-  const registrations = new RegistrationService(ctx)
+  const registrations = new RegistrationService(ctx, new FakeClock())
   const fiber = await ctx.plugin(questions)
   const fellThrough = { count: 0 }
   const answer = ask(ctx, fellThrough)
