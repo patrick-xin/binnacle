@@ -256,6 +256,25 @@ test("binnacle's own theme takes its colours from the palette a terminal reports
   assert.deepEqual(drawn(), ['\x1b[31ma\x1b[39m', '\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m'])
 })
 
+test("ordinary prose is drawn in pi's text token, a markdown answer's and a view's untoned text alike", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { text: { color: 'red' } } })
+    ctx.binnacle.view('prompt', () => ({
+      kind: 'stack',
+      children: [
+        { kind: 'markdown', text: 'ordinary prose' },
+        { kind: 'text', text: 'plain' },
+        { kind: 'text', text: 'warned', tone: 'warning' },
+      ],
+    }))
+  })
+  assert.deepEqual(
+    screen([prompt], initial, 14, registrations.views, registrations.currentTheme).lines.map((line) => line.trimEnd()),
+    ['\x1b[31mordinary prose\x1b[39m', '\x1b[31mplain\x1b[39m', '\x1b[33mwarned\x1b[39m'],
+  )
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {

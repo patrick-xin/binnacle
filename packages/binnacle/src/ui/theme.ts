@@ -14,6 +14,7 @@ export const tones = {
   border: (text: string): string => `\x1b[2m${text}\x1b[22m`,
   borderAccent: (text: string): string => `\x1b[36m${text}\x1b[39m`,
   borderMuted: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  text: (text: string): string => text,
   userMessageText: (text: string): string => text,
   searchMatchText: (text: string): string => `\x1b[36m${text}\x1b[39m`,
   toolTitle: (text: string): string => text,
