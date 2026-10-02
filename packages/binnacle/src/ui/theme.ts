@@ -14,6 +14,7 @@ export const tones = {
   borderAccent: (text: string): string => `\x1b[36m${text}\x1b[39m`,
   borderMuted: (text: string): string => `\x1b[2m${text}\x1b[22m`,
   userMessageText: (text: string): string => text,
+  searchMatchText: (text: string): string => `\x1b[36m${text}\x1b[39m`,
   toolTitle: (text: string): string => text,
   toolOutput: (text: string): string => text,
   thinkingText: (text: string): string => `\x1b[2m${text}\x1b[22m`,
@@ -39,6 +40,7 @@ export type Tone = keyof typeof tones | (string & {})
  */
 export const backgrounds = {
   userMessageBg: (text: string): string => `\x1b[100m${text}\x1b[49m`, // what the person sent, headed in a band
+  searchMatchBg: (text: string): string => text, // a search's match, on the fullscreen
 } as const satisfies Record<string, (text: string) => string>
 
 /** A background of the theme's, by what the content drawn on it means: binnacle's own, or one an author's theme adds. */
@@ -196,8 +198,8 @@ export function editorThemeOf(current: () => Theme): EditorTheme {
 /** How the fullscreen draws a search's matches, read from the current theme each time it draws. */
 export function searchStylesOf(current: () => Theme): Required<Pick<TuiAltScreenOptions, 'searchMatchStyle' | 'searchCurrentMatchStyle'>> {
   return {
-    searchMatchStyle: (text) => current().tones.accent(text),
-    searchCurrentMatchStyle: (text) => attributes.bold(current().tones.accent(text)),
+    searchMatchStyle: (text) => current().backgrounds.searchMatchBg(current().tones.searchMatchText(text)),
+    searchCurrentMatchStyle: (text) => attributes.bold(current().backgrounds.searchMatchBg(current().tones.searchMatchText(text))),
   }
 }
 

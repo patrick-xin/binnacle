@@ -2839,7 +2839,7 @@ test('what / offers follows dsh: a command registered after the session opened i
   await until(async () => (await terminal.altScreen()).some((row) => row.includes('plan before acting')))
 })
 
-test("on the fullscreen, an open search's matches are drawn in the theme's accent tone, the current one bold too, as a registration comes and goes", async () => {
+test("on the fullscreen, an open search's matches are drawn in pi's searchMatchText on searchMatchBg, the current one bold too, as a registration comes and goes", async () => {
   const terminal = new XtermTerminal(40, 30)
   const session = new FakeSession(folded)
   const { ctx, commit } = await mount([], session, async () => session, terminal)
@@ -2848,21 +2848,22 @@ test("on the fullscreen, an open search's matches are drawn in the theme's accen
   terminal.type('\x1b[102;6u')
   terminal.type('read')
   const drawnIn = (code: string) => {
-    const current = `\x1b[1m\x1b[${code}mread\x1b[39m\x1b[22m`
-    return terminal.written.includes(current) && terminal.written.replaceAll(current, '').includes(`\x1b[${code}mread\x1b[39m`)
+    const current = `\x1b[1m${code}read\x1b[39m${code.includes('[4') ? '\x1b[49m' : ''}\x1b[22m`
+    const other = `${code}read\x1b[39m${code.includes('[4') ? '\x1b[49m' : ''}`
+    return terminal.written.includes(current) && terminal.written.replaceAll(current, '').includes(other)
   }
-  await until(() => drawnIn('36'))
+  await until(() => drawnIn('\x1b[36m'))
   terminal.written = ''
   const author = ctx.plugin({
     name: 'author',
     inject: ['binnacle'],
     apply: (plugin: Context) => {
-      plugin.binnacle.theme({ tones: { accent: { color: 'magenta' } } })
+      plugin.binnacle.theme({ tones: { searchMatchText: { color: 'magenta' } }, backgrounds: { searchMatchBg: 'blue' } })
     },
   })
   await author
-  await until(() => drawnIn('35'))
+  await until(() => drawnIn('\x1b[44m\x1b[35m'))
   terminal.written = ''
   await author.dispose()
-  await until(() => drawnIn('36'))
+  await until(() => drawnIn('\x1b[36m'))
 })

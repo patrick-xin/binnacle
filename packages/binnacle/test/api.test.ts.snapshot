@@ -333,6 +333,7 @@ export type Background = keyof typeof backgrounds | (string & {});
 // ui/theme.d.ts
 export declare const backgrounds: {
     readonly userMessageBg: (text: string) => string;
+    readonly searchMatchBg: (text: string) => string;
 };
 // ui/theme.d.ts
 export interface ThemeChanges {
@@ -386,6 +387,7 @@ export declare const tones: {
     readonly borderAccent: (text: string) => string;
     readonly borderMuted: (text: string) => string;
     readonly userMessageText: (text: string) => string;
+    readonly searchMatchText: (text: string) => string;
     readonly toolTitle: (text: string) => string;
     readonly toolOutput: (text: string) => string;
     readonly thinkingText: (text: string) => string;
