@@ -555,6 +555,20 @@ test('a presented output fold shows the rows the theme gives the tool kind, not 
   assert.deepEqual(drawText(pane, 60), ['● Read src/api.ts', '│ a', '│ … 4 more lines'])
 })
 
+test("a card's title is drawn in pi's toolTitle token and its output in toolOutput, by the plugin's card and binnacle's alike", async () => {
+  const { registrations, fiber, pane } = await withCards(read)
+  registrations.theme({ tones: { toolTitle: { color: 'red' }, toolOutput: { color: 'blue' } } })
+  pane.push(asked('read', '{"path":"src/api.ts"}'))
+  pane.push(returned('the file'))
+  const drawn = () => pane.render(60).map((line) => line.trimEnd())
+  assert.deepEqual(drawn().slice(0, 2), ['\x1b[32m●\x1b[39m\x1b[31m Read src/api.ts\x1b[39m', '\x1b[2m│\x1b[22m \x1b[34mthe file\x1b[39m'])
+  await fiber.dispose()
+  assert.deepEqual(drawn().slice(0, 2), [
+    '\x1b[32m●\x1b[39m\x1b[31m read {"path":"src/api.ts"}\x1b[39m',
+    '\x1b[2m│\x1b[22m \x1b[34mthe file\x1b[39m',
+  ])
+})
+
 test("disposing the plugin gives every call back to binnacle's card", async () => {
   const { fiber, pane } = await withCards(read)
   pane.push(asked('read', '{"path":"src/api.ts"}'))

@@ -966,7 +966,7 @@ test("an author's band is filled with the background it names, and one naming a 
   const banded = new Map<string, View[]>([
     [
       'prompt',
-      [() => ({ kind: 'band', background: 'prompt', child: { kind: 'text', text: [{ mark: 'prompt' } as const, ' asked again'] } })],
+      [() => ({ kind: 'band', background: 'userMessageBg', child: { kind: 'text', text: [{ mark: 'prompt' } as const, ' asked again'] } })],
     ],
   ])
   // 80 columns, one of padding, thirteen of content

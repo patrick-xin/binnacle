@@ -228,7 +228,7 @@ function ask(node: Extract<Node, { readonly kind: 'ask' }>, width: number, state
   const inner = width - 2 * ASK_SIDE
   if (inner < 1) return drawn(node.child, width, state, theme)
   const frame = drawn(node.child, inner, state, theme)
-  const edge = (text: string): string => inTone(text, node.edge ?? 'dim', theme)
+  const edge = (text: string): string => inTone(text, node.edge ?? 'border', theme)
   const fill = node.background === undefined ? undefined : theme.backgrounds[node.background]
   const border = theme.chrome.border
   // Don't cut title; a cut one reads as another one.
@@ -261,7 +261,7 @@ function show(node: Extract<Node, { readonly kind: 'show' }>, width: number, sta
   ).render(width)
   const inner = width - SHOW_GUTTER
   const frame = drawn(node.child, inner < 1 ? width : inner, state, theme)
-  const gutter = inTone(theme.chrome.gutter, 'dim', theme)
+  const gutter = inTone(theme.chrome.gutter, 'borderMuted', theme)
   const opened = frame.regions.find((placed) => placed.region.id === node.opens)
   const head =
     opened === undefined

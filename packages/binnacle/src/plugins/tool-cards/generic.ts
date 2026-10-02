@@ -10,7 +10,7 @@ function spent(ms: number): string {
 
 export const genericCard: CardRow = {
   draw: (parts) => {
-    const head = [parts.mark, ` ${titled(parts.result?.title ?? parts.call.title)}`] as const
+    const head = [parts.mark, { text: ` ${titled(parts.result?.title ?? parts.call.title)}`, tone: 'toolTitle' }] as const
     const title =
       parts.took === undefined || parts.took < 1000 ? head : [...head, { text: ` · took ${spent(parts.took)}`, tone: 'muted' } as const]
     if (parts.waiting !== undefined)
@@ -21,12 +21,17 @@ export const genericCard: CardRow = {
       }
     const reason: Node[] = parts.reason === undefined ? [] : [{ kind: 'text', text: parts.reason, tone: 'error' }]
     const presented =
-      parts.result?.content === undefined ? undefined : { kind: 'text' as const, text: textOfPresented(parts.result.content) }
+      parts.result?.content === undefined
+        ? undefined
+        : { kind: 'text' as const, text: textOfPresented(parts.result.content), tone: 'toolOutput' }
     return {
       kind: 'show',
       title,
       opens: 'output',
-      child: { kind: 'stack', children: [...parts.made, ...reason, parts.fold(presented ?? { kind: 'text', text: parts.resultText })] },
+      child: {
+        kind: 'stack',
+        children: [...parts.made, ...reason, parts.fold(presented ?? { kind: 'text', text: parts.resultText, tone: 'toolOutput' })],
+      },
     }
   },
 }

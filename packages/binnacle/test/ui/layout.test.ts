@@ -386,7 +386,7 @@ test('a card with no column inside its border draws what it holds without one', 
 
 test('what a band holds is a region inside its padding, by its rows and by its columns', () => {
   const held = { kind: 'offer', id: 'o', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'exit 0' } } as const
-  const { regions } = layout({ kind: 'band', background: 'prompt', child: held }, 20, OPEN)
+  const { regions } = layout({ kind: 'band', background: 'userMessageBg', child: held }, 20, OPEN)
   assert.deepEqual(
     regions.map(({ region, top, height, left, width }) => [region.id, top, height, left, width]),
     [['o', 1, 1, 1, 18]],
@@ -399,11 +399,11 @@ test('what a band holds is a region inside its padding, by its rows and by its c
 })
 
 test('a band with no column inside it draws what it holds without its padding', () => {
-  assert.deepEqual(plain(layout({ kind: 'band', background: 'prompt', child: { kind: 'text', text: 'ok' } }, 2, OPEN)).lines, ['ok'])
+  assert.deepEqual(plain(layout({ kind: 'band', background: 'userMessageBg', child: { kind: 'text', text: 'ok' } }, 2, OPEN)).lines, ['ok'])
 })
 
 test('a band around what draws nothing draws nothing itself, not empty padding rows', () => {
-  assert.deepEqual(plain(layout({ kind: 'band', background: 'prompt', child: { kind: 'stack', children: [] } }, 20, OPEN)).lines, [])
+  assert.deepEqual(plain(layout({ kind: 'band', background: 'userMessageBg', child: { kind: 'stack', children: [] } }, 20, OPEN)).lines, [])
 })
 
 /** A document with one of each part, laid out at 20 columns. */
@@ -526,7 +526,7 @@ test('an ask names on its bottom edge the keys that answer what it holds, as the
 })
 
 test("a card may be filled with a background and edged in a tone, both the theme's, every line of it filled", () => {
-  const card = { kind: 'ask', background: 'prompt', edge: 'accent', child: { kind: 'text', text: 'x' } } as const
+  const card = { kind: 'ask', background: 'userMessageBg', edge: 'accent', child: { kind: 'text', text: 'x' } } as const
   assert.deepEqual(layout(card, 6, { toggled: new Set() }).lines, [
     '\x1b[100m\x1b[36m╭────╮\x1b[39m\x1b[49m',
     '\x1b[100m\x1b[36m│\x1b[39m x  \x1b[36m│\x1b[39m\x1b[49m',
@@ -539,7 +539,7 @@ test("a filled card stays filled around what it holds that is filled otherwise: 
   const card = {
     kind: 'ask',
     background: 'failed',
-    child: { kind: 'band', background: 'prompt', child: { kind: 'text', text: 'x' } },
+    child: { kind: 'band', background: 'userMessageBg', child: { kind: 'text', text: 'x' } },
   } as const
   for (const line of layout(card, 9, { toggled: new Set() }, theme).lines) {
     const inner = line.slice(0, -'\x1b[49m'.length)

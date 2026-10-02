@@ -22,7 +22,7 @@ test('every string a node carries is treated, wherever it sits, and a mark or a 
       { kind: 'markdown', text: bell },
       { kind: 'text', text: [bell, { text: bell, tone: 'muted' }, { mark: 'done' }, { since: 5 }] },
       { kind: 'offer', id: bell, affordances: [{ kind: 'copy', label: bell }, { kind: 'expand' }], child: { kind: 'blank' } },
-      { kind: 'ask', title: bell, child: { kind: 'band', background: 'prompt', child: { kind: 'text', text: bell } } },
+      { kind: 'ask', title: bell, child: { kind: 'band', background: 'userMessageBg', child: { kind: 'text', text: bell } } },
       { kind: 'show', title: [bell], child: { kind: 'fold', id: 'output', title: [bell], child: { kind: 'text', text: bell } } },
     ],
   })
@@ -32,7 +32,7 @@ test('every string a node carries is treated, wherever it sits, and a mark or a 
       { kind: 'markdown', text: 'x␇' },
       { kind: 'text', text: ['x␇', { text: 'x␇', tone: 'muted' }, { mark: 'done' }, { since: 5 }] },
       { kind: 'offer', id: bell, affordances: [{ kind: 'copy', label: 'x␇' }, { kind: 'expand' }], child: { kind: 'blank' } },
-      { kind: 'ask', title: 'x␇', child: { kind: 'band', background: 'prompt', child: { kind: 'text', text: 'x␇' } } },
+      { kind: 'ask', title: 'x␇', child: { kind: 'band', background: 'userMessageBg', child: { kind: 'text', text: 'x␇' } } },
       { kind: 'show', title: ['x␇'], child: { kind: 'fold', id: 'output', title: ['x␇'], child: { kind: 'text', text: 'x␇' } } },
     ],
   })

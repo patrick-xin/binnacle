@@ -332,7 +332,7 @@ export declare const marks: {
 export type Background = keyof typeof backgrounds | (string & {});
 // ui/theme.d.ts
 export declare const backgrounds: {
-    readonly prompt: (text: string) => string;
+    readonly userMessageBg: (text: string) => string;
 };
 // ui/theme.d.ts
 export interface ThemeChanges {
@@ -382,6 +382,23 @@ export declare const tones: {
     readonly success: (text: string) => string;
     readonly warning: (text: string) => string;
     readonly error: (text: string) => string;
+    readonly border: (text: string) => string;
+    readonly borderAccent: (text: string) => string;
+    readonly borderMuted: (text: string) => string;
+    readonly userMessageText: (text: string) => string;
+    readonly toolTitle: (text: string) => string;
+    readonly toolOutput: (text: string) => string;
+    readonly thinkingText: (text: string) => string;
+    readonly mdHeading: (text: string) => string;
+    readonly mdLink: (text: string) => string;
+    readonly mdLinkUrl: (text: string) => string;
+    readonly mdCode: (text: string) => string;
+    readonly mdCodeBlock: (text: string) => string;
+    readonly mdCodeBlockBorder: (text: string) => string;
+    readonly mdQuote: (text: string) => string;
+    readonly mdQuoteBorder: (text: string) => string;
+    readonly mdHr: (text: string) => string;
+    readonly mdListBullet: (text: string) => string;
 };
 // ui/theme.d.ts
 export interface Style {

@@ -52,7 +52,7 @@ function card(question: AskUserQuestionItem, marked: readonly string[]): Node {
   return {
     kind: 'ask',
     ...(question.header === undefined ? {} : { title: question.header }),
-    edge: 'accent',
+    edge: 'borderAccent',
     child: {
       kind: 'stack',
       children: [
@@ -201,7 +201,7 @@ class Ask {
       draw: () => ({
         kind: 'ask',
         ...(question.header === undefined ? {} : { title: question.header }),
-        edge: 'accent',
+        edge: 'borderAccent',
         child: { kind: 'stack', children: asked(question) },
       }),
     })

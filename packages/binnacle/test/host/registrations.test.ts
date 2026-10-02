@@ -180,6 +180,24 @@ test('a theme may name a colour once among its variables and give it by name, to
   ])
 })
 
+test("markdown is drawn in pi's markdown tokens, so recolouring inline code leaves the warning tone it once borrowed", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { mdCode: { color: 'red' } } })
+    ctx.binnacle.view('prompt', () => ({
+      kind: 'stack',
+      children: [
+        { kind: 'markdown', text: 'run `tsc`' },
+        { kind: 'text', text: 'careful', tone: 'warning' },
+      ],
+    }))
+  })
+  assert.deepEqual(screen([prompt], initial, 9, registrations.views, registrations.currentTheme).lines, [
+    'run \x1b[31mtsc\x1b[39m  ',
+    '\x1b[33mcareful\x1b[39m  ',
+  ])
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {
@@ -345,6 +363,61 @@ test("a theme may start the thinking fold open, and a person's toggle folds it b
     )
   assert.deepEqual(lines(new Set()), ['∴ thinking · show less', 'a', 'b', 'c'])
   assert.deepEqual(lines(new Set(['2/reasoning-0'])), ['∴ thinking · 3 lines'])
+})
+
+test("thinking is drawn in pi's thinkingText token, so recolouring it leaves the dim tone it once borrowed", async () => {
+  const { registrations, author } = surface()
+  const reasoning: Fact = {
+    kind: 'answer',
+    seq: 2,
+    time: 2,
+    turn: 1,
+    step: 1,
+    provider: 'p',
+    model: 'm',
+    interrupted: true,
+    blocks: [{ kind: 'reasoning', text: 'a' }],
+  }
+  await author((ctx) => {
+    ctx.binnacle.theme({ folds: { answer: { open: true } }, tones: { thinkingText: { color: 'red' } } })
+  })
+  const lines = screen([reasoning], initial, 40, registrations.views, registrations.currentTheme).lines.map((line) => line.trimEnd())
+  assert.equal(lines[1], '\x1b[31ma\x1b[39m')
+  assert.equal(lines[2], '\x1b[2m(interrupted)\x1b[22m')
+})
+
+test("a prompt's band is filled with pi's userMessageBg and its words drawn in userMessageText", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ backgrounds: { userMessageBg: 'blue' }, tones: { userMessageText: { color: 'white' } } })
+  })
+  const lines = screen([prompt], initial, 20, registrations.views, registrations.currentTheme).lines
+  assert.ok(lines[1]?.startsWith('\x1b[44m'), `the band is blue: ${JSON.stringify(lines[1])}`)
+  assert.ok(lines[1]?.includes('\x1b[37m fix the build\x1b[39m'), `its words are white: ${JSON.stringify(lines[1])}`)
+})
+
+test("an ask's frame is drawn in pi's border token and a show's gutter in borderMuted, leaving the dim tone they once borrowed", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { border: { color: 'red' }, borderMuted: { color: 'blue' } } })
+    ctx.binnacle.view('prompt', () => ({
+      kind: 'stack',
+      children: [
+        { kind: 'ask', child: { kind: 'text', text: 'x' } },
+        { kind: 'show', title: ['t'], child: { kind: 'text', text: 'y' } },
+        { kind: 'text', text: 'z', tone: 'dim' },
+      ],
+    }))
+  })
+  const lines = screen([prompt], initial, 5, registrations.views, registrations.currentTheme).lines.map((line) => line.trimEnd())
+  assert.deepEqual(lines, [
+    '\x1b[31m╭───╮\x1b[39m',
+    '\x1b[31m│\x1b[39m x \x1b[31m│\x1b[39m',
+    '\x1b[31m╰───╯\x1b[39m',
+    't',
+    '\x1b[34m│\x1b[39m y',
+    '\x1b[2mz\x1b[22m',
+  ])
 })
 
 test('a theme registration draws and lays out every entry again, so an author changes no view of their own for it', async () => {

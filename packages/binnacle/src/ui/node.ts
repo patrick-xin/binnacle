@@ -55,7 +55,7 @@ export type Node =
       readonly title?: string
       /** The theme's background every line of it is filled with, border included; the terminal's own when absent. */
       readonly background?: Background
-      /** The theme's tone its border is drawn in; dim when absent. */
+      /** The theme's tone its border is drawn in; `border` when absent. */
       readonly edge?: Tone
       /** What it holds, inside a rounded border; drawn without one where the width leaves no room inside it. */
       readonly child: Node

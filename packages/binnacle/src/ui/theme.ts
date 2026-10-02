@@ -2,8 +2,6 @@ import { backgroundAnsi, foregroundAnsi, parseColor } from '@earendil-works/pi-t
 import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
 
-const plain = (text: string): string => text
-
 /** The theme's colours for content, named by what the content means, in the names pi's themes use. */
 export const tones = {
   accent: (text: string): string => `\x1b[36m${text}\x1b[39m`,
@@ -12,6 +10,23 @@ export const tones = {
   success: (text: string): string => `\x1b[32m${text}\x1b[39m`,
   warning: (text: string): string => `\x1b[33m${text}\x1b[39m`,
   error: (text: string): string => `\x1b[31m${text}\x1b[39m`,
+  border: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  borderAccent: (text: string): string => `\x1b[36m${text}\x1b[39m`,
+  borderMuted: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  userMessageText: (text: string): string => text,
+  toolTitle: (text: string): string => text,
+  toolOutput: (text: string): string => text,
+  thinkingText: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdHeading: (text: string): string => `\x1b[1m${text}\x1b[22m`,
+  mdLink: (text: string): string => `\x1b[36m${text}\x1b[39m`,
+  mdLinkUrl: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdCode: (text: string): string => `\x1b[33m${text}\x1b[39m`,
+  mdCodeBlock: (text: string): string => text,
+  mdCodeBlockBorder: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdQuote: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdQuoteBorder: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdHr: (text: string): string => `\x1b[2m${text}\x1b[22m`,
+  mdListBullet: (text: string): string => `\x1b[36m${text}\x1b[39m`,
 } as const satisfies Record<string, (text: string) => string>
 
 /** A colour of the theme's, by what the content drawn in it means: binnacle's own, or one an author's theme adds. */
@@ -23,7 +38,7 @@ export type Tone = keyof typeof tones | (string & {})
  * means.
  */
 export const backgrounds = {
-  prompt: (text: string): string => `\x1b[100m${text}\x1b[49m`, // what the person sent, headed in a band
+  userMessageBg: (text: string): string => `\x1b[100m${text}\x1b[49m`, // what the person sent, headed in a band
 } as const satisfies Record<string, (text: string) => string>
 
 /** A background of the theme's, by what the content drawn on it means: binnacle's own, or one an author's theme adds. */
@@ -143,16 +158,16 @@ export const markdownTheme: MarkdownTheme = markdownIn(tones)
 
 function markdownIn(toned: Theme['tones']): MarkdownTheme {
   return {
-    heading: attributes.bold,
-    link: toned.accent,
-    linkUrl: toned.dim,
-    code: toned.warning,
-    codeBlock: plain,
-    codeBlockBorder: toned.dim,
-    quote: toned.dim,
-    quoteBorder: toned.dim,
-    hr: toned.dim,
-    listBullet: toned.accent,
+    heading: toned.mdHeading,
+    link: toned.mdLink,
+    linkUrl: toned.mdLinkUrl,
+    code: toned.mdCode,
+    codeBlock: toned.mdCodeBlock,
+    codeBlockBorder: toned.mdCodeBlockBorder,
+    quote: toned.mdQuote,
+    quoteBorder: toned.mdQuoteBorder,
+    hr: toned.mdHr,
+    listBullet: toned.mdListBullet,
     bold: attributes.bold,
     italic: attributes.italic,
     underline: attributes.underline,
@@ -161,7 +176,7 @@ function markdownIn(toned: Theme['tones']): MarkdownTheme {
 }
 
 export const editorTheme: EditorTheme = {
-  borderColor: tones.dim,
+  borderColor: tones.borderMuted,
   selectList: {
     selectedPrefix: tones.accent,
     selectedText: tones.accent,
