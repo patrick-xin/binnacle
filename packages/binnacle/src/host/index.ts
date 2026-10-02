@@ -29,7 +29,7 @@ import type {
 import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { AnswerStream } from '../facts/stream.ts'
-import { editorTheme } from '../ui/theme.ts'
+import { editorThemeOf, searchStylesOf } from '../ui/theme.ts'
 import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
@@ -349,7 +349,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   }
   const composer = new Editor(
     reaching(() => tui),
-    editorTheme,
+    editorThemeOf(() => registrations.currentTheme),
   )
   let page = arrange()
   // A submitted line is the composer placement's to act on: the built-in Composer plugin sends it, through the grant
@@ -468,7 +468,10 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const next =
       mode === 'regular'
         ? new TuiMainScreen(terminal)
-        : new TuiAltScreen(terminal, undefined, undefined, { scrollToEndIndicator: jumpToLatest })
+        : new TuiAltScreen(terminal, undefined, undefined, {
+            scrollToEndIndicator: jumpToLatest,
+            ...searchStylesOf(() => registrations.currentTheme),
+          })
     if (next instanceof TuiMainScreen && left !== undefined) next.restoreRenderState(left)
     if (next instanceof TuiMainScreen) scroll = undefined
     stack(next)

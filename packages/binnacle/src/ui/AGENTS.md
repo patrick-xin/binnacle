@@ -11,7 +11,7 @@ What a view draws with and how a person's input changes what is shown: nodes lai
 - `readable.ts` — the treatment every string a node carries gets before layout, so no text a view draws acts on the terminal.
 - `state.ts` — UI state: what a person opened and what has focus, and what an action does to it.
 - `theme-changes.ts` — an author's theme registration, checked and copied as data where it enters.
-- `theme.ts` — the theme binnacle draws in: tones, backgrounds, marks, the chrome's glyphs and words, markdown and composer styles; `themed` lays changes over it.
+- `theme.ts` — the theme binnacle draws in: tones, backgrounds, marks, the chrome's glyphs and words, markdown, composer and search styles; `themed` lays changes over it.
 
 ## Keep
 

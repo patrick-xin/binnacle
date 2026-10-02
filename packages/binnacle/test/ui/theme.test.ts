@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { editorTheme, markdownTheme } from '../../src/ui/theme.ts'
+import { binnacleTheme, editorThemeOf, markdownTheme } from '../../src/ui/theme.ts'
+
+const editorTheme = editorThemeOf(() => binnacleTheme)
 
 test("the markdown theme gives each part of a document the terminal theme's style for it", () => {
   assert.equal(markdownTheme.heading('x'), '\x1b[1mx\x1b[22m')

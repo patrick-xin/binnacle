@@ -396,6 +396,24 @@ test('a theme an author registers after its entries were drawn draws them again,
   await until(() => /› fix the build/.test(shown()))
 })
 
+test("the composer's frame is drawn in pi's borderMuted token, as a registration changes it and until it is disposed", async () => {
+  const { ctx, terminal, commit } = await mount([])
+  commit()
+  await until(() => terminal.written.includes('\x1b[2m─'))
+  const author = ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.theme({ tones: { borderMuted: { color: 'red' } } })
+    },
+  })
+  await author
+  await until(() => terminal.written.includes('\x1b[31m─'))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => terminal.written.includes('\x1b[2m─'))
+})
+
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
   commit()
@@ -2781,6 +2799,33 @@ test("typing / offers the session's commands and the skills a person may invoke,
   })
 })
 
+test("an open / list is drawn in the theme's tones, its chosen row accent and the rest's descriptions muted, as a registration comes and goes", async () => {
+  const terminal = new XtermTerminal(60, 14)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  session.commands.set('compact', 'summarize the session so far')
+  session.skills.set('review', 'review a change')
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('fix the build')))
+  terminal.type('/')
+  const drawnIn = (accent: string, muted: string) =>
+    terminal.written.includes(`\x1b[${accent}m→ compact`) && terminal.written.includes(`\x1b[${muted}m      review a change\x1b[39m`)
+  await until(() => drawnIn('36', '90'))
+  terminal.written = ''
+  const author = ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.theme({ tones: { accent: { color: 'magenta' }, muted: { color: 'yellow' } } })
+    },
+  })
+  await author
+  await until(() => drawnIn('35', '33'))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => drawnIn('36', '90'))
+})
+
 test('what / offers follows dsh: a command registered after the session opened is offered once dsh says so', async () => {
   const terminal = new XtermTerminal(60, 14)
   const session = new FakeSession([prompt(1, 'fix the build')])
@@ -2792,4 +2837,32 @@ test('what / offers follows dsh: a command registered after the session opened i
   await settle()
   terminal.type('/')
   await until(async () => (await terminal.altScreen()).some((row) => row.includes('plan before acting')))
+})
+
+test("on the fullscreen, an open search's matches are drawn in the theme's accent tone, the current one bold too, as a registration comes and goes", async () => {
+  const terminal = new XtermTerminal(40, 30)
+  const session = new FakeSession(folded)
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('read6')))
+  terminal.type('\x1b[102;6u')
+  terminal.type('read')
+  const drawnIn = (code: string) => {
+    const current = `\x1b[1m\x1b[${code}mread\x1b[39m\x1b[22m`
+    return terminal.written.includes(current) && terminal.written.replaceAll(current, '').includes(`\x1b[${code}mread\x1b[39m`)
+  }
+  await until(() => drawnIn('36'))
+  terminal.written = ''
+  const author = ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.theme({ tones: { accent: { color: 'magenta' } } })
+    },
+  })
+  await author
+  await until(() => drawnIn('35'))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => drawnIn('36'))
 })

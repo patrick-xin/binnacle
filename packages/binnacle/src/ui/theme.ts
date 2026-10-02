@@ -1,5 +1,5 @@
 import { backgroundAnsi, foregroundAnsi, parseColor } from '@earendil-works/pi-tui'
-import type { EditorTheme, MarkdownTheme } from '@earendil-works/pi-tui'
+import type { EditorTheme, MarkdownTheme, TuiAltScreenOptions } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
 
 /** The theme's colours for content, named by what the content means, in the names pi's themes use. */
@@ -175,15 +175,30 @@ function markdownIn(toned: Theme['tones']): MarkdownTheme {
   }
 }
 
-export const editorTheme: EditorTheme = {
-  borderColor: tones.borderMuted,
-  selectList: {
-    selectedPrefix: tones.accent,
-    selectedText: tones.accent,
-    description: tones.muted,
-    scrollInfo: tones.muted,
-    noMatch: tones.muted,
-  },
+/** The composer's theme, read from the current theme each time it draws, so a registration coming or going restyles it. */
+export function editorThemeOf(current: () => Theme): EditorTheme {
+  const tone =
+    (name: keyof typeof tones) =>
+    (text: string): string =>
+      current().tones[name](text)
+  return {
+    borderColor: tone('borderMuted'),
+    selectList: {
+      selectedPrefix: tone('accent'),
+      selectedText: tone('accent'),
+      description: tone('muted'),
+      scrollInfo: tone('muted'),
+      noMatch: tone('muted'),
+    },
+  }
+}
+
+/** How the fullscreen draws a search's matches, read from the current theme each time it draws. */
+export function searchStylesOf(current: () => Theme): Required<Pick<TuiAltScreenOptions, 'searchMatchStyle' | 'searchCurrentMatchStyle'>> {
+  return {
+    searchMatchStyle: (text) => current().tones.accent(text),
+    searchCurrentMatchStyle: (text) => attributes.bold(current().tones.accent(text)),
+  }
 }
 
 /** A theme: each part of binnacle's own, or as registrations changed it. */
