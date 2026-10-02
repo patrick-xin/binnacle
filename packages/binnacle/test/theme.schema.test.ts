@@ -61,3 +61,9 @@ test('each structural break is refused by both the schema and the reading', () =
     assert.equal(read(data), false, `the reading refuses ${file}`)
   }
 })
+
+test('dusk, the worked example the author skill ships, validates against the schema and the reading accepts it', () => {
+  const data = JSON.parse(readFileSync(join(here, '../skills/binnacle-author/themes/dusk.json'), 'utf8')) as unknown
+  assert.equal(read(data), true, 'the reading accepts dusk')
+  assert.equal(validates(data), true, 'the schema does not refuse dusk')
+})

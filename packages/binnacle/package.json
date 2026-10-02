@@ -43,6 +43,7 @@
   "files": [
     "dist",
     "theme.schema.json",
+    "skills",
     "cordis.patch.yml",
     "NOTICE",
     "presets/standard.patch.yml",

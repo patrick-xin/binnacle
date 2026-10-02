@@ -1,14 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import type { Events } from '@deepseek-ai/cordis'
 import { CommandId } from '@deepseek-ai/dsh-commands'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
-import { getKeybindings, stripTerminalSequences } from '@earendil-works/pi-tui'
+import { getKeybindings, stripTerminalSequences, setCapabilities, getCapabilities, resetCapabilitiesCache } from '@earendil-works/pi-tui'
 import { LlmAttemptId, MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
@@ -25,6 +26,13 @@ import * as statusLine from '../../src/plugins/status-line/index.ts'
 import * as toolCards from '../../src/plugins/tool-cards/index.ts'
 import * as trajectory from '../../src/plugins/trajectory/index.ts'
 import * as theme from '../../src/plugins/theme/index.ts'
+import * as builtHost from '../../dist/host/index.js'
+import * as builtTranscript from '../../dist/plugins/transcript/index.js'
+import * as builtComposer from '../../dist/plugins/composer/index.js'
+import * as builtStatusLine from '../../dist/plugins/status-line/index.js'
+import * as builtToolCards from '../../dist/plugins/tool-cards/index.js'
+import * as builtTrajectory from '../../dist/plugins/trajectory/index.js'
+import * as builtTheme from '../../dist/plugins/theme/index.js'
 import type { OpenedSession } from '../../src/host/session.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
 import { FakeClock } from '../support/clock.ts'
@@ -459,6 +467,413 @@ test('disposing the theme row gives the theme back and closes the watch', async 
   clock.advance(1_000)
   clock.advance(50)
   assert.equal(terminal.written.includes('\u001b[32m›'), false, 'the watch is closed: a write after it draws nothing')
+})
+
+/** The worked example the author skill ships, as its text: read from the skill’s directory, so the test holds the shipped file. */
+const dusk = readFileSync(new URL('../../skills/binnacle-author/themes/dusk.json', import.meta.url), 'utf8')
+
+/** One turn holding a prompt and a markdown answer, as a session logs them. */
+const answeredTurn = (): FakeSession =>
+  new FakeSession([
+    prompt(1, 'fix the build'),
+    answered(2, '## Ship it\n\nRun `pnpm test`, then see [the docs](https://example.com/docs).\n\n- check the theme\n'),
+  ])
+
+/** A markdown answer naming every markdown tone, as one answer. */
+const markdownOfEveryTone =
+  '## Ship it\n\nRun `pnpm test`, then read [the docs](https://example.com/docs).\n\n- check the theme\n\n> one way or another\n\n---\n\n```\nfenced\n```\n'
+
+/** What a call returned, failing, as dsh logs it: an error result with its reason. */
+const failedResult = (seq: number, callSeq: number, reason: string): SessionEvent<'tool/result'> => ({
+  type: 'tool/result',
+  seq: SessionSeq(seq),
+  time: seq,
+  surfaceOp: 'append',
+  data: {
+    turn: 1,
+    step: 1,
+    error: { name: 'ExitCodeError', code: '2', reason },
+    message: {
+      role: 'tool',
+      id: MessageId(`m${seq}`),
+      source: { kind: 'tool', callId: ToolCallId(`c${callSeq}`) },
+      toolCallId: ToolCallId(`c${callSeq}`),
+      isError: true,
+      content: [{ type: 'text', text: reason }],
+    },
+  },
+})
+
+/** An answer whose turn was interrupted, as dsh marks it. */
+const interrupted = (seq: number, text: string): SessionEvent<'assistant/message'> => ({
+  ...answered(seq, text),
+  data: { ...answered(seq, text).data, interrupted: true },
+})
+
+/** A session whose screen draws every part dusk names: a prompt, a markdown answer, a call that returned, one that failed, and an interrupted answer. */
+const duskSession = (): FakeSession =>
+  new FakeSession([
+    prompt(1, 'fix the build'),
+    answered(2, markdownOfEveryTone),
+    called(3, 'read'),
+    returned(4, 3, 'w\nx\ny\nz'),
+    called(5, 'bash'),
+    failedResult(6, 5, 'the command exited 2'),
+    interrupted(7, 'part way through'),
+  ])
+
+test('dusk, the author skill’s worked example, draws the transcript, markdown and the composer in its colours, and its marks', async () => {
+  const { terminal, clock } = await themedSurface({ dusk }, { theme: 'dusk' }, 64, answeredTurn())
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('Ship it')))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m›'), 'the prompt mark draws in orchid, dusk’s accent')
+  assert.ok(terminal.written.includes('\u001b[48;2;46;35;68m'), 'the prompt band fills with plum')
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m\u001b[1m fix the build'), 'the person’s words draw bold in orchid')
+  assert.ok(terminal.written.includes('\u001b[38;2;247;168;216m\u001b[1m'), 'a heading draws bold in rose')
+  assert.ok(terminal.written.includes('\u001b[38;2;184;161;255m\u001b[4m'), 'a link draws in violet, underlined')
+  assert.ok(terminal.written.includes('\u001b[48;2;43;33;64m\u001b[38;2;226;194;255m'), 'inline code draws lilac on a chip')
+  assert.ok(terminal.written.includes('\u001b[38;2;138;106;217m'), 'a list’s bullets draw in amethyst')
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m\u2500'), 'the composer’s frame draws in dusk, the dim of the look')
+})
+
+test('an ask dusk frames in its accent, and a show’s title, gutter and mark in its tones', async () => {
+  const session = new FakeSession([prompt(1, 'fix the build'), called(3, 'read')])
+  const { ctx, terminal, clock } = await themedSurface({ dusk }, { theme: 'dusk' }, 64, session)
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('read')))
+  void askQuestionsFor(ctx, session.agent, {
+    questions: [{ id: 'q1', question: 'ship it?', options: [{ label: 'yes' }, { label: 'no' }] }],
+  })
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('ship it?')))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m\u256d'), 'the ask’s frame draws in orchid, the accent of a border')
+  assert.ok(terminal.written.includes('\u001b[38;2;143;166;255m read'), 'the show’s title draws in iris')
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m\u2502'), 'the show’s gutter draws in dusk, as chrome')
+  assert.ok(terminal.written.includes('\u001b[38;2;166;152;200m\u25cf'), 'a running call’s mark draws in haze, the muted of the look')
+})
+
+test('a terminal turning light draws dusk’s light twin, pinned indices and all', async () => {
+  const { terminal, clock } = await themedSurface({ dusk }, { theme: 'dusk' }, 64, answeredTurn())
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('Ship it')))
+  terminal.written = ''
+  terminal.type('\u001b[?997;2n')
+  await drawing(clock, () => terminal.written.includes('\u001b[38;5;243m\u2500'))
+  assert.ok(terminal.written.includes('\u001b[38;5;30m›'), 'the prompt mark draws in the pinned cyan')
+  assert.ok(terminal.written.includes('\u001b[48;5;254m'), 'the prompt band fills with the pinned index 254')
+  assert.ok(terminal.written.includes('\u001b[1m fix the build\u001b[22m'), 'the person’s words draw bold, in the terminal’s own colour')
+  assert.ok(terminal.written.includes('\u001b[1mShip it\u001b[22m'), 'a heading draws bold, with no colour of its own')
+  assert.ok(terminal.written.includes('\u001b[38;5;30m\u001b[4m'), 'a link draws in the pinned cyan, underlined')
+  assert.ok(terminal.written.includes('\u001b[38;5;130m'), 'inline code draws in the pinned yellow, on nothing of its own')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m\u2500'), 'the composer’s frame draws in the pinned grey')
+  assert.equal(terminal.written.includes('\u001b[38;2;255;122;198m'), false, 'the dark look’s orchid is gone')
+})
+
+test('disposing the dusk row gives binnacle’s own theme back', async () => {
+  const dir = themed({ dusk })
+  const session = answeredTurn()
+  const clock = new FakeClock()
+  const terminal = new XtermTerminal(64, 24)
+  const { ctx, commit } = await mount(
+    [],
+    session,
+    async () => session,
+    terminal,
+    async (context) => {
+      context.provide('profileContext', { dir } as never)
+    },
+    clock,
+    ROWS.filter((mounted) => mounted.row !== theme),
+  )
+  const fiber = ctx.plugin(theme, { theme: 'dusk' })
+  await fiber
+  commit()
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('Ship it')))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m›'), 'dusk draws while the row stands')
+  await fiber.dispose()
+  terminal.written = ''
+  await drawing(clock, () => terminal.written.includes('\u001b[36m›'))
+  assert.ok(terminal.written.includes('\u001b[36m›'), 'the prompt mark draws in binnacle’s own cyan')
+  assert.ok(terminal.written.includes('\u001b[100m'), 'the prompt band fills with the terminal’s own bright black')
+  assert.equal(terminal.written.includes('\u001b[38;2;'), false, 'no exact colour of dusk’s remains')
+})
+
+/** The built bundle’s host and rows, mounted as a profile loads them: from `dist`, over a profile holding dusk and the theme row choosing it.
+ * @param session - the session on screen.
+ * @param columns - the terminal’s width.
+ * @param rows - the terminal’s height; tall enough that a session drawing every part fits without scrolling.
+ * @returns the context, the commit that starts it, the session, the clock, the terminal, the profile directory, and the built theme row’s fiber.
+ */
+async function mountedBuilt(session: FakeSession, columns = 80, rows = 50) {
+  const dir = themed({ dusk })
+  const clock = new FakeClock()
+  const terminal = new XtermTerminal(columns, rows)
+  const listeners = new Set<() => void>()
+  let committed = false
+  cmdline.stdout = { write: () => true }
+  cmdline.stderr = { write: () => true }
+  builtHost.internals.terminal = () => terminal
+  builtHost.internals.stdout = { write: () => true }
+  builtHost.internals.stderr = { write: () => true }
+  builtHost.internals.open = async () => session
+  builtHost.internals.clock = clock
+  builtHost.internals.colourMode = () => 'truecolor'
+  builtHost.internals.clipboard = () => undefined
+  const ctx = new Context()
+  ctx.provide('profileContext', { dir } as never)
+  ctx.provide('agents', {} as never)
+  ctx.provide('sessionProjections', {
+    snapshot: () => ({ values: session.projections }),
+    onChanged: (listener: () => void) => session.onProjections(listener),
+  } as never)
+  ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4' }) } as never)
+  ctx.provide('agentPresets', {
+    mount: async () => ({ id: 'standard' }),
+    list: async () => ['standard', 'ptc', 'minimal', 'cordis', 'author'].map((id) => ({ id })),
+  } as never)
+  ctx.provide('commands', {} as never)
+  provideCmdline(ctx, {
+    args: [],
+    exit: () => {},
+    ready: {
+      onReady: (listener) => {
+        if (committed) {
+          listener()
+          return () => {}
+        }
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+        }
+      },
+    },
+  })
+  await ctx.plugin(builtHost)
+  for (const row of [builtTranscript, builtComposer, builtStatusLine, builtToolCards, builtTrajectory]) void ctx.plugin(row)
+  const themeRow = ctx.plugin(builtTheme, { theme: 'dusk' })
+  return {
+    ctx,
+    session,
+    clock,
+    terminal,
+    dir,
+    themeRow,
+    commit: () => {
+      committed = true
+      const run = [...listeners]
+      listeners.clear()
+      for (const listener of run) listener()
+    },
+  }
+}
+
+test('the built bundle, with dusk chosen, draws every part it maps in the look’s colours, on a dark terminal', async (t) => {
+  // pi-tui’s markdown prints a link’s address beside it only where the terminal has no hyperlinks; draw that path here.
+  const capabilities = getCapabilities()
+  setCapabilities({ ...capabilities, hyperlinks: false })
+  t.after(() => {
+    setCapabilities(capabilities)
+    resetCapabilitiesCache()
+  })
+  const session = duskSession()
+  const { ctx, commit, clock, terminal } = await mountedBuilt(session)
+  commit()
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('the command exited 2')))
+  const rows = await screenRows(terminal)
+  assert.ok(
+    rows.some((row) => row.includes('fix the build')),
+    'the prompt line is on screen',
+  )
+  assert.ok(
+    rows.some((row) => row.includes('Ship it')),
+    'the answer’s heading is',
+  )
+  assert.ok(
+    rows.some((row) => row.includes('read {}')),
+    'the show’s title is',
+  )
+  assert.ok(
+    rows.some((row) => row.includes('deepseek/deepseek-v4')),
+    'the status line is',
+  )
+  // The transcript and its marks: accent on the prompt, plum under the person’s words, bold orchid on them, mint on a call that returned, coral on one that failed, haze on the muted status line, dusk on the interrupted.
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m›'), 'accent: the prompt mark')
+  assert.ok(terminal.written.includes('\u001b[48;2;46;35;68m'), 'userMessageBg: the prompt band')
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m\u001b[1m fix the build'), 'userMessageText: the person’s words')
+  assert.ok(terminal.written.includes('\u001b[38;2;127;224;181m\u25cf'), 'success: the call that returned')
+  assert.ok(terminal.written.includes('\u001b[38;2;255;107;129m\u2717'), 'error: the call that failed')
+  assert.ok(terminal.written.includes('\u001b[38;2;255;107;129mthe command exited 2'), 'error: why it failed')
+  assert.ok(terminal.written.includes('\u001b[38;2;166;152;200mdeepseek/deepseek-v4'), 'muted: the status line')
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m(interrupted)'), 'dim: the interrupted answer')
+  // Markdown, tone by tone: rose headings, violet links, dusk link addresses, lilac code on a chip, dusk a code block’s border, italic haze quotes beside amethyst, amethyst rules and bullets.
+  assert.ok(terminal.written.includes('\u001b[38;2;247;168;216m\u001b[1m'), 'mdHeading')
+  assert.ok(terminal.written.includes('\u001b[38;2;184;161;255m\u001b[4m'), 'mdLink')
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m (https://example.com/docs)'), 'mdLinkUrl')
+  assert.ok(terminal.written.includes('\u001b[48;2;43;33;64m\u001b[38;2;226;194;255mpnpm test'), 'mdCode')
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m```'), 'mdCodeBlockBorder')
+  assert.ok(terminal.written.includes('\u001b[38;2;166;152;200m\u001b[3m\u001b[3mone way'), 'mdQuote')
+  assert.ok(terminal.written.includes('\u001b[38;2;138;106;217m\u2502 '), 'mdQuoteBorder: amethyst beside the quote')
+  assert.ok(terminal.written.includes(`\u001b[38;2;138;106;217m${'\u2500'.repeat(80)}\u001b[39m`), 'mdHr: a full-width rule in amethyst')
+  assert.ok(terminal.written.includes('\u001b[38;2;138;106;217m- \u001b[39m'), 'mdListBullet: the bullet in amethyst')
+  // The shows and the chrome: iris titles beside a dusk gutter, a dusk composer frame.
+  assert.ok(terminal.written.includes('\u001b[38;2;143;166;255m read'), 'toolTitle')
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m\u2502'), 'borderMuted: the gutter')
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m\u2500'), 'borderMuted: the composer’s frame')
+  // The fullscreen’s chrome needs the session taller than the window, so the label that jumps back has a reason to draw.
+  for (const event of Array.from({ length: 10 }, (_, index) => [
+    called(8 + index * 2, `read${index + 1}`),
+    returned(9 + index * 2, 8 + index * 2, 'w\nx\ny\nz'),
+  ]).flat())
+    session.log(event)
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('read4 {}')))
+  // The fullscreen’s chrome: the jump label in accent, a search’s matches in accent.
+  for (let step = 0; step < 20 && !(await screenRows(terminal)).some((row) => row.includes('Jump to latest')); step++) {
+    terminal.type('\u001b[Z')
+    await settle()
+    clock.advance(50)
+  }
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('Jump to latest')))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m \u2193 Jump to latest'), 'accent: the jump label')
+  terminal.type('\u001b[102;6u')
+  terminal.type('read')
+  await drawing(clock, () => terminal.written.includes('\u001b[38;2;255;122;198mread\u001b[39m'))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198mread\u001b[39m'), 'searchMatchText: a search’s match')
+  // Back to the end, so what the session logs next draws on screen.
+  terminal.type('\x1b[F')
+  await drawing(clock, async () => (await screenRows(terminal)).every((row) => row.includes('Jump to latest') === false))
+  // The asks: an approval framed in accent, its decided entry under a warning mark, and an author’s ask in the dialog framed as chrome.
+  void askApprovalFor(ctx, session.agent, { toolName: 'bash', reason: 'run the tests' })
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('run the tests')))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m\u256d'), 'borderAccent: the approval’s frame')
+  session.log({
+    type: 'approval/asked',
+    seq: SessionSeq(30),
+    time: 30,
+    data: { id: ApprovalRequestId('a1'), toolName: 'bash', callId: ToolCallId('c30'), reason: 'run the tests' },
+  })
+  session.log({ type: 'approval/decided', seq: SessionSeq(31), time: 31, data: { id: ApprovalRequestId('a1'), outcome: 'allowed-once' } })
+  await drawing(clock, () => terminal.written.includes('allowed once'))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;183;132m\u2691'), 'warning: the approval’s mark')
+  assert.ok(terminal.written.includes('\u001b[38;2;127;224;181m  allowed once'), 'success: what was decided')
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('dialog', {
+        kind: 'lines',
+        draw: () => ({ kind: 'ask', title: 'pick', child: { kind: 'stack', children: [chosen('a'), chosen('b')] } }),
+      })
+    },
+  })
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('pick')))
+  assert.ok(terminal.written.includes('\u001b[38;2;107;97;144m\u256d'), 'border: the dialog ask’s frame')
+})
+
+test('the built bundle draws dusk’s light twin the same way, on a light terminal', async (t) => {
+  const capabilities = getCapabilities()
+  setCapabilities({ ...capabilities, hyperlinks: false })
+  t.after(() => {
+    setCapabilities(capabilities)
+    resetCapabilitiesCache()
+  })
+  const session = duskSession()
+  const { ctx, commit, clock, terminal } = await mountedBuilt(session)
+  commit()
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('the command exited 2')))
+  terminal.type('\u001b[?997;2n')
+  await drawing(clock, () => terminal.written.includes('\u001b[48;5;254m'))
+  assert.ok(
+    (await screenRows(terminal)).some((row) => row.includes('fix the build')),
+    'the prompt line is on screen',
+  )
+  // The transcript and its marks: pinned cyan accent, 254 under the person’s bold words, green on a call that returned, red on one that failed, 240 on the muted status line, grey on the interrupted.
+  assert.ok(terminal.written.includes('\u001b[38;5;30m›'), 'accent: the prompt mark')
+  assert.ok(terminal.written.includes('\u001b[48;5;254m'), 'userMessageBg: the prompt band')
+  assert.ok(
+    terminal.written.includes('\u001b[1m fix the build\u001b[22m'),
+    'userMessageText: the person’s words, bold in the terminal’s own colour',
+  )
+  assert.ok(terminal.written.includes('\u001b[38;5;28m\u25cf'), 'success: the call that returned')
+  assert.ok(terminal.written.includes('\u001b[38;5;124m\u2717'), 'error: the call that failed')
+  assert.ok(terminal.written.includes('\u001b[38;5;124mthe command exited 2'), 'error: why it failed')
+  assert.ok(terminal.written.includes('\u001b[38;5;240mdeepseek/deepseek-v4'), 'muted: the status line')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m(interrupted)'), 'dim: the interrupted answer')
+  // Markdown: bold headings, cyan links and bullets, grey everything else a markdown answer draws.
+  assert.ok(terminal.written.includes('\u001b[1mShip it\u001b[22m'), 'mdHeading')
+  assert.ok(terminal.written.includes('\u001b[38;5;30m\u001b[4m'), 'mdLink')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m (https://example.com/docs)'), 'mdLinkUrl')
+  assert.ok(terminal.written.includes('\u001b[38;5;130mpnpm test'), 'mdCode')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m```'), 'mdCodeBlockBorder')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m\u001b[3mone way'), 'mdQuote')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m\u2502 '), 'mdQuoteBorder')
+  const greyRule = `\u001b[38;5;243m${'\u2500'.repeat(80)}`
+  const rule = terminal.written.indexOf(greyRule)
+  const fence = terminal.written.indexOf('\u001b[38;5;243m```', rule + greyRule.length)
+  assert.ok(rule !== -1 && fence !== -1 && fence - (rule + greyRule.length) < 40, 'mdHr: the grey rule, with the fence on the row after it')
+  assert.ok(terminal.written.includes('\u001b[38;5;30m- \u001b[39m'), 'mdListBullet: the bullet in cyan')
+  // The shows and the chrome: blue titles beside a grey gutter and composer frame.
+  assert.ok(terminal.written.includes('\u001b[38;5;26m read'), 'toolTitle')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m\u2502'), 'borderMuted: the gutter')
+  assert.ok(terminal.written.includes('\u001b[38;5;243m\u2500'), 'borderMuted: the composer’s frame')
+  // The fullscreen’s chrome, the asks, the search: cyan where the dark look is orchid, grey where it is dusk.
+  for (const event of Array.from({ length: 10 }, (_, index) => [
+    called(8 + index * 2, `read${index + 1}`),
+    returned(9 + index * 2, 8 + index * 2, 'w\nx\ny\nz'),
+  ]).flat())
+    session.log(event)
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('read4 {}')))
+  for (let step = 0; step < 20 && !(await screenRows(terminal)).some((row) => row.includes('Jump to latest')); step++) {
+    terminal.type('\u001b[Z')
+    await settle()
+    clock.advance(50)
+  }
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('Jump to latest')))
+  assert.ok(terminal.written.includes('\u001b[38;5;30m \u2193 Jump to latest'), 'accent: the jump label')
+  terminal.type('\x1b[102;6u')
+  terminal.type('read')
+  await drawing(clock, () => terminal.written.includes('\u001b[38;5;30mread\u001b[39m'))
+  assert.ok(terminal.written.includes('\u001b[38;5;30mread\u001b[39m'), 'searchMatchText: a search’s match')
+  terminal.type('\x1b[F')
+  await drawing(clock, async () => (await screenRows(terminal)).every((row) => row.includes('Jump to latest') === false))
+  void askApprovalFor(ctx, session.agent, { toolName: 'bash', reason: 'run the tests' })
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('run the tests')))
+  assert.ok(terminal.written.includes('\u001b[38;5;30m\u256d'), 'borderAccent: the approval’s frame')
+  session.log({
+    type: 'approval/asked',
+    seq: SessionSeq(30),
+    time: 30,
+    data: { id: ApprovalRequestId('a1'), toolName: 'bash', callId: ToolCallId('c30'), reason: 'run the tests' },
+  })
+  session.log({ type: 'approval/decided', seq: SessionSeq(31), time: 31, data: { id: ApprovalRequestId('a1'), outcome: 'allowed-once' } })
+  await drawing(clock, () => terminal.written.includes('allowed once'))
+  assert.ok(terminal.written.includes('\u001b[38;5;130m\u2691'), 'warning: the approval’s mark')
+  assert.ok(terminal.written.includes('\u001b[38;5;28m  allowed once'), 'success: what was decided')
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('dialog', {
+        kind: 'lines',
+        draw: () => ({ kind: 'ask', title: 'pick', child: { kind: 'stack', children: [chosen('a'), chosen('b')] } }),
+      })
+    },
+  })
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('pick')))
+  assert.ok(terminal.written.includes('\u001b[38;5;243m\u256d'), 'border: the dialog ask’s frame')
+})
+
+test('disposing the built theme row gives binnacle’s own theme back, and its watch draws nothing more', async () => {
+  const { themeRow, commit, clock, terminal, dir } = await mountedBuilt(new FakeSession([prompt(1, 'fix the build')]))
+  await themeRow
+  commit()
+  await drawing(clock, async () => (await screenRows(terminal)).some((row) => row.includes('fix the build')))
+  assert.ok(terminal.written.includes('\u001b[38;2;255;122;198m›'), 'dusk draws while the built row stands')
+  await themeRow.dispose()
+  terminal.written = ''
+  await drawing(clock, () => terminal.written.includes('\u001b[36m›'))
+  assert.ok(terminal.written.includes('\u001b[36m›'), 'the prompt mark draws in binnacle’s own cyan')
+  assert.equal(terminal.written.includes('\u001b[38;2;'), false, 'no exact colour of dusk’s remains')
+  writeFileSync(join(dir, 'themes/dusk.json'), '{"tones":{"accent":{"color":"green"}}}')
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  clock.advance(1_000)
+  clock.advance(50)
+  assert.equal(terminal.written.includes('\u001b[32m›'), false, 'the watch is closed: a write after disposal draws nothing')
 })
 
 test('the row is named binnacle and needs the command line, the agents, the default model, the preset registry and the commands', () => {

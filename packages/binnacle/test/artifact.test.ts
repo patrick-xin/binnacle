@@ -31,6 +31,8 @@ test('the manifest points dsh at the patch files it ships, and the patch inserts
   const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
   assert.match(patch, new RegExp(`name: '${manifest.name}'`))
   assert.ok(manifest.files.includes('theme.schema.json'), 'the schema a theme file is checked against ships with the package')
+  assert.ok(manifest.files.includes('skills'), 'the author skill ships with the package')
+  assert.ok(existsSync(new URL('../skills/binnacle-author/SKILL.md', import.meta.url)), 'the skill is where the author preset looks')
 })
 
 test("the presets compose dsh's ask-user tool, whose questions the built-in Questions plugin answers", () => {
