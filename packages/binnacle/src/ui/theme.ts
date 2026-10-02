@@ -162,11 +162,9 @@ const attributes = {
 export const markdownTheme: MarkdownTheme = markdownIn(tones)
 
 function markdownIn(toned: Theme['tones']): MarkdownTheme {
-  // Prose's colour is lifted from a link's words, so the link's own is the one they show.
-  const prose = toned.text('\u0000').split('\u0000')[0] ?? ''
   return {
     heading: toned.mdHeading,
-    link: (text) => toned.mdLink(prose === '' ? text : text.replaceAll(prose, '')),
+    link: toned.mdLink,
     linkUrl: toned.mdLinkUrl,
     code: toned.mdCode,
     codeBlock: toned.mdCodeBlock,

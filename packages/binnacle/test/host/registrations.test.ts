@@ -305,6 +305,18 @@ test('a variant may name a tone or change a mark its own theme adds beneath it',
   ])
 })
 
+/**
+ * The foreground a word is drawn in: the last colour the escape codes before it on its line set.
+ * @param lines - the lines drawn.
+ * @param word - the word, on one of them.
+ * @returns the code, as a string: `31` for red, `39` for the terminal's own.
+ */
+function colourOf(lines: readonly string[], word: string): string | undefined {
+  const line = lines.find((drawn) => drawn.includes(word)) ?? ''
+  const codes = [...line.slice(0, line.indexOf(word)).matchAll(/\[([0-9;]*)m/g)].flatMap((sgr) => (sgr[1] ?? '').split(';'))
+  return codes.filter((code) => /^(3[0-9]|9[0-7])$/.test(code)).at(-1)
+}
+
 test('a link and a heading are drawn in their own markdown tokens, whatever colour ordinary prose is given', async () => {
   const { registrations, author } = surface()
   await author((ctx) => {
@@ -312,13 +324,11 @@ test('a link and a heading are drawn in their own markdown tokens, whatever colo
     ctx.binnacle.view('prompt', () => ({ kind: 'markdown', text: '## head\n\nsee [link](https://example.invalid) now' }))
   })
   const lines = screen([prompt], initial, 40, registrations.views, registrations.currentTheme).lines
-  const heading = lines.find((line) => line.includes('head')) ?? ''
-  const linked = lines.find((line) => line.includes('link')) ?? ''
-  assert.equal(heading.includes('\x1b[31m'), false, `the heading is not drawn in prose's red: ${JSON.stringify(heading)}`)
-  assert.ok(heading.includes('\x1b[32m'), `the heading is green: ${JSON.stringify(heading)}`)
-  const lastColour = [...linked.slice(0, linked.indexOf('link')).matchAll(/\[(3[0-7]|9[0-7])m/g)].at(-1)?.[1]
-  assert.equal(lastColour, '34', `the link's words are blue, not prose's red: ${JSON.stringify(linked)}`)
-  assert.ok(linked.startsWith('\x1b[31msee'), `prose is red: ${JSON.stringify(linked)}`)
+  assert.deepEqual(
+    ['head', 'see', 'link', 'now'].map((word) => colourOf(lines, word)),
+    ['32', '31', '34', '31'],
+    JSON.stringify(lines),
+  )
 })
 
 test("a variable may take any name, an object's own names such as toString included", async () => {
@@ -328,6 +338,22 @@ test("a variable may take any name, an object's own names such as toString inclu
     ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'a', tone: 'accent' }))
   })
   assert.deepEqual(screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines, ['\x1b[38;2;255;0;0ma\x1b[39m'])
+})
+
+test('every word of a formatted link keeps mdLink, and prose after it is prose again, at a width that wraps it too', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { text: { color: 'red' }, mdLink: { color: 'blue' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'markdown', text: '[one **two** three](https://example.invalid) after' }))
+  })
+  for (const width of [40, 9]) {
+    const lines = screen([prompt], initial, width, registrations.views, registrations.currentTheme).lines
+    assert.deepEqual(
+      ['one', 'two', 'three', 'after'].map((word) => colourOf(lines, word)),
+      ['34', '34', '34', '31'],
+      `at ${width}: ${JSON.stringify(lines)}`,
+    )
+  }
 })
 
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {

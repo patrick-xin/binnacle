@@ -41,6 +41,14 @@ function inTone(text: string, tone: Tone | undefined, theme: Theme): string {
   return paint === undefined ? text : paint(text)
 }
 
+/** A line of a document in prose's style, which each part's own style, laid inside it, gives way to and gives back. */
+function inProse(line: string, theme: Theme): string {
+  const [opening = '', closing = ''] = theme.tones.text('\u0000').split('\u0000')
+  if (opening === '') return line
+  const reopened = ['\x1b[0m', '\x1b[39m', '\x1b[49m'].reduce((sofar, reset) => sofar.replaceAll(reset, `${reset}${opening}`), line)
+  return `${opening}${reopened}${closing}`
+}
+
 function markIn(name: Mark, theme: Theme): { readonly glyph: string; readonly tone: Tone } {
   return theme.marks[name] ?? theme.marks.unknown
 }
@@ -135,7 +143,7 @@ function drawn(node: Node, width: number, state: LayoutState, theme: Theme): Fra
     case 'text':
       return { lines: new Text(written(node, theme), 0, 0).render(width), regions: [] }
     case 'markdown':
-      return { lines: new Markdown(node.text, 0, 0, theme.markdown, { color: theme.tones.text }).render(width), regions: [] }
+      return { lines: new Markdown(node.text, 0, 0, theme.markdown).render(width).map((line) => inProse(line, theme)), regions: [] }
     case 'stack': {
       const lines: string[] = []
       const regions: Placed[] = []
