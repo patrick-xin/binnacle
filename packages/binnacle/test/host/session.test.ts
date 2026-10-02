@@ -10,7 +10,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -22,7 +22,7 @@ import { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
 import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import { createScope } from '@deepseek-ai/dsh-scope'
-import { SkillRegistry } from '@deepseek-ai/dsh-skill'
+import { SkillRegistry, isModelInvocable } from '@deepseek-ai/dsh-skill'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
@@ -423,6 +423,32 @@ test('a session on author without a profile has no plugin_manager, the row stayi
   assert.ok(
     tools.every((tool) => tool.name !== 'plugin_manager'),
     'no profile, no plugin manager',
+  )
+})
+
+test('the author skill the preset mounts is in the model’s catalog and loads its router; standard’s is not', async (t) => {
+  const { ctx, agent } = await onAuthorish('author', true)
+  t.after(() => ctx.fiber.dispose())
+  const catalog = await ctx.skills.list({ cwd: process.cwd(), scope: agent })
+  const listed = catalog.find(({ name }) => name === 'binnacle-author')
+  assert.ok(listed !== undefined, 'the author preset’s catalog lists binnacle-author')
+  assert.ok(isModelInvocable(listed), 'the model reaches it')
+  assert.equal(listed.invocation.userInvocable, false, 'a person does not: it is the agent’s')
+  const loaded = await ctx.skills.get('binnacle-author', { cwd: process.cwd(), scope: agent })
+  assert.ok(loaded !== undefined, 'the skill loads')
+  assert.match(loaded.content, /themes\.md/, 'loading it gives the chapter’s router')
+  const base = listed.resourceBase
+  assert.ok(base?.kind === 'directory', 'the catalog names the skill’s base directory')
+  assert.ok(existsSync(join(base.path, 'themes.md')), 'the chapter the router names is where it says')
+})
+
+test('a session on standard lists no author skill', async (t) => {
+  const { ctx, agent } = await onAuthorish('standard', true)
+  t.after(() => ctx.fiber.dispose())
+  const catalog = await ctx.skills.list({ cwd: process.cwd(), scope: agent })
+  assert.ok(
+    catalog.every(({ name }) => name !== 'binnacle-author'),
+    'standard’s catalog holds no binnacle-author',
   )
 })
 

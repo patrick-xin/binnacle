@@ -1,0 +1,5 @@
+---
+'binnacle': minor
+---
+
+An author agent learns themes from the author skill. binnacle ships `skills/binnacle-author/` (listed in the package's `files`), which the `author` preset mounts through `skill-filesystem`'s `customSkillDirs` — so a session's catalog lists `binnacle-author` in that preset and in no other, the model may load it, and a person cannot invoke it by name. Its theme chapter tells an agent where a theme file goes (`$DSH_PROFILE_DIR/themes/`), what it may say, how to choose it by editing the `binnacle-theme` row's config in the profile's patch (which applies at the next start, while a file the row already names is watched and drawn as it changes), and how to check it. dusk — the look binnacle's predecessor shipped, with its light twin as one file's variant — ships beside the chapter as the worked example, drawn by theme data alone. The authoritative reading ships as a checker: `node dist/host/check-theme.js <file>` reads a file the way the theme row does and prints `ok` or the reading's own message.

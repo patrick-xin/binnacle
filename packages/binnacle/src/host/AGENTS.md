@@ -7,6 +7,7 @@ The one layer that touches the terminal and the process: it reads the invocation
 - `seats.ts` — the seats: every pane the host mounts in a place — the transcript, placed screens, placed lines — given what its place gives it from one table, keys and the scroll focus is brought into view on; the placed panes kept, invalidated and ticked in one walk, the transcript's own cache still called by the host.
 - `session.ts` — the session the surface draws: one agent on the default model, bound to the preset the registry defaults to as it is created, its log followed from the first event, and its answer heard as it streams.
 - `theme-file.ts` — the theme-file grant behind `ctx.binnacle.themeFile`: one file of the profile's `themes/` directory, read now and watched — and looked for again now and then, for a platform may coalesce a change away — its parsed JSON handed over as it changes and every problem raised as a notice naming its path.
+- `check-theme.ts` — the theme checker the author skill points an agent at: run under plain `node` from `dist/`, it reads one file the way the theme row does and prints `ok` or the reading's own message, so the agent knows the authoritative reading before it writes into the profile.
 
 ## Keep
 

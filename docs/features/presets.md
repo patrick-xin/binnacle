@@ -6,7 +6,7 @@ A session's agent runs on a **preset**: the composition that says which tools it
 - **ptc** — standard's composition with workflow delegation off, its tools presented through dsh's ptc runtime.
 - **minimal** — a persistent shell and little else: a complete persona of its own, no delegation, no goals, no compaction — and no way to ask a person a question, for it composes no ask-user tool.
 - **cordis** — dsh's creator mode, built for the web: it reads and edits the composition it runs on. It mounts, so the roster is dsh's, but it is a web preset; the picker will show it greyed out (#109).
-- **author** — standard with binnacle's own two rows: its agent finds the skills in binnacle's `skills/` directory — where the author skill will live (#97) — and it can change the profile's plugins with `plugin_manager`, but only when binnacle runs under a profile. This is the preset an author agent is asked in; everything else is an ordinary coding agent without the author's tools.
+- **author** — standard with binnacle's own two rows: its agent finds the skills in binnacle's `skills/` directory — home of the author skill (#97), which only this preset lists — and it can change the profile's plugins with `plugin_manager`, but only when binnacle runs under a profile. This is the preset an author agent is asked in; everything else is an ordinary coding agent without the author's tools.
 
 A session in any preset is the same surface: the transcript, the composer, the keys — only what the agent is composed of changes.
 

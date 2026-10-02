@@ -1,0 +1,75 @@
+{
+  "$schema": "../../../theme.schema.json",
+  "name": "dusk",
+  "vars": {
+    "orchid": "#ff7ac6",
+    "rose": "#f7a8d8",
+    "violet": "#b8a1ff",
+    "iris": "#8fa6ff",
+    "lilac": "#e2c2ff",
+    "amethyst": "#8a6ad9",
+    "mint": "#7fe0b5",
+    "peach": "#ffb784",
+    "coral": "#ff6b81",
+    "haze": "#a698c8",
+    "dusk": "#6b6190",
+    "plum": "#2e2344",
+    "velvet": "#3b2d57",
+    "chip": "#2b2140"
+  },
+  "tones": {
+    "accent": { "color": "orchid" },
+    "borderAccent": { "color": "orchid" },
+    "searchMatchText": { "color": "orchid" },
+    "dim": { "color": "dusk" },
+    "border": { "color": "dusk" },
+    "borderMuted": { "color": "dusk" },
+    "muted": { "color": "haze" },
+    "success": { "color": "mint" },
+    "warning": { "color": "peach" },
+    "error": { "color": "coral" },
+    "userMessageText": { "color": "orchid", "bold": true },
+    "toolTitle": { "color": "iris" },
+    "mdHeading": { "color": "rose", "bold": true },
+    "mdLink": { "color": "violet", "underline": true },
+    "mdLinkUrl": { "color": "dusk" },
+    "mdCode": { "color": "lilac", "background": "chip" },
+    "mdCodeBlockBorder": { "color": "dusk" },
+    "mdQuote": { "color": "haze", "italic": true },
+    "mdQuoteBorder": { "color": "amethyst" },
+    "mdHr": { "color": "amethyst" },
+    "mdListBullet": { "color": "amethyst" }
+  },
+  "backgrounds": {
+    "userMessageBg": "plum"
+  },
+  "light": {
+    "vars": { "grey": 243, "cyan": 30, "green": 28, "red": 124, "yellow": 130, "blue": 26, "magenta": 90 },
+    "tones": {
+      "accent": { "color": "cyan" },
+      "borderAccent": { "color": "cyan" },
+      "searchMatchText": { "color": "cyan" },
+      "dim": { "color": "grey" },
+      "border": { "color": "grey" },
+      "borderMuted": { "color": "grey" },
+      "muted": { "color": 240 },
+      "success": { "color": "green" },
+      "warning": { "color": "yellow" },
+      "error": { "color": "red" },
+      "userMessageText": { "bold": true },
+      "toolTitle": { "color": "blue" },
+      "mdHeading": { "bold": true },
+      "mdLink": { "color": "cyan" },
+      "mdLinkUrl": { "color": "grey" },
+      "mdCode": { "color": "yellow" },
+      "mdCodeBlockBorder": { "color": "grey" },
+      "mdQuote": { "color": "grey" },
+      "mdQuoteBorder": { "color": "grey" },
+      "mdHr": { "color": "grey" },
+      "mdListBullet": { "color": "cyan" }
+    },
+    "backgrounds": {
+      "userMessageBg": 254
+    }
+  }
+}
