@@ -141,6 +141,8 @@ async function mount(
   }
   host.internals.open = open
   host.internals.clock = clock
+  // Exact colours are drawn as the test's terminal would, never as the machine's.
+  host.internals.colourMode = () => 'truecolor'
   // No test writes the machine's own clipboard.
   host.internals.clipboard = () => undefined
   const ctx = new Context()
@@ -412,6 +414,23 @@ test("the composer's frame is drawn in pi's borderMuted token, as a registration
   terminal.written = ''
   await author.dispose()
   await until(() => terminal.written.includes('\x1b[2m─'))
+})
+
+test("the terminal saying it turned dark or light draws the theme's variant for it, without a restart", async () => {
+  const { ctx, terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.theme({ dark: { tones: { accent: { color: 'blue' } } }, light: { tones: { accent: { color: 'green' } } } })
+    },
+  })
+  commit()
+  await until(() => terminal.written.includes('\x1b[36m›'))
+  terminal.type('\x1b[?997;1n')
+  await until(() => terminal.written.includes('\x1b[34m›'))
+  terminal.type('\x1b[?997;2n')
+  await until(() => terminal.written.includes('\x1b[32m›'))
 })
 
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {

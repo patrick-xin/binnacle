@@ -19,7 +19,7 @@ import type {
 import { binnacleTheme, themed } from '../ui/theme.ts'
 import { parseThemeChanges } from '../ui/theme-changes.ts'
 import { refusedBindings } from '../ui/keys.ts'
-import type { Theme } from '../ui/theme.ts'
+import type { TerminalLook, Theme } from '../ui/theme.ts'
 
 export type RegistrationsChanged = 'facts' | 'views' | 'screens' | 'placements' | 'theme' | 'keys' | 'drawn'
 
@@ -65,6 +65,7 @@ export class RegistrationService extends Service implements Registrations {
   private granted: GrantedSession | undefined
   private readonly themeTable = new Map<string, readonly ThemeChanges[]>()
   private drawnIn: Theme = binnacleTheme
+  private look: TerminalLook = { mode: 'truecolor' }
   private readonly listeners = new Set<(changed: RegistrationsChanged) => void>()
 
   constructor(ctx: Context) {
@@ -107,6 +108,13 @@ export class RegistrationService extends Service implements Registrations {
 
   get currentTheme(): Theme {
     return this.drawnIn
+  }
+
+  /** The host's: what the terminal binnacle draws on is, so the theme is drawn for it, every registration's variant included. */
+  drawOn(look: TerminalLook): void {
+    this.look = look
+    this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [], look)
+    for (const listener of this.listeners) listener('theme')
   }
 
   /**
@@ -240,7 +248,7 @@ export class RegistrationService extends Service implements Registrations {
       if (newest !== undefined) this.newestScreens.set(name, newest)
     }
     if (table === 'keys') this.bound = overlaid(...(this.bindingTable.get('keys') ?? []))
-    if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [])
+    if (table === 'theme') this.drawnIn = themed(binnacleTheme, this.themeTable.get('theme') ?? [], this.look)
     for (const listener of this.listeners) listener(table)
   }
 }

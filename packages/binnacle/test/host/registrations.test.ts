@@ -198,11 +198,47 @@ test("markdown is drawn in pi's markdown tokens, so recolouring inline code leav
   ])
 })
 
+test("a theme's light and dark variants lay over it as the terminal's appearance is light or dark, and neither while it is unknown", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({
+      tones: { accent: { color: 'red' } },
+      dark: { tones: { accent: { color: 'blue' } } },
+      light: { tones: { accent: { color: 'green' } } },
+    })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'a', tone: 'accent' }))
+  })
+  const drawn = () => screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines
+  assert.deepEqual(drawn(), ['\x1b[31ma\x1b[39m'])
+  registrations.drawOn({ appearance: 'dark', mode: 'truecolor' })
+  assert.deepEqual(drawn(), ['\x1b[34ma\x1b[39m'])
+  registrations.drawOn({ appearance: 'light', mode: 'truecolor' })
+  assert.deepEqual(drawn(), ['\x1b[32ma\x1b[39m'])
+})
+
+test('on a terminal of 256 colours, an exact colour is drawn as the nearest of them, as pi-tui draws it', async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { accent: { color: '#ff8800', background: '#ff8800' } } })
+    ctx.binnacle.view('prompt', () => ({ kind: 'text', text: 'a', tone: 'accent' }))
+  })
+  registrations.drawOn({ mode: '256color' })
+  assert.deepEqual(screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines, [
+    '\x1b[48;5;208m\x1b[38;5;208ma\x1b[39m\x1b[49m',
+  ])
+})
+
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {
   const { registrations } = surface()
   assert.throws(() => registrations.theme({ tones: { accent: { color: 'purple' } } } as never), {
     message:
       'binnacle.theme: tones.accent.color is "purple", not a colour: one of the terminal\'s sixteen (black, red, green, yellow, blue, magenta, cyan, white, bright-black, bright-red, bright-green, bright-yellow, bright-blue, bright-magenta, bright-cyan, bright-white), a 256-colour index from 0 to 255, #rrggbb, okhsl(h s% l%), oklch(l c h), or a name among the theme\'s vars',
+  })
+  assert.throws(() => registrations.theme({ dark: { tones: { accent: { color: 'purple' } } } }), {
+    message: /^binnacle\.theme: dark\.tones\.accent\.color is "purple", not a colour/,
+  })
+  assert.throws(() => registrations.theme({ light: { dark: {} } } as never), {
+    message: 'binnacle.theme: light.dark is no part of a variant, which holds no variant of its own',
   })
   assert.throws(() => registrations.theme({ tones: { accent: { color: 256 } } }), {
     message: /^binnacle\.theme: tones\.accent\.color is 256, not a colour/,

@@ -7,6 +7,7 @@ import {
   CombinedAutocompleteProvider,
   Editor,
   getNativeClipboard,
+  getTerminalColorMode,
   ProcessTerminal,
   ScrollView,
   setKeybindings,
@@ -20,6 +21,8 @@ import type {
   NativeClipboard,
   OverlayHandle,
   Terminal,
+  TerminalColorMode,
+  TerminalColorScheme,
   TUI,
   TuiInputListenerResult,
   TuiMainScreenRenderState,
@@ -53,7 +56,9 @@ export const internals: {
   open: (ctx: Context) => Promise<OpenedSession>
   clock: { now(): number; after(ms: number, then: () => void): () => void }
   clipboard: () => NativeClipboard | undefined
+  colourMode: () => TerminalColorMode
 } = {
+  colourMode: () => getTerminalColorMode(),
   terminal: () => new ProcessTerminal(),
   stdout: process.stdout,
   stderr: process.stderr,
@@ -463,6 +468,9 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     const theme = registrations.currentTheme
     return theme.tones.accent(` ${theme.chrome.jump} Jump to latest · ${bound} `)
   }
+  let appearance: TerminalColorScheme | undefined
+  let unscheme: (() => void) | undefined
+  const look = (): void => registrations.drawOn({ mode: internals.colourMode(), ...(appearance === undefined ? {} : { appearance }) })
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)
     const next =
@@ -476,6 +484,12 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (next instanceof TuiMainScreen) scroll = undefined
     stack(next)
     next.addInputListener(keys)
+    unscheme?.()
+    unscheme = next.onTerminalColorSchemeChange((scheme) => {
+      appearance = scheme
+      look()
+    })
+    next.setTerminalColorSchemeNotifications(true)
     return next
   }
   const leave = (): void => {
@@ -493,6 +507,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (mode === 'fullscreen') transcript.reveal()
   }
   tui = build(first)
+  look()
   const unfollow = session.follow((event) => {
     events.push(event)
     const fact = adapt(event, registrations.adapters)
@@ -518,6 +533,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     unraise?.()
     arming?.()
     untick?.()
+    unscheme?.()
     unoffer()
     closeGrants()
     unregister()

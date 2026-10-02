@@ -336,7 +336,12 @@ export declare const backgrounds: {
     readonly searchMatchBg: (text: string) => string;
 };
 // ui/theme.d.ts
-export interface ThemeChanges {
+export interface ThemeChanges extends ThemeVariant {
+    readonly light?: ThemeVariant;
+    readonly dark?: ThemeVariant;
+}
+// ui/theme.d.ts
+export interface ThemeVariant {
     readonly vars?: {
         readonly [name: string]: Colour;
     };
