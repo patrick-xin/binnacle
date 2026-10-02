@@ -23,6 +23,7 @@ import type {
   Terminal,
   TerminalColorMode,
   TerminalColorScheme,
+  TerminalColors,
   TUI,
   TuiInputListenerResult,
   TuiMainScreenRenderState,
@@ -33,6 +34,7 @@ import { adapt } from '../facts/adapt.ts'
 import type { Fact } from '../facts/adapt.ts'
 import { AnswerStream } from '../facts/stream.ts'
 import { editorThemeOf, searchStylesOf } from '../ui/theme.ts'
+import { deriveColours } from '../ui/derived-colours.ts'
 import { AFFORDANCE_BINDINGS, BINNACLE_BINDINGS, keyTable } from '../ui/keys.ts'
 import { affordances, describe } from '../contract/index.ts'
 import { TranscriptPane } from '../panes/transcript.ts'
@@ -469,8 +471,21 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     return theme.tones.accent(` ${theme.chrome.jump} Jump to latest · ${bound} `)
   }
   let appearance: TerminalColorScheme | undefined
+  let reported: TerminalColors = {}
   let unscheme: (() => void) | undefined
-  const look = (): void => registrations.drawOn({ mode: internals.colourMode(), ...(appearance === undefined ? {} : { appearance }) })
+  const look = (): void => {
+    const derived = deriveColours(reported, appearance)
+    const seen = derived.appearance ?? appearance
+    registrations.drawOn({ mode: internals.colourMode(), derived, ...(seen === undefined ? {} : { appearance: seen }) })
+  }
+  // A terminal that answers late is still read; one that fails to answer leaves binnacle's own colours.
+  const heard = (colours: TerminalColors): void => {
+    reported = colours
+    look()
+  }
+  const askColours = (): void => {
+    tui.queryTerminalColors({ timeoutMs: 100, onLateReply: heard }).then(heard, () => heard({}))
+  }
   const build = (mode: TuiMode): TuiMainScreen | TuiAltScreen => {
     transcript.drawOn(mode)
     const next =
@@ -488,6 +503,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     unscheme = next.onTerminalColorSchemeChange((scheme) => {
       appearance = scheme
       look()
+      askColours()
     })
     next.setTerminalColorSchemeNotifications(true)
     return next
@@ -553,6 +569,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
   try {
     tui.start()
     started = true
+    askColours()
   } catch (error) {
     release()
     throw error

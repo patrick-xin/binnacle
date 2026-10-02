@@ -17,6 +17,8 @@ import { prompt as promptFact, call, returned } from '../support/facts.ts'
 import { called, seed as seedEvent } from '../support/events.ts'
 import { pointer } from '../support/pointer.ts'
 import { foldedAlike } from '../support/views.ts'
+import { mocha, rgb } from '../support/palettes.ts'
+import { deriveColours } from '../../src/ui/derived-colours.ts'
 
 const prompt = promptFact(1, 1, 'fix the build')
 const seed = seedEvent(2, 2)
@@ -226,6 +228,32 @@ test('on a terminal of 256 colours, an exact colour is drawn as the nearest of t
   assert.deepEqual(screen([prompt], initial, 1, registrations.views, registrations.currentTheme).lines, [
     '\x1b[48;5;208m\x1b[38;5;208ma\x1b[39m\x1b[49m',
   ])
+})
+
+test("binnacle's own theme takes its colours from the palette a terminal reports, under what an author's theme gives, and its sixteen where the terminal reports nothing", async () => {
+  const { registrations, author } = surface()
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', () => ({
+      kind: 'stack',
+      children: [
+        { kind: 'text', text: 'a', tone: 'accent' },
+        { kind: 'markdown', text: '# h' },
+      ],
+    }))
+  })
+  const drawn = () => screen([prompt], initial, 3, registrations.views, registrations.currentTheme).lines.map((line) => line.trimEnd())
+  const reported = deriveColours({ background: rgb('#1E1E2E'), foreground: rgb('#CDD6F4'), palette: mocha })
+  registrations.drawOn({ mode: 'truecolor', appearance: 'dark', derived: reported })
+  assert.deepEqual(drawn(), [
+    '\x1b[38;2;232;104;205ma\x1b[39m',
+    '\x1b[38;2;193;154;59m\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m\x1b[39m',
+  ])
+  await author((ctx) => {
+    ctx.binnacle.theme({ tones: { accent: { color: 'red' } } })
+  })
+  assert.equal(drawn()[0], '\x1b[31ma\x1b[39m')
+  registrations.drawOn({ mode: 'truecolor', derived: deriveColours({}) })
+  assert.deepEqual(drawn(), ['\x1b[31ma\x1b[39m', '\x1b[1m\x1b[1m\x1b[4mh\x1b[24m\x1b[22m\x1b[22m'])
 })
 
 test('a theme that names what binnacle cannot draw is refused where it is registered, saying what to change', () => {

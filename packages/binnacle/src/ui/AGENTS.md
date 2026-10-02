@@ -19,4 +19,4 @@ What a view draws with and how a person's input changes what is shown: nodes lai
 - The gesture table is the one place a gesture is given a meaning, and `answer.ts` the one place a landed gesture becomes a change of UI state.
 - `keys.ts` is the one place key bytes are matched to what they do; `pointer.ts` the one place pi-tui's mouse vocabulary is read; `readable.ts` the one place terminal sequences are stripped. The `owners` of `layers.json` hold each, naming the pi-tui symbols only these files, and the panes and the host that hand them on, may import.
 - The container roles, `ask` and `show`, are a closed set in `node.ts`: a new one joins there, never in a plugin.
-- binnacle's own tones and backgrounds are the terminal's sixteen colours, so a person's palette decides what they look like, as their terminal already does; an author's theme may give any colour.
+- binnacle's own tones and backgrounds follow the palette the terminal reports, and are its sixteen where it reports nothing, so a person's palette decides what they look like; an author's theme may give any colour.

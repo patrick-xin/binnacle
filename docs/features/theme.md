@@ -21,8 +21,8 @@ binnacle's own starts, a person's to change: the thinking fold, context, the fal
 ## Choices
 
 - The tones are pi's names for what content means (`pi:packages/coding-agent/docs/themes.md`).
-- Each tone is one of the terminal's own sixteen colours, so the person's palette decides how it looks, as it does for everything else they run. pi's own themes name exact colours instead.
-- Each background is one of the terminal's own sixteen it fills with, so the person's palette decides how it looks, as a tone's does; the prompt band is filled with the terminal's bright black, the grey a band reads as on a light palette and a dark one alike.
+- binnacle's own colours follow the terminal's: where it reports its background, each tone and background takes its hue from one of the terminal's sixteen, at a lightness that keeps its contrast on that background, light or dark (`binnacle:packages/binnacle/src/ui/derived-colours.ts#deriveColours`), asked again when the terminal turns light or dark. An author's theme lays over them.
+- Where the terminal reports nothing, each tone and background is one of its own sixteen, so the person's palette decides how it looks, as it does for everything else they run; the prompt band is filled with the terminal's bright black, the grey a band reads as on a light palette and a dark one alike.
 - Each mark's glyph is one column wide and a glyph every terminal's fonts carry, so a mark never misaligns what it stands before.
 - Which marks exist, the glyph each draws and the tone it draws it in, change on request; so do the tones and the backgrounds, and the colour each takes.
 - How each kind's folds start — how many rows each shows, and whether it starts open — changes on request the same way; binnacle's own starts are those above.

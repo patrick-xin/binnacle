@@ -2,46 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { deriveColours } from '../../src/ui/derived-colours.ts'
 import type { DerivedColour } from '../../src/ui/derived-colours.ts'
-
-const rgb = (hex: string) => ({ r: parseInt(hex.slice(1, 3), 16), g: parseInt(hex.slice(3, 5), 16), b: parseInt(hex.slice(5, 7), 16) })
-
-/** Catppuccin's Mocha and Latte, as their terminal mappings set the sixteen. */
-const mocha = [
-  '#45475A',
-  '#F38BA8',
-  '#A6E3A1',
-  '#F9E2AF',
-  '#89B4FA',
-  '#F5C2E7',
-  '#94E2D5',
-  '#BAC2DE',
-  '#585B70',
-  '#F38BA8',
-  '#A6E3A1',
-  '#F9E2AF',
-  '#89B4FA',
-  '#F5C2E7',
-  '#94E2D5',
-  '#A6ADC8',
-].map(rgb)
-const latte = [
-  '#5C5F77',
-  '#D20F39',
-  '#40A02B',
-  '#DF8E1D',
-  '#1E66F5',
-  '#EA76CB',
-  '#179299',
-  '#ACB0BE',
-  '#6C6F85',
-  '#D20F39',
-  '#40A02B',
-  '#DF8E1D',
-  '#1E66F5',
-  '#EA76CB',
-  '#179299',
-  '#BCC0CC',
-].map(rgb)
+import { latte, mocha, rgb } from '../support/palettes.ts'
 
 test('a dark palette the terminal reports gives every token a colour of its own, in hex, and says the terminal is dark', () => {
   const derived = deriveColours({ background: rgb('#1E1E2E'), foreground: rgb('#CDD6F4'), palette: mocha })

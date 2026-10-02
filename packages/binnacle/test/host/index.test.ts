@@ -28,6 +28,8 @@ import { FakeSession } from '../support/session.ts'
 import { FakeTerminal, FailingTerminal, XtermTerminal } from '../support/terminal.ts'
 import type { Node, Placement } from '../../src/api.ts'
 import type { Fact } from '../../src/facts/adapt.ts'
+import { deriveColours } from '../../src/ui/derived-colours.ts'
+import { rgb } from '../support/palettes.ts'
 
 /** A person's line, as dsh logs it. */
 const prompt = (seq: number, text: string): SessionEvent<'user/message'> => ({
@@ -414,6 +416,18 @@ test("the composer's frame is drawn in pi's borderMuted token, as a registration
   terminal.written = ''
   await author.dispose()
   await until(() => terminal.written.includes('\x1b[2m─'))
+})
+
+test("binnacle's own colours are derived from the background the terminal answers with, and stay its sixteen while it answers nothing", async () => {
+  const { terminal, commit } = await mount([], new FakeSession([prompt(1, 'fix the build')]))
+  commit()
+  await until(() => terminal.written.includes('\x1b[36m›'))
+  const accent = deriveColours({ background: rgb('#1e1e2e') }).colours.accent
+  assert.equal(accent.kind, 'hex')
+  const { r, g, b } = rgb(accent.kind === 'hex' ? accent.hex : '')
+  terminal.type('\x1b]11;rgb:1e1e/1e1e/2e2e\x1b\\')
+  terminal.type('\x1b[?62c')
+  await until(() => terminal.written.includes(`\x1b[38;2;${r};${g};${b}m›`))
 })
 
 test("the terminal saying it turned dark or light draws the theme's variant for it, without a restart", async () => {

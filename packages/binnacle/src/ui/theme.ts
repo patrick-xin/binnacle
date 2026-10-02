@@ -1,6 +1,7 @@
 import { backgroundAnsi, foregroundAnsi, parseColor } from '@earendil-works/pi-tui'
 import type { EditorTheme, MarkdownTheme, TerminalColorMode, TuiAltScreenOptions } from '@earendil-works/pi-tui'
 import type { AffordanceKind } from '../contract/index.ts'
+import type { DerivedColour, DerivedColours } from './derived-colours.ts'
 
 /** The theme's colours for content, named by what the content means, in the names pi's themes use. */
 export const tones = {
@@ -375,6 +376,27 @@ export interface TerminalLook {
   readonly appearance?: 'light' | 'dark'
   /** How many colours an exact colour may be drawn in. */
   readonly mode: TerminalColorMode
+  /** The colours derived from the palette the terminal reported, which binnacle's own tones and backgrounds take where it reported its background. */
+  readonly derived?: DerivedColours
+}
+
+/** binnacle's own tones and backgrounds in the colours derived for a terminal, each keeping its attributes. */
+function derivedChanges(derived: DerivedColours): ThemeChanges {
+  const colour = (token: string): Colour | undefined => {
+    const given = (derived.colours as Readonly<Record<string, DerivedColour | undefined>>)[token]
+    return given?.kind === 'hex' ? given.hex : given?.kind === 'index' ? given.index : undefined
+  }
+  const tonesNow: Record<string, Style> = {}
+  for (const token of Object.keys(tones)) {
+    const given = colour(token)
+    tonesNow[token] = { ...(given === undefined ? {} : { color: given }), ...(token === 'mdHeading' ? { bold: true } : {}) }
+  }
+  const filled: Record<string, Colour> = {}
+  for (const token of Object.keys(backgrounds)) {
+    const given = colour(token)
+    if (given !== undefined) filled[token] = given
+  }
+  return { tones: tonesNow, backgrounds: filled }
 }
 
 /**
@@ -383,7 +405,8 @@ export interface TerminalLook {
  */
 export function themed(base: Theme, registered: readonly ThemeChanges[], look: TerminalLook = { mode: 'truecolor' }): Theme {
   const variant = look.appearance
-  const changes: readonly ThemeVariant[] = registered.flatMap((change) => {
+  const derived = look.derived?.appearance === undefined ? [] : [derivedChanges(look.derived)]
+  const changes: readonly ThemeVariant[] = [...derived, ...registered].flatMap((change) => {
     const varied = variant === undefined ? undefined : change[variant]
     return varied === undefined ? [change] : [change, varied]
   })
