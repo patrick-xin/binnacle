@@ -159,15 +159,33 @@ function markdownIn(toned: Theme['tones']): MarkdownTheme {
   }
 }
 
-export const editorTheme: EditorTheme = {
-  borderColor: tones.dim,
-  selectList: {
-    selectedPrefix: tones.accent,
-    selectedText: tones.accent,
-    description: tones.muted,
-    scrollInfo: tones.muted,
-    noMatch: tones.muted,
-  },
+/** The composer's theme, read from the current theme each time it draws, so a registration coming or going restyles it. */
+export function editorThemeOf(current: () => Theme): EditorTheme {
+  const tone =
+    (name: keyof typeof tones) =>
+    (text: string): string =>
+      current().tones[name](text)
+  return {
+    borderColor: tone('dim'),
+    selectList: {
+      selectedPrefix: tone('accent'),
+      selectedText: tone('accent'),
+      description: tone('muted'),
+      scrollInfo: tone('muted'),
+      noMatch: tone('muted'),
+    },
+  }
+}
+
+/** How the fullscreen draws a search's matches, read from the current theme each time it draws. */
+export function searchStylesOf(current: () => Theme): {
+  readonly searchMatchStyle: (text: string) => string
+  readonly searchCurrentMatchStyle: (text: string) => string
+} {
+  return {
+    searchMatchStyle: (text) => current().tones.accent(text),
+    searchCurrentMatchStyle: (text) => attributes.bold(current().tones.accent(text)),
+  }
 }
 
 /** A theme: each part of binnacle's own, or as registrations changed it. */

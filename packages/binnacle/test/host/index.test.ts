@@ -396,6 +396,24 @@ test('a theme an author registers after its entries were drawn draws them again,
   await until(() => /› fix the build/.test(shown()))
 })
 
+test("the composer's frame is drawn in the theme's dim tone, as a registration changes it and until it is disposed", async () => {
+  const { ctx, terminal, commit } = await mount([])
+  commit()
+  await until(() => terminal.written.includes('\x1b[2m─'))
+  const author = ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.theme({ tones: { dim: { color: 'red' } } })
+    },
+  })
+  await author
+  await until(() => terminal.written.includes('\x1b[31m─'))
+  terminal.written = ''
+  await author.dispose()
+  await until(() => terminal.written.includes('\x1b[2m─'))
+})
+
 test('an adapter registered after its kind was logged reads what was logged, and disposing it gives that back to the fallback', async () => {
   const { ctx, terminal, commit } = await mount([], new FakeSession([seed(1)]))
   commit()
@@ -2792,4 +2810,28 @@ test('what / offers follows dsh: a command registered after the session opened i
   await settle()
   terminal.type('/')
   await until(async () => (await terminal.altScreen()).some((row) => row.includes('plan before acting')))
+})
+
+test("on the fullscreen, a search's matches are drawn in the theme's accent tone, the current one bold too, as a registration gives it", async () => {
+  const terminal = new XtermTerminal(40, 30)
+  const session = new FakeSession(folded)
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.theme({ tones: { accent: { color: 'magenta' } } })
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('read6')))
+  terminal.written = ''
+  terminal.type('\x1b[102;6u')
+  terminal.type('read')
+  const current = '\x1b[1m\x1b[35mread\x1b[39m\x1b[22m'
+  await until(() => terminal.written.includes(current))
+  assert.ok(
+    terminal.written.replaceAll(current, '').includes('\x1b[35mread\x1b[39m'),
+    'a match not current is drawn in the accent tone alone',
+  )
 })
