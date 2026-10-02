@@ -316,8 +316,8 @@ test('a link and a heading are drawn in their own markdown tokens, whatever colo
   const linked = lines.find((line) => line.includes('link')) ?? ''
   assert.equal(heading.includes('\x1b[31m'), false, `the heading is not drawn in prose's red: ${JSON.stringify(heading)}`)
   assert.ok(heading.includes('\x1b[32m'), `the heading is green: ${JSON.stringify(heading)}`)
-  assert.ok(/\x1b\[34m(\x1b\[[0-9;]*m)*link/.test(linked), `the link is blue: ${JSON.stringify(linked)}`)
-  assert.equal(/\x1b\[31m(\x1b\[[0-9;]*m)*link/.test(linked), false, `the link's words are not prose's red: ${JSON.stringify(linked)}`)
+  const lastColour = [...linked.slice(0, linked.indexOf('link')).matchAll(/\[(3[0-7]|9[0-7])m/g)].at(-1)?.[1]
+  assert.equal(lastColour, '34', `the link's words are blue, not prose's red: ${JSON.stringify(linked)}`)
   assert.ok(linked.startsWith('\x1b[31msee'), `prose is red: ${JSON.stringify(linked)}`)
 })
 

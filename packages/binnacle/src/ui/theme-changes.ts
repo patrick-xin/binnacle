@@ -34,10 +34,10 @@ function resolved(given: Readonly<Record<string, unknown>>, outer: Vars): Vars {
     const done = read.get(name)
     if (done !== undefined) return done
     const value = given[name]
-    const named = typeof value === 'string' && Object.hasOwn(given, value)
-    if (named && (value === name || through.includes(value)))
+    const aliased = typeof value === 'string' && Object.hasOwn(given, value)
+    if (aliased && (value === name || through.includes(value)))
       throw new Error(`vars.${through[0] ?? name} names itself, through ${[...through.slice(1), name].join(', ')}`)
-    const found = named ? follow(value, [...through, name]) : colour(value, `vars.${name}`, outer)
+    const found = aliased ? follow(value, [...through, name]) : colour(value, `vars.${name}`, outer)
     read.set(name, found)
     return found
   }
