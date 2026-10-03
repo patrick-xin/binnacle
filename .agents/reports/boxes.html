@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>binnacle — boxes: show, ask, dialog, tool card</title>
+<style>
+  /* dusk: legacy's dark palette (issue #97), as vars */
+  :root {
+    --night: #1b1428;
+    --plum: #2e2344;
+    --velvet: #3b2d57;
+    --chip: #2b2140;
+    --orchid: #ff7ac6;
+    --rose: #f7a8d8;
+    --violet: #b8a1ff;
+    --iris: #8fa6ff;
+    --lilac: #e2c2ff;
+    --amethyst: #8a6ad9;
+    --mint: #7fe0b5;
+    --peach: #ffb784;
+    --coral: #ff6b81;
+    --haze: #a698c8;
+    --dusk: #6b6190;
+    --text: #ece4fa;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--night); color: var(--text);
+    font: 15px/1.6 -apple-system, "Inter", "Segoe UI", sans-serif;
+  }
+  .wrap { display: grid; grid-template-columns: 230px 1fr; max-width: 1280px; margin: 0 auto; }
+  nav {
+    position: sticky; top: 0; height: 100vh; overflow: auto; padding: 28px 18px;
+    border-right: 1px solid var(--velvet);
+  }
+  nav .brand { font-family: var(--mono); color: var(--orchid); font-size: 13px; letter-spacing: .04em; }
+  nav .brand b { color: var(--lilac); }
+  nav ol { list-style: none; padding: 0; margin: 18px 0 0; counter-reset: s; }
+  nav li { counter-increment: s; margin: 2px 0; }
+  nav a { color: var(--haze); text-decoration: none; font-size: 13.5px; display: block; padding: 3px 8px; border-radius: 6px; }
+  nav a::before { content: counter(s, decimal-leading-zero) "  "; color: var(--dusk); font-family: var(--mono); font-size: 11px; }
+  nav a:hover { background: var(--plum); color: var(--orchid); }
+  main { padding: 36px 48px 120px; min-width: 0; }
+  h1 { font-size: 30px; margin: 0 0 6px; color: var(--rose); font-weight: 650; letter-spacing: -.01em; }
+  h2 { font-size: 21px; color: var(--rose); margin: 64px 0 12px; padding-top: 10px; border-top: 1px solid var(--velvet); }
+  h3 { font-size: 16px; color: var(--lilac); margin: 28px 0 8px; }
+  p, li { color: var(--text); }
+  .lede { color: var(--haze); max-width: 70ch; }
+  .meta { font-family: var(--mono); font-size: 12px; color: var(--dusk); margin-bottom: 22px; }
+  a { color: var(--violet); text-decoration: underline; text-decoration-color: var(--amethyst); }
+  code { font-family: var(--mono); font-size: 12.5px; background: var(--chip); color: var(--lilac); padding: 1px 6px; border-radius: 4px; }
+  .muted { color: var(--haze); }
+  .dim { color: var(--dusk); }
+  blockquote { margin: 14px 0; padding: 4px 16px; border-left: 3px solid var(--amethyst); color: var(--haze); font-style: italic; }
+
+  /* cards of this page (HTML cards, not binnacle's) */
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 16px 0; }
+  .tile { background: var(--plum); border: 1px solid var(--velvet); border-radius: 10px; padding: 14px 16px; }
+  .tile h4 { margin: 0 0 4px; font-size: 14px; color: var(--orchid); font-family: var(--mono); }
+  .tile .role { font-size: 12px; color: var(--haze); text-transform: uppercase; letter-spacing: .06em; }
+  .tile p { margin: 6px 0 0; font-size: 13.5px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  th { text-align: left; color: var(--lilac); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--amethyst); background: var(--chip); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--velvet); vertical-align: top; }
+  tr:hover td { background: rgba(59, 45, 87, .35); }
+
+  /* terminal mockups */
+  .term {
+    font-family: var(--mono); font-size: 13px; line-height: 1.45; white-space: pre;
+    background: #160f22; border: 1px solid var(--velvet); border-radius: 10px;
+    padding: 14px 18px; margin: 12px 0; overflow-x: auto; color: var(--text);
+    position: relative;
+  }
+  .term[data-label]::before {
+    content: attr(data-label); position: absolute; top: -9px; right: 14px; font-size: 10.5px;
+    background: var(--night); color: var(--dusk); padding: 0 6px; letter-spacing: .05em; text-transform: uppercase;
+  }
+  .t-border { color: var(--dusk); }
+  .t-accent { color: var(--orchid); }
+  .t-muted { color: var(--haze); }
+  .t-dim { color: var(--dusk); }
+  .t-ok { color: var(--mint); }
+  .t-warn { color: var(--peach); }
+  .t-err { color: var(--coral); }
+  .t-tool { color: var(--iris); }
+  .t-agent { color: var(--violet); }
+  .t-user { color: var(--orchid); font-weight: 700; }
+  .t-userbg { background: var(--plum); display: inline-block; width: 100%; }
+  .t-head { color: var(--rose); font-weight: 700; }
+  .t-ann { color: var(--amethyst); font-style: italic; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 1000px) { .two { grid-template-columns: 1fr; } .wrap { grid-template-columns: 1fr; } nav { position: static; height: auto; } }
+
+  /* page diagram */
+  .page { border: 1px solid var(--amethyst); border-radius: 10px; overflow: hidden; position: relative; max-width: 620px; margin: 18px 0; font-family: var(--mono); font-size: 12.5px; }
+  .slot { padding: 10px 14px; border-bottom: 1px dashed var(--velvet); color: var(--haze); }
+  .slot b { color: var(--lilac); font-weight: 600; }
+  .slot.big { height: 150px; background: #1f1730; }
+  .slot.comp { background: var(--chip); }
+  .dialog-box {
+    position: absolute; left: 10%; width: 80%; top: 40px; height: 120px;
+    border: 1px solid var(--orchid); border-radius: 8px; background: rgba(46, 35, 68, .93);
+    box-shadow: 0 10px 40px rgba(0,0,0,.5); padding: 10px 14px; color: var(--text);
+  }
+  .dialog-box b { color: var(--orchid); }
+
+  .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 14px 0; font-size: 13px; }
+  .flow .step { background: var(--plum); border: 1px solid var(--velvet); border-radius: 8px; padding: 8px 12px; flex: 1 1 150px; }
+  .flow .step b { display: block; color: var(--orchid); font-family: var(--mono); font-size: 12px; }
+  .flow .arrow { align-self: center; color: var(--amethyst); }
+
+  .callout { border-radius: 10px; padding: 12px 16px; margin: 14px 0; border: 1px solid; }
+  .callout.note { border-color: var(--iris); background: rgba(143, 166, 255, .07); }
+  .callout.warn { border-color: var(--peach); background: rgba(255, 183, 132, .07); }
+
+  .dev { border: 1px solid var(--velvet); border-left: 4px solid var(--dusk); background: var(--plum); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+  .dev.high { border-left-color: var(--coral); }
+  .dev.med { border-left-color: var(--peach); }
+  .dev.low { border-left-color: var(--iris); }
+  .dev h4 { margin: 0 0 6px; font-size: 14.5px; color: var(--text); }
+  .dev .tag { font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 10px; margin-right: 6px; vertical-align: 1px; }
+  .dev.high .tag { background: rgba(255,107,129,.18); color: var(--coral); }
+  .dev.med .tag { background: rgba(255,183,132,.18); color: var(--peach); }
+  .dev.low .tag { background: rgba(143,166,255,.18); color: var(--iris); }
+  .dev p { margin: 6px 0; font-size: 13.5px; }
+  .dev .fix { color: var(--mint); }
+  .dev .fix::before { content: "→ "; }
+
+  pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--chip); border: 1px solid var(--velvet); border-radius: 8px; padding: 12px 16px; overflow-x: auto; color: var(--lilac); line-height: 1.5; }
+  pre.code .k { color: var(--orchid); }
+  pre.code .s { color: var(--mint); }
+  pre.code .c { color: var(--dusk); font-style: italic; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--velvet); color: var(--lilac); margin: 0 2px; }
+  .pill.no { background: rgba(255,107,129,.16); color: var(--coral); }
+  .pill.yes { background: rgba(127,224,181,.14); color: var(--mint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="brand"><b>binnacle</b> · boxes</div>
+  <ol>
+    <li><a href="#words">Words first</a></li>
+    <li><a href="#map">Places and blocks</a></li>
+    <li><a href="#show">show — the container</a></li>
+    <li><a href="#card">Tool card</a></li>
+    <li><a href="#ask">ask — the asking frame</a></li>
+    <li><a href="#dialog">The dialog slot</a></li>
+    <li><a href="#band">band and fold</a></li>
+    <li><a href="#interact">How interaction works</a></li>
+    <li><a href="#which">When to use which</a></li>
+    <li><a href="#author">What an author can do</a></li>
+    <li><a href="#style">Styling a tool card</a></li>
+    <li><a href="#theme">Theming boxes</a></li>
+    <li><a href="#planned">Decided, not built</a></li>
+    <li><a href="#drift">Deviations to watch</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+<h1>Boxes in binnacle</h1>
+<p class="lede">A field guide to every box binnacle draws: what it's for, where it goes, how a person interacts with it, and what an author agent can change. Everything here was read from the code and records on <code>main</code>. The last section lists where the code, the records and the words have drifted apart.</p>
+<div class="meta">read at main 5abb6c5 (sections 1–11 at 1454184; layout and theme unchanged since) · 2026-10-02 · mockups drawn in dusk (legacy's dark palette, the worked example #97 ports; binnacle's own theme follows the terminal's sixteen colours)</div>
+
+<!-- ============================================================ -->
+<h2 id="words">1 · Words first: container, dialog, card</h2>
+<p>binnacle's records already rule on these three words, and two of them don't mean what they mean elsewhere. ADR 11 rejected naming a container by how it's drawn ("a card, a border"), because nothing would then tell a decision apart from a tool's output. So the vocabulary is:</p>
+<table>
+  <tr><th>You might say</th><th>binnacle's word</th><th>What it is</th><th>Kind</th></tr>
+  <tr><td>container</td><td><code>show</code> and <code>ask</code></td><td>The closed set of containers (ADR 11), named for what the surface is doing: a <b>show</b> holds what it <i>shows and did not write</i>, an <b>ask</b> holds what it <i>asks or offers</i>.</td><td>block (node)</td></tr>
+  <tr><td>dialog</td><td>the <code>dialog</code> slot</td><td>A <i>place</i>, not a block: the slot drawn over the page, centred, on pi-tui's overlay stack. What's placed there is usually an ask.</td><td>place (slot)</td></tr>
+  <tr><td>card</td><td><b>tool card</b> (ours) · <code>card</code> (dsh's)</td><td><code>card</code> is dsh's word: the kind of view a tool presents a call as. A <b>tool card</b> is binnacle drawing that call <i>inside a show</i>. binnacle has no node called card.</td><td>show, by convention</td></tr>
+  <tr><td>panel, box with a fill</td><td><code>band</code></td><td>Content padded inside a background the theme names by meaning (<code>userMessageBg</code>). It's drawn for what a person sent.</td><td>block (node)</td></tr>
+</table>
+<div class="callout note"><b>Rule of thumb.</b> A <i>block</i> is what a view returns (data). A <i>place</i> is where the host seats it (a slot, or a placed screen). An ask can stand in any place. The dialog is one place an ask can stand.</div>
+
+<!-- ============================================================ -->
+<h2 id="map">2 · Places and blocks</h2>
+<h3>Places: where something is seated</h3>
+<p>Every place is reached through one registration, <code>ctx.binnacle.place(slot, placement)</code> or <code>ctx.binnacle.screen(name, screen)</code>. The built-in transcript and composer are placed the same way (ADR 13).</p>
+<div class="page">
+  <div class="slot big"><b>transcript</b> · newest placement · grows on the alternate screen<br><span class="dim">or a <b style="color:var(--lilac)">placed screen</b> in its place (Trajectory, Ctrl+O)</span></div>
+  <div class="slot"><b>above-composer</b> · every lines placement, oldest first · pointer only</div>
+  <div class="slot comp"><b>composer</b> · newest placement · binnacle's Editor, <i>or lines</i> that take the keyboard while they offer (the "seat")</div>
+  <div class="slot" style="border-bottom:0"><b>below-composer</b> · every lines placement · Status line lives here</div>
+  <div class="dialog-box"><b>dialog</b> · newest <i>lines</i> placement, over the page<br><span class="muted">centred · 80% wide · ≤ 80% tall · non-capturing overlay · takes keys ahead of the seat while it offers</span></div>
+</div>
+<table>
+  <tr><th>Slot</th><th>Accepts</th><th>Draws</th><th>Keyboard</th><th>Built-in user</th></tr>
+  <tr><td><code>transcript</code></td><td><code>{kind:'transcript'}</code> only</td><td>newest</td><td>the reading pane</td><td>Transcript plugin</td></tr>
+  <tr><td><code>above-composer</code></td><td>lines</td><td>all, top to bottom</td><td><span class="pill no">never</span> pointer only</td><td>Questions (echoes the question while typing)</td></tr>
+  <tr><td><code>composer</code></td><td><code>{kind:'composer', submit}</code> or lines</td><td>newest</td><td><span class="pill yes">yes</span> lines that offer take it</td><td>Composer, Approvals, Questions</td></tr>
+  <tr><td><code>below-composer</code></td><td>lines</td><td>all</td><td><span class="pill no">never</span></td><td>Status line</td></tr>
+  <tr><td><code>dialog</code></td><td>lines</td><td>newest</td><td><span class="pill yes">yes</span> ahead of the seat</td><td><b>none</b></td></tr>
+  <tr><td>placed screen</td><td><code>screen(name, {key, description, draw})</code></td><td>in the transcript's place</td><td>its own UI state</td><td>Trajectory</td></tr>
+</table>
+<p class="muted">Refusals are thrown where they're registered (<code>host/registrations.ts#misplaced</code>): the transcript or composer outside its own slot, or lines in the transcript's place.</p>
+
+<h3>Blocks: what a view returns</h3>
+<div class="grid">
+  <div class="tile"><div class="role">container</div><h4>show</h4><p>A title line, then what it holds along the gutter. For what the surface shows and did not write.</p></div>
+  <div class="tile"><div class="role">container</div><h4>ask</h4><p>A rounded frame: a title on the top edge, the answering keys on the bottom edge. For what the surface asks or offers.</p></div>
+  <div class="tile"><div class="role">fill</div><h4>band</h4><p>Padded content inside a named background.</p></div>
+  <div class="tile"><div class="role">interactive</div><h4>offer · fold</h4><p>A region that offers affordances. A fold is cut to rows and offers <code>expand</code>.</p></div>
+  <div class="tile"><div class="role">seam</div><h4>part</h4><p><code>thinking</code> / <code>output</code>, drawn by the views of its kind.</p></div>
+  <div class="tile"><div class="role">leaf</div><h4>text · markdown · stack · blank</h4><p>Spans in tones and marks, a markdown document, a vertical list.</p></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="show">3 · show: the container for what the surface shows</h2>
+<div class="two">
+<div>
+<p><b>Anatomy</b> (<code>ui/layout.ts#show</code>):</p>
+<ul>
+  <li><code>title: Span[]</code> is drawn in <code>tone</code> (default <code>text</code>) and wraps.</li>
+  <li>The child is laid out at <code>width − 1 − spacing.show</code>. Every row is prefixed with <code>chrome.gutter</code> in <code>borderMuted</code>.</li>
+  <li><code>opens: '&lt;fold id&gt;'</code> makes the title the line that fold folds under. The <i>head</i> region then offers that fold's <code>expand</code> plus <code>copy</code> (text = everything the show holds). The fold's own rows offer nothing, so a click on output does nothing and selecting text leaves it alone.</li>
+  <li>When the width leaves no room, the gutter is dropped and the child is drawn full width.</li>
+</ul>
+<p><b>Built-in uses:</b> every tool card (the generic row, and binnacle's own card in <code>views/entries.ts</code>), and the <code>presented</code> entry (files the agent handed over).</p>
+</div>
+<div>
+<div class="term" data-label="show · folded"><span class="t-ok">●</span> Read src/api.ts <span class="t-muted">· took 1.4s</span>
+<span class="t-dim">│</span> import type { Agent } from '…'
+<span class="t-dim">│</span> import type { AffordanceKind } from …
+<span class="t-dim">│</span> import type { AuthorAdapter, Fact } …
+<span class="t-dim">│</span> … 278 more lines</div>
+<div class="term" data-label="show · focused"><span class="t-ok">●</span> Read src/api.ts <span class="t-muted">· took 1.4s</span>
+<span class="t-dim">│</span> import type { Agent } from '…'
+<span class="t-dim">│</span> import type { AffordanceKind } from …
+<span class="t-dim">│</span> import type { AuthorAdapter, Fact } …
+<span class="t-dim">│</span> <span class="t-accent">▸ show 278 more lines</span></div>
+<div class="term" data-label="show · presented"><span class="t-accent">▤</span> presented 2 files
+<span class="t-dim">│</span> docs/report.md  <span class="t-muted">the summary</span>
+<span class="t-dim">│</span> out/chart.png</div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="card">4 · Tool card: a show drawn from what the tool presents</h2>
+<p>A tool card isn't a block. It's a <b>show</b> that a card row returns (ADR 15). The Tool cards plugin registers a view for the <code>tool</code> entry kind, asks dsh's <code>tools.get(name).presentCall/presentResult</code>, and draws through the rows stacked for the presented card kind.</p>
+<div class="flow">
+  <div class="step"><b>entry: tool</b>call + result from the log</div><div class="arrow">→</div>
+  <div class="step"><b>presentCall / Result</b>dsh tool's pure presenters, parsed as data</div><div class="arrow">→</div>
+  <div class="step"><b>CardParts</b>call, result, mark, waiting, reason, made, took, <code>fold()</code></div><div class="arrow">→</div>
+  <div class="step"><b>rows of kind</b>newest first → <code>generic</code>'s rows → binnacle's own card</div><div class="arrow">→</div>
+  <div class="step"><b>Shown</b>must be <code>{kind:'show'}</code> or <code>{declined}</code></div>
+</div>
+<div class="two">
+<div class="term" data-label="running"><span class="t-muted">●</span> pnpm test
+<span class="t-dim">│</span> <span class="t-muted">● vitest {}</span>
+<span class="t-dim">│</span> <span class="t-muted">running 4s</span></div>
+<div class="term" data-label="failed"><span class="t-err">✗</span> bash rm -rf build/
+<span class="t-dim">│</span> <span class="t-err">permission denied</span>
+<span class="t-dim">│</span> rm: build/: Operation not permitted</div>
+</div>
+<div class="term" data-label="fenced: a presenter threw">● bash {"command":"ls"}
+<span class="t-dim">│</span> a.ts  b.ts
+<span class="t-err">✗ bash.presentCall threw: cannot read 'cmd'</span></div>
+<table>
+  <tr><th>CardParts field</th><th>What a row does with it</th></tr>
+  <tr><td><code>mark</code></td><td>The head's leading span: <code>running</code> / <code>done</code> / <code>failed</code>.</td></tr>
+  <tr><td><code>waiting</code></td><td>Hold it under the head while running (<code>running 4s</code>, counting via <code>{since}</code>), or "the turn ended without it".</td></tr>
+  <tr><td><code>made</code></td><td>Lines for each sub-call a <code>run_code</code> program made, indented by depth.</td></tr>
+  <tr><td><code>fold(child, rows?)</code></td><td>Wraps output as the <code>output</code> part inside fold id <code>output</code>. Use it, so an <code>output</code> view applies and an opened fold stays open across fallbacks.</td></tr>
+  <tr><td><code>call.returned</code> / <code>result.returned</code></td><td>The presenter's frozen object. A row parses its kind's own fields here (e.g. a diff's hunks).</td></tr>
+</table>
+<p class="muted">Today one row ships, <code>generic</code>. Terminal, diff, read, search and web fall through to it until they get rows of their own (#10).</p>
+
+<!-- ============================================================ -->
+<h2 id="ask">5 · ask: the frame for what the surface asks or offers</h2>
+<div class="two">
+<div>
+<p><b>Anatomy</b> (<code>ui/layout.ts#ask</code>):</p>
+<ul>
+  <li>The border is <code>chrome.border</code> (rounded by default, or set by <code>chrome.frame</code>), drawn in <code>edge</code> (default <code>border</code>). Approvals and Questions use <code>borderAccent</code>.</li>
+  <li><code>title</code> is one line on the top edge. If it doesn't fit (<code>width − 6</code>), it's <b>left off whole</b>, never cut.</li>
+  <li>The <b>bottom edge</b> names the answering keys, e.g. <code>enter select · tab next</code>, from the key table as the person bound them. It's drawn only when the pane is handed the key table (composer seat, dialog) and the ask holds an offer. <code>next</code> appears only when there are two or more offers.</li>
+  <li>The padding is <code>spacing.ask</code> columns inside each side. <code>background</code> fills every line, border included.</li>
+  <li>With no room inside, the frame is dropped and the child is drawn bare.</li>
+</ul>
+</div>
+<div>
+<div class="term" data-label="approval · composer seat"><span class="t-accent">╭─ </span>bash asks<span class="t-accent"> ──────────────────────────╮</span>
+<span class="t-accent">│</span> writes outside the workspace          <span class="t-accent">│</span>
+<span class="t-accent">│</span> allow once                            <span class="t-accent">│</span>
+<span class="t-accent">│</span> <span class="t-accent">▸ allow once</span>                          <span class="t-accent">│</span>
+<span class="t-accent">│</span> reject                                <span class="t-accent">│</span>
+<span class="t-accent">╰─ </span>enter select · tab next<span class="t-accent"> ────────────╯</span></div>
+<div class="term" data-label="question · composer seat"><span class="t-accent">╭─ </span>Database<span class="t-accent"> ───────────────────────────╮</span>
+<span class="t-accent">│</span> Which database should I use?          <span class="t-accent">│</span>
+<span class="t-accent">│</span> Postgres <span class="t-muted">— relational, you have it</span>    <span class="t-accent">│</span>
+<span class="t-accent">│</span> <span class="t-accent">▸ Postgres</span>                            <span class="t-accent">│</span>
+<span class="t-accent">│</span> SQLite <span class="t-muted">— a file</span>                       <span class="t-accent">│</span>
+<span class="t-accent">│</span> type an answer                        <span class="t-accent">│</span>
+<span class="t-accent">│</span> skip                                  <span class="t-accent">│</span>
+<span class="t-accent">│</span> cancel                                <span class="t-accent">│</span>
+<span class="t-accent">╰─ </span>enter select · tab next<span class="t-accent"> ────────────╯</span></div>
+</div>
+</div>
+<p><b>Built-in uses.</b> Both deliberately sit in the <b>composer seat</b>, not the dialog. The seat is live on both screens, and answering gives back what was typed (Approvals and Questions pages, Choices).</p>
+<table>
+  <tr><th>Feature</th><th>Slot</th><th>Offers</th><th>Settles</th></tr>
+  <tr><td>Approvals</td><td>composer (newest lines)</td><td><code>grant</code> "allow once" (primary), <code>dismiss</code> "reject"</td><td><code>allowed-once</code> · <code>rejected</code> · <code>cancelled</code> (signal) · <code>unavailable</code> (disposed)</td></tr>
+  <tr><td>Questions</td><td>composer. While typing: the composer in the seat plus an offer-less ask echoed <code>above-composer</code></td><td><code>choose</code> per option, "done" (multi), <code>answer</code> "type an answer", <code>choose</code> "skip", <code>dismiss</code> "cancel"</td><td>answers in order · <code>ASK_CANCELLED</code> · <code>ASK_ABORTED</code> · handed to the next answerer on dispose</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="dialog">6 · The dialog slot</h2>
+<ul>
+  <li>Draws the <b>newest lines placement</b> placed in <code>'dialog'</code>, via pi-tui <code>showOverlay(pane, {anchor:'center', width:'80%', maxHeight:'80%', nonCapturing:true})</code>. Disposing it gives back the one before, or the page.</li>
+  <li><b>Keyboard precedence</b> (<code>host/index.ts</code> keys): a dialog that offers something comes first, then composer-seat lines that offer something, then the reading pane (the transcript, or an open placed screen). The seat's first offer is focused on taking the keyboard.</li>
+  <li>It stands over whichever screen the person switches to. On quit it's removed, so the printed session is left without it.</li>
+  <li><b>No built-in feature uses it.</b> It's tested only through author plugins in <code>test/host/index.test.ts</code>. The Approvals and Questions pages both say "a dialog over the page waits until a feature needs one". #82 (<code>open</code> on a card) is the open candidate.</li>
+</ul>
+<div class="term" data-label="author ask in the dialog">        <span class="t-dim">(transcript, dimmed behind)</span>
+     <span class="t-border">╭─ </span>Settings<span class="t-border"> ───────────────────────────────────╮</span>
+     <span class="t-border">│</span> Model                                        <span class="t-border">│</span>
+     <span class="t-border">│</span> <span class="t-accent">▸ choose</span>                                     <span class="t-border">│</span>
+     <span class="t-border">│</span> Theme                                        <span class="t-border">│</span>
+     <span class="t-border">╰─ </span>enter select · tab next<span class="t-border"> ───────────────────╯</span></div>
+
+<!-- ============================================================ -->
+<h2 id="band">7 · band and fold, briefly</h2>
+<div class="two">
+<div>
+<p><b>band</b> is pi-tui's <code>Box</code> with <code>spacing.band</code> padding and a <code>theme.backgrounds[name]</code> fill. binnacle draws one for what a person sent (<code>prompt</code>, <code>userMessageBg</code>). It offers nothing and takes no keys. It holds a child, but it isn't one of ADR 11's containers (see drift D2).</p>
+<div class="term" data-label="band · prompt"><span class="t-userbg"> </span>
+<span class="t-userbg"> <span class="t-accent">›</span> <span class="t-user">add a dusk theme file</span>                      </span>
+<span class="t-userbg"> </span></div>
+</div>
+<div>
+<p><b>fold</b> is the only box that changes shape by gesture. It shows <code>rows</code> (node, then the theme's per-kind <code>folds</code>, then 3) and offers <code>expand</code>. With <code>rows: 0</code> it rides its title line: <code>∴ thinking · 5 lines</code>. Opened, the label becomes <code>fold to N lines</code> / <code>fold it away</code>. Toggling is UI state (<code>ui/state.ts#act</code>) and never reaches a plugin's <code>invoke</code>.</p>
+<div class="term" data-label="fold · rows 0"><span class="t-muted">∴ thinking · 5 lines</span>
+<span class="t-accent">▸ ∴ thinking · show 5 more lines</span>  <span class="t-ann">← focused</span></div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="interact">8 · How interaction happens inside a box</h2>
+<p>Content declares <b>affordances</b>. One gesture table gives every gesture its meaning (ADR 7), and one key table names every key (ADR 8). No box handles input itself.</p>
+<div class="flow">
+  <div class="step"><b>view returns</b>offer / fold nodes with ids and affordances</div><div class="arrow">→</div>
+  <div class="step"><b>layout</b>regions with rows and columns, scoped to their entry. Only a cut fold offers expand</div><div class="arrow">→</div>
+  <div class="step"><b>gesture</b>click · wheel · drag · key binding</div><div class="arrow">→</div>
+  <div class="step"><b>meaning()</b>gesture × regions under it → action</div><div class="arrow">→</div>
+  <div class="step"><b>act()</b>expand → UI state. Any other kind → the placement's <code>invoke</code> / a host effect (copy)</div>
+</div>
+<table>
+  <tr><th>Affordance</th><th>Click may invoke?</th><th>Who handles it</th><th>Default word</th></tr>
+  <tr><td><code>expand</code></td><td><span class="pill yes">yes</span></td><td>UI state (toggles the fold)</td><td>expand</td></tr>
+  <tr><td><code>choose</code></td><td><span class="pill yes">yes</span></td><td><code>invoke</code></td><td>choose</td></tr>
+  <tr><td><code>open</code></td><td><span class="pill yes">yes</span></td><td><code>invoke</code> (no built-in user yet, #82)</td><td>open</td></tr>
+  <tr><td><code>copy</code></td><td><span class="pill yes">yes</span></td><td>the host writes <code>region.text</code> to the clipboard</td><td>copy</td></tr>
+  <tr><td><code>answer</code></td><td><span class="pill yes">yes</span></td><td><code>invoke</code></td><td>answer</td></tr>
+  <tr><td><code>grant</code></td><td><span class="pill no">never</span></td><td><code>invoke</code>, by a key on purpose</td><td>allow</td></tr>
+  <tr><td><code>dismiss</code></td><td><span class="pill no">never</span></td><td><code>invoke</code>, by a key on purpose</td><td>dismiss</td></tr>
+</table>
+<h3>The gesture table (<code>ui/gestures.ts#meaning</code>)</h3>
+<ul>
+  <li><b>click</b> invokes the <i>primary</i> (first) affordance of the innermost region under the pointer that offers something, if that kind allows the pointer.</li>
+  <li><b>wheel</b> scrolls the innermost region that overflows. <b>drag</b> selects text. <b>hover</b> does nothing.</li>
+  <li><b>keys:</b> <code>focus.next</code> / <code>focus.previous</code> cycle (wrapping) through focusable regions. <code>focus.out</code> unfocuses. <code>primary</code> (Enter) invokes the focused region's first affordance. A key bound to an affordance kind (<code>binnacle.copy</code> …, unbound by default) invokes that kind on the first region under focus that offers it.</li>
+  <li><b>focus is drawn by the box:</b> a focused offer gets an extra row <code>▸ label</code> beneath its content. A focused cut fold's marker becomes <code>▸ show N more lines</code> in place, so focusing doesn't move the layout.</li>
+</ul>
+<h3>Who gets the keyboard</h3>
+<table>
+  <tr><th>Box in place</th><th>Focus</th><th>Pointer</th><th>Bottom-edge key hints</th></tr>
+  <tr><td>ask in the dialog, offering</td><td>takes it first</td><td>yes</td><td>yes</td></tr>
+  <tr><td>ask in the composer seat, offering</td><td>takes it (first offer focused)</td><td>yes</td><td>yes</td></tr>
+  <tr><td>lines above / below the composer</td><td>never</td><td>yes, but grant and dismiss never</td><td>no</td></tr>
+  <tr><td>show / fold in the transcript</td><td>Tab through regions</td><td>yes</td><td>n/a</td></tr>
+  <tr><td>anything on a placed screen</td><td>its own UI state</td><td>yes</td><td>—</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="which">9 · When to use which</h2>
+<table>
+  <tr><th>You are drawing…</th><th>Use</th><th>Place it</th><th>Not</th></tr>
+  <tr><td>what a tool did, a file, any content the surface relays but didn't write</td><td><code>show</code> (via a card row for tool calls)</td><td>a view in the transcript, or a placed screen</td><td>an ask: nothing is being asked</td></tr>
+  <tr><td>a decision blocking the agent (approve, answer)</td><td><code>ask</code> with offers</td><td>the <b>composer seat</b>, like Approvals and Questions</td><td>a show, or bare offers with no frame</td></tr>
+  <tr><td>something that should stand <i>over</i> what the person reads (a picker, settings, a modal choice)</td><td><code>ask</code></td><td>the <b>dialog</b></td><td>the composer seat, which would hide what they typed</td></tr>
+  <tr><td>a question kept readable while the person types</td><td><code>ask</code> with no offers</td><td><code>above-composer</code></td><td>—</td></tr>
+  <tr><td>what the person said</td><td><code>band</code> (<code>userMessageBg</code>)</td><td>transcript view</td><td>an ask or a show</td></tr>
+  <tr><td>long content a person reads at length or scrolls</td><td>any blocks</td><td>a <b>placed screen</b> (scrolling is a screen's: draft ADR 18)</td><td>a tall ask (it is cut today, #85)</td></tr>
+  <tr><td>a status, a notice, a meter</td><td><code>text</code></td><td><code>below-composer</code></td><td>a container</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="author">10 · What an author agent can do with boxes</h2>
+<p>All of this goes through <code>src/api.ts#Registrations</code>. Every registration is an effect, gone when the plugin's fiber is disposed (ADR 0, ADR 5). Built-ins use exactly the same doors.</p>
+<table>
+  <tr><th>Want</th><th>Door</th><th>Fencing</th></tr>
+  <tr><td>Redraw one card kind (diff, terminal …)</td><td><code>binnacle.card(kind, row)</code> → <code>Shown | {declined}</code></td><td>throw / decline → the row beneath, saying why</td></tr>
+  <tr><td>Redraw every tool's output</td><td><code>binnacle.view('output', (part, next) =&gt; …)</code></td><td>throw / bad node → the view beneath</td></tr>
+  <tr><td>Wrap or replace a whole entry kind</td><td><code>binnacle.view(key, (entry, next) =&gt; …)</code> (ADR 9 stacking)</td><td>same</td></tr>
+  <tr><td>Ask the person something, inline</td><td><code>place('composer', {kind:'lines', draw, invoke})</code></td><td><code>draw</code> / <code>invoke</code> throws → drawn, named</td></tr>
+  <tr><td>Ask over the page</td><td><code>place('dialog', {kind:'lines', draw, invoke})</code></td><td>same</td></tr>
+  <tr><td>A full reading screen</td><td><code>binnacle.screen(name, {key, description, draw})</code></td><td>same</td></tr>
+  <tr><td>Restyle every box</td><td><code>binnacle.theme({chrome:{frame:'heavy', gutter:'┃'}, spacing:{ask:2, show:2}, tones:{borderAccent:{color:'#ff7ac6'}}})</code> or a theme file</td><td>refused at registration, by path</td></tr>
+  <tr><td>Change what the bottom edge says</td><td><code>theme({words:{select:'ok', next:'more', 'offer.grant':'yes'}})</code></td><td>—</td></tr>
+  <tr><td>Bind a key to an affordance</td><td><code>binnacle.keys({'binnacle.dismiss':'escape', 'binnacle.copy':'ctrl+y'})</code></td><td>refused on clashes</td></tr>
+  <tr><td>Remove a built-in box feature</td><td>the profile patch: <code>binnacle-tool-cards</code> <code>disabled: true</code></td><td>Approvals and Questions can't be removed this way (#57)</td></tr>
+</table>
+<div class="two">
+<pre class="code"><span class="c">// a diff card row</span>
+ctx.binnacle.card(<span class="s">'diff'</span>, {
+  draw: (p) =&gt; {
+    <span class="k">const</span> hunks = p.result?.returned.hunks
+    <span class="k">if</span> (!Array.isArray(hunks)) <span class="k">return</span> { declined: <span class="s">'no hunks'</span> }
+    <span class="k">return</span> {
+      kind: <span class="s">'show'</span>, opens: <span class="s">'output'</span>,
+      title: [p.mark, <span class="s">' '</span>, p.call.title],
+      child: p.fold({ kind: <span class="s">'text'</span>, text: render(hunks) }),
+    }
+  },
+})</pre>
+<pre class="code"><span class="c">// a choice over the page</span>
+<span class="k">const</span> close = ctx.binnacle.place(<span class="s">'dialog'</span>, {
+  kind: <span class="s">'lines'</span>,
+  draw: () =&gt; ({
+    kind: <span class="s">'ask'</span>, title: <span class="s">'Model'</span>, edge: <span class="s">'borderAccent'</span>,
+    child: { kind: <span class="s">'stack'</span>, children: models.map((m) =&gt; ({
+      kind: <span class="s">'offer'</span>, id: m, affordances: [{ kind: <span class="s">'choose'</span> }],
+      child: { kind: <span class="s">'text'</span>, text: m },
+    })) },
+  }),
+  invoke: (id) =&gt; { pick(id); close() },
+})</pre>
+</div>
+<div class="callout warn"><b>An author cannot today:</b> change what a gesture means on a box (#88). Give a single show its own gutter tone (only the theme's <code>borderMuted</code>, globally). Size an ask (#85). Add a new kind of container (that's a change to the author API by decision, ADR 11).</div>
+
+<!-- ============================================================ -->
+<h2 id="style">11 · Styling a tool card, as the author agent</h2>
+<p class="lede">A person says "try a few styles for the tool cards". This section covers what an author agent can actually hand them today, and where it hits a wall.</p>
+
+<h3>The two levers, and the split between them</h3>
+<div class="two">
+<div class="tile"><div class="role">lever A · no code · hot</div><h4>a theme file</h4>
+<p><code>&lt;profile&gt;/themes/&lt;name&gt;.json</code>, chosen by the <code>binnacle-theme</code> row's config (<code>theme</code> / <code>light</code> / <code>dark</code>). Saving it redraws the screen with no restart, and a broken file shows a notice naming its path while the last theme stays. It's checked against <code>theme.schema.json</code>. It changes <b>how every card looks</b>: tones, marks, gutter and frame glyphs, spacing, fold starts and fold words. It applies to every card at once. Rows already printed to the main screen's scrollback keep their old look (ADR 14).</p></div>
+<div class="tile"><div class="role">lever B · a plugin</div><h4>a card row (and an <code>output</code> view)</h4>
+<p><code>ctx.binnacle.card(kind, row)</code> changes <b>what a card is made of</b>, per card kind: which spans the head holds, what goes under the gutter, how output is folded. It names tones and marks, never colours. <code>ctx.binnacle.view('output', …)</code> restyles the output fold on every card, built-in and author rows alike.</p></div>
+</div>
+<div class="callout note"><b>The split.</b> The row says <i>what</i> is drawn and <i>which named tone</i>. The theme says <i>what that tone looks like</i>. To get a new look on one part of a card, add a tone in the theme (<code>"tones": {"toolPill": {…}}</code>) and name it in the row. The theme must be registered first, because a row naming a tone the theme doesn't give is refused (and see D1 for where that refusal lands).</div>
+
+<h3>A gallery an author can hand over today</h3>
+<p class="muted">Each mockup is the same <code>Read src/api.ts</code> call (plus one <code>bash</code> call), drawn in dusk.</p>
+
+<div class="two">
+<div>
+<p><span class="pill">A only</span> <b>1 · Quiet</b>: no rail, ticks, output folded away.</p>
+<div class="term" data-label="quiet"><span class="t-ok">✓</span> <span class="t-muted">Read src/api.ts</span>
+  <span class="t-dim">… 281 more lines</span>
+<span class="t-ok">✓</span> <span class="t-muted">pnpm test</span> <span class="t-dim">· took 3.2s</span>
+  <span class="t-dim">… 42 more lines</span></div>
+<pre class="code">{
+  <span class="s">"chrome"</span>: { <span class="s">"frame"</span>: <span class="s">"none"</span> },
+  <span class="s">"marks"</span>: { <span class="s">"done"</span>: { <span class="s">"glyph"</span>: <span class="s">"✓"</span> },
+             <span class="s">"running"</span>: { <span class="s">"glyph"</span>: <span class="s">"○"</span> } },
+  <span class="s">"tones"</span>: { <span class="s">"toolTitle"</span>: { <span class="s">"color"</span>: <span class="s">"#a698c8"</span> } },
+  <span class="s">"folds"</span>: { <span class="s">"tool"</span>: { <span class="s">"rows"</span>: 0 } }
+}</pre>
+<p class="muted">With <code>frame: none</code> the gutter glyph is blank, but its column stays. <code>marks</code> are shared with the transcript, so the sub-call lines change too.</p>
+</div>
+<div>
+<p><span class="pill">A only</span> <b>2 · Heavy rail</b>: a bold title on a coloured rail.</p>
+<div class="term" data-label="heavy rail"><span class="t-ok">●</span> <span class="t-tool" style="font-weight:700">Read src/api.ts</span> <span class="t-muted">· took 1.4s</span>
+<span class="t-tool">┃</span>  import type { Agent } from '…'
+<span class="t-tool">┃</span>  import type { AffordanceKind } …
+<span class="t-tool">┃</span>  import type { AuthorAdapter } …
+<span class="t-tool">┃</span>  <span class="t-dim">… 278 more lines</span></div>
+<pre class="code">{
+  <span class="s">"vars"</span>: { <span class="s">"iris"</span>: <span class="s">"#8fa6ff"</span> },
+  <span class="s">"chrome"</span>: { <span class="s">"frame"</span>: <span class="s">"heavy"</span> },
+  <span class="s">"tones"</span>: {
+    <span class="s">"borderMuted"</span>: { <span class="s">"color"</span>: <span class="s">"iris"</span> },
+    <span class="s">"toolTitle"</span>: { <span class="s">"color"</span>: <span class="s">"iris"</span>, <span class="s">"bold"</span>: true } },
+  <span class="s">"spacing"</span>: { <span class="s">"show"</span>: 2 }
+}</pre>
+<p class="muted">Caveat: <code>frame</code> also changes every ask's border, and <code>borderMuted</code> also colours the composer's frame. A theme can't target cards alone.</p>
+</div>
+</div>
+
+<div class="two">
+<div>
+<p><span class="pill">A + B</span> <b>3 · Pill head</b>: the card kind as a chip.</p>
+<div class="term" data-label="pill head"><span class="t-ok">●</span> <span style="background:var(--velvet);color:var(--lilac)"> read </span> src/api.ts
+<span class="t-dim">│</span> import type { Agent } from '…'
+<span class="t-dim">│</span> <span class="t-dim">… 280 more lines</span>
+<span class="t-muted">●</span> <span style="background:var(--velvet);color:var(--peach)"> terminal </span> pnpm test
+<span class="t-dim">│</span> <span class="t-muted">running 4s</span></div>
+<pre class="code"><span class="c">// theme: "tones": { "toolPill": { "color": "#e2c2ff",
+//                               "background": "#3b2d57" } }</span>
+ctx.binnacle.card(<span class="s">'generic'</span>, { draw: (p) =&gt; ({
+  kind: <span class="s">'show'</span>, opens: <span class="s">'output'</span>,
+  title: [p.mark, <span class="s">' '</span>,
+    { text: <span class="s">` ${p.result?.card ?? p.call.card} `</span>, tone: <span class="s">'toolPill'</span> },
+    <span class="s">' '</span>, p.call.title],
+  child: p.waiting ?? p.fold({ kind: <span class="s">'text'</span>,
+    text: p.resultText, tone: <span class="s">'toolOutput'</span> }),
+}) })</pre>
+<p class="muted">The chip shows the <i>card kind</i>, not the tool's name. <code>CardParts</code> carries no tool name (see the can't list).</p>
+</div>
+<div>
+<p><span class="pill">A + B</span> <b>4 · Filled output</b>: output on its own ground.</p>
+<div class="term" data-label="filled output"><span class="t-ok">●</span> pnpm test <span class="t-muted">· took 3.2s</span>
+<span class="t-dim">│</span> <span style="background:var(--chip);display:inline-block;width:92%"> </span>
+<span class="t-dim">│</span> <span style="background:var(--chip);display:inline-block;width:92%"> <span class="t-ok">✔</span> 412 passed                     </span>
+<span class="t-dim">│</span> <span style="background:var(--chip);display:inline-block;width:92%"> <span class="t-dim">duration 3.1s</span>                   </span>
+<span class="t-dim">│</span> <span style="background:var(--chip);display:inline-block;width:92%"> </span></div>
+<pre class="code"><span class="c">// theme: "backgrounds": { "toolOutputBg": "#2b2140" }</span>
+child: p.fold({
+  kind: <span class="s">'band'</span>, background: <span class="s">'toolOutputBg'</span>,
+  child: { kind: <span class="s">'text'</span>, text: p.resultText,
+           tone: <span class="s">'toolOutput'</span> },
+})</pre>
+<p class="muted">A band pads by <code>spacing.band</code>, which the prompt's band shares. A tone's own <code>background</code> fills only under the text, never to the edge.</p>
+</div>
+</div>
+
+<div class="two">
+<div>
+<p><span class="pill">A + B</span> <b>5 · Diff in colour</b>: a row for the <code>diff</code> kind.</p>
+<div class="term" data-label="diff row"><span class="t-ok">●</span> Edit src/ui/theme.ts <span class="t-muted">· +2 −1</span>
+<span class="t-dim">│</span> <span class="t-muted">@@ -61,3 +61,4 @@</span>
+<span class="t-dim">│</span> <span class="t-err">- retry: { glyph: '↻' },</span>
+<span class="t-dim">│</span> <span class="t-ok">+ retry: { glyph: '↻' }, // a model…</span>
+<span class="t-dim">│</span> <span class="t-ok">+ workflow: { glyph: '◇' },</span></div>
+<pre class="code"><span class="c">// theme: "tones": { "diffAdd": {"color":"#7fe0b5"},
+//                   "diffDel": {"color":"#ff6b81"} }</span>
+ctx.binnacle.card(<span class="s">'diff'</span>, { draw: (p) =&gt; {
+  <span class="k">const</span> hunks = p.result?.returned.hunks <span class="c">// the presenter's, parsed here</span>
+  <span class="k">if</span> (!Array.isArray(hunks)) <span class="k">return</span> { declined: <span class="s">'no hunks'</span> }
+  <span class="k">return</span> { kind: <span class="s">'show'</span>, opens: <span class="s">'output'</span>,
+    title: [p.mark, <span class="s">' '</span>, p.call.title],
+    child: p.fold({ kind: <span class="s">'stack'</span>, children: lines(hunks) }) }
+} })</pre>
+<p class="muted">The fields in <code>returned</code> are dsh's presenter's to rename. If they're renamed, the row declines and the generic card draws the call.</p>
+</div>
+<div>
+<p><span class="pill">B only</span> <b>6 · Every output as markdown</b>: one view, all cards.</p>
+<div class="term" data-label="output view"><span class="t-ok">●</span> WebFetch docs.example.dev
+<span class="t-dim">│</span> <span class="t-head">Getting started</span>
+<span class="t-dim">│</span> <span style="color:var(--amethyst)">•</span> install with <span style="background:var(--chip);color:var(--lilac)">pnpm add x</span>
+<span class="t-dim">│</span> <span style="color:var(--amethyst)">•</span> run <span style="background:var(--chip);color:var(--lilac)">x init</span>
+<span class="t-dim">│</span> <span class="t-dim">… 40 more lines</span></div>
+<pre class="code">ctx.binnacle.view(<span class="s">'output'</span>, (part, next) =&gt;
+  part.tool === <span class="s">'web_fetch'</span>
+    ? { kind: <span class="s">'markdown'</span>, text: part.text }
+    : next())</pre>
+<p class="muted">This is the one place the tool's name <i>is</i> handed over (<code>part.tool</code>). Code blocks draw in <code>mdCodeBlock</code> with no syntax highlighting.</p>
+</div>
+</div>
+
+<h3>Can and can't, read from the code</h3>
+<table>
+  <tr><th style="width:16%">Area</th><th style="width:42%">Can</th><th>Can't (and why)</th></tr>
+  <tr><td><b>Shape</b></td>
+    <td>Any head spans: text, tones, marks, live <code>{since}</code> / <code>{until}</code> timers. Any child: text, markdown, stack, folds (<code>fold(child, rows)</code> per call), a band, a nested show. Decline per call, so the next row draws it. A different row per card kind.</td>
+    <td>Return anything but a <code>show</code> at the top, so the head-over-gutter shape is fixed (<code>views/cards.ts#Shown</code>). Drop the gutter for one card: <code>frame:none</code> blanks it for every show, and the column stays. Put an <code>ask</code> in a card (it parses, but ADR 11 says a card shows and doesn't ask).</td></tr>
+  <tr><td><b>Colour</b></td>
+    <td>Recolour any tone, and add new ones: colour, background, bold, dim, italic, underline. Exact hex, okhsl/oklch, 256-index or the sixteen. <code>vars</code>. Light and dark variants that follow the terminal.</td>
+    <td>Name a colour in a row: only tone names, and an unknown one is refused. Escape codes in text are drawn as text (ADR 12). Give one card its own gutter tone: <code>borderMuted</code> is hard-wired in <code>layout.ts#show</code> and shared with the composer's frame (D8).</td></tr>
+  <tr><td><b>Glyphs</b></td>
+    <td>Marks (<code>running</code>, <code>done</code>, <code>failed</code>, or new ones), gutter, frame set, <code>focus ▸</code>, <code>cut …</code>, <code>separator ·</code>. Fold words (<code>cut</code>, <code>show</code>, <code>to</code> …) with <code>{n}</code> and <code>{lines}</code>.</td>
+    <td>A gutter or border glyph wider than one column (refused). An animated spinner: only <code>{since}</code> ticks, once a second. Card-only marks: <code>done</code> and <code>failed</code> are the transcript's too.</td></tr>
+  <tr><td><b>Room</b></td>
+    <td><code>spacing.show</code> (gutter to content), <code>spacing.indent</code> (sub-calls), <code>spacing.gap</code> (between entries), <code>folds.tool</code> and <code>folds.result</code> rows and open.</td>
+    <td>Know the width: a row is a function of its parts, so there's no right-aligned "took 1.4s", no width-filling rule, and no proportional bar. Side-by-side columns: no horizontal node, so no split diff. A per-tool fold start in the theme, which is keyed by entry kind (<code>tool</code>), not tool name. The row can pass <code>rows</code> to <code>fold()</code> instead. A full-line fill on a single line: a tone's background covers the text only.</td></tr>
+  <tr><td><b>Data</b></td>
+    <td>The presented title, the card kind, <code>returned</code> (the presenter's object), <code>resultText</code>, <code>reason</code>, <code>took</code>, <code>made</code> (sub-calls), <code>waiting</code>.</td>
+    <td>The tool's <b>name</b> or raw <b>arguments</b>: <code>CardParts</code> carries neither, and ADR 15 forbids reading arguments by name. A row is drawn once and kept (ADR 10), so anything it reads besides its parts needs <code>invalidate('tool')</code>.</td></tr>
+  <tr><td><b>Input</b></td>
+    <td>The head opens and folds output (<code>opens</code>) and offers <code>copy</code> of everything the card holds. Folds of its own, toggled by click and Enter.</td>
+    <td>Offer an action that does something: in the transcript only <code>expand</code> and <code>copy</code> act (<code>panes/transcript.ts</code>), and views have no <code>invoke</code>, so a "re-run" or <code>open</code> offer is inert. <code>copy</code> on an author offer copies nothing: only a show's head gets the region text. Change what a click means (#88). Scroll output inside the card (draft ADR 18: scrolling is a screen's; #82 <code>open</code>).</td></tr>
+</table>
+
+<h3>How an author iterates with a person</h3>
+<div class="flow">
+  <div class="step"><b>1 · theme first</b>Write <code>themes/cards-try.json</code>, point the <code>binnacle-theme</code> row's config at it, and the screen redraws on save</div><div class="arrow">→</div>
+  <div class="step"><b>2 · swap files</b>One file per style (<code>quiet</code>, <code>rail</code> …) means changing one word in the config</div><div class="arrow">→</div>
+  <div class="step"><b>3 · row only if needed</b>Pills, fills and diffs need a card row in a profile plugin, plus the tones it names in the theme</div><div class="arrow">→</div>
+  <div class="step"><b>4 · undo</b>Remove the plugin: its rows go and the generic card is back. Remove the file: the theme beneath stays</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="theme">12 · Theming boxes, as the author agent</h2>
+<p class="lede">A person says "make it feel like dusk, but make the asks louder and the cards calmer". This section covers what a theme reaches on each box, what a node chooses for itself, what nobody can change, and what happens when boxes are nested.</p>
+
+<h3>What a theme holds, and whether it can add names</h3>
+<table>
+  <tr><th>Part</th><th>Change binnacle's</th><th>Add your own</th><th>Reaches which box</th></tr>
+  <tr><td><code>vars</code></td><td>—</td><td><span class="pill yes">yes</span> (may chain, cycles refused)</td><td>none directly; colours by name</td></tr>
+  <tr><td><code>tones</code></td><td><span class="pill yes">yes</span> colour, background, bold, dim, italic, underline</td><td><span class="pill yes">yes</span></td><td>all: ask <code>edge</code>, show title and gutter, fold title, text spans</td></tr>
+  <tr><td><code>backgrounds</code></td><td><span class="pill yes">yes</span></td><td><span class="pill yes">yes</span></td><td><code>band</code> (required), <code>ask</code> (optional fill)</td></tr>
+  <tr><td><code>marks</code></td><td><span class="pill yes">yes</span> glyph and/or tone</td><td><span class="pill yes">yes</span> (needs glyph + tone)</td><td>any span, card heads</td></tr>
+  <tr><td><code>chrome</code></td><td><span class="pill yes">yes</span> focus, cut, separator, jump, gutter, border pieces, <code>frame</code></td><td><span class="pill no">no</span></td><td>ask border, show gutter, fold and focus markers</td></tr>
+  <tr><td><code>frame</code></td><td>one of <code>rounded</code> <code>square</code> <code>heavy</code> <code>double</code> <code>none</code></td><td><span class="pill no">no</span> named frames (set pieces instead)</td><td>every ask and every show at once</td></tr>
+  <tr><td><code>words</code></td><td><span class="pill yes">yes</span> fold words, <code>select</code>, <code>next</code>, <code>offer.&lt;kind&gt;</code></td><td><span class="pill no">no</span></td><td>fold markers, ask bottom edge, focus row</td></tr>
+  <tr><td><code>spacing</code></td><td><span class="pill yes">yes</span> band, ask, show, indent, gap</td><td><span class="pill no">no</span></td><td>one number per box kind, global</td></tr>
+  <tr><td><code>folds</code></td><td><span class="pill yes">yes</span> rows, open</td><td><span class="pill yes">yes</span> any entry key</td><td>folds, by the entry kind they're drawn in</td></tr>
+  <tr><td><code>light</code> / <code>dark</code></td><td colspan="2">every part above, laid over the rest by terminal appearance</td><td>all</td></tr>
+  <tr><td>pi's <code>colors</code></td><td colspan="2">read: <code>…Bg</code> tokens become backgrounds, the rest become tone colours</td><td>all</td></tr>
+</table>
+<p class="muted">Only <code>tones</code>, <code>backgrounds</code>, <code>marks</code> and <code>folds</code> are open to new names. Everything else is a closed set, so a theme restyles a box <i>kind</i>, never an instance.</p>
+
+<h3>Who decides each piece of a box</h3>
+<p class="muted">"Node" means the view or placement picks it per instance. "Theme" means it's global. "Fixed" means nobody can change it.</p>
+<table>
+  <tr><th>Box</th><th>Node picks</th><th>Theme decides</th><th>Fixed in <code>layout.ts</code></th></tr>
+  <tr><td><b>ask</b></td><td><code>edge</code> tone, <code>background</code>, <code>title</code> (plain string)</td><td>border glyphs (frame), padding (<code>spacing.ask</code>), hint words</td><td>title colour (<b>untoned</b>), hint colour (<b>untoned</b>), title can't hold marks or spans</td></tr>
+  <tr><td><b>show</b></td><td>title spans and <code>tone</code>, <code>opens</code></td><td>gutter glyph (frame or <code>gutter</code>), <code>spacing.show</code></td><td>gutter tone = <code>borderMuted</code>; no background</td></tr>
+  <tr><td><b>band</b></td><td><code>background</code></td><td>its colour, <code>spacing.band</code> (both sides and top/bottom)</td><td>padding is the same on all four sides</td></tr>
+  <tr><td><b>fold</b></td><td><code>title</code>, <code>tone</code>, <code>rows</code></td><td>start by entry kind, <code>cut</code> / <code>separator</code> glyphs, words</td><td>cut marker <b>untoned</b> (<code>… 3 more lines</code>)</td></tr>
+  <tr><td><b>offer focus</b></td><td><code>label</code></td><td><code>focus</code> glyph, <code>offer.&lt;kind&gt;</code> words</td><td>always the <code>accent</code> tone, shared with links, the prompt mark and searches</td></tr>
+</table>
+
+<h3>Combos that work today</h3>
+<div class="two">
+<div>
+<p><b>A · Loud ask over a quiet card</b>: an author's ask in the dialog holding a show of the command, on its own ground.</p>
+<div class="term" data-label="ask ⊃ show + offers"><span style="background:var(--plum);display:inline-block;width:100%"><span class="t-warn">╭─ </span>Run in production?<span class="t-warn"> ──────────────────╮</span>
+<span class="t-warn">│</span> <span class="t-tool">●</span> deploy --prod                        <span class="t-warn">│</span>
+<span class="t-warn">│</span> <span class="t-dim">│</span> 3 services · 1 migration             <span class="t-warn">│</span>
+<span class="t-warn">│</span> run it                                 <span class="t-warn">│</span>
+<span class="t-warn">│</span> <span class="t-accent">▸ run it</span>                               <span class="t-warn">│</span>
+<span class="t-warn">│</span> not now                                <span class="t-warn">│</span>
+<span class="t-warn">╰─ </span>enter select · tab next<span class="t-warn"> ─────────────╯</span></span></div>
+<pre class="code"><span class="c">// theme</span>
+{ <span class="s">"backgrounds"</span>: { <span class="s">"askBg"</span>: <span class="s">"#2e2344"</span> } }
+<span class="c">// node</span>
+{ kind: <span class="s">'ask'</span>, title: <span class="s">'Run in production?'</span>,
+  edge: <span class="s">'warning'</span>, background: <span class="s">'askBg'</span>,
+  child: { kind: <span class="s">'stack'</span>, children: [
+    { kind: <span class="s">'show'</span>, title: [{mark:<span class="s">'running'</span>,tone:<span class="s">'toolTitle'</span>}, <span class="s">' deploy --prod'</span>],
+      child: { kind: <span class="s">'text'</span>, text: <span class="s">'3 services · 1 migration'</span> } },
+    offer(<span class="s">'run'</span>, <span class="s">'grant'</span>, <span class="s">'run it'</span>), offer(<span class="s">'no'</span>, <span class="s">'dismiss'</span>, <span class="s">'not now'</span>) ] } }</pre>
+<p class="muted">The fill is re-applied after every inner reset, so the show's gutter and a nested band keep the ask's ground. The title "Run in production?" stays in the terminal's default colour: the ask's title can't be toned.</p>
+</div>
+<div>
+<p><b>B · Card with a banded summary</b>: a show holding a band and then a fold.</p>
+<div class="term" data-label="show ⊃ band + fold"><span class="t-ok">●</span> pnpm test <span class="t-muted">· took 3.2s</span>
+<span class="t-dim">│</span> <span style="background:var(--chip);display:inline-block;width:90%"> </span>
+<span class="t-dim">│</span> <span style="background:var(--chip);display:inline-block;width:90%"> <span class="t-ok">412 passed</span> · <span class="t-err">1 failed</span>              </span>
+<span class="t-dim">│</span> <span style="background:var(--chip);display:inline-block;width:90%"> </span>
+<span class="t-dim">│</span> FAIL test/ui/layout.test.ts
+<span class="t-dim">│</span> … 40 more lines</div>
+<pre class="code"><span class="c">// theme</span>
+{ <span class="s">"backgrounds"</span>: { <span class="s">"summaryBg"</span>: <span class="s">"#2b2140"</span> },
+  <span class="s">"spacing"</span>: { <span class="s">"band"</span>: 1 } }
+<span class="c">// card row child</span>
+{ kind: <span class="s">'stack'</span>, children: [
+  { kind: <span class="s">'band'</span>, background: <span class="s">'summaryBg'</span>, child: summary },
+  p.fold(output) ] }</pre>
+<p class="muted">The band's padding is <code>spacing.band</code>, the same number as the prompt's band. Setting it to 0 for a tight summary also squashes every prompt. The <code>… 40 more lines</code> marker can't be dimmed.</p>
+</div>
+</div>
+
+<h3>Combos that look possible but aren't</h3>
+<div class="two">
+<div>
+<p><b>C · Two asks, two frames</b>: approvals heavy, questions rounded.</p>
+<div class="term" data-label="wanted, not drawable"><span class="t-err">┏━ </span>bash asks<span class="t-err"> ━━━━━━━━━━━━━━━━━━━┓</span>   <span class="t-accent">╭─ </span>Database<span class="t-accent"> ─────────╮</span>
+<span class="t-err">┃</span> allow once                  <span class="t-err">┃</span>   <span class="t-accent">│</span> Postgres         <span class="t-accent">│</span>
+<span class="t-err">┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛</span>   <span class="t-accent">╰──────────────────╯</span></div>
+<p class="muted"><code>chrome.border</code> is one set for every ask <i>and</i> every show gutter. A node picks the edge's tone, not its glyphs. A person can have a red approval and a cyan question, but not a heavy approval and a rounded question.</p>
+</div>
+<div>
+<p><b>D · Ask inside a transcript entry</b>: "pick one to rerun".</p>
+<div class="term" data-label="draws, but lies"><span class="t-border">╭─ </span>rerun which?<span class="t-border"> ──────────────────╮</span>
+<span class="t-border">│</span> <span class="t-accent">▸ pnpm test</span>                        <span class="t-border">│</span>
+<span class="t-border">│</span> pnpm build                         <span class="t-border">│</span>
+<span class="t-border">╰─ </span>enter select · tab next<span class="t-border"> ─────────╯</span></div>
+<p class="muted">A view can return an ask, and the transcript's seat gives keys, so the bottom edge promises <code>enter select</code>. But views have no <code>invoke</code>, and in the transcript only <code>expand</code> and <code>copy</code> act. Enter does nothing.</p>
+</div>
+</div>
+
+<h3>Can and can't, theme × boxes</h3>
+<table>
+  <tr><th style="width:44%">Can</th><th>Can't (where it's fixed)</th></tr>
+  <tr><td>Recolour every ask's border (<code>border</code>), and give an instance its own via <code>edge</code> naming a tone the theme adds (<code>"danger"</code>).</td><td>Colour an ask's <b>title</b> or its <b>key hints</b>: both are written untoned in <code>layout.ts#ask</code>, and the title is a plain string, so no marks in it.</td></tr>
+  <tr><td>Fill an ask, border included, with any background, and nest bands and shows inside without breaking the fill.</td><td>Give a <b>show</b> a ground: it has no <code>background</code> field. Wrapping it in a band pads it and shares <code>spacing.band</code>.</td></tr>
+  <tr><td>Pick one frame for the whole surface, or set pieces one by one (a <code>┃</code> gutter with rounded asks).</td><td>A frame per ask or per kind. <code>frame</code> also sets the gutter: in one registration a <code>gutter</code> beside it wins, but a later registration's <code>frame</code> resets an earlier one's gutter.</td></tr>
+  <tr><td>Rename the focus glyph, rename what each offer kind says on focus, rename <code>select</code> / <code>next</code>.</td><td>Give focus its own colour: the focus row and focused fold markers use <code>accent</code>, which also colours links, the prompt mark and searches. No <code>focus</code> tone exists.</td></tr>
+  <tr><td>Change how each entry kind's folds start, including authored facts and quiet kinds by key.</td><td>Tone the cut marker <code>… N more lines</code> (untoned), or start folds per <b>tool</b> rather than per entry kind.</td></tr>
+  <tr><td>Spacing per box kind: ask padding, gutter gap, sub-call indent, entry gap.</td><td>Spacing per instance, asymmetric band padding (horizontal ≠ vertical), or an ask's height (#85 adds <code>asks.rows</code>).</td></tr>
+  <tr><td>Add tones and backgrounds that author views then name. Give light and dark variants. Paste a pi theme file as-is.</td><td>Add new <code>words</code>, <code>chrome</code> parts or <code>spacing</code> keys for an author's own boxes. An author's own ask can't have its own words for its keys.</td></tr>
+  <tr><td>Recolour markdown inside any box (<code>md…</code> tones).</td><td>Highlight code blocks: pi-tui's <code>MarkdownTheme.highlightCode</code> exists, but binnacle never passes it, and a theme can't supply a function. Markdown bold/italic are attributes, not tones.</td></tr>
+  <tr><td>Change a mark everywhere at once.</td><td>Use one mark differently in two boxes: <code>done</code> in a card head and <code>done</code> beside a marked question option are the same mark. Add a new mark instead.</td></tr>
+</table>
+
+<h3>Gaps this surfaces</h3>
+<p class="muted">These are added to section 14 as D12–D16.</p>
+<ul>
+  <li><b>Three untoned pieces of chrome</b> (ask title, ask hints, cut marker) break "a view names a tone, never a colour" from the other side. The surface paints them in no tone, so no theme reaches them.</li>
+  <li><b>No focus tone</b>: focus borrows <code>accent</code>.</li>
+  <li><b>Frame is surface-wide</b>: ADR 11 says ask and show exist so that "restyling one doesn't restyle both", yet <code>chrome.frame</code> restyles both.</li>
+  <li><b>Asks in views advertise keys that do nothing.</b></li>
+  <li><b>The closed <code>words</code>, <code>chrome</code> and <code>spacing</code></b> mean an author's box can't be themed through the same parts binnacle's are, which strains ADR 0's "same registrations".</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="planned">13 · Decided, not built</h2>
+<table>
+  <tr><th>Issue</th><th>What it changes about boxes</th></tr>
+  <tr><td>#105 <span class="pill yes">merged</span></td><td>One host <b>seat</b> (<code>host/seats.ts</code>) owns every seated pane, read from one table of what each place gives (keys, inView). #85 adds room there.</td></tr>
+  <tr><td>#85 + draft ADR 18</td><td><b>An ask fits the room it's given.</b> Edges are always drawn. Prose is paged by <code>shift+↑/↓</code>, offers are windowed with <code>7/20</code>, PageUp/PageDown jump. Nothing scrolls inside an ask. Rooms: seat <code>max(12, rows−10)</code>, dialog 4/5. New <code>ask.rows</code> and theme <code>asks.rows</code> (≥ 3). New page <code>docs/features/blocks.md</code>, which this report pre-empts.</td></tr>
+  <tr><td>#82</td><td>The card head offers <code>open</code>: content on a screen of its own, or in the dialog (undecided).</td></tr>
+  <tr><td>#88</td><td>An author changes what a gesture means.</td></tr>
+  <tr><td>#89 · #90</td><td>Question sets as tabs, sent from a review. A long ask list filtered by typing.</td></tr>
+  <tr><td>#97</td><td>Dusk ported as a theme file, proven over an ask and a show in both appearances.</td></tr>
+  <tr><td>#10</td><td>Card rows for terminal, diff, read, search and web.</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="drift">14 · Deviations to watch</h2>
+<p class="muted">Each one is a place where code, records and words disagree. Severity is about how far it pulls the project off its own commitments, not how hard it is to fix.</p>
+
+<div class="dev high"><h4><span class="tag">high · verified</span>D1. A malformed card row skips every row beneath it</h4>
+<p><code>plugins/tool-cards/cards.ts#drawCard</code> checks only <code>drawn.kind === 'show'</code>. A row that returns <code>{kind:'show', title: 5}</code> passes, and the result fails <code>parseNode</code> later in the view stack. Probed: with rows <code>[good, bad]</code>, drawCard returns the bad show, and parseNode then throws <i>"a show's title is 5"</i>. The good row is never tried. The entry falls to binnacle's own card, blamed on <code>binnacle.view(tool)</code>, not <code>binnacle.card(generic)</code>.</p>
+<p>This contradicts the <code>card</code> JSDoc in <code>api.ts</code> ("returns no show … is drawn over by the row beneath, saying why"), and the root AGENTS.md rule that author code is parsed where it enters.</p>
+<p class="fix">parseNode each row's return inside drawCard, and treat a failure as a refusal by that row.</p></div>
+
+<div class="dev med"><h4><span class="tag">med</span>D2. <code>band</code> sits outside ADR 11's closed set of containers</h4>
+<p>ADR 11 says a block that holds another names what the surface is doing, and that "these containers are a closed set" (ask, show). It rejected naming a container by how it's drawn. <code>band</code> holds a child and is named by its fill. The glossary lists it with no word on its standing. Either ADR 11 should say a band is a fill, not a container, or band is a third container that needs a meaning-based name ("what the person wrote").</p>
+<p class="fix">Settle it in ADR 11 (amend in place while young) before #85's blocks page restates it.</p></div>
+
+<div class="dev med"><h4><span class="tag">med</span>D3. "Every decision has an ask as its parent" isn't held by anything</h4>
+<p>ADR 11 commits that every decision and every tool call has the surface's container as its parent. Tool calls are held: a card row must return a show. Decisions are not. <code>parseNode</code> accepts an <code>offer</code> with <code>grant</code>/<code>dismiss</code> anywhere, and a composer-seat placement of bare offers takes the keyboard with no frame and no key hints. Only the pointer policy protects it.</p>
+<p class="fix">Decide whether this is a gate (refuse grant/dismiss outside an ask at parse) or a convention (then soften ADR 11's wording).</p></div>
+
+<div class="dev med"><h4><span class="tag">med</span>D4. Asks are called "card" in the code and tests</h4>
+<p>Approvals' and Questions' node builders are both named <code>card()</code>. Approvals' comment says "Card takes keyboard as newest composer placement", and host tests assert "the card offers both" and "a click on the card does nothing". The glossary reserves <i>card</i> for dsh's tool-view kind and says binnacle has no node of that name, and ADR 11 rejected the word for a container. This is exactly the blur that keeps "dialog/card/container" from meaning one thing.</p>
+<p class="fix">Rename them to <code>ask()</code>, and "the ask" in comments and test titles.</p></div>
+
+<div class="dev med"><h4><span class="tag">med</span>D5. The dialog is a door with no built-in feature behind it</h4>
+<p>The glossary describes the dialog as holding "an ask, as a rule", and ADR 13 lists "a dialog over the page" among the places. Yet both built-in asks chose the composer seat, and nothing built-in places there. #32 ("every door, each proven by the built-in feature placed behind it") is the record that says this matters. Proof is author tests only. #85 will give the dialog a room, so the first built-in user is near.</p>
+<p class="fix">Name its first built-in user (#82 <code>open</code>, or a <code>/settings</code> picker) on #32.</p></div>
+
+<div class="dev med"><h4><span class="tag">med · known</span>D6. A tall ask is cut off: bottom edge lost, focus on invisible offers</h4>
+<p>This is tracked as #85 (bug). Its prerequisite #105 has merged. Until it lands, "the bottom edge names the keys that answer it" doesn't hold for long asks in either place.</p></div>
+
+<div class="dev low"><h4><span class="tag">low</span>D7. A focused offer repeats its label beneath itself</h4>
+<p><code>layout.ts</code> appends a focus row <code>▸ label</code> under a focused offer's content. In an approval, the child text equals the label, so a seated approval reads <code>allow once / ▸ allow once / reject</code> (the asserted behaviour in <code>test/ui/layout.test.ts:642</code>). Questions do the same for each option. It may be intended (the focus row says what Enter does), but inside an ask it reads as a duplicate.</p>
+<p class="fix">Consider marking the focused line in place within an ask, as a focused fold marker already does.</p></div>
+
+<div class="dev low"><h4><span class="tag">low</span>D8. ask and show are asymmetric in what a node may name</h4>
+<p>An ask names its <code>edge</code> tone and <code>background</code> per node. A show names only its title <code>tone</code>, and its gutter is hard-wired to <code>borderMuted</code> in <code>layout.ts#show</code>. That fits "restyle by meaning", but a card row can't mark one show as different (a failing call's gutter in error, say) without a new theme name.</p></div>
+
+<div class="dev low"><h4><span class="tag">low</span>D9. Approvals has no test folder of its own</h4>
+<p>The root AGENTS.md says tests mirror <code>src/&lt;path&gt;</code>. <code>test/plugins/</code> has composer, questions, status-line, tool-cards and trajectory, but no <code>approvals/</code>. Its behaviour is asserted in <code>test/host/index.test.ts</code> (it's applied on the agent's scope by the host). That's defensible, but undocumented in the plugins folder note.</p></div>
+
+<div class="dev low"><h4><span class="tag">low</span>D10. Small record and code drift</h4>
+<p>ADR 11's status says "its colours are revised by ADR 16, if that is accepted", and ADR 16 and 17 are still <i>proposed</i>. In <code>ui/theme.ts#marks</code>, the comment for <code>retry</code> ("a model request dsh tries again after it failed") is appended to the <code>workflow</code> line, and <code>retry</code> has none. The <code>chrome.border</code> JSDoc says "the border an ask is framed in", while <code>chrome.frame</code> also sets the show's gutter (documented on the Theme page, not on the field).</p></div>
+
+<div class="dev low"><h4><span class="tag">low</span>D11. A card row can't tell which tool it's drawing</h4>
+<p><code>CardParts</code> holds the presented title and card kind, but not the call's name. The tool cards plugin has it (<code>entry.call.name</code>) and passes it only into the <code>output</code> part. A row styling "bash differently from read" has to guess from the title, though the <code>output</code> view gets <code>part.tool</code>. This shapes what a person can ask for at the grain ADR 0 promises, so decide whether it's a deliberate omission (ADR 15) or a gap.</p>
+<p class="fix">Either hand the row <code>tool</code> as the output part does, or say in the <code>CardParts</code> JSDoc why it's withheld.</p></div>
+
+<div class="dev med"><h4><span class="tag">med</span>D12. Three pieces of box chrome are drawn in no tone</h4>
+<p>In <code>ui/layout.ts</code>: an ask's title and its bottom-edge key hints are written between edge-toned pieces with no tone of their own, and an unfocused fold's cut marker (<code>… N more lines</code>) has none either. No theme can reach them, so a person asking to "dim the more-lines marker" or "colour the ask title" can't be served at any grain, which falls short of ADR 0.</p>
+<p class="fix">Give each a tone (pi has <code>muted</code> / <code>dim</code>, or new names), and let an ask's title be spans like a show's.</p></div>
+
+<div class="dev med"><h4><span class="tag">med</span>D13. <code>chrome.frame</code> restyles ask and show together</h4>
+<p>ADR 11 rejected one container drawn by its border because "restyling one restyled both". <code>frame</code> sets the ask border and the show gutter at once, and no node can pick its frame. Pieces can be set apart, so it's escapable, but the headline knob contradicts the record, and per-instance frames (a heavy approval) are impossible.</p>
+<p class="fix">Split into <code>frame.ask</code> / <code>frame.show</code>, or let an ask name a frame as it names an edge tone.</p></div>
+
+<div class="dev med"><h4><span class="tag">med</span>D14. An ask drawn by a view advertises keys that do nothing</h4>
+<p>The transcript is seated with keys (<code>host/seats.ts</code>), so an ask a view returns gets <code>enter select · tab next</code> on its bottom edge. Views have no <code>invoke</code>, and the transcript acts only on <code>expand</code> and <code>copy</code>. The edge's promise is false, and nothing refuses a <code>choose</code> / <code>grant</code> / <code>answer</code> offer in a view.</p>
+<p class="fix">Either hints count only offers the seat can act on, or a view refuses offers it can't honour (ties to D3).</p></div>
+
+<div class="dev low"><h4><span class="tag">low</span>D15. Focus has no tone of its own</h4>
+<p>The focus row and focused fold markers paint in <code>accent</code>, also used by links, the prompt and steer marks, and searches. Recolouring focus recolours all of them.</p>
+<p class="fix">A <code>focus</code> tone, defaulting to <code>accent</code>.</p></div>
+
+<div class="dev low"><h4><span class="tag">low</span>D16. An author's boxes can't be themed through the parts binnacle's are</h4>
+<p><code>tones</code>, <code>backgrounds</code>, <code>marks</code> and <code>folds</code> accept new names. <code>words</code>, <code>chrome</code> and <code>spacing</code> refuse them (<code>ui/theme-changes.ts</code>). An author's own ask can't say its own hint words, and its own box can't take a spacing a person tunes in the theme, so authors hard-code what binnacle's own boxes keep themeable.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="sources">15 · Sources read</h2>
+<p class="muted" style="font-family:var(--mono);font-size:12.5px;line-height:1.9">
+binnacle:packages/binnacle/src/ui/node.ts#Node · #parseNode<br>
+binnacle:packages/binnacle/src/ui/layout.ts#layout (ask, show, band, fold, answeredBy)<br>
+binnacle:packages/binnacle/src/ui/gestures.ts#meaning · ui/state.ts#act · ui/answer.ts<br>
+binnacle:packages/binnacle/src/ui/theme.ts (chrome, frames, words, spacing, folds)<br>
+binnacle:packages/binnacle/src/contract/index.ts#affordances<br>
+binnacle:packages/binnacle/src/api.ts#Registrations · #Placement · #Slot · #PlacedScreen<br>
+binnacle:packages/binnacle/src/views/cards.ts#CardRow · views/entries.ts<br>
+binnacle:packages/binnacle/src/plugins/{approvals,questions,tool-cards,composer,status-line}<br>
+binnacle:packages/binnacle/src/host/index.ts (arrange, stack, keys) · host/registrations.ts#misplaced<br>
+docs/adr 0007, 0009, 0010, 0011, 0013, 0015, 0016, 0017 · docs/glossary.md<br>
+docs/features approvals, questions, tool-cards, authoring, theme<br>
+issues #10 #32 #57 #82 #85 (draft ADR 18) #88 #89 #90 #97 #105
+</p>
+</main>
+</div>
+</body>
+</html>
