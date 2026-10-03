@@ -53,6 +53,12 @@ export type Node =
       readonly kind: 'ask'
       /** One line on its top edge, left off whole where the edge is too narrow for it. */
       readonly title?: string
+      /**
+       * The rows the ask is drawn in as a box of its own, the edges included, however much it holds and whatever
+       * the theme gives every ask: a whole number of at least 3, padded inside when what it holds is shorter, its
+       * prose paged and its offers windowed when it is taller — never taller than the room its place gives it.
+       */
+      readonly rows?: number
       /** The theme's background every line of it is filled with, border included; the terminal's own when absent. */
       readonly background?: Background
       /** The theme's tone its border is drawn in; `border` when absent. */
@@ -156,6 +162,9 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
       const title = field('title')
       if (title !== undefined && typeof title !== 'string') throw new Error(`an ask's title is ${describe(title)}`)
       if (typeof title === 'string' && /[\r\n]/.test(title)) throw new Error("an ask's title is one line")
+      const rows = field('rows')
+      if (rows !== undefined && (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 3))
+        throw new Error(`an ask's rows are ${describe(rows)}, not a whole number of rows from 3`)
       const background = field('background')
       const edge = field('edge')
       if (background !== undefined && (typeof background !== 'string' || !Object.hasOwn(theme.backgrounds, background)))
@@ -166,6 +175,7 @@ export function parseNode(value: unknown, theme: Theme = binnacleTheme): Node {
       return {
         kind: 'ask',
         ...(title === undefined ? {} : { title }),
+        ...(rows === undefined ? {} : { rows }),
         ...(background === undefined ? {} : { background: background as Background }),
         ...(edge === undefined ? {} : { edge: edge as Tone }),
         child,

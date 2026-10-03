@@ -46,7 +46,7 @@ const files = readdirSync(join(here, 'fixtures/theme')).map((file) => ({
 
 test('what the reading accepts, the schema never refuses: the worked example and the accepted set validate', () => {
   const accepted = files.filter(({ file }) => file === 'example.json' || file.startsWith('accepted-'))
-  assert.equal(accepted.length, 2, 'the worked example and the accepted set are there')
+  assert.equal(accepted.length, 3, 'the worked example and the accepted set are there')
   for (const { file, data } of accepted) {
     assert.equal(read(data), true, `the reading accepts ${file}`)
     assert.equal(validates(data), true, `the schema does not refuse ${file}`)
@@ -55,7 +55,7 @@ test('what the reading accepts, the schema never refuses: the worked example and
 
 test('each structural break is refused by both the schema and the reading', () => {
   const broken = files.filter(({ file }) => file.startsWith('broken-'))
-  assert.equal(broken.length, 12, 'twelve broken files, one structural way a theme file breaks each')
+  assert.equal(broken.length, 13, 'thirteen broken files, one structural way a theme file breaks each')
   for (const { file, data } of broken) {
     assert.equal(validates(data), false, `the schema refuses ${file}`)
     assert.equal(read(data), false, `the reading refuses ${file}`)

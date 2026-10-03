@@ -2,7 +2,7 @@ import { parseColor, visibleWidth } from '@earendil-works/pi-tui'
 import { binnacleTheme, chrome, colours, frames, themed, words } from './theme.ts'
 import type { Colour, FoldStart, Style, Theme, ThemeChanges } from './theme.ts'
 
-const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds', 'spacing', 'light', 'dark'] as const
+const parts = ['vars', 'tones', 'backgrounds', 'marks', 'chrome', 'words', 'folds', 'spacing', 'asks', 'light', 'dark'] as const
 
 function named(value: unknown): string {
   if (typeof value === 'string') return JSON.stringify(value)
@@ -195,6 +195,14 @@ function parsed(
           Object.entries(record(field, 'folds')).map(([key, start]) => [key, foldStart(start, `folds.${key}`)]),
         )
         break
+      case 'asks': {
+        const sized = record(field, 'asks')
+        const rows = 'rows' in sized ? sized.rows : undefined
+        if (rows !== undefined && (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 3))
+          throw new Error(`asks.rows is ${named(rows)}, not a whole number of rows from 3`)
+        read.asks = rows === undefined ? {} : { rows }
+        break
+      }
       default:
         throw new Error(`${part} is no part of a theme: ${parts.join(', ')}`)
     }

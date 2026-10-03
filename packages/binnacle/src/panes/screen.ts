@@ -4,7 +4,7 @@ import type { AffordanceKind, Gesture } from '../contract/index.ts'
 import { answer } from '../ui/answer.ts'
 import { describe } from '../contract/index.ts'
 import { extent, layout, under } from '../ui/layout.ts'
-import type { Frame, LayoutState } from '../ui/layout.ts'
+import type { AskDrawn, Frame, LayoutState } from '../ui/layout.ts'
 import type { Node } from '../ui/node.ts'
 import { drawPlaced, refused } from './placed.ts'
 import { gestureOf } from '../ui/pointer.ts'
@@ -24,11 +24,13 @@ export interface ScreenReports {
 
 interface Laid {
   readonly width: number
+  readonly room: LayoutState['room']
   readonly state: UiState
   readonly theme: Theme
   readonly now: number | undefined
   readonly frame: Frame
   readonly focusable: readonly string[]
+  readonly asks: readonly AskDrawn[]
 }
 
 export class ScreenPane implements Component {
@@ -36,6 +38,7 @@ export class ScreenPane implements Component {
   readonly #theme: () => Theme
   readonly #now: () => number | undefined
   readonly #keys: () => LayoutState['keys']
+  readonly #room: () => LayoutState['room']
   readonly #changed: () => void
   readonly #inView: (top: number, height: number) => void
   readonly #invoked: (region: string, affordance: AffordanceKind) => void
@@ -54,11 +57,13 @@ export class ScreenPane implements Component {
     theme: () => Theme = () => binnacleTheme,
     now: () => number | undefined = () => undefined,
     keys: () => LayoutState['keys'] = () => undefined,
+    room: () => LayoutState['room'] = () => undefined,
   ) {
     this.#facts = facts
     this.#theme = theme
     this.#now = now
     this.#keys = keys
+    this.#room = room
     this.#changed = reports.changed ?? (() => {})
     this.#inView = reports.inView ?? (() => {})
     this.#invoked = reports.invoked ?? (() => {})
@@ -77,7 +82,10 @@ export class ScreenPane implements Component {
   }
 
   get offering(): boolean {
-    return (this.#laid?.focusable.length ?? 0) > 0
+    const laid = this.#laid
+    if (laid === undefined) return false
+    // An ask paged or windowed takes the keyboard for its keys, as one that offers does for its offers'.
+    return laid.focusable.length > 0 || laid.asks.some((ask) => ask.pages > 1 || ask.shown < ask.offers.length)
   }
 
   get focused(): boolean {
@@ -164,10 +172,12 @@ export class ScreenPane implements Component {
     const laid = this.#laid
     const theme = this.#theme()
     const now = this.#now()
+    const room = this.#room()
     if (
       !this.#stale &&
       laid !== undefined &&
       laid.width === width &&
+      laid.room === room &&
       laid.state === state &&
       laid.theme === theme &&
       (!this.#timed || laid.now === now)
@@ -176,17 +186,24 @@ export class ScreenPane implements Component {
     const node = this.#drawn(theme)
     this.#timed = timedIn(node)
     const keys = this.#keys()
-    const frame = layout(node, width, { ...state, ...(now === undefined ? {} : { now }), ...(keys === undefined ? {} : { keys }) }, theme)
-    const next: Laid = {
+    const frame = layout(
+      node,
       width,
-      state,
+      { ...state, ...(now === undefined ? {} : { now }), ...(keys === undefined ? {} : { keys }), ...(room === undefined ? {} : { room }) },
       theme,
-      now,
-      frame,
-      focusable: frame.regions.filter((placed) => placed.region.affordances.length > 0).map((placed) => placed.region.id),
-    }
+    )
+    const next: Laid = { width, room, state, theme, now, frame, focusable: frame.focusable, asks: frame.asks }
     this.#laid = next
     this.#stale = false
+    this.#kept(frame.asks)
     return next
+  }
+
+  /** The clamped page and window each ask drew are kept, so the state stays valid as what it drew changes. */
+  #kept(asks: readonly AskDrawn[]): void {
+    const held = this.#state.asks
+    const clamped = asks.map((ask) => ({ page: ask.page, window: ask.window }))
+    if (clamped.every((ask, at) => held?.[at]?.page === ask.page && held?.[at]?.window === ask.window)) return
+    this.#state = { ...this.#state, asks: clamped }
   }
 }

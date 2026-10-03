@@ -6,11 +6,11 @@ What a view draws with and how a person's input changes what is shown: nodes lai
 - `derived-colours.ts` — the theme's default colours, derived from the palette the terminal reports: each colour's hue from one of its sixteen, at a lightness that keeps its contrast on the background it reported, and its sixteen by index when it reports nothing; a port of pi's own (MIT, [`NOTICE`](../../NOTICE)), ours from here on.
 - `gestures.ts` — the gesture table: what a gesture means on the regions it lands on, or nothing.
 - `keys.ts` — the key table: binnacle's and pi-tui's bindings in one manager, the keys plugins offer for their screens, and what key bytes resolve to.
-- `layout.ts` — a node at a width as a frame: the lines it draws and the regions placed on them; `under` finds the regions at a point.
+- `layout.ts` — a node at a width as a frame: the lines it draws and the regions placed on them, and where an ask taller than its height holds its page and its window; `under` finds the regions at a point. Overflow is the ask's, here: an ask taller than its room pages its prose and windows its offers, edges kept, and nothing else is windowed by binnacle.
 - `node.ts` — the nodes a view draws with, and parsing a node an author's code returned.
 - `pointer.ts` — pi-tui's mouse events as gestures.
 - `readable.ts` — the treatment every string a node carries gets before layout, so no text a view draws acts on the terminal.
-- `state.ts` — UI state: what a person opened and what has focus, and what an action does to it.
+- `state.ts` — UI state: what a person opened, what has focus, and where each ask's prose page and offers' window stand; and what an action does to it.
 - `theme-changes.ts` — an author's theme registration, checked and copied as data where it enters.
 - `theme.ts` — the theme binnacle draws in: tones, backgrounds, marks, the chrome's glyphs and words, markdown, composer and search styles; `themed` lays changes over it.
 

@@ -2,11 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
 import { extent, layout, under } from '../../src/ui/layout.ts'
-import type { Frame } from '../../src/ui/layout.ts'
+import type { AskDrawn, Frame, LayoutState } from '../../src/ui/layout.ts'
 import type { Node } from '../../src/ui/node.ts'
 import { drawText } from '../support/draw.ts'
 import { componentOf } from '../support/drawn.ts'
 import { binnacleTheme, themed } from '../../src/ui/theme.ts'
+import { parseNode } from '../../src/ui/node.ts'
 
 const OPEN = { toggled: new Set<string>() }
 
@@ -17,6 +18,8 @@ test('text wraps at the width, as pi-tui wraps it, and offers nothing', () => {
   assert.deepEqual(plain(layout({ kind: 'text', text: 'the quick brown fox jumps' }, 10, OPEN)), {
     lines: ['the quick', 'brown fox', 'jumps'],
     regions: [],
+    focusable: [],
+    asks: [],
   })
 })
 
@@ -44,6 +47,8 @@ test('a stack draws its children in order, and what offers something is a region
         width: 5,
       },
     ],
+    focusable: ['answer:4'],
+    asks: [],
   })
 })
 
@@ -169,6 +174,8 @@ test('a fold whose content was cut shows its first rows, says what it cut, and o
         width: 20,
       },
     ],
+    focusable: ['tool:c1'],
+    asks: [],
   })
 })
 
@@ -184,11 +191,13 @@ test('an opened fold shows everything, and expand folds it back', () => {
         width: 20,
       },
     ],
+    focusable: ['tool:c1'],
+    asks: [],
   })
 })
 
 test('a fold whose content fits offers nothing, so no gesture reaches it', () => {
-  assert.deepEqual(plain(layout({ ...long, rows: 4 }, 20, OPEN)), { lines: ['l1', 'l2', 'l3', 'l4'], regions: [] })
+  assert.deepEqual(plain(layout({ ...long, rows: 4 }, 20, OPEN)), { lines: ['l1', 'l2', 'l3', 'l4'], regions: [], focusable: [], asks: [] })
 })
 
 test('a titled fold whose content fits draws its title above it, and offers nothing', () => {
@@ -355,6 +364,8 @@ test('an ask draws what it holds inside a rounded border, its title on the top e
   assert.deepEqual(plain(layout({ kind: 'ask', title: 'bash', child: { kind: 'text', text: 'exit 0' } }, 20, OPEN)), {
     lines: ['╭─ bash ───────────╮', '│ exit 0           │', '╰──────────────────╯'],
     regions: [],
+    focusable: [],
+    asks: [{ page: 0, pages: 1, pageRows: 0, window: 0, shown: 0, offers: [] }],
   })
 })
 
@@ -543,9 +554,16 @@ test("a cut fold says what an author's theme gives the chrome and the words: its
   )
 })
 
-/** The keys a table binds: Enter answers what has focus, Tab moves it on; nothing else is bound. */
+/** The keys a table binds: Enter answers what has focus, Tab moves it on, the shift arrows page prose; nothing else is bound. */
 const keys = (binding: string): readonly string[] =>
-  (({ primary: ['enter'], 'focus.next': ['tab'] }) as Readonly<Record<string, readonly string[]>>)[binding] ?? []
+  (
+    ({
+      primary: ['enter'],
+      'focus.next': ['tab'],
+      'page.previous': ['shift+up'],
+      'page.next': ['shift+down'],
+    }) as Readonly<Record<string, readonly string[]>>
+  )[binding] ?? []
 
 /** An ask holding two offers, as an approval does. */
 const asked = {
@@ -589,6 +607,323 @@ test('what a show holds is a region beside its gutter, below its title, its rows
 
 test('an ask names on its bottom edge the keys that answer what it holds, as the key table binds them', () => {
   assert.equal(plain(layout(asked, 30, { ...OPEN, keys })).lines.at(-1), '╰─ enter select · tab next ──╯')
+})
+
+/** An ask holding twenty offers of one row each, as a long list to choose from is drawn. */
+const twenty = {
+  kind: 'ask',
+  title: 'pick',
+  child: {
+    kind: 'stack',
+    children: Array.from({ length: 20 }, (_, at): Node => ({
+      kind: 'offer',
+      id: `o${at + 1}`,
+      affordances: [{ kind: 'choose', label: `option ${at + 1}` }],
+      child: { kind: 'text', text: `option ${at + 1}` },
+    })),
+  },
+} as const
+
+test('an ask whose offers are taller than its room keeps its edges, windows whole offers holding the focused one, and says where it is on the bottom edge', () => {
+  const frame = layout(twenty, 30, { toggled: new Set<string>(), focus: 'o7', room: 8 })
+  assert.deepEqual(plain(frame).lines, [
+    `╭─ pick ${'─'.repeat(21)}╮`,
+    '│ option 3                   │',
+    '│ option 4                   │',
+    '│ option 5                   │',
+    '│ option 6                   │',
+    '│ option 7                   │',
+    '│ ▸ option 7                 │',
+    `╰─ 7/20 ${'─'.repeat(21)}╯`,
+  ])
+  assert.deepEqual(
+    frame.regions.map(({ region, top, height, left, width }) => [region.id, top, height, left, width]),
+    [
+      ['o3', 1, 1, 2, 26],
+      ['o4', 2, 1, 2, 26],
+      ['o5', 3, 1, 2, 26],
+      ['o6', 4, 1, 2, 26],
+      ['o7', 5, 2, 2, 26],
+    ],
+  )
+  // Every offer is focusable, the windowed away included, so focus can reach them.
+  assert.deepEqual(
+    frame.focusable,
+    Array.from({ length: 20 }, (_, at) => `o${at + 1}`),
+  )
+  assert.deepEqual(frame.asks, [
+    { page: 0, pages: 1, pageRows: 0, window: 2, shown: 5, offers: Array.from({ length: 20 }, (_, at) => `o${at + 1}`) },
+  ])
+})
+
+/** The twenty offers as the ask reports them, in order. */
+const twentyOffers = Array.from({ length: 20 }, (_, at) => `o${at + 1}`)
+
+/** The one ask a frame holds, as the ask reports where its window stands. */
+const askOf = (frame: Frame): AskDrawn => {
+  const [ask] = frame.asks
+  assert.ok(ask !== undefined, 'the ask reports where its window stands')
+  return ask
+}
+
+/** The twenty offers' ask drawn at a room of eight rows, in a state a test fills in. */
+const inRoomEight = (state: {
+  readonly focus?: string
+  readonly asks?: readonly ({ page: number; window: number } | undefined)[]
+}): Frame => layout(twenty, 30, { toggled: new Set<string>(), ...state, room: 8 })
+
+test("moving focus past the window's end brings the next offer in, and the window moves no further than it must", () => {
+  const drawn = inRoomEight
+  const offers = twentyOffers
+  // With nothing focused the window starts where the state says: at its first offer.
+  assert.deepEqual(drawn({}).asks, [{ page: 0, pages: 1, pageRows: 0, window: 0, shown: 6, offers }])
+  assert.deepEqual(askOf(drawn({ focus: 'o8' })), { page: 0, pages: 1, pageRows: 0, window: 3, shown: 5, offers })
+  assert.deepEqual(plain(drawn({ focus: 'o8' })).lines.slice(1, -1), [
+    '│ option 4                   │',
+    '│ option 5                   │',
+    '│ option 6                   │',
+    '│ option 7                   │',
+    '│ option 8                   │',
+    '│ ▸ option 8                 │',
+  ])
+  // Focus moving inside the window moves nothing; focus above it brings the window up to the offer.
+  assert.equal(askOf(drawn({ focus: 'o6', asks: [{ page: 0, window: 3 }] })).window, 3)
+  assert.equal(askOf(drawn({ focus: 'o2', asks: [{ page: 0, window: 3 }] })).window, 1)
+})
+
+/** An ask holding six rows of prose over three offers of one row each, as a long plan review is drawn. */
+const longAsked = {
+  kind: 'ask',
+  title: 'plan',
+  child: {
+    kind: 'stack',
+    children: [
+      ...Array.from({ length: 6 }, (_, row): Node => ({ kind: 'text', text: `p${row + 1}` })),
+      ...(['one', 'two', 'three'] as const).map((text, at): Node => ({
+        kind: 'offer',
+        id: `o${at + 1}`,
+        affordances: [{ kind: 'choose', label: `option ${at + 1}` }],
+        child: { kind: 'text', text },
+      })),
+    ],
+  },
+} as const
+
+/** One row of an ask drawn at 60 columns. */
+const wideRow = (text: string): string => `│ ${text}${' '.repeat(57 - text.length)}│`
+
+test('an ask whose prose is taller than its room pages the prose, keeps its offers and edges drawn, and says which page it is on', () => {
+  const frame = layout(longAsked, 60, { toggled: new Set<string>(), room: 10, keys })
+  assert.deepEqual(plain(frame).lines, [
+    `╭─ plan ${'─'.repeat(51)}╮`,
+    wideRow('p1'),
+    wideRow('p2'),
+    wideRow('p3'),
+    wideRow('p4'),
+    wideRow('page 1/2'),
+    wideRow('one'),
+    wideRow('two'),
+    wideRow('three'),
+    `╰─ enter select · tab next · shift+up/shift+down page ${'─'.repeat(5)}╯`,
+  ])
+  assert.deepEqual(frame.asks, [{ page: 0, pages: 2, pageRows: 4, window: 0, shown: 3, offers: ['o1', 'o2', 'o3'] }])
+})
+
+test('the next page of the prose keeps one row of the last, and the position row moves under it', () => {
+  const frame = layout(longAsked, 60, { toggled: new Set<string>(), room: 10, keys, asks: [{ page: 3, window: 0 }] })
+  assert.deepEqual(plain(frame).lines.slice(1, -1), [
+    wideRow('p4'),
+    wideRow('p5'),
+    wideRow('p6'),
+    wideRow('page 2/2'),
+    wideRow(''),
+    wideRow('one'),
+    wideRow('two'),
+    wideRow('three'),
+  ])
+  assert.deepEqual(frame.asks, [{ page: 3, pages: 2, pageRows: 4, window: 0, shown: 3, offers: ['o1', 'o2', 'o3'] }])
+})
+
+test("the theme's asks.rows makes every ask a box of that height, padded inside when what it holds is shorter", () => {
+  const theme = themed(binnacleTheme, [{ asks: { rows: 6 } }])
+  assert.deepEqual(plain(layout({ kind: 'ask', title: 'pick', child: { kind: 'text', text: 'one' } }, 12, OPEN, theme)).lines, [
+    '╭─ pick ───╮',
+    '│ one      │',
+    '│          │',
+    '│          │',
+    '│          │',
+    '╰──────────╯',
+  ])
+  assert.deepEqual(layout({ kind: 'ask', title: 'pick', child: { kind: 'text', text: 'one' } }, 12, OPEN, theme).asks, [
+    { page: 0, pages: 1, pageRows: 0, window: 0, shown: 0, offers: [] },
+  ])
+})
+
+test('an ask naming its own rows is drawn at that height, whatever the theme gives every ask', () => {
+  const theme = themed(binnacleTheme, [{ asks: { rows: 8 } }])
+  const ask = parseNode({ kind: 'ask', title: 'pick', rows: 5, child: { kind: 'text', text: 'one' } }, theme)
+  assert.deepEqual(plain(layout(ask, 12, OPEN, theme)).lines, [
+    '╭─ pick ───╮',
+    '│ one      │',
+    '│          │',
+    '│          │',
+    '╰──────────╯',
+  ])
+})
+
+test("an ask's position words are the theme's, wherever it says where it is: the window on the edge, the page beneath the prose", () => {
+  const theme = themed(binnacleTheme, [{ words: { page: 'pg', 'offer.at': '{count} of {of}', 'page.at': 'pg {count}/{of}' } }])
+  assert.equal(plain(layout(twenty, 30, { toggled: new Set<string>(), room: 8 }, theme)).lines.at(-1), `╰─ 1 of 20 ${'─'.repeat(18)}╯`)
+  const paged = layout(longAsked, 60, { toggled: new Set<string>(), room: 10, keys }, theme)
+  assert.equal(plain(paged).lines[5], `│ pg 1/2${' '.repeat(51)}│`)
+  assert.equal(plain(paged).lines.at(-1), `╰─ enter select · tab next · shift+up/shift+down pg ${'─'.repeat(7)}╯`)
+})
+
+test('an ask below the root of what is drawn has no room of it, and an ask of its own rows is windowed where it sits', () => {
+  const node: Node = {
+    kind: 'stack',
+    children: [
+      { kind: 'text', text: 'before' },
+      { ...twenty, rows: 7, title: 'pick' },
+    ],
+  }
+  const frame = layout(node, 30, { toggled: new Set<string>(), room: 24 })
+  assert.deepEqual(plain(frame).lines, [
+    'before',
+    `╭─ pick ${'─'.repeat(21)}╮`,
+    '│ option 1                   │',
+    '│ option 2                   │',
+    '│ option 3                   │',
+    '│ option 4                   │',
+    '│ option 5                   │',
+    `╰─ 1/20 ${'─'.repeat(21)}╯`,
+  ])
+  assert.deepEqual(frame.asks, [{ page: 0, pages: 1, pageRows: 0, window: 0, shown: 5, offers: twentyOffers }])
+})
+
+/** An ask of `prose` one-row prose lines over three one-row offers, as a plan review is drawn. */
+const proseOver = (prose: number): Node => ({
+  kind: 'ask',
+  title: 'plan',
+  child: {
+    kind: 'stack',
+    children: [
+      ...Array.from({ length: prose }, (_, row): Node => ({ kind: 'text', text: `p${row + 1}` })),
+      ...(['one', 'two', 'three'] as const).map((text, at): Node => ({
+        kind: 'offer',
+        id: `o${at + 1}`,
+        affordances: [{ kind: 'choose', label: `option ${at + 1}` }],
+        child: { kind: 'text', text },
+      })),
+    ],
+  },
+})
+
+test('prose that the last full page finishes pages into no further page', () => {
+  // Seven prose rows, four a page, stepping three: pages one and two (from row four) hold it all.
+  const frame = layout(proseOver(7), 60, { toggled: new Set<string>(), room: 10, keys })
+  assert.deepEqual(frame.asks, [{ page: 0, pages: 2, pageRows: 4, window: 0, shown: 3, offers: ['o1', 'o2', 'o3'] }])
+  // A page held beyond the last is clamped onto it, not onto a page of one row.
+  const clamped = layout(proseOver(7), 60, { toggled: new Set<string>(), room: 10, keys, asks: [{ page: 6, window: 0 }] })
+  assert.deepEqual(clamped.asks, [{ page: 3, pages: 2, pageRows: 4, window: 0, shown: 3, offers: ['o1', 'o2', 'o3'] }])
+  assert.deepEqual(
+    plain(clamped)
+      .lines.slice(1, 5)
+      .map((line) => line.slice(2, -1).trimEnd()),
+    ['p4', 'p5', 'p6', 'p7'],
+  )
+})
+
+test('the window moves no further than it must among offers of unequal rows, wrapped ones among them', () => {
+  const unequal: Node = {
+    kind: 'ask',
+    title: 'pick',
+    child: {
+      kind: 'stack',
+      children: [
+        { kind: 'offer', id: 'a', affordances: [{ kind: 'choose', label: 'a' }], child: { kind: 'text', text: 'a\na\na\na' } },
+        { kind: 'offer', id: 'b', affordances: [{ kind: 'choose', label: 'b' }], child: { kind: 'text', text: 'b' } },
+        { kind: 'offer', id: 'c', affordances: [{ kind: 'choose', label: 'c' }], child: { kind: 'text', text: 'c c c c c c c c c c' } },
+      ],
+    },
+  }
+  const frame = layout(unequal, 20, { toggled: new Set<string>(), focus: 'c', room: 6 })
+  assert.deepEqual(frame.asks, [{ page: 0, pages: 1, pageRows: 0, window: 1, shown: 2, offers: ['a', 'b', 'c'] }])
+  assert.deepEqual(plain(frame).lines, [
+    `╭─ pick ${'─'.repeat(11)}╮`,
+    '│ b                │',
+    '│ c c c c c c c c  │',
+    '│ c c              │',
+    '│ ▸ c              │',
+    '╰─ 3/3 ────────────╯',
+  ])
+  assert.deepEqual(
+    frame.regions.map(({ region, top, height, left, width }) => [region.id, top, height, left, width]),
+    [
+      ['b', 1, 1, 2, 16],
+      ['c', 2, 3, 2, 16],
+    ],
+  )
+})
+
+test('only what is drawn and offers something is focusable: not an offer that offers nothing, not what a fold holds away', () => {
+  assert.deepEqual(layout({ kind: 'offer', id: 'none', affordances: [], child: { kind: 'text', text: 'plain' } }, 30, OPEN).focusable, [])
+  const folded: Node = {
+    kind: 'fold',
+    id: 'f',
+    rows: 0,
+    child: { kind: 'offer', id: 'hidden', affordances: [{ kind: 'copy', label: 'copy' }], child: { kind: 'text', text: 'held' } },
+  }
+  assert.deepEqual(layout(folded, 30, OPEN).focusable, ['f'])
+  const opened = layout(folded, 30, { toggled: new Set(['f']) })
+  assert.deepEqual(opened.focusable, ['f', 'hidden'], 'opened, what it holds is drawn and focusable again')
+  // A fold that shows rows keeps focusable what its rows show, and drops what it cut.
+  const below: Node = { ...(folded.child as Extract<Node, { readonly kind: 'offer' }>), id: 'below' }
+  const cut: Node = { ...folded, rows: 1, child: { kind: 'stack', children: [{ kind: 'text', text: 'shown' }, below] } }
+  assert.deepEqual(layout(cut, 30, OPEN).focusable, ['f'], 'the offer beneath the rows it shows is held away')
+})
+
+test('the bottom edge keeps the tail of its hint that fits, so where the ask is and what pages it outlive the well-known keys', () => {
+  const drawnAt = (width: number, state: LayoutState): readonly string[] => drawText(componentOf(oneOffer, state), width)
+  // At thirty columns the whole hint cannot fit; the paging keys are kept and the select hint dropped.
+  const oneOffer: Node = {
+    kind: 'ask',
+    title: 'plan',
+    child: {
+      kind: 'stack',
+      children: [
+        ...Array.from({ length: 10 }, (_, row): Node => ({ kind: 'text', text: `p${row + 1}` })),
+        { kind: 'offer', id: 'yes', affordances: [{ kind: 'choose', label: 'yes' }], child: { kind: 'text', text: 'yes' } },
+      ],
+    },
+  }
+  assert.equal(drawnAt(30, { ...OPEN, room: 8, keys }).at(-1), `╰─ shift+up/shift+down page ${'─'.repeat(1)}╯`)
+  // And a windowed ask keeps its position, dropping the select hint before it.
+  assert.equal(drawText(componentOf(twenty, { ...OPEN, focus: 'o7', room: 8, keys }), 35).at(-1), `╰─ tab next · 7/20 ${'─'.repeat(15)}╯`)
+})
+
+test('a position word too wide for the ask is left off whole, never drawn over its edge', () => {
+  const seventy: Node = {
+    kind: 'ask',
+    title: 'plan',
+    child: { kind: 'stack', children: Array.from({ length: 70 }, (_, row): Node => ({ kind: 'text', text: `p${row + 1}` })) },
+  }
+  // At twelve columns the word `page 1/18` cannot fit the eight inside the border; the row stays, the word goes.
+  assert.deepEqual(drawText(componentOf(seventy, { ...OPEN, room: 8 }), 12), [
+    '╭─ plan ───╮',
+    '│ p1       │',
+    '│ p2       │',
+    '│ p3       │',
+    '│ p4       │',
+    '│ p5       │',
+    '│          │',
+    '╰──────────╯',
+  ])
+  assert.equal(
+    layout(seventy, 12, { ...OPEN, room: 8 }).asks[0]?.pages,
+    18,
+    'the prose still pages, and the ask still says where it is to the pane',
+  )
 })
 
 test("a card may be filled with a background and edged in a tone, both the theme's, every line of it filled", () => {

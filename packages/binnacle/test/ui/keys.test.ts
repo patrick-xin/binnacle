@@ -109,3 +109,26 @@ test('the table names the keys that give a gesture each meaning, as a person bou
   assert.deepEqual(table.keysOf('grant'), ['y'])
   assert.deepEqual(table.keysOf('primary'), ['enter', 'space'])
 })
+
+test("while something has focus the shift arrows page an ask's prose, and while a seat offers PageUp/PageDown jump its window; otherwise both reach the viewport", () => {
+  assert.deepEqual(resolve('\x1b[1;2A', true), { kind: 'gesture', binding: 'page.previous' })
+  assert.deepEqual(resolve('\x1b[1;2B', true), { kind: 'gesture', binding: 'page.next' })
+  for (const focused of [false, true]) {
+    assert.deepEqual(resolve('\x1b[5~', focused, false, true), { kind: 'gesture', binding: 'jump.previous' })
+    assert.deepEqual(resolve('\x1b[6~', focused, false, true), { kind: 'gesture', binding: 'jump.next' })
+    assert.deepEqual(resolve('\x1b[5~', focused), undefined)
+    assert.deepEqual(resolve('\x1b[6~', focused), undefined)
+  }
+  // And with nothing focused, while a seat offers: an ask of prose alone is paged by them.
+  assert.deepEqual(resolve('\x1b[1;2A', false, false, true), { kind: 'gesture', binding: 'page.previous' })
+  assert.deepEqual(resolve('\x1b[1;2B', false, false, true), { kind: 'gesture', binding: 'page.next' })
+  for (const data of ['\x1b[1;2A', '\x1b[1;2B']) assert.deepEqual(resolve(data, false), undefined)
+})
+
+test('the table names the keys bound to paging, and a person may rebind them', () => {
+  const table = keyTable()
+  assert.deepEqual(table.keysOf('page.next'), ['shift+down'])
+  table.bind({ 'binnacle.ask.pageDown': 'ctrl+d' })
+  assert.deepEqual(table.keysOf('page.next'), ['ctrl+d'])
+  assert.deepEqual(table.resolve('\x04', true), { kind: 'gesture', binding: 'page.next' })
+})

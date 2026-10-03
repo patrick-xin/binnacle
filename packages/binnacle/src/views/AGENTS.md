@@ -4,7 +4,7 @@ How the transcript is drawn: each entry through the built-in view for its kind a
 
 - `cards.ts` — the tool cards' vocabulary in the author API: what a presenter declared, the parts a card row is handed, and the row.
 - `entries.ts` — the built-in views: how each kind of entry is drawn and what its content offers, with authors' views drawn over them and fenced.
-- `screen.ts` — the screen: the whole transcript and the UI state at a width, as lines, regions and what can take focus, keeping each entry's drawing while it stands.
+- `screen.ts` — the screen: the whole transcript and the UI state at a width, as lines, regions and what can take focus, keeping each entry's drawing while it stands, an entry laid out again only when its own asks moved.
 
 ## Keep
 

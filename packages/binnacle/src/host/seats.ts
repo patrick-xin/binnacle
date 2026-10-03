@@ -8,10 +8,11 @@ import type { Theme } from '../ui/theme.ts'
 import type { Views } from '../views/entries.ts'
 import type { Placement, PlacedScreen, Slot, Surface } from '../api.ts'
 
-/** What one place gives the pane seated in it: the keys that reach its gestures, and focus brought into view on the place's scroll. */
+/** What one place gives the pane seated in it: the keys that reach its gestures, focus brought into view on the place's scroll, and the room an ask at its root is given, from the rows the terminal has. */
 interface Given {
   readonly keys: boolean
   readonly inView: boolean
+  readonly room?: (rows: number) => number
 }
 
 /** The one table of places, read by every seating. */
@@ -19,9 +20,9 @@ const places: Readonly<Record<'screen' | Slot, Given>> = {
   transcript: { keys: true, inView: true },
   screen: { keys: true, inView: true },
   'above-composer': { keys: false, inView: false },
-  composer: { keys: true, inView: false },
+  composer: { keys: true, inView: false, room: (rows) => Math.max(12, rows - 10) },
   'below-composer': { keys: false, inView: false },
-  dialog: { keys: true, inView: false },
+  dialog: { keys: true, inView: false, room: (rows) => Math.floor((rows * 4) / 5) },
 }
 
 /** What the seats ask of the host: a frame drawn now or asked for, a copy written, the fullscreen taken. */
@@ -47,6 +48,7 @@ export class Seats {
   readonly #theme: () => Theme
   readonly #now: () => number | undefined
   readonly #keys: () => LayoutState['keys']
+  readonly #rows: () => number
   readonly #facts: () => readonly Fact[]
   readonly #surface: () => Surface
   readonly #screens = new Map<string, ScreenPane>()
@@ -61,6 +63,7 @@ export class Seats {
     theme: () => Theme,
     now: () => number | undefined,
     keys: () => LayoutState['keys'],
+    rows: () => number,
     facts: () => readonly Fact[],
     surface: () => Surface,
   ) {
@@ -68,6 +71,7 @@ export class Seats {
     this.#theme = theme
     this.#now = now
     this.#keys = keys
+    this.#rows = rows
     this.#facts = facts
     this.#surface = surface
     this.transcript = new TranscriptPane(
@@ -90,6 +94,7 @@ export class Seats {
       this.#theme,
       this.#now,
       this.#keysOf('screen'),
+      this.#roomOf('screen'),
     )
     this.#screens.set(id, pane)
     return pane
@@ -114,6 +119,7 @@ export class Seats {
       this.#theme,
       this.#now,
       this.#keysOf(slot),
+      this.#roomOf(slot),
     )
     pane.place(slot, { draw: (drawn) => placement.draw(drawn, this.#surface()) }, `binnacle.place(${slot})`)
     inSlot.set(placement, pane)
@@ -182,6 +188,12 @@ export class Seats {
   /** The keys a place gives the pane seated in it, as the pane's keys getter takes it. */
   #keysOf(place: 'screen' | Slot): () => LayoutState['keys'] {
     return places[place].keys ? this.#keys : () => undefined
+  }
+
+  /** The room a place gives the ask at the root of what its pane draws, read as each frame is laid out. */
+  #roomOf(place: 'screen' | Slot): () => LayoutState['room'] {
+    const room = places[place].room
+    return room === undefined ? () => undefined : () => room(this.#rows())
   }
 
   #transcriptView(): ScrollView {

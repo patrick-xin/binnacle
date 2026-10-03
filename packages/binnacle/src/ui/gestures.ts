@@ -21,6 +21,10 @@ export function meaning(gesture: Gesture, under: readonly Region[]): Action | un
       if (gesture.binding === 'focus.next') return { kind: 'focus', step: 1 }
       if (gesture.binding === 'focus.previous') return { kind: 'focus', step: -1 }
       if (gesture.binding === 'focus.out') return { kind: 'unfocus' }
+      if (gesture.binding === 'page.next') return { kind: 'page', step: 1 }
+      if (gesture.binding === 'page.previous') return { kind: 'page', step: -1 }
+      if (gesture.binding === 'jump.next') return { kind: 'jump', step: 1 }
+      if (gesture.binding === 'jump.previous') return { kind: 'jump', step: -1 }
       // Primary key invokes the focused region; a key bound to a kind invokes the first region it lands on that offers it.
       const binding = gesture.binding
       const region =

@@ -371,6 +371,7 @@ export interface ThemeVariant {
     readonly spacing?: {
         readonly [part in keyof Spacing]?: number;
     };
+    readonly asks?: Asks;
     readonly marks?: {
         readonly [name: string]: {
             readonly glyph?: string;
@@ -492,6 +493,9 @@ export declare const words: {
     readonly to: (count: number) => string;
     readonly select: 'select';
     readonly next: 'next';
+    readonly page: 'page';
+    readonly 'offer.at': (count: number, of: number) => string;
+    readonly 'page.at': (count: number, of: number) => string;
     readonly 'offer.expand': 'expand';
     readonly 'offer.choose': 'choose';
     readonly 'offer.open': 'open';
@@ -512,6 +516,10 @@ export interface Spacing {
     readonly show: number;
     readonly indent: number;
     readonly gap: number;
+}
+// ui/theme.d.ts
+export interface Asks {
+    readonly rows?: number;
 }
 // ui/theme.d.ts
 export type Tone = keyof typeof tones | (string & {});
@@ -536,6 +544,7 @@ export type Node = {
 } | {
     readonly kind: 'ask';
     readonly title?: string;
+    readonly rows?: number;
     readonly background?: Background;
     readonly edge?: Tone;
     readonly child: Node;

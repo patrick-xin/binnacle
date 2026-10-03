@@ -16,6 +16,8 @@ export interface BinnacleKeybindings extends AffordanceKeybindings {
   'binnacle.focusPrevious': true
   'binnacle.primary': true
   'binnacle.stepOut': true
+  'binnacle.ask.pageUp': true
+  'binnacle.ask.pageDown': true
 }
 
 declare module '@earendil-works/pi-tui' {
@@ -28,6 +30,8 @@ export const BINNACLE_BINDINGS = {
   'binnacle.focusPrevious': { defaultKeys: 'up', description: 'focus the previous thing that offers something' },
   'binnacle.primary': { defaultKeys: 'enter', description: 'do what the focused thing offers first' },
   'binnacle.stepOut': { defaultKeys: 'escape', description: 'give the keyboard back to the composer' },
+  'binnacle.ask.pageUp': { defaultKeys: 'shift+up', description: 'page back the prose of the ask in focus' },
+  'binnacle.ask.pageDown': { defaultKeys: 'shift+down', description: 'page on the prose of the ask in focus' },
   'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'stop a running turn; pressed twice, quit' },
   'binnacle.switchScreens': { defaultKeys: 'ctrl+t', description: 'switch screens' },
   'binnacle.interrupt': { defaultKeys: 'escape', description: 'interrupt the running turn, while nothing has focus' },
@@ -62,13 +66,17 @@ const bindingIds: Readonly<Partial<Record<KeyBinding, Keybinding>>> = {
   'focus.previous': 'binnacle.focusPrevious',
   'focus.out': 'binnacle.stepOut',
   primary: 'binnacle.primary',
+  'page.previous': 'binnacle.ask.pageUp',
+  'page.next': 'binnacle.ask.pageDown',
+  'jump.previous': 'tui.select.pageUp',
+  'jump.next': 'tui.select.pageDown',
 }
 
 const offeredBinding = (name: string): string => `binnacle.screen.${name}`
 
 export interface KeyTable {
   readonly manager: KeybindingsManager
-  readonly resolve: (data: string, focused: boolean, open?: boolean) => ResolvedKey | undefined
+  readonly resolve: (data: string, focused: boolean, open?: boolean, offering?: boolean) => ResolvedKey | undefined
   readonly keysOf: (binding: KeyBinding) => readonly KeyId[]
   readonly offer: (name: string, definition: KeybindingDefinition) => () => void
   readonly bind: (bindings: KeybindingsConfig) => void
@@ -99,7 +107,7 @@ export function keyTable(): KeyTable {
       }
     },
     keysOf: (binding: KeyBinding): readonly KeyId[] => manager.getKeys(bindingIds[binding] ?? (`binnacle.${binding}` as Keybinding)),
-    resolve: (data: string, focused: boolean, open = false): ResolvedKey | undefined => {
+    resolve: (data: string, focused: boolean, open = false, offering = false): ResolvedKey | undefined => {
       if (isKeyRelease(data) || isKeyRepeat(data)) return undefined
       // Bindings are checked in order: quit and screen switching, then screen keys if open,
       // step in, then focus moves/primary/step-out if focused, then affordances, else interrupt.
@@ -117,10 +125,25 @@ export function keyTable(): KeyTable {
           { id: 'binnacle.focusPrevious', to: { kind: 'gesture', binding: 'focus.previous' } },
           { id: 'binnacle.primary', to: { kind: 'gesture', binding: 'primary' } },
           { id: 'binnacle.stepOut', to: { kind: 'gesture', binding: 'focus.out' } },
+          { id: 'binnacle.ask.pageUp', to: { kind: 'gesture', binding: 'page.previous' } },
+          { id: 'binnacle.ask.pageDown', to: { kind: 'gesture', binding: 'page.next' } },
         )
         for (const kind of Object.keys(affordances) as AffordanceKind[])
           live.push({ id: `binnacle.${kind}` as Keybinding, to: { kind: 'gesture', binding: kind } })
       } else live.push({ id: 'binnacle.interrupt', to: { kind: 'interrupt' } })
+      // An ask paged by keys takes them with nothing focused, as one that offers takes them for its offers'.
+      if (!focused && offering)
+        live.push(
+          { id: 'binnacle.ask.pageUp', to: { kind: 'gesture', binding: 'page.previous' } },
+          { id: 'binnacle.ask.pageDown', to: { kind: 'gesture', binding: 'page.next' } },
+        )
+      // While a seat offers — a dialog or an ask in the composer's place — its window takes PageUp and PageDown
+      // ahead of the viewport's keys of the same name.
+      if (offering)
+        live.push(
+          { id: 'tui.select.pageUp', to: { kind: 'gesture', binding: 'jump.previous' } },
+          { id: 'tui.select.pageDown', to: { kind: 'gesture', binding: 'jump.next' } },
+        )
       // Explicit bindings take precedence over defaults.
       const explicit = live.filter(({ id }) => Object.hasOwn(set, id) && set[id] !== undefined)
       return (explicit.find(({ id }) => manager.matches(data, id)) ?? live.find(({ id }) => manager.matches(data, id)))?.to

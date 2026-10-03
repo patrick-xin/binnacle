@@ -609,6 +609,31 @@ test("an ask's frame is drawn in pi's border token and a show's gutter in border
   ])
 })
 
+test("the theme's asks.rows makes every ask a box of that height, and disposing it gives the default back", async () => {
+  const { registrations, author } = surface()
+  const asked: Node = { kind: 'ask', title: 'pick', child: { kind: 'text', text: 'one' } }
+  await author((ctx) => {
+    ctx.binnacle.view('prompt', () => asked)
+  })
+  const fiber = await author((ctx) => {
+    ctx.binnacle.theme({ asks: { rows: 6 } })
+  })
+  assert.deepEqual(shown(registrations), [
+    `╭─ pick ${'─'.repeat(31)}╮`,
+    '│ one                                  │',
+    '│                                      │',
+    '│                                      │',
+    '│                                      │',
+    `╰${'─'.repeat(38)}╯`,
+  ])
+  await fiber.dispose()
+  assert.deepEqual(
+    shown(registrations).slice(0, 3),
+    [`╭─ pick ${'─'.repeat(31)}╮`, '│ one                                  │', `╰${'─'.repeat(38)}╯`],
+    'with the theme gone, the ask grows with what it holds again',
+  )
+})
+
 test('a theme registration draws and lays out every entry again, so an author changes no view of their own for it', async () => {
   const { registrations, author } = surface()
   let calls = 0

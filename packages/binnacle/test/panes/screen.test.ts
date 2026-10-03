@@ -180,3 +180,126 @@ test('a key bound to copy on a focused show on a placed screen hands the host al
   assert.deepEqual(copied, ['a\nb\nc'])
   assert.deepEqual(invoked, [])
 })
+
+/** An ask of `count` offers, each one row, titled as given. */
+const offered = (title: string, count: number): Node => ({
+  kind: 'ask',
+  title,
+  child: {
+    kind: 'stack',
+    children: Array.from({ length: count }, (_, at): Node => ({
+      kind: 'offer',
+      id: `o${at + 1}`,
+      affordances: [{ kind: 'choose', label: `option ${at + 1}` }],
+      child: { kind: 'text', text: `option ${at + 1}` },
+    })),
+  },
+})
+
+/** An ask of six rows of prose over three offers, titled as given. */
+const paged = (title: string): Node => ({
+  kind: 'ask',
+  title,
+  child: {
+    kind: 'stack',
+    children: [
+      ...Array.from({ length: 6 }, (_, row): Node => ({ kind: 'text', text: `p${row + 1}` })),
+      ...(['one', 'two', 'three'] as const).map((text, at): Node => ({
+        kind: 'offer',
+        id: `o${at + 1}`,
+        affordances: [{ kind: 'choose', label: `option ${at + 1}` }],
+        child: { kind: 'text', text },
+      })),
+    ],
+  },
+})
+
+test('a pane given a room pages its ask by keys and keeps the page it drew, clamped', () => {
+  const pane = new ScreenPane(
+    () => [],
+    {},
+    () => binnacleTheme,
+    () => undefined,
+    () => undefined,
+    () => 10,
+  )
+  pane.place('asked', { draw: () => paged('plan') })
+  pane.handleKey({ kind: 'key', binding: 'focus.next' })
+  assert.deepEqual(
+    drawText(pane, 60)
+      .slice(1, -1)
+      .map((line) => line.slice(2, -1).trimEnd()),
+    ['p1', 'p2', 'p3', 'p4', 'page 1/2', 'one', 'two', 'three'],
+  )
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'page.next' }), true)
+  assert.deepEqual(
+    drawText(pane, 60)
+      .slice(1, -1)
+      .map((line) => line.slice(2, -1).trimEnd()),
+    ['p4', 'p5', 'p6', 'page 2/2', '', 'one', 'two', 'three'],
+  )
+  // At the last page, paging on is answered but moves nothing, and paging back returns.
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'page.next' }), true)
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'page.previous' }), true)
+  assert.deepEqual(
+    drawText(pane, 60)
+      .slice(1, -1)
+      .map((line) => line.slice(2, -1).trimEnd()),
+    ['p1', 'p2', 'p3', 'p4', 'page 1/2', 'one', 'two', 'three'],
+  )
+})
+
+test('a pane given a room jumps focus a window of offers on, and the window follows', () => {
+  const pane = new ScreenPane(
+    () => [],
+    {},
+    () => binnacleTheme,
+    () => undefined,
+    () => undefined,
+    () => 8,
+  )
+  pane.place('asked', { draw: () => offered('pick', 20) })
+  pane.handleKey({ kind: 'key', binding: 'focus.next' })
+  assert.deepEqual(
+    drawText(pane, 30)
+      .slice(1, -1)
+      .map((line) => line.slice(2, -1).trimEnd()),
+    ['option 1', 'option 2', 'option 3', 'option 4', 'option 5', 'option 6'],
+  )
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'jump.next' }), true)
+  assert.deepEqual(
+    drawText(pane, 30)
+      .slice(1, -1)
+      .map((line) => line.slice(2, -1).trimEnd()),
+    ['option 3', 'option 4', 'option 5', 'option 6', 'option 7', '▸ option 7'],
+  )
+  assert.equal(drawText(pane, 30).at(-1), '╰─ 7/20 ─────────────────────╯')
+})
+
+test('a placed ask whose rows are not a whole number from 3 draws what went wrong, naming them', () => {
+  const pane = new ScreenPane(() => [])
+  pane.place('asked', { draw: () => ({ kind: 'ask', rows: 2, child: { kind: 'text', text: 'one' } }) as unknown as Node })
+  assert.deepEqual(drawText(pane, 100), [
+    "✗ binnacle.screen(asked) returned no drawable node: an ask's rows are 2, not a whole number of rows",
+    'from 3',
+  ])
+})
+
+test('a room that changes with the terminal is read on every frame: the ask is drawn at the room it now has', () => {
+  let room: number | undefined = 8
+  const pane = new ScreenPane(
+    () => [],
+    {},
+    () => binnacleTheme,
+    () => undefined,
+    () => undefined,
+    () => room,
+  )
+  pane.place('asked', { draw: () => offered('pick', 20) })
+  assert.equal(drawText(pane, 30).length, 8)
+  assert.equal(drawText(pane, 30).length, 8, 'the same frame again')
+  room = 12
+  assert.equal(drawText(pane, 30).length, 12, 'a taller terminal gives the ask a taller room')
+  room = undefined
+  assert.equal(drawText(pane, 30).length, 22, 'a place that gives no room draws the ask whole')
+})
