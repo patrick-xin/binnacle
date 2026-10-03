@@ -2,7 +2,7 @@
 
 When the agent needs a person's answer — which database, which checks to run, whether a plan is good enough — it asks with dsh's `ask_user_question` tool. The ask goes down dsh's `user-questions/request` waterfall; nothing in binnacle answered, the waterfall found no answerer and failed `NO_PROVIDER`, so the agent could never ask. With this feature, the ask reaches the person at the one place they already are:
 
-- What the agent asks sits in the composer's place, one question at a time: an ask titled with the question's header, the question, and its detail beneath as markdown, whose bottom edge names the keys that answer it. What they had typed waits under it.
+- What the agent asks sits in the composer's place, one question at a time: an ask titled with the question's header, the question, and its detail beneath as markdown, whose bottom edge names the keys that answer it. What they had typed waits under it. However much it holds, the ask fits the room its place gives it: a long detail is paged by the shift arrows, and forty options show in a window that follows focus, saying where it is — its edges always drawn ([Blocks](blocks.md)).
 - **Pick an option by a key or a click.** Enter chooses the focused option, and a click invokes the option it lands on. On a question that allows several, choosing marks the option — the done mark beside its label — and a last offer, **done**, answers with what is marked.
 - **Type an answer of their own.** The offer places the composer in the seat with the question still readable above it; the line submitted is the answer, and a blank line gives the ask back.
 - **Skip** the question, answering it with nothing selected, or **cancel** the whole ask — the key bound to `dismiss` cancels, as it rejects an approval.

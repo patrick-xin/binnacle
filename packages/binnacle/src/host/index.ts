@@ -22,6 +22,7 @@ import type {
   ScrollView,
   Terminal,
   TerminalColorMode,
+  TuiInputListener,
   TerminalColorScheme,
   TerminalColors,
   TUI,
@@ -133,15 +134,75 @@ function reaching(live: () => TUI): TUI {
   })
 }
 
+/** The terminal the host hands pi-tui: every byte runs the host's one key listener first, so a seat that offers takes its keys ahead of pi-tui's own input chain, the viewport's PageUp and PageDown included. */
+class AheadTerminal implements Terminal {
+  readonly #real: Terminal
+  readonly #keys: TuiInputListener
+  constructor(real: Terminal, keys: TuiInputListener) {
+    this.#real = real
+    this.#keys = keys
+  }
+  start(onInput: (data: string) => void, onResize: () => void): void {
+    this.#real.start((data) => {
+      if (this.#keys(data)?.consume === true) return
+      onInput(data)
+    }, onResize)
+  }
+  stop(): void {
+    this.#real.stop()
+  }
+  drainInput(maxMs?: number, idleMs?: number): Promise<void> {
+    return this.#real.drainInput(maxMs, idleMs)
+  }
+  write(data: string): void {
+    this.#real.write(data)
+  }
+  get columns(): number {
+    return this.#real.columns
+  }
+  get rows(): number {
+    return this.#real.rows
+  }
+  get kittyProtocolActive(): boolean {
+    return this.#real.kittyProtocolActive
+  }
+  moveBy(lines: number): void {
+    this.#real.moveBy(lines)
+  }
+  hideCursor(): void {
+    this.#real.hideCursor()
+  }
+  showCursor(): void {
+    this.#real.showCursor()
+  }
+  clearLine(): void {
+    this.#real.clearLine()
+  }
+  clearFromCursor(): void {
+    this.#real.clearFromCursor()
+  }
+  clearScreen(): void {
+    this.#real.clearScreen()
+  }
+  setTitle(title: string): void {
+    this.#real.setTitle(title)
+  }
+  setProgress(active: boolean): void {
+    this.#real.setProgress(active)
+  }
+}
+
 function takeTerminal(session: OpenedSession, registrations: RegistrationService, quit: () => void, first: TuiMode): () => void {
-  const terminal = internals.terminal()
+  const real = internals.terminal()
+  // The keys listener is defined below; the terminal only reads it as input arrives, by then defined.
+  const terminal = new AheadTerminal(real, (data) => keys(data))
   const events: SessionEvent[] = []
   const facts: Fact[] = []
   let tui: TuiMainScreen | TuiAltScreen
   let left: TuiMainScreenRenderState | undefined
   const copy = (text: string): void => {
     const byTerminal = (): void => {
-      terminal.write(`\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`)
+      real.write(`\x1b]52;c;${Buffer.from(text).toString('base64')}\x07`)
     }
     const native = internals.clipboard()
     if (native?.setText === undefined) byTerminal()
@@ -164,6 +225,7 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     () => registrations.currentTheme,
     () => internals.clock.now(),
     () => table.keysOf,
+    () => terminal.rows,
     () => facts,
     () => surface(),
   )
@@ -341,7 +403,8 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
           : undefined
     if (seat !== undefined && !seat.focused) seat.handleKey({ kind: 'key', binding: 'focus.next' })
     const reading = seat ?? (open === undefined ? (page.transcript ? transcript : undefined) : open.pane)
-    const resolved = table.resolve(data, reading?.focused ?? false, seat === undefined && open !== undefined)
+    const offering = seat !== undefined || (open !== undefined && open.pane.offering)
+    const resolved = table.resolve(data, reading?.focused ?? false, seat === undefined && open !== undefined, offering)
     if (resolved?.kind === 'quit') {
       if (arming !== undefined) {
         quit()
@@ -417,7 +480,6 @@ function takeTerminal(session: OpenedSession, registrations: RegistrationService
     if (next instanceof TuiMainScreen && left !== undefined) next.restoreRenderState(left)
     if (next instanceof TuiMainScreen) seats.onMainScreen()
     stack(next)
-    next.addInputListener(keys)
     unscheme?.()
     unscheme = next.onTerminalColorSchemeChange((scheme) => {
       appearance = scheme

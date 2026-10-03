@@ -113,6 +113,7 @@ export class TranscriptPane implements Component {
   render(width: number): string[] {
     const now = settled(this.#transcript)
     let screen = this.#draw(this.#transcript, this.#state, width, this.#views(), this.#theme(), this.#now())
+    this.#kept(screen)
     if (this.#on === 'regular' && this.#state.focus !== undefined) {
       // Avoid changing already-printed rows.
       const through = (entries: number): number => (entries === 0 ? 0 : (screen.ends[entries - 1] ?? screen.lines.length))
@@ -188,6 +189,14 @@ export class TranscriptPane implements Component {
       this.#changed()
     }
     return true
+  }
+
+  /** The clamped page and window each ask drew are kept, so the state stays valid as what it drew changes. */
+  #kept(screen: Screen): void {
+    const held = this.#state.asks
+    const clamped = screen.asks.map((ask) => ({ page: ask.page, window: ask.window }))
+    if (clamped.every((ask, at) => held?.[at]?.page === ask.page && held?.[at]?.window === ask.window)) return
+    this.#state = { ...this.#state, asks: clamped }
   }
 
   #printedThrough(width: number, screen: Screen): number {

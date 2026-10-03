@@ -32,7 +32,16 @@ export interface Region {
   readonly text?: string
 }
 
-export type KeyBinding = 'focus.next' | 'focus.previous' | 'focus.out' | 'primary' | AffordanceKind
+export type KeyBinding =
+  | 'focus.next'
+  | 'focus.previous'
+  | 'focus.out'
+  | 'primary'
+  | 'page.previous'
+  | 'page.next'
+  | 'jump.previous'
+  | 'jump.next'
+  | AffordanceKind
 
 export type Gesture =
   | { readonly kind: 'click' }
@@ -46,6 +55,10 @@ export type Action =
   | { readonly kind: 'scroll'; readonly region: string; readonly delta: number }
   | { readonly kind: 'select' }
   | { readonly kind: 'focus'; readonly step: 1 | -1 }
+  /** Moves the prose page of the ask holding focus, or else the first paged ask, on by its page height less one row, clamped. */
+  | { readonly kind: 'page'; readonly step: 1 | -1 }
+  /** Moves focus by the window's count of offers, clamped at the ends, never wrapping. */
+  | { readonly kind: 'jump'; readonly step: 1 | -1 }
   | { readonly kind: 'unfocus' }
 
 export function describe(value: unknown): string {

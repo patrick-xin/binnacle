@@ -98,6 +98,12 @@ export const words = {
   select: 'select',
   /** What the keys that move focus on in an ask do, as its bottom edge names them. */
   next: 'next',
+  /** What the keys that page an ask's prose do, as its bottom edge names them while it is paged. */
+  page: 'page',
+  /** Where an ask's window is, as its bottom edge says it: the focused offer's number, and how many offers there are. */
+  'offer.at': (count: number, of: number): string => `${count}/${of}`,
+  /** Which page an ask's prose is on, as the row under the page shown says it. */
+  'page.at': (count: number, of: number): string => `page ${count}/${of}`,
   /** What each kind of offer does, said where an offer names no label of its own. */
   'offer.expand': 'expand',
   'offer.choose': 'choose',
@@ -107,7 +113,7 @@ export const words = {
   'offer.grant': 'allow',
   'offer.dismiss': 'dismiss',
 } as const satisfies { readonly [kind in AffordanceKind as `offer.${kind}`]: string } & Readonly<
-  Record<string, string | ((count: number) => string)>
+  Record<string, string | ((count: number) => string) | ((count: number, of: number) => string)>
 >
 
 /** The words that say no count: each is said as it is, where the rest are templates of a count. */
@@ -116,6 +122,7 @@ const plainWords = [
   'away',
   'select',
   'next',
+  'page',
   'offer.expand',
   'offer.choose',
   'offer.open',
@@ -126,6 +133,11 @@ const plainWords = [
 ] as const
 
 type PlainWord = (typeof plainWords)[number]
+
+/** The words that count two things, an ask's position words: templates of `{count}` and `{of}`. */
+const atWords = ['offer.at', 'page.at'] as const
+
+type AtWord = (typeof atWords)[number]
 
 /**
  * The theme's chrome: the glyphs the chrome — the focus row, a cut fold, a
@@ -232,12 +244,21 @@ export interface Theme {
   readonly chrome: { readonly [part in Exclude<keyof typeof chrome, 'border'>]: string } & {
     readonly border: { readonly [piece in keyof typeof chrome.border]: string }
   }
-  readonly words: { readonly [word in Exclude<keyof typeof words, PlainWord>]: (count: number) => string } & {
-    readonly [word in PlainWord]: string
+  readonly words: {
+    readonly [word in Exclude<keyof typeof words, PlainWord | AtWord>]: (count: number) => string
+  } & { readonly [word in PlainWord]: string } & { readonly [word in AtWord]: (count: number, of: number) => string } & {
+    readonly [word: string]: string | ((count: number) => string) | ((count: number, of: number) => string)
   }
   readonly markdown: MarkdownTheme
   readonly folds: { readonly [key: string]: FoldStart | undefined }
   readonly spacing: Spacing
+  readonly asks: Asks
+}
+
+/** How every ask is given room: the rows it is drawn in as a box of its own, edges included, when a person or a view names them. */
+export interface Asks {
+  /** The rows every ask is drawn in, however much it holds; absent, an ask grows with what it holds, up to its room. */
+  readonly rows?: number
 }
 
 /** The room the layout leaves, in columns or rows, each a whole number. */
@@ -271,6 +292,7 @@ export const binnacleTheme: Theme = {
   words,
   markdown: markdownTheme,
   spacing: { band: 1, ask: 1, show: 1, indent: 2, gap: 1 },
+  asks: {},
   folds: {
     answer: { rows: 0 },
     streaming: { rows: 0 },
@@ -321,6 +343,8 @@ export interface ThemeVariant {
   readonly folds?: { readonly [key: string]: FoldStart }
   /** The room the layout leaves, each part named replacing the one beneath. */
   readonly spacing?: { readonly [part in keyof Spacing]?: number }
+  /** How every ask is given room: the rows it is drawn in as a box of its own, edges included. */
+  readonly asks?: Asks
   /** Marks, by name: a glyph, a tone, or both. */
   readonly marks?: { readonly [name: string]: { readonly glyph?: string; readonly tone?: Tone } }
 }
@@ -395,6 +419,11 @@ function foreground(colour: Colour, mode: TerminalColorMode): string {
 
 function counting(template: string): (count: number) => string {
   return (count) => template.replaceAll('{n}', String(count)).replaceAll('{lines}', lineWord(count))
+}
+
+/** A position word's template, counting two things: where something is, and how many there are. */
+function at(template: string): (count: number, of: number) => string {
+  return (count, of) => template.replaceAll('{count}', String(count)).replaceAll('{of}', String(of))
 }
 
 function filling(colour: Colour, mode: TerminalColorMode): (text: string) => string {
@@ -473,11 +502,14 @@ export function themed(base: Theme, registered: readonly ThemeChanges[], look: T
     }
     for (const [word, template] of Object.entries(change.words ?? {})) {
       if (template === undefined) continue
-      said = (plainWords as readonly string[]).includes(word) ? { ...said, [word]: template } : { ...said, [word]: counting(template) }
+      const written = (atWords as readonly string[]).includes(word) ? at(template) : counting(template)
+      said = (plainWords as readonly string[]).includes(word) ? { ...said, [word]: template } : { ...said, [word]: written }
     }
   }
   let room: Spacing = base.spacing
   for (const change of changes) room = { ...room, ...change.spacing }
+  let asked: Asks = base.asks
+  for (const change of changes) asked = { ...asked, ...change.asks }
   let starts: Theme['folds'] = base.folds
   for (const change of changes) {
     for (const [key, start] of Object.entries(change.folds ?? {})) starts = { ...starts, [key]: { ...starts[key], ...start } }
@@ -487,6 +519,7 @@ export function themed(base: Theme, registered: readonly ThemeChanges[], look: T
     ...base,
     folds: starts,
     spacing: room,
+    asks: asked,
     chrome: glyphs,
     words: said,
     tones: tonesNow,

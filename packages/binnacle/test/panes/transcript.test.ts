@@ -6,7 +6,7 @@ import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { adapt } from '../../src/facts/adapt.ts'
 import type { Fact } from '../../src/facts/adapt.ts'
-import type { View, Views } from '../../src/api.ts'
+import type { Node, View, Views } from '../../src/api.ts'
 import { TranscriptPane } from '../../src/panes/transcript.ts'
 import type { PaneReports } from '../../src/panes/transcript.ts'
 import { prompt as promptFact, call as callFact, returned as returnedFact } from '../support/facts.ts'
@@ -647,4 +647,131 @@ test('a key bound to copy on a focused card hands the host all the card holds, a
   shown(pane)
   pane.handleKey({ kind: 'key', binding: 'copy' })
   assert.deepEqual(copied, ['w\nx\ny\nz'])
+})
+
+/** An author's view drawing every prompt as an ask of its own height, holding one-row offers named by count. */
+const askedAlike =
+  (rows: number, count: number): View =>
+  () => ({
+    kind: 'ask',
+    title: 'pick',
+    rows,
+    child: {
+      kind: 'stack',
+      children: Array.from({ length: count }, (_, at): Node => ({
+        kind: 'offer',
+        id: `o${at + 1}`,
+        affordances: [{ kind: 'choose', label: `option ${at + 1}` }],
+        child: { kind: 'text', text: `o${at + 1}` },
+      })),
+    },
+  })
+
+/** One row of an ask drawn at 40 columns. */
+const askRow = (text: string): string => `│ ${text}${' '.repeat(37 - text.length)}│`
+
+test("an author's ask naming its own rows is windowed in the transcript too, and jumps by keys", () => {
+  const views: Views = new Map([['prompt', [askedAlike(6, 20)]]])
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
+  pane.push(prompt)
+  assert.deepEqual(shown(pane), [
+    `╭─ pick ${'─'.repeat(31)}╮`,
+    askRow('o1'),
+    askRow('o2'),
+    askRow('o3'),
+    askRow('o4'),
+    `╰─ 1/20 ${'─'.repeat(31)}╯`,
+  ])
+  // Focus reaches the offers the window holds away, and the window follows the jump.
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.next' }), true)
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'jump.next' }), true)
+  assert.deepEqual(shown(pane), [
+    `╭─ pick ${'─'.repeat(31)}╮`,
+    askRow('o3'),
+    askRow('o4'),
+    askRow('o5'),
+    askRow('▸ option 5'),
+    `╰─ 5/20 ${'─'.repeat(31)}╯`,
+  ])
+})
+
+/** An author's ask of its own rows over `prose` one-row prose lines and one offer, as the drawing stands. */
+const pagedAlike =
+  (rows: number, prose: () => number): View =>
+  () => ({
+    kind: 'ask',
+    title: 'plan',
+    rows,
+    child: {
+      kind: 'stack',
+      children: [
+        ...Array.from({ length: prose() }, (_, line): Node => ({ kind: 'text', text: `p${line + 1}` })),
+        { kind: 'offer', id: 'yes', affordances: [{ kind: 'choose', label: 'yes' }], child: { kind: 'text', text: 'yes' } },
+      ],
+    },
+  })
+
+const twoPromptPane = (view: View): TranscriptPane => {
+  const views: Views = new Map([['prompt', [view]]])
+  const pane = new TranscriptPane(
+    () => {},
+    () => views,
+  )
+  pane.push(prompt)
+  pane.push(promptFact(2, 2, 'and the tests'))
+  return pane
+}
+
+test('two entries each holding an ask are paged apart: paging the one in focus leaves the other as it was', () => {
+  const pane = twoPromptPane(pagedAlike(8, () => 8))
+  const before = shown(pane)
+  // Focus reaches the second entry's offer (the nearest the composer).
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'page.next' }), true)
+  const after = shown(pane)
+  assert.deepEqual(after.slice(0, 8), before.slice(0, 8), "the first entry's ask keeps its first page")
+  assert.deepEqual(
+    after.slice(9),
+    [
+      `╭─ plan ${'─'.repeat(31)}╮`,
+      askRow('p3'),
+      askRow('p4'),
+      askRow('p5'),
+      askRow('page 2/4'),
+      askRow('yes'),
+      askRow('▸ yes'),
+      `╰${'─'.repeat(38)}╯`,
+    ],
+    "the second entry's ask, the one in focus, turns its page",
+  )
+})
+
+test('the transcript keeps the page an ask was clamped onto, so what it holds growing back does not jump', () => {
+  let prose = 12
+  const pane = twoPromptPane(pagedAlike(8, () => prose))
+  shown(pane)
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'focus.previous' }), true)
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'page.next' }), true)
+  shown(pane)
+  assert.equal(pane.handleKey({ kind: 'key', binding: 'page.next' }), true)
+  assert.ok(
+    shown(pane).some((line) => line.includes('page 3/6')),
+    'paged on twice',
+  )
+  // The prose shrinks so the page held is beyond the last; then it grows back.
+  prose = 5
+  pane.invalidate()
+  assert.ok(
+    shown(pane).some((line) => line.includes('page 2/2')),
+    'clamped onto the last page of what it now holds',
+  )
+  prose = 12
+  pane.invalidate()
+  assert.ok(
+    shown(pane).some((line) => line.includes('page 2/6')),
+    'still the page it was clamped onto, not the one it left',
+  )
 })

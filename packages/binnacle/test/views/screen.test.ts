@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { stripTerminalSequences } from '@earendil-works/pi-tui'
+import type { Node, View, Views } from '../../src/api.ts'
+import type { AskState } from '../../src/ui/state.ts'
 import type { Fact } from '../../src/facts/adapt.ts'
 import type { Frame } from '../../src/ui/layout.ts'
 import { initial } from '../../src/ui/state.ts'
@@ -15,6 +17,8 @@ import { prompt as promptFact } from '../support/facts.ts'
 const plain = (frame: Frame): Frame => ({
   lines: frame.lines.map((line) => stripTerminalSequences(line).trimEnd()),
   regions: frame.regions,
+  focusable: frame.focusable,
+  asks: frame.asks,
 })
 
 /**
@@ -215,4 +219,78 @@ test('an entry whose view draws the time since a moment is drawn at the time the
   )
   assert.equal(at(15_000).timed, true)
   assert.equal(draw(transcript([promptFact(1, 10_000, 'fix the build')]), initial, 40, new Map(), binnacleTheme, 15_000).timed, false)
+})
+
+test("one entry's ask paging lays out that entry alone, not every entry the session holds", () => {
+  let painted = 0
+  const theme = {
+    ...binnacleTheme,
+    tones: {
+      ...binnacleTheme.tones,
+      text: (text: string): string => {
+        painted++
+        return text
+      },
+    },
+  }
+  const views: Views = new Map([
+    [
+      'prompt',
+      [
+        (): Node => ({
+          kind: 'ask',
+          title: 'plan',
+          rows: 8,
+          child: {
+            kind: 'stack',
+            children: [
+              ...Array.from({ length: 8 }, (_, line): Node => ({ kind: 'text', text: `p${line + 1}` })),
+              { kind: 'offer', id: 'yes', affordances: [{ kind: 'choose', label: 'yes' }], child: { kind: 'text', text: 'yes' } },
+            ],
+          },
+        }),
+      ],
+    ],
+  ])
+  const facts = Array.from({ length: 100 }, (_, at) => promptFact(at + 1, at + 1, `fix ${at + 1}`))
+  const model = transcript(facts)
+  const draw = screens()
+  const warm = draw(model, initial, 40, views, theme)
+  // The pane's kept state, dense, with only the last ask paged on.
+  const asks = warm.asks.map((ask) => ({ page: ask.page, window: ask.window }))
+  asks[99] = { page: 3, window: 0 }
+  painted = 0
+  const next = draw(model, { ...initial, asks }, 40, views, theme)
+  assert.equal(next.asks[99]?.page, 3, "the last entry's ask is drawn on its second page")
+  assert.equal(painted, 9, "the last entry's nine text lines alone are laid out again")
+})
+
+/** An ask of its own rows holding one-row prose lines, as an author's view draws it. */
+const proseAsk =
+  (prose: number): View =>
+  () => ({
+    kind: 'ask',
+    title: 'plan',
+    rows: 8,
+    child: { kind: 'stack', children: Array.from({ length: prose }, (_, line): Node => ({ kind: 'text', text: `p${line + 1}` })) },
+  })
+
+test('an entry whose asks moved to another offset is laid out again, not answered from the warm cache', () => {
+  const views = new Map<string, readonly View[]>([
+    ['prompt', [proseAsk(12)]],
+    ['context', [proseAsk(12)]],
+  ])
+  const context: Fact = { kind: 'context', seq: 2, time: 2, source: 'goal', blocks: [{ kind: 'text', text: 'a\nb' }] }
+  const model = transcript([promptFact(1, 1, 'fix the build'), context])
+  const draw = screens()
+  // Both asks drawn once: the prompt's at index 0 on page five, the context's at index 1 on its first.
+  const asks: readonly (AskState | undefined)[] = [
+    { page: 4, window: 0 },
+    { page: 0, window: 0 },
+  ]
+  draw(model, { ...initial, asks }, 40, views, binnacleTheme)
+  // The prompt's view stack alone changes, to plain text: the context's ask now stands at index 0.
+  views.set('prompt', [(): Node => ({ kind: 'text', text: 'gone' })])
+  const next = draw(model, { ...initial, asks }, 40, views, binnacleTheme)
+  assert.equal(next.asks[0]?.page, 4, 'the remaining ask reads the state at the offset it now stands at')
 })

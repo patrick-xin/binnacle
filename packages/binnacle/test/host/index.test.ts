@@ -2669,6 +2669,216 @@ test("lines in the composer's seat that offer something take the keyboard: enter
   assert.deepEqual(session.sent, [])
 })
 
+/** An ask of `count` one-row offers, titled as given, as a long list to choose from is seated. */
+const offeredAsk = (title: string, count: number): Extract<Placement, { readonly kind: 'lines' }> => ({
+  kind: 'lines',
+  draw: () => ({
+    kind: 'ask',
+    title,
+    child: { kind: 'stack', children: Array.from({ length: count }, (_, at) => chosen(`o${at + 1}`)) },
+  }),
+})
+
+test("the composer's seat gives its ask max(12, rows − 10) rows, and the ask keeps its edges and windows its offers", async () => {
+  const terminal = new XtermTerminal(44, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('composer', offeredAsk('pick', 20))
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.startsWith('╭─ pick')))
+  const rows = await terminal.altScreen()
+  const top = rows.findIndex((row) => row.startsWith('╭─ pick'))
+  assert.equal(rows[top], `╭─ pick ${'─'.repeat(35)}╮`)
+  assert.deepEqual(
+    rows.slice(top + 1, top + 11).map((row) => row.slice(2, -1).trimEnd()),
+    Array.from({ length: 10 }, (_, at) => `o${at + 1}`),
+  )
+  assert.equal(rows[top + 11], `╰─ enter select · tab/down next · 1/20 ${'─'.repeat(4)}╯`)
+})
+
+test('the dialog gives its ask four fifths of the rows, and the ask keeps its edges and windows its offers', async () => {
+  const terminal = new XtermTerminal(56, 15)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('dialog', offeredAsk('pick', 20))
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('╭─ pick')))
+  const rows = await terminal.altScreen()
+  const top = rows.findIndex((row) => row.includes('╭─ pick'))
+  assert.ok(top >= 0, 'the ask is drawn')
+  // The overlay is transparent, so the transcript shows through beside its edges; read the ask from where it begins.
+  const left = rows[top]?.indexOf('╭') ?? 0
+  assert.equal(rows[top]?.slice(left), `╭─ pick ${'─'.repeat(35)}╮`)
+  assert.deepEqual(
+    rows.slice(top + 1, top + 11).map((row) => row.slice(left + 2, left + 42).trimEnd()),
+    Array.from({ length: 10 }, (_, at) => `o${at + 1}`),
+  )
+  assert.equal(rows[top + 11]?.slice(left), `╰─ enter select · tab/down next · 1/20 ${'─'.repeat(4)}╯`)
+})
+
+/** An ask of prose rows over offers, titled as given, as a plan review is seated. */
+const pagedAsk = (title: string, prose: number, offers: number): Extract<Placement, { readonly kind: 'lines' }> => ({
+  kind: 'lines',
+  draw: () => ({
+    kind: 'ask',
+    title,
+    child: {
+      kind: 'stack',
+      children: [
+        ...Array.from({ length: prose }, (_, row): Node => ({ kind: 'text', text: `p${row + 1}` })),
+        ...Array.from({ length: offers }, (_, at) => chosen(`o${at + 1}`)),
+      ],
+    },
+  }),
+})
+
+test("shift+down pages the prose of the ask in the composer's seat, keeping a row of the last page", async () => {
+  const terminal = new XtermTerminal(44, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('composer', pagedAsk('plan', 8, 3))
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('page 1/2')))
+  terminal.type('\x1b[1;2B')
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('page 2/2')))
+  const rows = await terminal.altScreen()
+  const top = rows.findIndex((row) => row.startsWith('╭─ plan'))
+  assert.ok(top >= 0, 'the ask is drawn')
+  // The first key also focuses the ask's first offer, whose focus row the window now holds.
+  assert.deepEqual(
+    rows.slice(top + 1, top + 11).map((row) => row.slice(2, -1).trimEnd()),
+    ['p5', 'p6', 'p7', 'p8', 'page 2/2', '', 'o1', '▸ o1', 'o2', 'o3'],
+  )
+})
+
+test("PageDown moves focus a window's worth of offers on, without wrapping, and the window follows", async () => {
+  const terminal = new XtermTerminal(44, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('composer', offeredAsk('pick', 20))
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('1/20')))
+  terminal.type('\x1b[6~')
+  // The key also focuses the ask's first offer, whose focus row the window holds, so a window shows nine offers.
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('10/20')))
+  const rows = await terminal.altScreen()
+  const top = rows.findIndex((row) => row.startsWith('╭─ pick'))
+  assert.ok(top >= 0, 'the ask is drawn')
+  assert.deepEqual(
+    rows.slice(top + 1, top + 11).map((row) => row.slice(2, -1).trimEnd()),
+    ['o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'o8', 'o9', 'o10', '▸ o10'],
+  )
+  // PageUp at the top clamps, never wrapping to the end.
+  terminal.type('\x1b[<64;20;8M')
+  terminal.type('\x1b[5~')
+  await settle()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('1/20')))
+})
+
+test('with no seat offering, PageUp and PageDown still scroll the fullscreen as they do', async () => {
+  const terminal = new XtermTerminal(40, 9)
+  const logged: SessionEvent[] = []
+  for (let entry = 1; entry <= 6; entry++) logged.push(called(entry * 2, `read${entry}`), returned(entry * 2 + 1, entry * 2, 'w\nx\ny\nz'))
+  const session = new FakeSession(logged)
+  const { commit } = await mount([], session, async () => session, terminal)
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('read6')))
+  terminal.type('\x1b[5~')
+  await until(async () => (await terminal.altScreen()).some((row) => /Jump to latest/.test(row ?? '')))
+  terminal.type('\x1b[6~')
+  await until(async () => (await terminal.altScreen()).every((row) => !/Jump to latest/.test(row ?? '')))
+})
+
+/** An ask of prose alone, titled as given, as a plan review with nothing to choose is seated. */
+const proseAsk = (title: string, prose: number): Extract<Placement, { readonly kind: 'lines' }> => ({
+  kind: 'lines',
+  draw: () => ({
+    kind: 'ask',
+    title,
+    child: { kind: 'stack', children: Array.from({ length: prose }, (_, row): Node => ({ kind: 'text', text: `p${row + 1}` })) },
+  }),
+})
+
+test('an ask of prose alone is paged by its keys, which its bottom edge names, and takes the keyboard while it stands', async () => {
+  const terminal = new XtermTerminal(44, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('composer', proseAsk('plan', 12))
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('page 1/2')))
+  const rows = await terminal.altScreen()
+  const top = rows.findIndex((row) => row.startsWith('╭─ plan'))
+  assert.ok(top >= 0, 'the ask is drawn')
+  assert.equal(rows[top + 11], `╰─ shift+up/shift+down page ${'─'.repeat(15)}╯`, 'the bottom edge names the paging keys')
+  terminal.type('\x1b[1;2B')
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('page 2/2')))
+})
+
+test("the wheel over an ask in the composer's seat or the dialog changes nothing: nothing scrolls inside an ask", async () => {
+  const terminal = new XtermTerminal(44, 16)
+  const session = new FakeSession([prompt(1, 'fix the build')])
+  const { ctx, commit } = await mount([], session, async () => session, terminal)
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('composer', offeredAsk('pick', 20))
+    },
+  })
+  commit()
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('1/20')))
+  const before = await terminal.altScreen()
+  // The wheel, up and down, over the ask\'s middle row.
+  terminal.type('\x1b[<64;20;8M')
+  terminal.type('\x1b[<65;20;8M')
+  await settle()
+  assert.deepEqual(await terminal.altScreen(), before)
+  // And over an ask in the dialog, held over the page.
+  await ctx.plugin({
+    name: 'dialog',
+    inject: ['binnacle'],
+    apply: (author: Context) => {
+      author.binnacle.place('dialog', offeredAsk('note', 20))
+    },
+  })
+  await until(async () => (await terminal.altScreen()).some((row) => row.includes('╭─ note')))
+  const stood = await terminal.altScreen()
+  terminal.type('\x1b[<64;20;8M')
+  terminal.type('\x1b[<65;20;8M')
+  await settle()
+  assert.deepEqual(await terminal.altScreen(), stood)
+})
+
 test('lines placed in the dialog slot are drawn over the page, centred at four fifths of its width, and disposing them gives the page back', async () => {
   const terminal = new XtermTerminal(40, 10)
   const session = new FakeSession([prompt(1, 'fix the build')])

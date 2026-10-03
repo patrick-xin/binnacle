@@ -18,6 +18,7 @@ Everything a person can do with binnacle, by the stage of their journey it serve
 
 ## Decide: what does the agent ask?
 
+- [Blocks](features/blocks.md): the containers a view draws with — an ask that fits the room it is given, its prose paged and its offers windowed by keys, its edges always drawn.
 - [Approvals](features/approvals.md): what the agent asks to do, in the composer's place — allow it once or reject it by a key, and what was decided drawn in the transcript.
 - [Questions](features/questions.md): what the agent asks a person, in the composer's place — pick an option, type an answer, or skip, one question at a time.
 

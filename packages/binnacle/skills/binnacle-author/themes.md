@@ -32,9 +32,10 @@ Each part names only what it changes; what it leaves out stays as the theme bene
 - `backgrounds` — a colour each, for the bands and fills that name one.
 - `marks` — a mark's `glyph` and the `tone` it draws in.
 - `chrome` — the glyphs the surface draws with: a border's `border` pieces, `frame` as one word (`rounded`, `square`, `heavy`, `double`, `none`), `gutter`, `focus`, `cut`, `separator`, `jump`.
-- `words` — what a fold says of itself, each a template of `{n}` and `{lines}`.
+- `words` — what a fold says of itself, each a template of `{n}` and `{lines}`; and what an ask says of itself: `page` after the keys that page its prose, `offer.at` and `page.at`, templates of `{count}` and `{of}`, saying where its window is and which page its prose is on.
 - `folds` — how each kind of entry's folds start: `rows` shown while folded, and `open`.
 - `spacing` — the room the layout leaves: `band`, `ask`, `show`, `indent`, `gap`.
+- `asks` — how every ask is given room: `rows`, the height it is drawn in as a box of its own, the edges included, from three up; absent, an ask grows with what it holds, up to the room its place gives it.
 - `light`, `dark` — a variant, laid over the rest of the file on a terminal of that appearance; one file can hold both.
 - `colors` — pi's own theme block, taken as it is: a token ending in `Bg` fills that background, every other token is that tone's colour, and `""` leaves the token as binnacle has it. `$schema`, `name`, `export` and `appearance` are ignored.
 

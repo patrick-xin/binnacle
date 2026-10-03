@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "A binnacle theme",
-  "description": "One theme file of a binnacle profile, <profile>/themes/<name>.json: a theme registration's changes (vars, tones, backgrounds, marks, chrome, words, folds, spacing, light, dark), or a pi theme file as it is.",
+  "description": "One theme file of a binnacle profile, <profile>/themes/<name>.json: a theme registration's changes (vars, tones, backgrounds, marks, chrome, words, folds, spacing, asks, light, dark), or a pi theme file as it is.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -48,6 +48,9 @@
     },
     "spacing": {
       "$ref": "#/$defs/spacing"
+    },
+    "asks": {
+      "$ref": "#/$defs/asks"
     },
     "light": {
       "$ref": "#/$defs/variant"
@@ -225,6 +228,15 @@
         },
         "offer.dismiss": {
           "$ref": "#/$defs/text"
+        },
+        "page": {
+          "$ref": "#/$defs/text"
+        },
+        "offer.at": {
+          "$ref": "#/$defs/text"
+        },
+        "page.at": {
+          "$ref": "#/$defs/text"
         }
       }
     },
@@ -290,8 +302,22 @@
         },
         "spacing": {
           "$ref": "#/$defs/spacing"
+        },
+        "asks": {
+          "$ref": "#/$defs/asks"
         }
       }
+    },
+    "asks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 3
+        }
+      },
+      "description": "How every ask is given room: the rows it is drawn in as a box of its own, the edges included."
     }
   }
 }
