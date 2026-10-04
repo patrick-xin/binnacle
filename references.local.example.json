@@ -1,0 +1,4 @@
+{
+  "pi": { "url": "/path/to/a/local/clone/of/pi" },
+  "private": { "url": "/path/to/a/repository/only/this/machine/has", "commit": "<full commit>" }
+}

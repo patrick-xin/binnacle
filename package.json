@@ -1,0 +1,32 @@
+{
+  "name": "binnacle-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
+    "refs": "node scripts/refs.mjs",
+    "lint": "oxlint",
+    "lint:commits": "commitlint --from origin/main --to HEAD",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "check:paths": "node scripts/check-paths.mjs",
+    "check:placeholders": "node scripts/check-placeholders.mjs",
+    "check:citations": "node scripts/check-citations.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "check:skills": "node scripts/check-skills.mjs",
+    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:skills && pnpm run lint && pnpm run fmt:check",
+    "test": "pnpm run check && node --test \"scripts/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
+    "js-yaml": "4.3.1",
+    "oxc-parser": "0.151.0",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.85.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

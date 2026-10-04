@@ -97,7 +97,7 @@ An example row, with no names decided:
 
 | Term | It is | It is not | A person may say | Owner | Code |
 |---|---|---|---|---|---|
-| **offer** | A part of a box that a person can act on, by a key or a click. | An *affordance* (what the action is). | button, action, option | Ours | `binnacle:packages/binnacle/src/ui/node.ts#Node` |
+| **offer** | A part of a box that a person can act on, by a key or a click. | An *affordance* (what the action is). | button, action, option | Ours | `binnacle-v0:packages/binnacle/src/ui/node.ts#Node` |
 
 ## 6. Blast radius
 

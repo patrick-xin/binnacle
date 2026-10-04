@@ -1,0 +1,3 @@
+#!/bin/sh
+# What a commit stages is formatted with it; the script stands aside in CI, where jobs commit their own prose.
+exec node scripts/format-staged.mjs
