@@ -32,7 +32,7 @@ Choose the lane when you file the issue. A task moves up a lane, never down.
 
 | Lane | When | Builds | Review |
 |---|---|---|---|
-| **Fix** | One behaviour is wrong today. No change to the author API, no new decision, two source files at most. | You | One round by your subagent |
+| **Fix** | One behaviour is wrong or missing, and you and the Maintainer agree that it is small enough. No change to the author API, no new decision, two source files at most. | You | Optional: one round by your subagent |
 | **Chore** | Records, a dependency or a check. Nothing that a person or an author sees changes. | You | The checks and CI |
 | **Build** | All other work | The Implementer | Round 0, then rounds |
 
@@ -71,7 +71,7 @@ The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 1. Make a worktree in `~/.binnacle/worktrees/<n>`, on the branch `task/<n>`.
 2. For a Fix, load the `tdd` skill.
 3. For a Fix, prove each new test as the `implementer` skill says.
-4. For a Fix, have your subagent review the diff once.
+4. For a Fix, if you or the Maintainer want a review, have your subagent review the diff once.
 5. Open the PR.
 
 Before you open the PR:

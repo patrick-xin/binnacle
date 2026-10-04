@@ -1,14 +1,14 @@
 ---
 name: Fix
-about: One behaviour that is wrong today. The Lead builds it.
+about: One small behaviour that is wrong or missing. The Lead builds it.
 labels: fix
 ---
 
-## Wrong
+## Today
 
-<!-- What binnacle does today, and how to see it. -->
+<!-- What binnacle does today, or what it does not do, and how to see it. -->
 
-## Right
+## After
 
 <!-- What it does after the fix. -->
 
