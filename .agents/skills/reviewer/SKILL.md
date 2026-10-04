@@ -5,7 +5,7 @@ description: The Reviewer's role skill. Load it first when your prompt makes you
 
 # Reviewer
 
-You check one task: its spec before the build, and its diff after it. You serve the task until its PR merges or closes, so you keep what you read between rounds. You write only your reports. You never decide scope. Your task's folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
+You check one task: its spec before the build, and its diff after it. You serve the task until its PR merges or closes, so you keep what you read between rounds. You write only your reports, the state, and a question for the Lead. You never decide scope. Your task's folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 
 ## Round 0: the spec
 
@@ -24,10 +24,15 @@ In round 0, each unanswered decision is a finding. Round 0 is `approved` only wh
 3. Run `pnpm install --frozen-lockfile && pnpm refs`.
 4. Run `pnpm test`. A failure is the first finding.
 5. If the change draws something, draw it. Compare the lines with the spec.
-6. Read the diff against the spec, under the heading **Spec**: a behaviour that is missing, wrong, or outside the spec. Quote the spec's line.
-7. Read the diff against the rules, under the heading **Standard**: a break of `CODING-STANDARD.md`, of the skills, or of an ADR.
-8. From round 2, check each earlier finding first.
+6. From round 2, check each earlier finding first.
+7. Read the diff against the spec.
+8. Read the diff against the rules.
 9. Write `review-<r>.md`.
+
+The report has two headings:
+
+- **Spec:** a behaviour that is missing, wrong, or outside the spec. Quote the spec's line.
+- **Standard:** a break of `CODING-STANDARD.md`, of the skills, or of an ADR.
 
 A question of scope, or a choice that the spec leaves open, goes to the Lead under the heading **Questions**. It is not a finding for the Implementer.
 

@@ -9,7 +9,7 @@ You turn what the Maintainer wants into tasks, start each task, answer its quest
 
 ## From intent to tasks
 
-1. Brainstorm with the originator with the `grill` skill.
+1. Brainstorm with the originator, with the `grill` skill.
 2. Continue until both of you agree on what is wanted.
 3. Write `intents/<slug>/intent.md`: title, metadata, problem, proposed outcome, affected users and systems, constraints, stages and open questions.
 4. Show the intent to the Maintainer with the doc tool.
@@ -47,25 +47,28 @@ If a Fix needs a decision or a third source file, stop. Move it to Build.
 
 The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 
-1. Make the task's folder and the Implementer's worktree.
-2. Send the spec to the Reviewer for round 0.
-3. Change the spec for each finding of round 0.
-4. Send the changed spec to the Reviewer again, until round 0 is `approved`.
-5. If the door is one-way, get the Maintainer's agreement on the spec.
-6. Start the Implementer and the Reviewer, with the settings in `.agents/roles.json`.
-7. Watch the state files, and send each hand-off.
-8. If an answer changes the spec, edit the spec body. Link the edit in a comment.
-9. Read each review report in full.
-10. After the third round with findings, choose one narrow round more, or ask the Maintainer.
-11. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
-12. Open the PR, as `.agents/task.md` says. Say in it what you drove and what it drew.
+1. Make the task's folder.
+2. Make the Implementer's worktree.
+3. Send the spec to the Reviewer for round 0.
+4. Change the spec for each finding of round 0.
+5. Send the changed spec to the Reviewer again, until round 0 is `approved`.
+6. If the door is one-way, get the Maintainer's agreement on the spec.
+7. Start the Implementer and the Reviewer, with the settings in `.agents/roles.json`.
+8. Watch the state files, and send each hand-off.
+9. If an answer changes the spec, edit the spec body. Link the edit in a comment.
+10. Read each review report in full.
+11. After the third round with findings, choose one narrow round more, or ask the Maintainer.
+12. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
+13. Open the PR, as `.agents/task.md` says.
+14. If you tried the branch, write in the PR what you drove and what it drew.
 
 ## A Fix or a Chore task
 
 1. Make a worktree in `~/.binnacle/worktrees/<n>`, on the branch `task/<n>`.
-2. For a Fix, load the `tdd` skill, and prove each new test as the `implementer` skill says.
-3. For a Fix, have your subagent review the diff once.
-4. Open the PR.
+2. For a Fix, load the `tdd` skill.
+3. For a Fix, prove each new test as the `implementer` skill says.
+4. For a Fix, have your subagent review the diff once.
+5. Open the PR.
 
 Before you open the PR:
 
@@ -89,6 +92,7 @@ The Maintainer merges a one-way PR. Every other PR is **two-way**, and it merges
 
 ## Before you end a session
 
-- Each task in flight has its state in its task folder.
+- Each Build in flight has its state in its task folder.
+- Each Fix or Chore in flight has its branch pushed, and a note on its issue that says where it stopped.
 - Each decision that you took for the Maintainer is in an ADR.
 - If the Maintainer asked for it, the `handoff` skill wrote what the next Lead needs.
