@@ -1,6 +1,6 @@
 ---
 name: lead
-description: The Lead's job in binnacle — intents, specs, lanes, doors, answers, checks of results, and Fix and Chore builds. Load it first when your prompt makes you the Lead.
+description: The Lead's role skill. Load it first when your prompt makes you the Lead.
 ---
 
 # Lead
@@ -9,15 +9,20 @@ You turn what the Maintainer wants into tasks, start each task, answer its quest
 
 ## From intent to tasks
 
-1. Brainstorm with the originator with the `grill` skill, until both of you agree on what is wanted.
-2. Write `intents/<slug>/intent.md`: title, metadata, problem, proposed outcome, affected users and systems, constraints, stages and open questions. Put no design in it.
-3. Show the intent to the Maintainer with the doc tool, and change it until the Maintainer approves it.
-4. Write the tasks of the current stage only, as GitHub issues. Use the `spec` skill for a Build task. A complex stage gets many tasks.
-5. List the issues of the stage in the intent.
-6. When every task of the stage is merged, tell the Maintainer what to try.
-7. If the Maintainer changes the intent, edit it. If the change is large, use `grill` again.
+1. Brainstorm with the originator with the `grill` skill.
+2. Continue until both of you agree on what is wanted.
+3. Write `intents/<slug>/intent.md`: title, metadata, problem, proposed outcome, affected users and systems, constraints, stages and open questions.
+4. Show the intent to the Maintainer with the doc tool.
+5. Change the intent until the Maintainer approves it.
+6. Write the tasks of the current stage as GitHub issues. Use the `spec` skill for a Build task.
+7. List the issues of the stage in the intent.
+8. When every task of the stage is merged, tell the Maintainer what to try.
+9. If the Maintainer changes the intent, edit it. If the change is large, use `grill` again.
 
-An answer to an open question is an edit to the intent. A decision that binds more than one task is an ADR, in the task that needs it.
+- An intent says what is wanted and why. The design goes in the specs.
+- An answer to an open question is an edit to the intent.
+- A decision that binds more than one task is an ADR, written in the task that needs it.
+- A decision that you take for the Maintainer is an ADR too.
 
 ## Lanes
 
@@ -29,21 +34,44 @@ Choose the lane when you file the issue. A task moves up a lane, never down.
 | **Chore** | Records, a dependency or a check. Nothing that a person or an author sees changes. | You | The checks and CI |
 | **Build** | All other work | The Implementer | Round 0, then rounds |
 
-- If a Fix needs a decision or a third source file, stop, and move it to Build.
-- Build one Fix at a time, in its own worktree under `~/.binnacle/worktrees/<n>`.
+If a Fix needs a decision or a third source file, stop. Move it to Build.
+
+## Before a task starts
+
+1. List the files that the task changes, from its spec.
+2. Compare them with the files of each running task.
+3. If a file is in both, wait until the running task merges.
+4. If a running task finds that it must change another task's file, stop the later task.
 
 ## A Build task
 
-1. Before the build, send the spec to the Reviewer for round 0.
-2. Change the spec for each finding of round 0.
-3. If the door is one-way, get the Maintainer's agreement on the spec.
-4. Start the Implementer and the Reviewer with the settings in `.agents/roles.json`.
-5. Answer each question. If the answer changes the spec, edit the spec body, and link the edit in a comment.
-6. Read each review report, never only its verdict.
-7. After the third round with findings, decide: one narrow round more, or a question for the Maintainer.
-8. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`. Say in the PR what you drove and what it drew.
+The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 
-Until the task tool exists, start each agent in a herdr pane by hand, and give it its issue number and its role.
+1. Make the task's folder and the Implementer's worktree.
+2. Send the spec to the Reviewer for round 0.
+3. Change the spec for each finding of round 0.
+4. Send the changed spec to the Reviewer again, until round 0 is `approved`.
+5. If the door is one-way, get the Maintainer's agreement on the spec.
+6. Start the Implementer and the Reviewer, with the settings in `.agents/roles.json`.
+7. Watch the state files, and send each hand-off.
+8. If an answer changes the spec, edit the spec body. Link the edit in a comment.
+9. Read each review report in full.
+10. After the third round with findings, choose one narrow round more, or ask the Maintainer.
+11. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
+12. Open the PR, as `.agents/task.md` says. Say in it what you drove and what it drew.
+
+## A Fix or a Chore task
+
+1. Make a worktree in `~/.binnacle/worktrees/<n>`, on the branch `task/<n>`.
+2. For a Fix, load the `tdd` skill, and prove each new test as the `implementer` skill says.
+3. For a Fix, have your subagent review the diff once.
+4. Open the PR.
+
+Before you open the PR:
+
+- `pnpm test` passes.
+- Each new test is proven, and the PR records its break.
+- The records that the change affects are changed in the same commit.
 
 ## Doors
 
@@ -54,12 +82,13 @@ A PR is **one-way** if it does one of these things:
 - adds an ADR, or changes the status of an ADR;
 - moves a pin;
 - changes a format that a person keeps, such as a theme, the profile or the presets;
-- changes a release workflow.
+- changes a release workflow;
+- changes this list.
 
 The Maintainer merges a one-way PR. Every other PR is **two-way**, and it merges when CI passes. If the spec and the change give different doors, the door is one-way.
 
 ## Before you end a session
 
-- Each task in flight has its state on its issue or in the task tool.
-- Each decision you took for the Maintainer is in an ADR or on its issue.
+- Each task in flight has its state in its task folder.
+- Each decision that you took for the Maintainer is in an ADR.
 - If the Maintainer asked for it, the `handoff` skill wrote what the next Lead needs.

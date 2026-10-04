@@ -13,6 +13,7 @@ binnacle is a terminal app for [DeepSeek Harness](https://github.com/deepseek-ai
 intents/<slug>/intent.md    what is wanted, why, and in which stages
 .agents/skills/             one skill for each role, and shared skills
 .agents/roles.json          the tool and the model that take each role
+.agents/task.md             a task's folders, states and hand-offs
 scripts/                    the checks, each with its test
 references.json             the repositories that pnpm refs fetches into .refs/
 .refs/<name>/               each reference at its pin, to read and never to write
