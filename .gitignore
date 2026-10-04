@@ -3,3 +3,4 @@ dist/
 .refs/
 references.local.json
 .DS_Store
+checked.md
