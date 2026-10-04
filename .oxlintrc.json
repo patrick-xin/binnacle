@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["unicorn", "oxc", "import", "node"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "import/no-cycle": "error",
+    "import/no-default-export": "error",
+    "unicorn/filename-case": ["error", { "case": "kebabCase" }]
+  },
+  "overrides": [
+    {
+      "files": ["commitlint.config.mjs"],
+      "rules": { "import/no-default-export": "off" }
+    }
+  ],
+  "ignorePatterns": [".refs/**", "**/dist/**", "node_modules/**"]
+}
