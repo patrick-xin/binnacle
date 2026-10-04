@@ -83,6 +83,8 @@ test("the hook's entry path: a misformatted .ts staged whole is formatted and st
   delete env.GIT_DIR
   delete env.GIT_WORK_TREE
   delete env.GIT_INDEX_FILE
+  // The script stands aside under CI, and this test runs under CI too.
+  delete env.GITHUB_ACTIONS
   const git = (args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', env })
   try {
     git(['init', '-q'])
