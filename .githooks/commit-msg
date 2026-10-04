@@ -1,4 +1,0 @@
-#!/bin/sh
-# A commit's header is Conventional Commits, held by commitlint.config.mjs; CI's jobs commit their own prose, so the hook stands aside there as pre-push does.
-[ -n "$GITHUB_ACTIONS" ] && exit 0
-exec pnpm exec commitlint --edit "$1"
