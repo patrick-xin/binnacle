@@ -1,0 +1,6 @@
+{
+  "lead": { "tool": "claude-code", "model": "claude-opus-5-5", "family": "anthropic", "runner": "herdr" },
+  "implementer": { "tool": "pi", "model": "zai/glm-5.3", "family": "zai", "thinking": "max", "runner": "herdr" },
+  "reviewer": { "tool": "pi", "model": "openai-codex/gpt-6.1-sol", "family": "openai", "thinking": "medium", "runner": "herdr" },
+  "researcher": { "tool": "claude-code", "model": "claude-opus-5-5", "family": "anthropic", "runner": "subagent" }
+}
