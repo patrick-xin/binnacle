@@ -18,7 +18,7 @@ An issue has one lane and at most one state.
 
 | Lane | For |
 |---|---|
-| `fix` | One behaviour is wrong today. |
+| `fix` | One small behaviour is wrong or missing. |
 | `chore` | Records, a dependency or a check |
 | `build` | All other work |
 
