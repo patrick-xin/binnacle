@@ -14,10 +14,12 @@ You turn what the Maintainer wants into tasks, start each task, answer its quest
 3. Write `intents/<slug>/intent.md`: title, metadata, problem, proposed outcome, affected users and systems, constraints, stages and open questions.
 4. Show the intent to the Maintainer with the doc tool.
 5. Change the intent until the Maintainer approves it.
-6. Write the tasks of the current stage as GitHub issues. Use the `spec` skill for a Build task.
-7. List the issues of the stage in the intent.
-8. When every task of the stage is merged, tell the Maintainer what to try.
-9. If the Maintainer changes the intent, edit it. If the change is large, use `grill` again.
+6. Write the tasks of the current stage as GitHub issues.
+7. For a Build task, use the `spec` skill.
+8. List the issues of the stage in the intent.
+9. When every task of the stage is merged, tell the Maintainer what to try.
+10. If the Maintainer makes a small change to the intent, edit it.
+11. If the change is large, use `grill` again.
 
 - An intent says what is wanted and why. The design goes in the specs.
 - An answer to an open question is an edit to the intent.
@@ -54,13 +56,15 @@ The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 5. Send the changed spec to the Reviewer again, until round 0 is `approved`.
 6. If the door is one-way, get the Maintainer's agreement on the spec.
 7. Start the Implementer and the Reviewer, with the settings in `.agents/roles.json`.
-8. Watch the state files, and send each hand-off.
-9. If an answer changes the spec, edit the spec body. Link the edit in a comment.
-10. Read each review report in full.
-11. After the third round with findings, choose one narrow round more, or ask the Maintainer.
-12. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
-13. Open the PR, as `.agents/task.md` says.
-14. If you tried the branch, write in the PR what you drove and what it drew.
+8. Watch the state files.
+9. Send each hand-off, as `.agents/task.md` says.
+10. If an answer changes the spec, edit the spec body.
+11. Link the edit in a comment on the issue.
+12. Read each review report in full.
+13. After the third round with findings, choose one narrow round more, or ask the Maintainer.
+14. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
+15. Open the PR, as `.agents/task.md` says.
+16. If you tried the branch, write in the PR what you drove and what it drew.
 
 ## A Fix or a Chore task
 

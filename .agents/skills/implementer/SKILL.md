@@ -16,11 +16,15 @@ You build one spec, in your own worktree. The spec is the GitHub issue that your
 5. List the behaviours from the spec. Each behaviour is the name of one test.
 6. Build one behaviour at a time, at the seams that the spec names.
 7. Commit as often as you like. Only the final message is kept.
-8. If the spec does not answer a question, write `question.md` and set the state `blocked`.
-9. When every behaviour is built, do the checks below, then set the state `ready`.
-10. If the state becomes `changes`, read the review report, and fix each finding.
-11. Do the checks below again, then set the state `ready`.
-12. If the state becomes `approved`, write `message.md`.
+8. If the spec does not answer a question, write `question.md`.
+9. Set the state `blocked`.
+10. When every behaviour is built, do the checks below.
+11. Set the state `ready`.
+12. If the state becomes `changes`, read the review report.
+13. Fix each finding.
+14. Do the checks below again.
+15. Set the state `ready`.
+16. If the state becomes `approved`, write `message.md`.
 
 ## A test is proven
 

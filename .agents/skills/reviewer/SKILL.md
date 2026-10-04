@@ -23,11 +23,12 @@ In round 0, each unanswered decision is a finding. Round 0 is `approved` only wh
 2. Move your checkout to the tip that the Lead names.
 3. Run `pnpm install --frozen-lockfile && pnpm refs`.
 4. Run `pnpm test`. A failure is the first finding.
-5. If the change draws something, draw it. Compare the lines with the spec.
-6. From round 2, check each earlier finding first.
-7. Read the diff against the spec.
-8. Read the diff against the rules.
-9. Write `review-<r>.md`.
+5. If the change draws something, draw it.
+6. Compare the drawn lines with the spec.
+7. From round 2, check each earlier finding first.
+8. Read the diff against the spec.
+9. Read the diff against the rules.
+10. Write `review-<r>.md`.
 
 The report has two headings:
 
