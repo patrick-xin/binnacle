@@ -171,3 +171,26 @@ test('a plugin that unloads, as on a reload, takes its screen with it, and the c
   await ctx.plugin(probe(['again']))
   assert.deepEqual([gone.screen, gone.rows, (await terminal.read()).rows], ['alternate', ['', ''], ['again', '']])
 })
+
+test('--help prints how to start binnacle, and exits without taking the terminal', async () => {
+  const { terminal, out, exits, ready } = await mount({ args: ['--help'] })
+  ready()
+  assert.match(out.join(''), /^Usage: dsh --profile binnacle \[options\]/)
+  assert.match(out.join(''), /--session <id>/)
+  assert.deepEqual([exits, (await terminal.read()).screen], [[0], 'normal'])
+})
+
+test('--session <id> names the stored session that plugins read, and none is named without it', async () => {
+  const named: (string | undefined)[] = []
+  for (const args of [['--session', 'session-abc'], []]) {
+    const { ctx } = await mount({ args })
+    await ctx.plugin({
+      name: 'reader',
+      inject: ['binnacle'],
+      apply: (plugin: Context) => {
+        named.push(plugin.binnacle.session)
+      },
+    })
+  }
+  assert.deepEqual(named, ['session-abc', undefined])
+})

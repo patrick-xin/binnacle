@@ -10,9 +10,11 @@ export class BinnacleService extends Service implements Binnacle {
   // TypeScript private, not #private: Cordis reaches the service through traced copies.
   private readonly screens: Screen[] = []
   private readonly changed: () => void
+  readonly session: string | undefined
 
-  constructor(ctx: Context, changed: () => void) {
+  constructor(ctx: Context, session: string | undefined, changed: () => void) {
     super(ctx, 'binnacle')
+    this.session = session
     this.changed = changed
   }
 

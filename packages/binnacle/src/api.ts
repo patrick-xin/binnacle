@@ -26,6 +26,8 @@ export interface Shown {
 
 /** The `binnacle` service. */
 export interface Binnacle {
+  /** The id of the stored session that the command line names, if any. */
+  readonly session: string | undefined
   /**
    * Show a screen. The newest screen shown is the one drawn.
    * @param screen - what to draw.

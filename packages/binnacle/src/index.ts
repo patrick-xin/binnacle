@@ -4,6 +4,8 @@
  * @module binnacle
  */
 import type { Context } from '@deepseek-ai/cordis'
+import { Command } from 'commander'
+import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { AppExit, AppReady } from '@deepseek-ai/dsh-cmdline'
 import { capture } from './core/capture.ts'
 import type { Stream } from './core/capture.ts'
@@ -17,7 +19,7 @@ export type { Binnacle, Screen, Shown } from './api.ts'
 
 export const name = 'binnacle'
 
-export const inject = ['appReady', 'appExit'] satisfies (keyof Context)[]
+export const inject = ['cmdlineArgs', 'appReady', 'appExit'] satisfies (keyof Context)[]
 
 /** The process binnacle runs in: the signals and the exit it answers, and how it stops itself. */
 export interface Process {
@@ -54,7 +56,33 @@ const WHEEL_DOWN = 65
 // How many rows one notch of the wheel scrolls.
 const NOTCH = 3
 
+/** What the command line asks for. */
+interface Asked {
+  /** The id of the stored session to read, if one is named. */
+  readonly session: string | undefined
+}
+
+function program(chosen: (asked: Asked) => void): Command {
+  return new Command()
+    .name('dsh --profile binnacle')
+    .description('A terminal app for dsh. The wheel scrolls; ctrl+c quits; ctrl+z suspends.')
+    .helpOption('-h, --help', 'show this help')
+    .option('--session <id>', 'the stored session to read; the newest when none is named')
+    .action((options: { session?: string }) => {
+      chosen({ session: options.session })
+    })
+}
+
 export function apply(ctx: Context): void {
+  let asked: Asked | undefined
+  parseCmdline(
+    ctx,
+    program((chosen) => {
+      asked = chosen
+    }),
+  )
+  // Help, or a command line binnacle refuses: the launcher exits, and binnacle takes nothing.
+  if (asked === undefined) return
   // The terminal once dsh is ready, and whether binnacle holds it now: it does not while suspended.
   let terminal: Terminal | undefined
   let holding = false
@@ -71,7 +99,7 @@ export function apply(ctx: Context): void {
     back = Math.min(back, most)
     display.draw(rows)
   }
-  const service = new BinnacleService(ctx, draw)
+  const service = new BinnacleService(ctx, asked.session, draw)
   const exit: AppExit = ctx.appExit!
   const input = new StdinBuffer()
   const take = (): void => {
