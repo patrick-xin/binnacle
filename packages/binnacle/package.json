@@ -1,0 +1,54 @@
+{
+  "name": "binnacle",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A terminal app for DeepSeek Harness, mounted as a dsh bundle.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./plugins/read": {
+      "types": "./dist/plugins/read/index.d.ts",
+      "default": "./dist/plugins/read/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "NOTICE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "node --test --test-timeout=30000 \"test/**/*.test.ts\""
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "commander": "15.0.0",
+    "get-east-asian-width": "1.6.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-cmdline": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session-persistence": "0.2.0-rc.2",
+    "@types/node": "24.19.0",
+    "@xterm/headless": "5.5.0",
+    "typescript": "7.0.2"
+  }
+}

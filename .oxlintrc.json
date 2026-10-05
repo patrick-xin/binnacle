@@ -8,12 +8,26 @@
   "rules": {
     "import/no-cycle": "error",
     "import/no-default-export": "error",
-    "unicorn/filename-case": ["error", { "case": "kebabCase" }]
+    "unicorn/filename-case": [
+      "error",
+      {
+        "case": "kebabCase"
+      }
+    ]
   },
   "overrides": [
     {
       "files": ["commitlint.config.mjs"],
-      "rules": { "import/no-default-export": "off" }
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["packages/binnacle/src/terminal/utils.ts", "packages/binnacle/src/terminal/stdin-buffer.ts"],
+      "rules": {
+        "no-control-regex": "off",
+        "no-shadow": "off"
+      }
     }
   ],
   "ignorePatterns": [".refs/**", "**/dist/**", "node_modules/**"]
