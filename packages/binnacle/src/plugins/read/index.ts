@@ -1,4 +1,3 @@
-// A temporary view of a stored session's raw events. The transcript replaces it.
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId, SessionEvent } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
@@ -28,15 +27,15 @@ async function readSession(store: SessionPersistence, named: string | undefined)
 
 export function apply(ctx: Context): void {
   let lines: readonly string[] = []
-  const shown = ctx.binnacle.show({ lines: () => lines })
+  const placed = ctx.binnacle.place('transcript', { lines: () => lines })
   void readSession(ctx.sessionPersistence, ctx.binnacle.session).then(
     (read) => {
       lines = read
-      shown.redraw()
+      placed.redraw()
     },
     (error: unknown) => {
       lines = [`Could not read the session: ${error instanceof Error ? error.message : String(error)}`]
-      shown.redraw()
+      placed.redraw()
     },
   )
 }

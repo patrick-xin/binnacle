@@ -1,4 +1,4 @@
-import type { Screen } from '../api.ts'
+import type { Part } from '../api.ts'
 import { stripTerminalSequences, wrapTextWithAnsi } from '../terminal/utils.ts'
 
 // Stripping sequences leaves single controls that a terminal still obeys: C0 but the tab, DEL, and C1.
@@ -10,15 +10,7 @@ export function toPlainText(untrusted: string): string {
   return stripTerminalSequences(untrusted).replace(CONTROLS, '').replaceAll('\t', TAB)
 }
 
-export function rowsOf(
-  screen: Screen | undefined,
-  width: number,
-  height: number,
-  scrolledUp: number,
-): { rows: string[]; maxScroll: number } {
-  if (screen === undefined) return { rows: [], maxScroll: 0 }
-  const all = screen.lines().flatMap((line) => wrapTextWithAnsi(toPlainText(line), width))
-  const maxScroll = Math.max(0, all.length - height)
-  const end = all.length - Math.min(scrolledUp, maxScroll)
-  return { rows: all.slice(Math.max(0, end - height), end), maxScroll }
+export function rowsOf(part: Part | undefined, width: number): string[] {
+  if (part === undefined || width < 1) return []
+  return part.lines(width).flatMap((line) => wrapTextWithAnsi(toPlainText(line), width))
 }

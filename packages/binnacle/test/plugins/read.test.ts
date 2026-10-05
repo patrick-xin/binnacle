@@ -48,7 +48,7 @@ test('with no stored session, the Read view says so', async () => {
   assert.deepEqual(rows, ['No stored session to read.', ''])
 })
 
-test('a session the Read view cannot read is said on the screen, with why', async () => {
+test('a session the Read view cannot read is said on the Screen, with why', async () => {
   const { rows } = await readViewOver(['--session', 'session-gone'], [older], 2)
   assert.deepEqual(rows, ['Could not read the session: no session', 'session-gone'])
 })

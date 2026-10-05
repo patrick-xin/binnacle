@@ -6,12 +6,14 @@ import { capture } from './core/capture.ts'
 import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
+import { arrange } from './core/layout.ts'
+import type { Placed } from './core/layout.ts'
 import { rowsOf } from './core/view.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
-export type { Binnacle, Screen, Shown } from './api.ts'
+export type { Binnacle, Box, Handle, Layout, Part, Screen, Side, Size } from './api.ts'
 
 export const name = 'binnacle'
 
@@ -52,7 +54,7 @@ const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l'
 const CTRL_C = '\x03'
 const CTRL_Z = '\x1a'
 
-const SGR_MOUSE = /^\x1b\[<(?<button>\d+);\d+;\d+[Mm]$/
+const SGR_MOUSE = /^\x1b\[<(?<button>\d+);(?<x>\d+);(?<y>\d+)[Mm]$/
 const WHEEL_UP = 64
 const WHEEL_DOWN = 65
 const ROWS_PER_WHEEL_NOTCH = 3
@@ -72,6 +74,10 @@ function program(parsed: (commandLine: CommandLine) => void): Command {
     })
 }
 
+function placedAt(placed: readonly Placed[], x: number, y: number): Placed | undefined {
+  return placed.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
+}
+
 export function apply(ctx: Context): void {
   let commandLine: CommandLine | undefined
   parseCmdline(
@@ -86,16 +92,21 @@ export function apply(ctx: Context): void {
   let terminal: Terminal | undefined
   let holdingTerminal = false
   let printHeldBack: (() => void) | undefined
-  let scrolledUp = 0
+  const scrolledUp = new Map<string, number>()
+  let placed: readonly Placed[] = []
   const display = new Display((data) => {
     terminal?.write(data)
   })
 
   const draw = (): void => {
     if (terminal === undefined || !holdingTerminal) return
-    const { rows, maxScroll } = rowsOf(service.onView, terminal.columns, terminal.rows, scrolledUp)
-    scrolledUp = Math.min(scrolledUp, maxScroll)
-    display.draw(rows)
+    const arranged = arrange(service.layoutOnView, terminal.columns, terminal.rows, {
+      rows: (place, width) => rowsOf(service.partIn(place), width),
+      scrolledUp: (place) => scrolledUp.get(place) ?? 0,
+    })
+    placed = arranged.placed
+    for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
+    display.draw(arranged.rows)
   }
   const service = new BinnacleService(ctx, commandLine.session, draw)
 
@@ -132,12 +143,14 @@ export function apply(ctx: Context): void {
   input.on('data', (sequence: string) => {
     if (sequence === CTRL_C) exit(0)
     else if (sequence === CTRL_Z) suspend()
-    else scroll(SGR_MOUSE.exec(sequence)?.groups?.button)
+    else scroll(SGR_MOUSE.exec(sequence)?.groups)
   })
-  const scroll = (button: string | undefined): void => {
-    if (button === String(WHEEL_UP)) scrolledUp += ROWS_PER_WHEEL_NOTCH
-    else if (button === String(WHEEL_DOWN)) scrolledUp = Math.max(0, scrolledUp - ROWS_PER_WHEEL_NOTCH)
-    else return
+  const scroll = (mouse: { button?: string; x?: string; y?: string } | undefined): void => {
+    const notches = mouse?.button === String(WHEEL_UP) ? 1 : mouse?.button === String(WHEEL_DOWN) ? -1 : 0
+    // SGR mouse reports count columns and rows from 1.
+    const under = placedAt(placed, Number(mouse?.x) - 1, Number(mouse?.y) - 1)
+    if (notches === 0 || under === undefined) return
+    scrolledUp.set(under.place, Math.max(0, (scrolledUp.get(under.place) ?? 0) + notches * ROWS_PER_WHEEL_NOTCH))
     draw()
   }
 
