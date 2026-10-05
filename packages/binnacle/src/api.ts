@@ -46,7 +46,7 @@ export interface Handle {
 export interface Binnacle {
   /** The id that `--session` names. */
   readonly session: string | undefined
-  /** Only the newest screen shown is drawn. Talk is the first. */
+  /** Only the newest screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle
   /** Replaces the layout of the screen by that name; the newest layout wins. */
   layout(screen: string, layout: Layout): Handle

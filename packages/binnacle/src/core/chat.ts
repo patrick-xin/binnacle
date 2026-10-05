@@ -1,7 +1,7 @@
 import type { Screen } from '../api.ts'
 
-export const TALK: Screen = {
-  name: 'talk',
+export const CHAT: Screen = {
+  name: 'chat',
   layout: {
     column: [
       { place: 'transcript', size: 'fill' },

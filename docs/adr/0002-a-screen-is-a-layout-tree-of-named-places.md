@@ -4,7 +4,7 @@
 
 A screen is a layout tree. Its nodes are rows and columns, and its leaves are places, each with a name. Each child is sized `fixed n`, `content` (the rows its lines need) or `fill` (a share of what is left). A plugin fills a place by its name with a part: what a part draws is its lines at the width it is given. A plugin may replace a screen's tree; the newest tree wins, and it goes when its plugin unloads.
 
-`show(screen)` pushes a screen, and the newest screen shown is drawn. Talk is the base screen. A screen with one place is the whole terminal.
+`show(screen)` pushes a screen, and the newest screen shown is drawn. The Chat is the base screen. A screen with one place is the whole terminal.
 
 Every node may have a box: `padding` and `gap`, in cells; a `border` on any of its sides, so a gutter is a left border; the `edge` its border is drawn with, by name; and a `title` set into its top edge. Edges, glyphs and spacing are named tables behind one lookup, and the theme gives their defaults.
 

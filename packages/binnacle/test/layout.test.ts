@@ -20,7 +20,7 @@ async function drawn(columns: number, rows: number, author: (binnacle: Binnacle)
 
 const part = (...lines: string[]) => ({ lines: () => lines })
 
-test('Talk stacks the transcript, the status and the composer: the status and the composer take the rows their lines need, and the transcript the rest', async () => {
+test('the Chat stacks the transcript, the status and the composer: the status and the composer take the rows their lines need, and the transcript the rest', async () => {
   const { rows } = await drawn(20, 6, (binnacle) => {
     binnacle.place('transcript', part('t1', 't2', 't3', 't4', 't5'))
     binnacle.place('status', part('working'))
@@ -29,9 +29,9 @@ test('Talk stacks the transcript, the status and the composer: the status and th
   assert.deepEqual(rows, ['t3', 't4', 't5', 'working', 'c1', 'c2'])
 })
 
-test("a plugin replaces Talk's layout: the composer on top, and a sidebar of a fixed width beside the rest", async () => {
+test("a plugin replaces the Chat's layout: the composer on top, and a sidebar of a fixed width beside the rest", async () => {
   const { rows } = await drawn(20, 4, (binnacle) => {
-    binnacle.layout('talk', {
+    binnacle.layout('chat', {
       row: [{ column: [{ place: 'composer', size: 'content' }, { place: 'transcript' }] }, { place: 'sidebar', size: { fixed: 6 } }],
     })
     binnacle.place('transcript', part('t1', 't2', 't3', 't4'))
@@ -41,9 +41,9 @@ test("a plugin replaces Talk's layout: the composer on top, and a sidebar of a f
   assert.deepEqual(rows, ['draft         files', 't2            a.ts', 't3', 't4'])
 })
 
-test('a screen shown is drawn with its own layout over Talk, and Talk is drawn again once the plugin that showed it unloads', async () => {
+test('a screen shown is drawn with its own layout over the Chat, and the Chat is drawn again once the plugin that showed it unloads', async () => {
   const { ctx, plugin, terminal, rows } = await drawn(20, 2, (binnacle) => {
-    binnacle.place('transcript', part('talk'))
+    binnacle.place('transcript', part('chat'))
     binnacle.place('detail', part('a', 'b'))
     binnacle.show({ name: 'trajectory', layout: { row: [{ place: 'detail', size: { fixed: 4 } }, { place: 'transcript' }] } })
   })
@@ -52,21 +52,21 @@ test('a screen shown is drawn with its own layout over Talk, and Talk is drawn a
     name: 'again',
     inject: ['binnacle'],
     apply: (again: Context) => {
-      again.binnacle.place('transcript', part('talk'))
+      again.binnacle.place('transcript', part('chat'))
     },
   })
   assert.deepEqual(
     [rows, (await terminal.read()).rows],
     [
-      ['a   talk', 'b'],
-      ['talk', ''],
+      ['a   chat', 'b'],
+      ['chat', ''],
     ],
   )
 })
 
 test('a layout goes when the plugin that set it unloads, and the screen is drawn with the layout beneath', async () => {
   const { ctx, plugin, terminal, rows } = await drawn(20, 2, (binnacle) => {
-    binnacle.layout('talk', { column: [{ place: 'sidebar' }] })
+    binnacle.layout('chat', { column: [{ place: 'sidebar' }] })
     binnacle.place('sidebar', part('side'))
   })
   await plugin.dispose()
@@ -90,7 +90,7 @@ const wheelUpAt = (column: number, row: number) => `\x1b[<64;${column};${row}M`
 
 test('the wheel scrolls the place under the pointer, and no other', async () => {
   const { terminal, rows } = await drawn(10, 2, (binnacle) => {
-    binnacle.layout('talk', { row: [{ place: 'transcript' }, { place: 'sidebar', size: { fixed: 5 } }] })
+    binnacle.layout('chat', { row: [{ place: 'transcript' }, { place: 'sidebar', size: { fixed: 5 } }] })
     binnacle.place('transcript', part('t1', 't2', 't3', 't4', 't5'))
     binnacle.place('sidebar', part('s1', 's2', 's3', 's4', 's5'))
   })
@@ -106,7 +106,7 @@ test('the wheel scrolls the place under the pointer, and no other', async () => 
 
 test('padding keeps blank cells inside a node, on each side or on the sides it names, and a gap keeps them between its children', async () => {
   const { rows } = await drawn(10, 6, (binnacle) => {
-    binnacle.layout('talk', {
+    binnacle.layout('chat', {
       column: [
         { place: 'a', size: 'content' },
         { place: 'b', size: 'content', padding: { left: 2 } },
@@ -122,7 +122,7 @@ test('padding keeps blank cells inside a node, on each side or on the sides it n
 
 test('a border is drawn with its edge, the theme’s rounded by default: on every side with a title set in its top, or on one side as a gutter', async () => {
   const { rows } = await drawn(12, 8, (binnacle) => {
-    binnacle.layout('talk', {
+    binnacle.layout('chat', {
       column: [
         { place: 'transcript', size: 'content', border: ['left'] },
         { place: 'composer', size: 'content', border: true, title: 'you' },
@@ -140,7 +140,7 @@ test('a terminal too small for the layout loses padding first, then borders, and
   const seen: string[][] = []
   for (const height of [5, 4, 3, 1]) {
     const { rows } = await drawn(8, height, (binnacle) => {
-      binnacle.layout('talk', {
+      binnacle.layout('chat', {
         column: [
           { place: 'transcript' },
           { place: 'status', size: 'content' },
@@ -163,7 +163,7 @@ test('a terminal too small for the layout loses padding first, then borders, and
 
 test('a wide character never straddles the border between two places side by side', async () => {
   const { rows } = await drawn(10, 2, (binnacle) => {
-    binnacle.layout('talk', { row: [{ place: 'a', size: { fixed: 3 } }, { place: 'b' }] })
+    binnacle.layout('chat', { row: [{ place: 'a', size: { fixed: 3 } }, { place: 'b' }] })
     binnacle.place('a', part('日本'))
     binnacle.place('b', part('b'))
   })
@@ -172,7 +172,7 @@ test('a wide character never straddles the border between two places side by sid
 
 test('a column draws every row it is given, so its bottom border closes at its last row and the place under it stays at the bottom', async () => {
   const { rows } = await drawn(10, 5, (binnacle) => {
-    binnacle.layout('talk', {
+    binnacle.layout('chat', {
       column: [
         { column: [{ place: 'a', size: 'content' }], border: true },
         { place: 'c', size: 'content' },
@@ -188,7 +188,7 @@ test('a node given fewer rows than its own box gives up its padding, then its bo
   const seen: string[][] = []
   for (const height of [3, 1]) {
     const { rows } = await drawn(10, height, (binnacle) => {
-      binnacle.layout('talk', { column: [{ place: 'a', border: true, padding: 1 }] })
+      binnacle.layout('chat', { column: [{ place: 'a', border: true, padding: 1 }] })
       binnacle.place('a', part('a1', 'a2'))
     })
     seen.push(rows)
@@ -200,7 +200,7 @@ test('a title is drawn as plain text, and a title too long for its border is cut
   const seen: string[] = []
   for (const title of ['x\ny\x1b[31mred', 'Transcript title long']) {
     const { rows } = await drawn(16, 3, (binnacle) => {
-      binnacle.layout('talk', { column: [{ place: 'a', border: true, title }] })
+      binnacle.layout('chat', { column: [{ place: 'a', border: true, title }] })
     })
     seen.push(rows[0] ?? '')
   }
@@ -209,7 +209,7 @@ test('a title is drawn as plain text, and a title too long for its border is cut
 
 test('a size, a padding or a gap of fewer than no cells, or of part of a cell, is drawn as the whole cells it holds, never fewer than none', async () => {
   const { rows } = await drawn(5, 2, (binnacle) => {
-    binnacle.layout('talk', {
+    binnacle.layout('chat', {
       column: [
         { place: 'a', size: { fixed: -3 } },
         { place: 'b', padding: -1 },
@@ -224,7 +224,7 @@ test('a size, a padding or a gap of fewer than no cells, or of part of a cell, i
 
 test('the wheel over a place’s border scrolls the place', async () => {
   const { terminal } = await drawn(10, 3, (binnacle) => {
-    binnacle.layout('talk', { column: [{ place: 'a', border: true }] })
+    binnacle.layout('chat', { column: [{ place: 'a', border: true }] })
     binnacle.place('a', part('a1', 'a2', 'a3', 'a4'))
   })
   terminal.type(wheelUpAt(1, 1))
@@ -239,7 +239,7 @@ test('a node is a place, a row or a column, never two at once', () => {
 
 test('a gap wider than the room between its children is given up before their rows are cut', async () => {
   const { rows } = await drawn(6, 3, (binnacle) => {
-    binnacle.layout('talk', { column: [{ place: 'a' }, { place: 'b' }], gap: 5 })
+    binnacle.layout('chat', { column: [{ place: 'a' }, { place: 'b' }], gap: 5 })
     binnacle.place('a', part('a'))
     binnacle.place('b', part('b'))
   })

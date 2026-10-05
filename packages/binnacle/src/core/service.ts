@@ -1,11 +1,11 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Binnacle, Handle, Layout, Part, Screen } from '../api.ts'
-import { TALK } from './talk.ts'
+import { CHAT } from './chat.ts'
 
 export class BinnacleService extends Service implements Binnacle {
   // TypeScript private, not #private: Cordis reaches the service through traced copies.
-  private readonly screens: Screen[] = [TALK]
+  private readonly screens: Screen[] = [CHAT]
   private readonly layouts = new Map<string, Layout[]>()
   private readonly parts = new Map<string, Part[]>()
   private readonly redraw: () => void
@@ -18,7 +18,7 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   get layoutOnView(): Layout {
-    const screen = this.screens.at(-1) ?? TALK
+    const screen = this.screens.at(-1) ?? CHAT
     return this.layouts.get(screen.name)?.at(-1) ?? screen.layout
   }
 
