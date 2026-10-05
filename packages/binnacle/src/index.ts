@@ -5,6 +5,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { AppExit, AppReady } from '@deepseek-ai/dsh-cmdline'
+import { capture } from './core/capture.ts'
+import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
 import { rowsOf } from './core/view.ts'
@@ -25,7 +27,7 @@ export interface Process {
   stop(): void
 }
 
-export const internals: { terminal: () => Terminal; process: Process } = {
+export const internals: { terminal: () => Terminal; process: Process; streams: readonly Stream[] } = {
   terminal: () => {
     throw new Error('binnacle: no terminal yet')
   },
@@ -34,6 +36,7 @@ export const internals: { terminal: () => Terminal; process: Process } = {
     off: () => {},
     stop: () => {},
   },
+  streams: [],
 }
 
 // The alternate screen, the cursor hidden, and the mouse's presses and wheel reported in SGR's form.
@@ -55,6 +58,8 @@ export function apply(ctx: Context): void {
   // The terminal once dsh is ready, and whether binnacle holds it now: it does not while suspended.
   let terminal: Terminal | undefined
   let holding = false
+  // While binnacle holds the terminal, what other code writes is held back; this ends that.
+  let release: (() => void) | undefined
   const display = new Display((data) => {
     terminal?.write(data)
   })
@@ -72,6 +77,7 @@ export function apply(ctx: Context): void {
   const take = (): void => {
     if (terminal === undefined || holding) return
     holding = true
+    release = capture(internals.streams)
     terminal.start(
       (data) => {
         input.process(data)
@@ -91,6 +97,9 @@ export function apply(ctx: Context): void {
     holding = false
     terminal.write(GIVE_BACK)
     terminal.stop()
+    // Printed on the main screen, now that binnacle no longer draws over it.
+    release?.()
+    release = undefined
   }
   const suspend = (): void => {
     if (!holding) return

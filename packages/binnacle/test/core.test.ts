@@ -167,3 +167,17 @@ test('a process that exits while binnacle holds the terminal, as on a crash, giv
     raw: false,
   })
 })
+
+test('text other code writes while binnacle draws stays off the screen, and is printed once the terminal is given back', async () => {
+  const { terminal, stdout, stderr, printed, ready, fiber } = await mount({ columns: 20, rows: 3 })
+  stdout.write('before\n')
+  ready()
+  stdout.write('stray out\n')
+  stderr.write('stray err\n')
+  assert.deepEqual(await terminal.read().then(({ rows }) => ({ rows, printed: [...printed] })), {
+    rows: ['', '', ''],
+    printed: ['stdout: before\n'],
+  })
+  await fiber.dispose()
+  assert.deepEqual(printed, ['stdout: before\n', 'stdout: stray out\n', 'stderr: stray err\n'])
+})

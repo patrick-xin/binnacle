@@ -37,6 +37,11 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
   cmdline.stdout = { write: (chunk: string) => out.push(chunk) }
   cmdline.stderr = { write: (chunk: string) => out.push(chunk) }
   const process = new FakeProcess()
+  // The process's own stdout and stderr, which other code writes to: what reaches them, in order.
+  const printed: string[] = []
+  const stdout = { write: (chunk: string) => printed.push(`stdout: ${chunk}`) > 0 }
+  const stderr = { write: (chunk: string) => printed.push(`stderr: ${chunk}`) > 0 }
+  core.internals.streams = [stdout, stderr]
   core.internals.terminal = () => terminal
   core.internals.process = process
   const ctx = new Context()
@@ -61,6 +66,9 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
     fiber,
     terminal,
     process,
+    stdout,
+    stderr,
+    printed,
     exits,
     out,
     /** The launcher commits startup: every row has mounted. */
