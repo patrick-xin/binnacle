@@ -34,5 +34,12 @@ export function agents() {
       },
     })
   }
-  return { created, sent, agent, provide }
+  // dsh emits each event its session commits, and each frame of the answer that streams, on the Context.
+  const commit = (ctx: Context, event: { seq: number; type: string; time: number; data: unknown }): void => {
+    ctx.emit('session/event', session as never, event as never)
+  }
+  const stream = (ctx: Context, frame: unknown): void => {
+    ctx.emit('agent/assistant-stream', { agent, frame } as never)
+  }
+  return { created, sent, agent, provide, commit, stream }
 }

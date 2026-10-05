@@ -38,6 +38,10 @@ export async function openNew(ctx: Context): Promise<ChatSession | undefined> {
   const cwd = fs === undefined ? process.cwd() : fs.processPath(await fs.resolve('.'))
   const id = `session-${randomUUID()}`
   const events: SessionEvent[] = []
+  // The session commits its first events while it is made, before the agent is returned.
+  ctx.on('session/event', (session, event) => {
+    if (session.header.id === id) events.push(event)
+  })
   const { agent } = await agents.create({
     sessionId: id as SessionId,
     meta: { cwd },
