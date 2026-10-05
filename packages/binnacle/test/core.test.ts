@@ -1,14 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Shown } from '../src/api.ts'
+import type { Drawn } from '../src/api.ts'
 import { mount } from './support/mount.ts'
 
 const probe = (lines: readonly string[]) => ({
   name: 'probe',
   inject: ['binnacle'],
   apply: (plugin: Context) => {
-    plugin.binnacle.show({ lines: () => lines })
+    plugin.binnacle.place('transcript', { lines: () => lines })
   },
 })
 
@@ -29,7 +29,7 @@ test('binnacle takes the alternate screen, raw mode and the mouse when dsh is re
   })
 })
 
-test('a screen that a plugin shows is drawn line by line, each line wrapped at the width', async () => {
+test('a part placed in the transcript is drawn line by line, each line wrapped at the width', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 6 })
   ready()
   await ctx.plugin(probe(['first', 'a line too long for twenty columns', 'last']))
@@ -50,7 +50,7 @@ test('a line with terminal control sequences in it is drawn as its plain text', 
 const WHEEL_UP = '\x1b[<64;5;2M'
 const WHEEL_DOWN = '\x1b[<65;5;2M'
 
-test('a screen longer than the terminal starts at its end, and the wheel scrolls it three rows a notch, stopping at each end', async () => {
+test('a part longer than its place starts at its end, and the wheel scrolls it three rows a notch, stopping at each end', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
   ready()
   await ctx.plugin(probe(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']))
@@ -70,28 +70,28 @@ test('a screen longer than the terminal starts at its end, and the wheel scrolls
   ])
 })
 
-test('a screen drawn again writes only the rows that changed', async () => {
+test('a part drawn again writes only the rows that changed', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
   ready()
   const lines = ['alpha', 'beta', 'gamma']
-  let shown: Shown | undefined
+  let drawn: Drawn | undefined
   await ctx.plugin({
     name: 'probe',
     inject: ['binnacle'],
     apply: (plugin: Context) => {
-      shown = plugin.binnacle.show({ lines: () => lines })
+      drawn = plugin.binnacle.place('transcript', { lines: () => lines })
     },
   })
   const before = terminal.written.length
   lines[1] = 'BETA'
-  shown?.redraw()
+  drawn?.redraw()
   const after = terminal.written.slice(before)
   assert.deepEqual((await terminal.read()).rows, ['alpha', 'BETA', 'gamma', ''])
   assert.ok(after.includes('BETA'))
   assert.ok(!after.includes('alpha') && !after.includes('gamma'), JSON.stringify(after))
 })
 
-test('a terminal that changes size has the screen drawn again at its new width', async () => {
+test('a terminal that changes size has its parts drawn again at the new width', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 30, rows: 4 })
   ready()
   await ctx.plugin(probe(['one two three four five', 'six']))
@@ -160,7 +160,7 @@ test('text other code writes while binnacle draws stays off the screen, and is p
   assert.deepEqual(printed, ['stdout: before\n', 'stdout: stray out\n', 'stderr: stray err\n'])
 })
 
-test('a plugin that unloads, as on a reload, takes its screen with it, and the core keeps the terminal for the plugin loaded again', async () => {
+test('a plugin that unloads, as on a reload, takes its part with it, and the core keeps the terminal for the plugin loaded again', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 2 })
   ready()
   const first = ctx.plugin(probe(['first']))
