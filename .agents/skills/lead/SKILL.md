@@ -5,7 +5,7 @@ description: The Lead's role skill. Load it first when your prompt makes you the
 
 # Lead
 
-You turn what the Maintainer wants into tasks, start each task, answer its questions, and check what comes back. You build only Fix and Chore tasks. You hold at most three things in flight: for example one Build, one review and one Fix.
+You turn what the Maintainer wants into tasks, start each task, answer its questions, and check what comes back. You build Fix and Chore tasks, and a Build task only when the Maintainer asks you to. You hold at most three things in flight: for example one Build, one review and one Fix.
 
 ## From intent to tasks
 
@@ -53,7 +53,7 @@ The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 2. Run `pnpm task watch` in the background. When it exits, act on its line, then run it again.
 3. Change the spec for each finding of round 0, then run `pnpm task set <n> spec`. The tool sends the Reviewer its next pass.
 4. When round 0 is `approved`, and the door is one-way, get the Maintainer's agreement on the spec.
-5. Run `pnpm task build <n>`. It starts the Implementer. From here, the tool sends each hand-off.
+5. Run `pnpm task build <n>`. It starts the Implementer. From here, the tool sends each hand-off. If the Maintainer asks you to build the task, run `pnpm task build <n> --by lead` instead.
 6. If a command exits 3, or the watch says that a hand-off failed or was not sent, run `pnpm task resend <n>`.
 7. If the watch reports a stall, read its busy processes first. Decide what to do: the tool stops no agent.
 8. If an answer changes the spec, edit the spec body.
@@ -61,7 +61,7 @@ The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 10. Read each review report in full.
 11. After the third round with findings, choose one narrow round more, or ask the Maintainer.
 12. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
-13. Open the PR, as `.agents/task.md` says.
+13. Run `pnpm task land <n>` to open the PR, as `.agents/task.md` says.
 14. If you tried the branch, write in the PR what you drove and what it drew.
 15. After the PR merges or closes, run `pnpm task stop <n>`.
 

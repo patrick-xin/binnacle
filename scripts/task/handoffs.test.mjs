@@ -25,7 +25,7 @@ test('`ready` sends the Reviewer the round, the tip, the commits since the last 
   assert.equal(handoff.start, false)
   assert.equal(
     handoff.text,
-    'Round 2 of #140 at b2: the commits a1..b2. In your checkout /h/worktrees/140-review, run `git switch --detach b2`, install again only if the lockfile changed, and run `pnpm test`. Check each finding of the last round first, then what the commits touched. Write the report to /h/tasks/140/review-2.md, then set the state with `pnpm -C /r task set 140 changes` or `pnpm -C /r task set 140 approved`, and end your turn.',
+    'Round 2 of #140 at b2: the commits a1..b2. In your checkout /h/worktrees/140-review, run `git switch --detach b2`, install if `node_modules` is missing or the lockfile changed, and run `pnpm test`. Check each finding of the last round first, then what the commits touched. Write the report to /h/tasks/140/review-2.md, then set the state with `pnpm -C /r task set 140 changes` or `pnpm -C /r task set 140 approved`, and end your turn.',
   )
 })
 

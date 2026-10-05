@@ -34,13 +34,14 @@ The log governs the state: the last line is the current state and round. If the 
 | Command | Role | Does |
 |---|---|---|
 | `pnpm task start <n>` | Lead | Checks the families, the tools, the files and the overlap. Makes the branch, the worktrees and the task folder. Starts the Reviewer, and sends it round 0. |
-| `pnpm task build <n>` | Lead | After round 0 is `approved`, starts the Implementer, and sends it the spec |
+| `pnpm task build <n> [--by lead]` | Lead | After round 0 is `approved`, starts the Implementer, and sends it the spec. With `--by lead`, records the Lead as the Implementer, and starts no agent. |
 | `pnpm task set <n> <state>` | the role that owns the state | Sets `spec`, `building`, `ready`, `changes` or `approved`, as the table below allows, and sends its hand-off |
 | `pnpm task ask <n>` | any role | Sets `blocked` |
 | `pnpm task answer <n>` | Lead | Sets the state from before `blocked`, and sends the answer to the role that asked |
 | `pnpm task resend <n>` | Lead | Sends the newest hand-off that did not land again, and starts its agent first if it is not running |
 | `pnpm task status [<n>]` | any role | Shows the tasks, and each agent with the time since its last session record |
 | `pnpm task watch` | Lead | Exits when the Lead must act |
+| `pnpm task land <n>` | Lead | After a round after round 0 is `approved`, squashes the branch with `message.md`, pushes it, and opens the PR. See *The PR*. |
 | `pnpm task stop <n> [--force]` | Lead | Closes the agents, removes the worktrees and the branch, and sets `stopped` |
 
 - An agent runs the tool of the main checkout, as its prompt names it: `pnpm -C <main checkout> task ...`. Its own checkout can hold another version of the tool, and a branch's tool sends that branch's hand-offs.
@@ -87,6 +88,7 @@ Each command that writes takes the lock `~/.binnacle/tasks/.lock`, and the watch
 | Line | Means |
 |---|---|
 | `140 approved round 1 (reviewer)` | A change of state that wakes the Lead |
+| `140 implementer (lead): <prompt>` | A hand-off to a role that the Lead takes, with the prompt the agent would get |
 | `140 reviewer hand-off h3 failed: <error>` | The agent did not start, or the prompt did not land after its last try |
 | `140 reviewer hand-off h3 was not sent; run task resend 140` | A command stopped during its hand-off |
 | `140 implementer stalled: no session record for 20 min` | The agent works, but pi wrote no session record for 20 minutes |
@@ -108,13 +110,24 @@ The Lead answers:
 1. Write the answer to `answer.md` in the task folder.
 2. Run `pnpm task answer <n>`. The tool sets the state from before `blocked`, renames both files to `question-<k>.md` and `answer-<k>.md`, where `<k>` counts the questions of the task, and sends the answer to the role that asked.
 
+## The Lead as the Implementer
+
+When the Maintainer asks the Lead to build a task, run `pnpm task build <n> --by lead`. The Lead's family must differ from the Reviewer's.
+
+- Set the Implementer's states with `--as implementer`.
+- A hand-off to the Implementer starts no agent: the watch prints it as `<n> implementer (lead): <prompt>`.
+- `task status` shows the entry as `implementer lead`. `task stop` and the watch leave it alone.
+
 ## The PR
 
-The Lead opens the PR when the Reviewer approves and `message.md` exists:
+Run `pnpm task land <n>` when the Reviewer approves a round after round 0, and `message.md` and `checked.md` exist. It checks each input before it changes anything, then:
 
-1. Squash the branch into one commit, with `message.md` as its message.
-2. Put `checked.md` in the PR's *Checked* list.
-3. Put the text of each review report in the PR, each in a `<details>` block.
-4. Label the PR with its door.
+1. squashes the branch into one commit on `origin/main`, with `message.md` as its message, and pushes it;
+2. opens the PR, in the shape of the PR template: the message's body, `checked.md` under *Evidence*, and the spec's door;
+3. labels a one-way PR `one-way`;
+4. posts each review report as a comment of its own, oldest first;
+5. writes `landed` with the PR's address.
+
+A land that stops part of the way names the step: run it again, and it finishes without a second commit, PR or comment. Before you merge, fill in *Blast radius*, and answer the items of *Checked* that the tool cannot know. A two-way PR merges when CI passes, and the Maintainer merges a one-way PR.
 
 A Fix, a Chore and a Researcher's question have no task folder. The Lead builds a Fix or a Chore alone, and the Researcher's answer ends its question.

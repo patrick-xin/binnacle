@@ -28,4 +28,4 @@ A task is a GitHub issue. The intent lists the issues of its current stage.
 | `pnpm install && pnpm refs` | Installs, and fetches each reference into `.refs/` |
 | `pnpm test` | Runs every check, then every test. CI runs it on each PR. |
 | `pnpm fmt` | Formats the tree |
-| `pnpm task` | Runs a Build task: `start`, `build`, `set`, `ask`, `answer`, `resend`, `status`, `watch`, `stop` |
+| `pnpm task` | Runs a Build task: `start`, `build`, `set`, `ask`, `answer`, `resend`, `status`, `watch`, `land`, `stop` |
