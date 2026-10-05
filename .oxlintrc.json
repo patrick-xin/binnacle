@@ -48,6 +48,38 @@
       "rules": {
         "no-control-regex": "off"
       }
+    },
+    {
+      "files": ["packages/binnacle/src/**"],
+      "rules": {
+        "max-lines": [
+          "error",
+          {
+            "max": 300,
+            "skipBlankLines": true,
+            "skipComments": true
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/binnacle/src/index.ts"],
+      "rules": {
+        "max-lines": [
+          "error",
+          {
+            "max": 80,
+            "skipBlankLines": true,
+            "skipComments": true
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/binnacle/src/terminal/**"],
+      "rules": {
+        "max-lines": "off"
+      }
     }
   ],
   "ignorePatterns": [".refs/**", "**/dist/**", "node_modules/**"]

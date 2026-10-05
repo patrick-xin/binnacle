@@ -62,3 +62,17 @@ export async function openNew(ctx: Context): Promise<ChatSession | undefined> {
     },
   }
 }
+
+/** Opens the Chat's session, and provides it once it is open; a session that cannot open is said, with why. */
+export function openChat(ctx: Context, named: string | undefined, failed: (why: string) => void): void {
+  void (named === undefined ? openNew(ctx) : openStored(ctx, named)).then(
+    (session) => {
+      // A service provided with no value is still there for Cordis, so it is provided once the session is open.
+      if (session !== undefined) ctx.provide('binnacleSession', session)
+    },
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      failed(`could not ${named === undefined ? 'open a session' : `read ${named}`}: ${message}`)
+    },
+  )
+}
