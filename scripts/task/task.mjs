@@ -276,7 +276,7 @@ function readRoles(deps) {
  * What a hand-off needs to know of its task, as the log and the events say.
  * @param {number} n - the task number.
  * @param {string} folder - the task's folder.
- * @param {{ home: string }} deps - the world.
+ * @param {{ home: string, repo: string }} deps - the world.
  * @returns {import('./handoffs.mjs').Context} the context.
  */
 function context(n, folder, deps) {
@@ -284,6 +284,7 @@ function context(n, folder, deps) {
   const last = lines.at(-1)
   return {
     n,
+    repo: deps.repo,
     folder,
     worktree: join(deps.home, 'worktrees', String(n)),
     review: join(deps.home, 'worktrees', `${n}-review`),

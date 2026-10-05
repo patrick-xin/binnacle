@@ -6,7 +6,7 @@
 
 /**
  * What a hand-off needs to know of its task.
- * @typedef {{ n: number, folder: string, worktree: string, review: string, round: number, pass: number, tip?: string, base?: string, k?: number }} Context
+ * @typedef {{ n: number, repo: string, folder: string, worktree: string, review: string, round: number, pass: number, tip?: string, base?: string, k?: number }} Context
  * @typedef {{ role: string, start: boolean, text: string }} Handoff
  */
 
@@ -31,7 +31,9 @@ export function reportFile(round, pass) {
  */
 export function handoffFor(change, c, asker) {
   const report = `${c.folder}/${reportFile(c.round, c.pass)}`
-  const verdict = `Write the report to ${report}, then set the state with \`pnpm task set ${c.n} changes\` or \`pnpm task set ${c.n} approved\`, and end your turn.`
+  // The tool of the main checkout: the agent's own checkout may hold another version of it.
+  const tool = `pnpm -C ${c.repo} task`
+  const verdict = `Write the report to ${report}, then set the state with \`${tool} set ${c.n} changes\` or \`${tool} set ${c.n} approved\`, and end your turn.`
   switch (change.kind) {
     case 'start':
       return {
@@ -43,7 +45,7 @@ export function handoffFor(change, c, asker) {
       return {
         role: 'implementer',
         start: true,
-        text: `You are the Implementer. Load the implementer skill in .agents/skills/implementer/ first. Build issue #${c.n} in ${c.worktree}, on the branch task/${c.n}. Round 0 is approved. Your task folder is ${c.folder}. Set your state with \`pnpm task set ${c.n} <state>\`, as .agents/task.md says.`,
+        text: `You are the Implementer. Load the implementer skill in .agents/skills/implementer/ first. Build issue #${c.n} in ${c.worktree}, on the branch task/${c.n}. Round 0 is approved. Your task folder is ${c.folder}. Set your state with \`${tool} set ${c.n} <state>\`, as .agents/task.md says.`,
       }
     case 'answer':
       return {
@@ -71,7 +73,7 @@ export function handoffFor(change, c, asker) {
             : {
                 role: 'implementer',
                 start: false,
-                text: `Round ${c.round} of #${c.n} has findings: read ${report} in full, fix each finding, prove each new test, and set \`ready\` again.`,
+                text: `Round ${c.round} of #${c.n} has findings: read ${report} in full, fix each finding, prove each new test, and set \`ready\` again with \`${tool} set ${c.n} ready\`.`,
               }
         case 'approved':
           return c.round === 0
