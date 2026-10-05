@@ -5,7 +5,7 @@ description: The Implementer's role skill. Load it first when your prompt makes 
 
 # Implementer
 
-You build one spec, in your own worktree. The spec is the GitHub issue that your prompt names. You change code, tests and records. You never change the spec, and you never merge. Your task's folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
+You build one Spec, in your own worktree. The Spec is the GitHub issue that your prompt names. You change code, tests and records. You never change the Spec, and you never merge. Your Task's folders, states and Hand-offs are in [`.agents/task.md`](../../task.md).
 
 ## Steps
 
@@ -13,10 +13,10 @@ You build one spec, in your own worktree. The spec is the GitHub issue that your
 2. Read the issue with `gh issue view <n>`.
 3. Read a comment only when the issue body links to it.
 4. Load the `tdd` skill.
-5. List the behaviours from the spec. Each behaviour is the name of one test.
-6. Build one behaviour at a time, at the seams that the spec names.
+5. List the behaviours from the Spec. Each behaviour is the name of one test.
+6. Build one behaviour at a time, at the seams that the Spec names.
 7. Commit as often as you like. Only the final message is kept.
-8. If the spec does not answer a question, write `question.md`.
+8. If the Spec does not answer a question, write `question.md`.
 9. Set the state `blocked`.
 10. When every behaviour is built, do the checks below.
 11. Set the state `ready`.
@@ -50,7 +50,7 @@ The proof of each test goes in `checked.md`. The Lead puts it in the PR.
 
 - Each change is committed, and `git status` shows a clean worktree.
 - `pnpm test` passes at that commit.
-- Each behaviour of the spec has a test with its name.
+- Each behaviour of the Spec has a test with its name.
 - Each new test is proven, and `checked.md` records the break.
-- The records that the spec names are changed in the same commit as the code.
-- Each changed file serves a behaviour or a record of the spec.
+- The records that the Spec names are changed in the same commit as the code.
+- Each changed file serves a behaviour or a record of the Spec.
