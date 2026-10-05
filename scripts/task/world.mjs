@@ -29,6 +29,7 @@ export function git(cwd, args) {
  * @returns {{
  *   dir: string, home: string, repo: string,
  *   deps: { home: string, repo: string, readIssue: (n: number) => Promise<string>, now: () => Date, sleep: (ms: number) => Promise<void> },
+ *   runner: ReturnType<typeof makeFakeRunner>,
  *   setIssue(n: number, body: string): void, shape(...paths: string[]): string, tick(ms?: number): void, remove(): void
  * }} the world.
  */
@@ -46,7 +47,13 @@ export function makeWorld() {
   ])
     execFileSync('git', ['config', key, value], { cwd: repo })
   mkdirSync(join(repo, '.agents'))
-  writeFileSync(join(repo, '.agents', 'roles.json'), JSON.stringify({ implementer: { family: 'zai' }, reviewer: { family: 'openai' } }))
+  writeFileSync(
+    join(repo, '.agents', 'roles.json'),
+    JSON.stringify({
+      implementer: { tool: 'pi', model: 'zai/glm-5.3', family: 'zai', thinking: 'max', runner: 'fake' },
+      reviewer: { tool: 'pi', model: 'openai-codex/gpt-6.1-sol', family: 'openai', thinking: 'medium', runner: 'fake' },
+    }),
+  )
   writeFileSync(join(repo, 'README.md'), 'one\n')
   execFileSync('git', ['add', '.agents/roles.json', 'README.md'], { cwd: repo })
   execFileSync('git', ['commit', '-m', 'init'], { cwd: repo, stdio: 'ignore' })
@@ -54,6 +61,8 @@ export function makeWorld() {
 
   const issues = new Map()
   let clock = new Date('2026-10-05T10:00:00.000Z')
+  const runner = makeFakeRunner()
+  let slept = 0
   return {
     dir,
     home,
@@ -66,8 +75,19 @@ export function makeWorld() {
         return body === undefined ? Promise.reject(new Error(`no issue ${n}`)) : Promise.resolve(body)
       },
       now: () => clock,
-      sleep: async () => {},
+      // A sleep that yields to the event loop, and ends a watch that finds
+      // nothing: a test's timeout fails the test, but cannot stop its loop,
+      // and a loop that runs on keeps the test file from exiting.
+      sleep() {
+        slept += 1
+        if (slept > 1000) return Promise.reject(new Error('slept 1000 times: nothing came'))
+        return new Promise((resolve) => setImmediate(resolve))
+      },
+      env: {},
+      runners: { fake: runner },
+      processes: async () => [],
     },
+    runner,
     setIssue(n, body) {
       issues.set(String(n), body)
     },
@@ -81,4 +101,42 @@ export function makeWorld() {
       rmSync(dir, { recursive: true, force: true })
     },
   }
+}
+
+/**
+ * A runner that starts nothing. It records each start, prompt and close, and
+ * answers each `activity` with the state a test sets for a role. A test can
+ * make a start or a prompt fail.
+ * @returns {{
+ *   starts: object[], prompts: { role: string, text: string }[], closed: string[],
+ *   states: Record<string, { state: string, root?: number }>, failStart: Set<string>, failPrompt: Set<string>,
+ *   start(agent: object): Promise<object>, prompt(handle: object, text: string, onRetry?: Function): Promise<void>,
+ *   activity(handle: object): Promise<object>, close(handle: object): Promise<void>
+ * }} the runner.
+ */
+export function makeFakeRunner() {
+  const runner = {
+    starts: [],
+    prompts: [],
+    closed: [],
+    states: {},
+    failStart: new Set(),
+    failPrompt: new Set(),
+    async start(agent) {
+      if (runner.failStart.has(agent.role)) throw new Error(`the ${agent.role} did not start`)
+      runner.starts.push(agent)
+      return { role: agent.role }
+    },
+    async prompt(handle, text) {
+      if (runner.failPrompt.has(handle.role)) throw new Error('agent_prompt_stalled')
+      runner.prompts.push({ role: handle.role, text })
+    },
+    async activity(handle) {
+      return runner.states[handle.role] ?? { state: 'idle' }
+    },
+    async close(handle) {
+      runner.closed.push(handle.role)
+    },
+  }
+  return runner
 }

@@ -27,22 +27,18 @@ test('`task watch` exits with one line for the oldest change that the Lead acts 
   world.tick(30_000)
   await ready(world, 141, 'docs/')
 
-  // Each run takes the oldest change that waits: task 140 first, and the
-  // changes to `building` wake no one.
-  const reports = [
-    '140 spec round 0 (lead)',
-    '140 approved round 0 (reviewer)',
-    '140 ready round 1 (implementer)',
-    '141 spec round 0 (lead)',
-    '141 approved round 0 (reviewer)',
-    '141 ready round 1 (implementer)',
-  ]
+  // Each run takes the oldest change that waits: task 140 first. The Lead's
+  // own `spec`, `building`, and `ready`, which goes to the Reviewer, wake no one.
+  const reports = ['140 approved round 0 (reviewer)', '141 approved round 0 (reviewer)']
   for (const [i, expected] of reports.entries()) {
     const result = await run(['watch'], world.deps)
     assert.equal(result.code, 0, `run ${i + 1}`)
     assert.equal(result.stdout, `${expected}\n`, `run ${i + 1}`)
   }
-  assert.deepEqual(JSON.parse(readFileSync(join(world.home, 'tasks', 'watch.json'), 'utf8')), { 140: 4, 141: 4 })
+  assert.deepEqual(JSON.parse(readFileSync(join(world.home, 'tasks', 'watch.json'), 'utf8')), {
+    140: { log: 2, events: 0 },
+    141: { log: 2, events: 0 },
+  })
 })
 
 test('Two changes that wait are reported by two runs of `task watch`, one each', async (t) => {
@@ -52,19 +48,23 @@ test('Two changes that wait are reported by two runs of `task watch`, one each',
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
   world.tick()
   await run(['set', '140', 'changes', '--as', 'reviewer'], world.deps)
+  world.tick()
+  await run(['set', '140', 'spec', '--as', 'lead'], world.deps)
+  world.tick()
+  await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)
 
   const first = await run(['watch'], world.deps)
-  assert.equal(first.stdout, '140 spec round 0 (lead)\n')
+  assert.equal(first.stdout, '140 changes round 0 (reviewer)\n')
   const second = await run(['watch'], world.deps)
-  assert.equal(second.stdout, '140 changes round 0 (reviewer)\n')
+  assert.equal(second.stdout, '140 approved round 0 (reviewer)\n')
 })
 
 test('`task watch` sleeps and reads again when no line waits', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
   await ready(world, 140, 'scripts/task/')
-  // Drain the three changes that wait; the change to `building` never waits.
-  for (const _ of [1, 2, 3]) await run(['watch'], world.deps)
+  // Drain the one change that waits: `approved` at round 0.
+  await run(['watch'], world.deps)
 
   const reads = []
   const deps = {
@@ -73,14 +73,14 @@ test('`task watch` sleeps and reads again when no line waits', async (t) => {
       reads.push('slept')
       writeFileSync(
         join(world.home, 'tasks', '140', 'log.ndjson'),
-        '{"at":"2026-10-05T10:04:30.000Z","role":"reviewer","from":"ready","to":"changes","round":1}\n',
+        '{"at":"2026-10-05T10:04:30.000Z","role":"reviewer","from":"ready","to":"approved","round":1}\n',
         { flag: 'a' },
       )
     },
   }
   const woken = await run(['watch'], deps)
   assert.equal(woken.code, 0)
-  assert.equal(woken.stdout, '140 changes round 1 (reviewer)\n')
+  assert.equal(woken.stdout, '140 approved round 1 (reviewer)\n')
   assert.deepEqual(reads, ['slept'])
 })
 
@@ -89,7 +89,6 @@ test('a second watch exits 2 while one runs', async (t) => {
   t.after(() => world.remove())
   world.setIssue(140, world.shape('scripts/task/'))
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
-  await run(['watch'], world.deps)
 
   // The first watch sleeps until the test lets it go, and ends by reporting
   // the change its sleep adds.
@@ -148,9 +147,10 @@ test('a watch that finds a gone process in watch.pid changes nothing, and exits 
 
   // The Lead removes the stale pid file by hand, and the watch runs.
   rmSync(pidFile)
+  await run(['set', '140', 'changes', '--as', 'reviewer'], world.deps)
   const after = await run(['watch'], world.deps)
   assert.equal(after.code, 0)
-  assert.equal(after.stdout, '140 spec round 0 (lead)\n')
+  assert.equal(after.stdout, '140 changes round 0 (reviewer)\n')
 })
 
 test('a watch that holds the pid file releases it when it gets SIGTERM', async (t) => {
@@ -158,7 +158,6 @@ test('a watch that holds the pid file releases it when it gets SIGTERM', async (
   t.after(() => world.remove())
   world.setIssue(140, world.shape('scripts/task/'))
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
-  await run(['watch'], world.deps)
   const pidFile = join(world.home, 'tasks', 'watch.pid')
 
   // The watch polls with nothing waiting, holding the pid file.

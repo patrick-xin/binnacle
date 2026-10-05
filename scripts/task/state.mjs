@@ -142,30 +142,96 @@ export function writeJson(path, value) {
  */
 
 /**
- * Each task of a home folder, by number, oldest first. The state and the
- * round are the last line of the log; the files are the record's.
+ * Each task of a home folder, by number, oldest first, and each folder that
+ * cannot be read as a task, with the reason. The state and the round are the
+ * last line of the log; the files are the record's.
+ * @param {string} home - the home folder, which holds `tasks`.
+ * @returns {{ tasks: Map<number, Task>, unreadable: { n: number, reason: string }[] }} the tasks, and the folders that are not.
+ */
+export function readTasks(home) {
+  const tasks = new Map()
+  const unreadable = []
+  const folder = join(home, 'tasks')
+  if (!existsSync(folder)) return { tasks, unreadable }
+  for (const entry of readdirSync(folder, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory() && /^\d+$/.test(dirent.name))
+    .toSorted((a, b) => Number(a.name) - Number(b.name))) {
+    const n = Number(entry.name)
+    try {
+      const record = readTask(join(folder, entry.name))
+      const lines = readLog(join(folder, entry.name))
+      const last = lines.at(-1)
+      tasks.set(n, { n, folder: join(folder, entry.name), files: record.files, state: last.to, round: last.round, lines })
+    } catch (error) {
+      unreadable.push({ n, reason: error.message })
+    }
+  }
+  return { tasks, unreadable }
+}
+
+/**
+ * Each task of a home folder, by number, oldest first.
  * @param {string} home - the home folder, which holds `tasks`.
  * @returns {Map<number, Task>} each task, by its number.
  * @throws {Error} when a task's log or record is broken; the message names the file.
  */
 export function tasksOf(home) {
-  const tasks = new Map()
-  const folder = join(home, 'tasks')
-  if (!existsSync(folder)) return tasks
-  for (const entry of readdirSync(folder, { withFileTypes: true })
-    .filter((dirent) => dirent.isDirectory() && /^\d+$/.test(dirent.name))
-    .toSorted((a, b) => Number(a.name) - Number(b.name))) {
-    const record = readTask(join(folder, entry.name))
-    const lines = readLog(join(folder, entry.name))
-    const last = lines.at(-1)
-    tasks.set(Number(entry.name), {
-      n: Number(entry.name),
-      folder: join(folder, entry.name),
-      files: record.files,
-      state: last.to,
-      round: last.round,
-      lines,
-    })
-  }
+  const { tasks, unreadable } = readTasks(home)
+  if (unreadable.length > 0) throw new Error(unreadable[0].reason)
   return tasks
+}
+
+/**
+ * Read a task's agents: for each role the task tool started, how to reach it.
+ * @param {string} folder - the task's folder.
+ * @returns {Record<string, { role: string, runner: string, tool: string, model: string, thinking?: string, handle: object, startedAt: string }>} each agent, by role.
+ * @throws {Error} when the file is broken; the message names it.
+ */
+export function readAgents(folder) {
+  const path = join(folder, 'agents.json')
+  if (!existsSync(path)) return {}
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    throw new Error(`${path}: not JSON; repair it by hand`, { cause: error })
+  }
+}
+
+/**
+ * An event of a task: what is not a change of state, such as a hand-off, a
+ * try that is tried again, or a stall.
+ * @typedef {{ at: string, event: string, role: string, detail?: object }} Event
+ */
+
+/**
+ * Read a task's events log, `events.ndjson`. A task with no events has none.
+ * @param {string} folder - the task's folder.
+ * @returns {Event[]} each event, in order.
+ * @throws {Error} when the log is broken; the message names the file.
+ */
+export function readEvents(folder) {
+  const path = join(folder, 'events.ndjson')
+  if (!existsSync(path)) return []
+  const text = readFileSync(path, 'utf8')
+  if (text === '') return []
+  if (!text.endsWith('\n')) throw new Error(`${path}: the log does not end with a newline`)
+  return text
+    .split('\n')
+    .slice(0, -1)
+    .map((line, index) => {
+      try {
+        return JSON.parse(line)
+      } catch (error) {
+        throw new Error(`${path}: line ${index + 1} is not JSON`, { cause: error })
+      }
+    })
+}
+
+/**
+ * Add one event to a task's events log.
+ * @param {string} folder - the task's folder.
+ * @param {Event} event - the event.
+ */
+export function appendEvent(folder, event) {
+  writeFileSync(join(folder, 'events.ndjson'), `${JSON.stringify(event)}\n`, { flag: 'a' })
 }
