@@ -9,3 +9,6 @@
     # The composer: what a person types, before it is sent.
     - id: binnacle-composer
       name: 'binnacle/plugins/composer'
+    # The status line: whether the agent runs, and on which model.
+    - id: binnacle-status-line
+      name: 'binnacle/plugins/status-line'

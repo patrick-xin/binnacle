@@ -20,6 +20,10 @@
       "types": "./dist/plugins/composer/index.d.ts",
       "default": "./dist/plugins/composer/index.js"
     },
+    "./plugins/status-line": {
+      "types": "./dist/plugins/status-line/index.d.ts",
+      "default": "./dist/plugins/status-line/index.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },

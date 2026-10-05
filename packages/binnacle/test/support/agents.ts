@@ -17,6 +17,7 @@ export function agents() {
   const sent: Sent[] = []
   let session: { header: { id: string } } | undefined
   const agent = {
+    options: SELECTION,
     status: 'idle' as 'idle' | 'running',
     get session() {
       return session
@@ -41,5 +42,9 @@ export function agents() {
   const stream = (ctx: Context, frame: unknown): void => {
     ctx.emit('agent/assistant-stream', { agent, frame } as never)
   }
-  return { created, sent, agent, provide, commit, stream }
+  const status = (ctx: Context, now: 'idle' | 'running'): void => {
+    agent.status = now
+    ctx.emit('agent/status', { agent, status: now } as never)
+  }
+  return { created, sent, agent, provide, commit, stream, status }
 }
