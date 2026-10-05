@@ -1,42 +1,25 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AppExit, AppReady } from '@deepseek-ai/dsh-cmdline'
-import type { Stream } from './core/capture.ts'
 import { readCommandLine } from './core/command-line.ts'
 import { Drawing } from './core/drawing.ts'
 import { Host } from './core/host.ts'
-import type { Process } from './core/host.ts'
+import { coreActions } from './core/actions.ts'
+import { internals } from './core/internals.ts'
 import { route } from './core/input.ts'
 import { keyTable } from './core/keys.ts'
 import { BinnacleService } from './core/service.ts'
 import { openChat } from './core/session.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
-import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
-import type { Terminal } from './terminal/terminal.ts'
 
 export type { Binnacle, Box, ChatSession, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
 export type { Process } from './core/host.ts'
 export { toPlainText } from './core/view.ts'
+export { internals } from './core/internals.ts'
 
 export const name = 'binnacle'
 
 export const inject = ['cmdlineArgs', 'appReady', 'appExit'] satisfies (keyof Context)[]
-
-export const internals: { terminal: () => Terminal; process: Process; streams: { stdout: Stream; stderr: Stream } } = {
-  terminal: () => new ProcessTerminal(),
-  process: {
-    on: (event, listener) => {
-      process.on(event, listener)
-    },
-    off: (event, listener) => {
-      process.off(event, listener)
-    },
-    stop: () => {
-      process.kill(process.pid, 'SIGSTOP')
-    },
-  },
-  streams: { stdout: process.stdout, stderr: process.stderr },
-}
 
 // The core only puts its parts together; each job is a module of its own in core/.
 export function apply(ctx: Context): void {
@@ -69,7 +52,12 @@ export function apply(ctx: Context): void {
       drawing.draw()
     },
     wheel: (notches, x, y) => drawing.wheel(notches, x, y),
-    act: (action) => (action === 'binnacle.quit' ? exit(0) : host.suspend()),
+    act: coreActions({
+      now: () => internals.now(),
+      quit: () => exit(0),
+      suspend: () => host.suspend(),
+      interrupt: () => ctx.get('binnacleSession')?.interrupt(),
+    }),
   })
   openChat(ctx, commandLine.session, (why) => {
     streams.stderr.write(`binnacle: ${why}\n`)

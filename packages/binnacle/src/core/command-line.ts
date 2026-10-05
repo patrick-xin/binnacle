@@ -9,7 +9,7 @@ export interface CommandLine {
 function program(parsed: (commandLine: CommandLine) => void): Command {
   return new Command()
     .name('dsh --profile binnacle')
-    .description('A terminal app for dsh. The wheel scrolls; ctrl+c quits; ctrl+z suspends.')
+    .description('A terminal app for dsh. Enter sends; esc interrupts; ctrl+c clears the draft, and twice quits; ctrl+z suspends.')
     .helpOption('-h, --help', 'show this help')
     .option('--session <id>', 'a stored session to read; nothing can be sent to it')
     .action((options: { session?: string }) => {

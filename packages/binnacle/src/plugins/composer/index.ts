@@ -56,7 +56,14 @@ export function apply(ctx: Context): void {
     cursor: (width) => drawn(width).cursor,
     key: (data) => {
       // pi-tui's editor names its actions `tui.`; a key bound to any other action is not the editor's.
-      if (ctx.binnacle.keys.actionsOf(data).some((action) => !action.startsWith('tui.'))) return false
+      const actions = ctx.binnacle.keys.actionsOf(data)
+      // The Key Table's clear is the draft's to do while there is one; on an empty draft it goes on to the core.
+      if (actions.includes('binnacle.clear') && editor.getText() !== '') {
+        editor.setText('')
+        changed()
+        return true
+      }
+      if (actions.some((action) => !action.startsWith('tui.'))) return false
       // A stored session takes nothing that is sent, and a new one takes nothing until it is open.
       editor.disableSubmit = ctx.get('binnacleSession')?.agent === undefined
       editor.handleInput(data)

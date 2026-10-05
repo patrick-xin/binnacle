@@ -36,6 +36,8 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
   core.internals.streams = { stdout, stderr }
   core.internals.terminal = () => terminal
   core.internals.process = process
+  const clock = { now: 0 }
+  core.internals.now = () => clock.now
   const ctx = new Context()
   provideCmdline(ctx, {
     args: options.args ?? [],
@@ -59,6 +61,7 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
     fiber,
     terminal,
     process,
+    clock,
     stdout,
     stderr,
     printed,

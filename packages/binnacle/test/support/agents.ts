@@ -15,6 +15,7 @@ function textOf(message: { content: readonly { type: string; text?: string }[] }
 export function agents() {
   const created: { sessionId: string; meta: unknown; agentOptions: unknown }[] = []
   const sent: Sent[] = []
+  const cancels: unknown[] = []
   let session: { header: { id: string } } | undefined
   const agent = {
     options: SELECTION,
@@ -24,6 +25,7 @@ export function agents() {
     },
     followup: (message: Parameters<typeof textOf>[0]) => sent.push({ how: 'followup', text: textOf(message) }),
     steer: (message: Parameters<typeof textOf>[0]) => sent.push({ how: 'steer', text: textOf(message) }),
+    cancel: (cause: unknown) => cancels.push(cause),
   }
   const provide = (ctx: Context): void => {
     ctx.provide('agentDefaultModel', { currentSelection: () => SELECTION })
@@ -46,5 +48,5 @@ export function agents() {
     agent.status = now
     ctx.emit('agent/status', { agent, status: now } as never)
   }
-  return { created, sent, agent, provide, commit, stream, status }
+  return { created, sent, cancels, agent, provide, commit, stream, status }
 }

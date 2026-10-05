@@ -102,13 +102,6 @@ test('a terminal that changes size has its Parts drawn again at the new width', 
   assert.deepEqual((await terminal.read()).rows, ['one two', 'three four', 'five', 'six'])
 })
 
-test('ctrl+c asks dsh to exit, with code 0', async () => {
-  const { terminal, ready, exits } = await mount()
-  ready()
-  terminal.type('\x03')
-  assert.deepEqual(exits, [0])
-})
-
 test('ctrl+z gives the terminal back and stops binnacle, and a resume takes the terminal again and draws the whole Screen', async () => {
   const { ctx, terminal, process, ready } = await mount({ columns: 20, rows: 3 })
   ready()
@@ -192,7 +185,7 @@ test('a plugin reads the actions of the Key Table that a key is bound to, in eac
       for (const key of ['\x03', '\x1b[99;5u', '\x1b[27;5;99~', 'x']) read.push([...plugin.binnacle.keys.actionsOf(key)])
     },
   })
-  assert.deepEqual(read, [['binnacle.quit'], ['binnacle.quit'], ['binnacle.quit'], []])
+  assert.deepEqual(read, [['binnacle.clear'], ['binnacle.clear'], ['binnacle.clear'], []])
 })
 
 test("a Part is asked for its lines once at a width, until it redraws: another Part's redraw does not ask it again", async () => {
@@ -249,4 +242,15 @@ test('while a person reads scrolled up, rows added at the end leave what they re
       ['10', '11', '12', '13'],
     ],
   )
+})
+
+test('ctrl+c pressed twice within half a second quits; once, or twice further apart, does not', async () => {
+  const { terminal, ready, exits, clock } = await mount()
+  ready()
+  const pressed = (at: number) => {
+    clock.now = at
+    terminal.type('\x03')
+    return [...exits]
+  }
+  assert.deepEqual([pressed(0), pressed(600), pressed(900)], [[], [], [0]])
 })
