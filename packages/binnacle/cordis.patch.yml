@@ -1,11 +1,29 @@
 # The binnacle bundle, stacked by a profile over dsh-base.
+# The agent is composed as dsh's headless bundle composes it: its persona and its tools mode.
+- id: system-prompt
+  config:
+    personaSuffix: Your working directory is {{cwd}}.
+    personaPrefix: >-
+      You are a coding agent powered by the {{model}} model.
+
+- id: tools
+  config:
+    mode: !!js process.env.DSH_TOOLS_MODE
+
+# Hot reload stays off until the core stays up while its plugins reload.
+- id: hmr
+  disabled: true
+
 - insert:
     # The core: it owns the terminal, and provides the binnacle service.
     - id: binnacle
       name: 'binnacle'
-    # The Read view, until the transcript can draw a session.
-    - id: binnacle-read
-      name: 'binnacle/plugins/read'
+    # The transcript: the session's events, raw.
+    - id: binnacle-transcript
+      name: 'binnacle/plugins/transcript'
     # The composer: what a person types, before it is sent.
     - id: binnacle-composer
       name: 'binnacle/plugins/composer'
+    # The status line: whether the agent runs, and on which model.
+    - id: binnacle-status-line
+      name: 'binnacle/plugins/status-line'

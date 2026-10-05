@@ -39,6 +39,7 @@ export function apply(ctx: Context): void {
   editor.focused = true
   editor.onSubmit = (text) => {
     editor.addToHistory(text)
+    ctx.get('binnacleSession')?.send(text)
   }
   // The editor marks its cursor in its lines, as pi-tui's own drawing reads it.
   const drawn = (width: number) => {
@@ -56,6 +57,8 @@ export function apply(ctx: Context): void {
     key: (data) => {
       // pi-tui's editor names its actions `tui.`; a key bound to any other action is not the editor's.
       if (ctx.binnacle.keys.actionsOf(data).some((action) => !action.startsWith('tui.'))) return false
+      // A stored session takes nothing that is sent, and a new one takes nothing until it is open.
+      editor.disableSubmit = ctx.get('binnacleSession')?.agent === undefined
       editor.handleInput(data)
       changed()
       return true

@@ -1,13 +1,15 @@
 // A module augmentation merges into Cordis's Context only in a file that imports Cordis.
 // oxlint-disable-next-line no-unassigned-import
 import '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 export interface Part {
   /** Unwrapped. A line keeps its colour and style; the core takes out every other control sequence, then wraps it at the width. */
   lines(width: number): readonly string[]
   /** Where the cursor is in the lines at that width, while the Part has the Focus. */
   cursor?(width: number): Cursor | undefined
-  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key; the Key Table takes the rest. */
+  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key, and the core draws the Part again; the Key Table takes the rest. */
   key?(data: string): boolean
 }
 
@@ -61,8 +63,6 @@ export interface Keys {
 }
 
 export interface Binnacle {
-  /** The id that `--session` names. */
-  readonly session: string | undefined
   readonly keys: Keys
   /** Only the newest Screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle
@@ -72,8 +72,25 @@ export interface Binnacle {
   place(name: string, part: Part): Handle
 }
 
+/**
+ * The session that the Chat shows. The core opens it, and provides it as `binnacleSession` once it is open.
+ * It opens after dsh's plugins settle, so a plugin waits for it with `ctx.inject(['binnacleSession'], …)` in its apply:
+ * dsh reports a plugin that injects it at load as one that did not activate.
+ */
+export interface ChatSession {
+  /** Its id, as dsh names it. */
+  readonly id: string
+  /** The agent that runs it. A stored session that `--session` names has none, and takes nothing that is sent. */
+  readonly agent: Agent | undefined
+  /** Its events so far, in order, as dsh keeps them. */
+  readonly events: readonly SessionEvent[]
+  /** Sends a prompt, or steers the turn that runs. */
+  send(text: string): void
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     binnacle: Binnacle
+    binnacleSession: ChatSession
   }
 }

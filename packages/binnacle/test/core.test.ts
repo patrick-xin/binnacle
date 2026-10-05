@@ -182,21 +182,6 @@ test('--help prints how to start binnacle, and exits without taking the terminal
   assert.deepEqual([exits, (await terminal.read()).screen], [[0], 'normal'])
 })
 
-test('--session <id> names the stored session that plugins read, and none is named without it', async () => {
-  const named: (string | undefined)[] = []
-  for (const args of [['--session', 'session-abc'], []]) {
-    const { ctx } = await mount({ args })
-    await ctx.plugin({
-      name: 'reader',
-      inject: ['binnacle'],
-      apply: (plugin: Context) => {
-        named.push(plugin.binnacle.session)
-      },
-    })
-  }
-  assert.deepEqual(named, ['session-abc', undefined])
-})
-
 test('a plugin reads the actions of the Key Table that a key is bound to, in each form a terminal sends it', async () => {
   const { ctx } = await mount()
   const read: string[][] = []
@@ -208,4 +193,60 @@ test('a plugin reads the actions of the Key Table that a key is bound to, in eac
     },
   })
   assert.deepEqual(read, [['binnacle.quit'], ['binnacle.quit'], ['binnacle.quit'], []])
+})
+
+test("a Part is asked for its lines once at a width, until it redraws: another Part's redraw does not ask it again", async () => {
+  const { ctx, ready } = await mount({ columns: 20, rows: 4 })
+  ready()
+  let asked = 0
+  let status: Handle | undefined
+  let transcript: Handle | undefined
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      transcript = plugin.binnacle.place('transcript', {
+        lines: () => {
+          asked++
+          return ['a line']
+        },
+      })
+      status = plugin.binnacle.place('status', { lines: () => ['status'] })
+    },
+  })
+  const placed = asked
+  status?.redraw()
+  status?.redraw()
+  const afterOthers = asked
+  transcript?.redraw()
+  assert.deepEqual([placed > 0, afterOthers - placed, asked - afterOthers > 0], [true, 0, true])
+})
+
+test('while a person reads scrolled up, rows added at the end leave what they read in place; at the end, the Part follows them', async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
+  ready()
+  const lines = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+  let transcript: Handle | undefined
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      transcript = plugin.binnacle.place('transcript', { lines: () => lines })
+    },
+  })
+  terminal.type(WHEEL_UP)
+  lines.push('11', '12')
+  transcript?.redraw()
+  const scrolledUp = (await terminal.read()).rows
+  terminal.type(WHEEL_DOWN)
+  terminal.type(WHEEL_DOWN)
+  lines.push('13')
+  transcript?.redraw()
+  assert.deepEqual(
+    [scrolledUp, (await terminal.read()).rows],
+    [
+      ['4', '5', '6', '7'],
+      ['10', '11', '12', '13'],
+    ],
+  )
 })

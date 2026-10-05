@@ -28,3 +28,8 @@ test('a row of the map that the patch does not insert is a problem', () => {
     ['binnacle-gone is in docs/features.md, but the bundle inserts no such row; remove it, or add the row'],
   )
 })
+
+test("a patch with a row configured by dsh's `!!js` tag is read, as dsh reads it", () => {
+  const configured = `${patch}- id: tools\n  config:\n    mode: !!js process.env.DSH_TOOLS_MODE\n`
+  assert.deepEqual(findProblems(configured, map('| Read view | a session | `binnacle-read` | `x` |')), [])
+})

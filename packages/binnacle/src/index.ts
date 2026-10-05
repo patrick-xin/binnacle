@@ -6,19 +6,20 @@ import { capture } from './core/capture.ts'
 import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
+import { openNew, openStored } from './core/session.ts'
 import { Keyboard } from './core/keyboard.ts'
 import { coreActionOf, keyTable } from './core/keys.ts'
 import { arrange } from './core/layout.ts'
 import type { Placed } from './core/layout.ts'
 import type { Part } from './api.ts'
-import { cursorOf, rowsOf } from './core/view.ts'
+import { Rows } from './core/view.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
 import { isKeyRelease } from './terminal/keys.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
-export type { Binnacle, Box, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
+export type { Binnacle, Box, ChatSession, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
 export { toPlainText } from './core/view.ts'
 
 export const name = 'binnacle'
@@ -33,7 +34,7 @@ export interface Process {
   stop(): void
 }
 
-export const internals: { terminal: () => Terminal; process: Process; streams: readonly Stream[] } = {
+export const internals: { terminal: () => Terminal; process: Process; streams: { stdout: Stream; stderr: Stream } } = {
   terminal: () => new ProcessTerminal(),
   process: {
     on: (event, listener) => {
@@ -46,7 +47,7 @@ export const internals: { terminal: () => Terminal; process: Process; streams: r
       process.kill(process.pid, 'SIGSTOP')
     },
   },
-  streams: [process.stdout, process.stderr],
+  streams: { stdout: process.stdout, stderr: process.stderr },
 }
 
 const ALTERNATE_SCREEN_ON = '\x1b[?1049h'
@@ -105,18 +106,39 @@ export function apply(ctx: Context): void {
     terminal?.write(data)
   })
 
+  // While a person reads scrolled up, the rows a Part adds or takes away at its end move the view with them.
+  // A Place sized by its content is also measured at other widths, so it moves once a draw, at the first width asked.
+  const counted = new Map<string, number>()
+  const anchored = new Set<string>()
+  const anchor = (place: string, width: number, count: number): void => {
+    const key = `${width} ${place}`
+    const before = counted.get(key) ?? count
+    counted.set(key, count)
+    const up = scrolledUp.get(place) ?? 0
+    if (up === 0 || anchored.has(place)) return
+    anchored.add(place)
+    scrolledUp.set(place, Math.max(0, up + count - before))
+  }
   const draw = (): void => {
     if (terminal === undefined || !holdingTerminal) return
+    anchored.clear()
     const arranged = arrange(service.layoutOnView, terminal.columns, terminal.rows, {
-      rows: (place, width) => rowsOf(service.partIn(place), width),
+      rows: (place, width) => {
+        const drawn = rows.of(service.partIn(place), width)
+        anchor(place, width, drawn.length)
+        return drawn
+      },
       scrolledUp: (place) => scrolledUp.get(place) ?? 0,
-      cursor: (place, width) => (place === service.focusOnView ? cursorOf(service.partIn(place), width) : undefined),
+      cursor: (place, width) => (place === service.focusOnView ? rows.cursorOf(service.partIn(place), width) : undefined),
     })
     placed = arranged.placed
     for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
     display.draw(arranged.rows, arranged.cursor)
   }
-  const service = new BinnacleService(ctx, commandLine.session, draw)
+  const rows = new Rows()
+  const service = new BinnacleService(ctx, draw, (part) => {
+    rows.forget(part)
+  })
   const keyboard = new Keyboard((data) => {
     terminal?.write(data)
   })
@@ -129,7 +151,7 @@ export function apply(ctx: Context): void {
   const take = (): void => {
     if (terminal === undefined || holdingTerminal) return
     holdingTerminal = true
-    printHeldBack = capture(internals.streams)
+    printHeldBack = capture([internals.streams.stdout, internals.streams.stderr])
     terminal.start((data) => {
       input.process(data)
     }, redrawAll)
@@ -157,12 +179,19 @@ export function apply(ctx: Context): void {
     const place = service.focusOnView
     return place !== undefined && placed.some((drawn) => drawn.place === place) ? service.partIn(place) : undefined
   }
+  // A Part that takes a key has changed its lines, and the core draws it again.
+  const keyTaken = (data: string): boolean => {
+    const part = focused()
+    if (part?.key?.(data) !== true) return false
+    rows.forget(part)
+    return true
+  }
   input.on('data', (sequence: string) => {
     // No Part asks for a key's release yet, and the editor would type it a second time.
     if (keyboard.answered(sequence) || isKeyRelease(sequence)) return
     const mouse = SGR_MOUSE.exec(sequence)?.groups
     if (mouse !== undefined) return scroll(mouse)
-    if (focused()?.key?.(sequence) === true) return draw()
+    if (keyTaken(sequence)) return draw()
     // Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as keys.
     const action = coreActionOf(sequence)
     if (action === 'binnacle.quit') exit(0)
@@ -170,7 +199,7 @@ export function apply(ctx: Context): void {
   })
   // The buffer takes a bracketed paste out of its markers; the editor reads a paste by them.
   input.on('paste', (content: string) => {
-    if (focused()?.key?.(`${PASTE_START}${content}${PASTE_END}`) === true) draw()
+    if (keyTaken(`${PASTE_START}${content}${PASTE_END}`)) draw()
   })
   const scroll = (mouse: { button?: string; x?: string; y?: string }): void => {
     const notches = mouse.button === String(WHEEL_UP) ? 1 : mouse.button === String(WHEEL_DOWN) ? -1 : 0
@@ -180,6 +209,20 @@ export function apply(ctx: Context): void {
     scrolledUp.set(under.place, Math.max(0, (scrolledUp.get(under.place) ?? 0) + notches * ROWS_PER_WHEEL_NOTCH))
     draw()
   }
+
+  const named = commandLine.session
+  void (named === undefined ? openNew(ctx) : openStored(ctx, named)).then(
+    (session) => {
+      // A service provided with no value is still there for Cordis, so it is provided once the session is open.
+      if (session !== undefined) ctx.provide('binnacleSession', session)
+    },
+    (error: unknown) => {
+      internals.streams.stderr.write(
+        `binnacle: could not ${named === undefined ? 'open a session' : `read ${named}`}: ${error instanceof Error ? error.message : String(error)}\n`,
+      )
+      exit(1)
+    },
+  )
 
   const ready: AppReady = ctx.appReady!
   const cancelReady = ready.onReady(() => {

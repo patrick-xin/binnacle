@@ -22,7 +22,7 @@ export class FakeProcess {
   }
 }
 
-export async function mount(options: { args?: string[]; columns?: number; rows?: number } = {}) {
+export async function mount(options: { args?: string[]; columns?: number; rows?: number; provide?: (ctx: Context) => void } = {}) {
   const terminal = new XtermTerminal(options.columns ?? 40, options.rows ?? 8)
   const exits: number[] = []
   const out: string[] = []
@@ -33,7 +33,7 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
   const printed: string[] = []
   const stdout = { write: (chunk: string) => printed.push(`stdout: ${chunk}`) > 0 }
   const stderr = { write: (chunk: string) => printed.push(`stderr: ${chunk}`) > 0 }
-  core.internals.streams = [stdout, stderr]
+  core.internals.streams = { stdout, stderr }
   core.internals.terminal = () => terminal
   core.internals.process = process
   const ctx = new Context()
@@ -51,6 +51,7 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
       },
     },
   })
+  options.provide?.(ctx)
   const fiber = ctx.plugin(core)
   await fiber
   return {
