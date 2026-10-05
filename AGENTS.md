@@ -13,6 +13,9 @@ binnacle is a terminal app for [DeepSeek Harness](https://github.com/deepseek-ai
 intents/<slug>/intent.md    what is wanted, why, and in which stages
 packages/binnacle/          the app: a dsh bundle, its core and its plugins
 docs/adr/                   the decisions that bind more than one task
+docs/glossary.md            binnacle's words, for a person and an author
+docs/features.md            each feature: what a person sees, its row and its code
+.agents/glossary.md         the words of the agents' workflow
 .agents/skills/             one skill for each role, and shared skills
 .agents/roles.json          the tool and the model that take each role
 .agents/task.md             a task's folders, states and hand-offs
@@ -22,6 +25,8 @@ references.json             the repositories that pnpm refs fetches into .refs/
 ```
 
 A task is a GitHub issue. The intent lists the issues of its current stage.
+
+A change that adds or changes a word, a feature or a row edits the glossary and the feature map in the same commit.
 
 ## Commands
 
