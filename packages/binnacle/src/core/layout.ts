@@ -1,14 +1,16 @@
 import type { Layout, Side, Size } from '../api.ts'
-import { truncateToWidth, visibleWidth } from '../terminal/utils.ts'
+import { sliceByColumn, truncateToWidth, visibleWidth } from '../terminal/utils.ts'
 import { edgeNamed, theme } from './theme.ts'
 import type { Edge } from './theme.ts'
+import { toPlainText } from './view.ts'
 
 export interface Places {
   rows(place: string, width: number): readonly string[]
   scrolledUp(place: string): number
 }
 
-export interface Region {
+/** A place as it was laid out: its box's cells, which the wheel hits. */
+export interface Placed {
   readonly place: string
   readonly top: number
   readonly left: number
@@ -19,7 +21,7 @@ export interface Region {
 
 export interface Arranged {
   readonly rows: string[]
-  readonly regions: Region[]
+  readonly placed: Placed[]
 }
 
 type Insets = { readonly [side in Side]: number }
@@ -32,9 +34,12 @@ const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left']
 
 const blank = (width: number): string => ' '.repeat(Math.max(0, width))
 const fit = (row: string, width: number): string => truncateToWidth(row, width, '', true)
+// An author's numbers are not checked by a type: a size, a padding or a gap is whole cells, and never fewer than none.
+const cells = (n: number): number => (Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0)
 
 function sizeOf(node: Layout): Size {
-  return node.size ?? 'fill'
+  const size = node.size ?? 'fill'
+  return typeof size === 'object' ? { fixed: cells(size.fixed) } : size
 }
 
 function childrenOf(node: Layout): readonly Layout[] {
@@ -52,8 +57,16 @@ function bordersOf(node: Layout, spare: Spare): Insets {
 function paddingOf(node: Layout, spare: Spare): Insets {
   if (spare !== 'nothing') return NONE
   const padding = node.padding ?? theme.padding
-  if (typeof padding === 'number') return { top: padding, right: padding, bottom: padding, left: padding }
-  return { top: padding.top ?? 0, right: padding.right ?? 0, bottom: padding.bottom ?? 0, left: padding.left ?? 0 }
+  if (typeof padding === 'number') {
+    const all = cells(padding)
+    return { top: all, right: all, bottom: all, left: all }
+  }
+  return {
+    top: cells(padding.top ?? 0),
+    right: cells(padding.right ?? 0),
+    bottom: cells(padding.bottom ?? 0),
+    left: cells(padding.left ?? 0),
+  }
 }
 
 function insetsOf(node: Layout, spare: Spare): Insets {
@@ -72,13 +85,13 @@ function edgeRow(edge: Edge, borders: Insets, width: number, at: 'top' | 'bottom
   const left = borders.left === 1 ? start : ''
   const right = borders.right === 1 ? end : ''
   const between = width - visibleWidth(left) - visibleWidth(right)
-  const shownTitle = truncateToWidth(title, between - 3, '')
+  const shownTitle = sliceByColumn(toPlainText(title), 0, Math.max(0, between - 3), true).trimEnd()
   const middle = shownTitle === '' ? '' : `${line} ${shownTitle} `
   return left + middle + line.repeat(Math.max(0, between - visibleWidth(middle))) + right
 }
 
 function gapOf(node: Layout, spare: Spare): number {
-  return spare === 'nothing' ? (node.gap ?? theme.gap) : 0
+  return spare === 'nothing' ? cells(node.gap ?? theme.gap) : 0
 }
 
 function gapsOf(node: Layout, spare: Spare): number {
@@ -86,7 +99,7 @@ function gapsOf(node: Layout, spare: Spare): number {
 }
 
 class Arrangement {
-  readonly regions: Region[] = []
+  readonly placed: Placed[] = []
   overflowed = false
   readonly #places: Places
   readonly #spare: Spare
@@ -110,9 +123,12 @@ class Arrangement {
     const insets = insetsOf(node, this.#spare)
     const borders = bordersOf(node, this.#spare)
     const padding = paddingOf(node, this.#spare)
+    if (insets.top + insets.bottom > height || insets.left + insets.right > width) this.overflowed = true
     const innerWidth = Math.max(0, width - insets.left - insets.right)
     const innerHeight = Math.max(0, height - insets.top - insets.bottom)
-    const inner = this.#drawInner(node, top + insets.top, left + insets.left, innerWidth, innerHeight)
+    const inner = this.#drawInner(node, innerWidth, innerHeight, top + insets.top, left + insets.left)
+    if ('place' in node)
+      this.placed.push({ place: node.place, top, left, width, height, maxScroll: this.#maxScroll(node.place, innerWidth, innerHeight) })
     const paddedWidth = Math.max(0, width - borders.left - borders.right)
     const padded = [
       ...Array.from({ length: padding.top }, () => blank(paddedWidth)),
@@ -141,8 +157,8 @@ class Arrangement {
     return Math.max(0, ...childrenOf(node).map((child) => this.width(child, available)))
   }
 
-  #drawInner(node: Layout, top: number, left: number, width: number, height: number): string[] {
-    if ('place' in node) return this.#place(node.place, top, left, width, height)
+  #drawInner(node: Layout, width: number, height: number, top: number, left: number): string[] {
+    if ('place' in node) return this.#place(node.place, width, height)
     if ('row' in node) return this.#row(node, top, left, width, height)
     return this.#column(node, top, left, width, height)
   }
@@ -151,14 +167,15 @@ class Arrangement {
     const gap = gapOf(node, this.#spare)
     const heights = this.#share(childrenOf(node), height - gapsOf(node, this.#spare), (child) => this.height(child, width))
     let y = top
-    return childrenOf(node).flatMap((child, index) => {
-      const rows = [
+    const rows = childrenOf(node).flatMap((child, index) => {
+      const drawn = [
         ...(index === 0 ? [] : Array.from({ length: gap }, () => blank(width))),
         ...this.draw(child, y + (index === 0 ? 0 : gap), left, width, heights[index] ?? 0),
       ]
-      y += rows.length
-      return rows
+      y += drawn.length
+      return drawn
     })
+    return [...rows, ...Array.from({ length: height - rows.length }, () => blank(width))]
   }
 
   #row(node: Layout, top: number, left: number, width: number, height: number): string[] {
@@ -173,11 +190,13 @@ class Arrangement {
     return Array.from({ length: height }, (_, y) => blocks.map((block, index) => fit(block[y] ?? '', widths[index] ?? 0)).join(gap))
   }
 
-  #place(place: string, top: number, left: number, width: number, height: number): string[] {
+  #maxScroll(place: string, width: number, height: number): number {
+    return Math.max(0, this.#places.rows(place, width).length - height)
+  }
+
+  #place(place: string, width: number, height: number): string[] {
     const all = this.#places.rows(place, width)
-    const maxScroll = Math.max(0, all.length - height)
-    const end = all.length - Math.min(this.#places.scrolledUp(place), maxScroll)
-    this.regions.push({ place, top, left, width, height, maxScroll })
+    const end = all.length - Math.min(this.#places.scrolledUp(place), this.#maxScroll(place, width, height))
     const shown = all.slice(Math.max(0, end - height), end).map((row) => fit(row, width))
     return [...shown, ...Array.from({ length: height - shown.length }, () => blank(width))]
   }
@@ -186,7 +205,6 @@ class Arrangement {
     return this.#share(childrenOf(node), width - gapsOf(node, this.#spare), (child) => this.width(child, width))
   }
 
-  /** What is fixed or sized by content is given first, in order; what fills shares the rest. */
   #share(children: readonly Layout[], available: number, natural: (child: Layout) => number): number[] {
     let left = Math.max(0, available)
     const sizes = children.map((child) => {
@@ -212,7 +230,7 @@ class Arrangement {
 function attempt(layout: Layout, width: number, height: number, places: Places, spare: Spare) {
   const arrangement = new Arrangement(places, spare)
   const rows = arrangement.draw(layout, 0, 0, width, height)
-  return { rows, regions: arrangement.regions, overflowed: arrangement.overflowed }
+  return { rows, placed: arrangement.placed, overflowed: arrangement.overflowed }
 }
 
 export function arrange(layout: Layout, width: number, height: number, places: Places): Arranged {
@@ -222,5 +240,5 @@ export function arrange(layout: Layout, width: number, height: number, places: P
     arranged = attempt(layout, width, height, places, spare)
   }
   // The display clears each row to its end, so the blanks that pad a row out to the width are not written.
-  return { rows: arranged.rows.map((row) => row.trimEnd()), regions: arranged.regions }
+  return { rows: arranged.rows.map((row) => row.trimEnd()), placed: arranged.placed }
 }

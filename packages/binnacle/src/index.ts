@@ -7,7 +7,7 @@ import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
 import { arrange } from './core/layout.ts'
-import type { Region } from './core/layout.ts'
+import type { Placed } from './core/layout.ts'
 import { rowsOf } from './core/view.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
@@ -74,8 +74,8 @@ function program(parsed: (commandLine: CommandLine) => void): Command {
     })
 }
 
-function regionAt(regions: readonly Region[], x: number, y: number): Region | undefined {
-  return regions.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
+function placedAt(placed: readonly Placed[], x: number, y: number): Placed | undefined {
+  return placed.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
 }
 
 export function apply(ctx: Context): void {
@@ -93,7 +93,7 @@ export function apply(ctx: Context): void {
   let holdingTerminal = false
   let printHeldBack: (() => void) | undefined
   const scrolledUp = new Map<string, number>()
-  let regions: readonly Region[] = []
+  let placed: readonly Placed[] = []
   const display = new Display((data) => {
     terminal?.write(data)
   })
@@ -104,8 +104,8 @@ export function apply(ctx: Context): void {
       rows: (place, width) => rowsOf(service.partIn(place), width),
       scrolledUp: (place) => scrolledUp.get(place) ?? 0,
     })
-    regions = arranged.regions
-    for (const { place, maxScroll } of regions) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
+    placed = arranged.placed
+    for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
     display.draw(arranged.rows)
   }
   const service = new BinnacleService(ctx, commandLine.session, draw)
@@ -148,7 +148,7 @@ export function apply(ctx: Context): void {
   const scroll = (mouse: { button?: string; x?: string; y?: string } | undefined): void => {
     const notches = mouse?.button === String(WHEEL_UP) ? 1 : mouse?.button === String(WHEEL_DOWN) ? -1 : 0
     // SGR mouse reports count columns and rows from 1.
-    const under = regionAt(regions, Number(mouse?.x) - 1, Number(mouse?.y) - 1)
+    const under = placedAt(placed, Number(mouse?.x) - 1, Number(mouse?.y) - 1)
     if (notches === 0 || under === undefined) return
     scrolledUp.set(under.place, Math.max(0, (scrolledUp.get(under.place) ?? 0) + notches * ROWS_PER_WHEEL_NOTCH))
     draw()

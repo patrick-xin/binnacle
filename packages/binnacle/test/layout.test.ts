@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle } from '../src/api.ts'
+import type { Binnacle, Layout } from '../src/api.ts'
 import { mount } from './support/mount.ts'
 
 async function drawn(columns: number, rows: number, author: (binnacle: Binnacle) => void) {
@@ -168,4 +168,71 @@ test('a wide character never straddles the border between two places side by sid
     binnacle.place('b', part('b'))
   })
   assert.deepEqual(rows, ['日 b', '本'])
+})
+
+test('a column draws every row it is given, so its bottom border closes at its last row and the place under it stays at the bottom', async () => {
+  const { rows } = await drawn(10, 5, (binnacle) => {
+    binnacle.layout('talk', {
+      column: [
+        { column: [{ place: 'a', size: 'content' }], border: true },
+        { place: 'c', size: 'content' },
+      ],
+    })
+    binnacle.place('a', part('a'))
+    binnacle.place('c', part('c'))
+  })
+  assert.deepEqual(rows, ['╭────────╮', '│a       │', '│        │', '╰────────╯', 'c'])
+})
+
+test('a node given fewer rows than its own box gives up its padding, then its border, before its rows are cut', async () => {
+  const seen: string[][] = []
+  for (const height of [3, 1]) {
+    const { rows } = await drawn(10, height, (binnacle) => {
+      binnacle.layout('talk', { column: [{ place: 'a', border: true, padding: 1 }] })
+      binnacle.place('a', part('a1', 'a2'))
+    })
+    seen.push(rows)
+  }
+  assert.deepEqual(seen, [['╭────────╮', '│a2      │', '╰────────╯'], ['a2']])
+})
+
+test('a title is drawn as plain text, and a title too long for its border is cut at a whole character', async () => {
+  const seen: string[] = []
+  for (const title of ['x\ny\x1b[31mred', 'Transcript title long']) {
+    const { rows } = await drawn(16, 3, (binnacle) => {
+      binnacle.layout('talk', { column: [{ place: 'a', border: true, title }] })
+    })
+    seen.push(rows[0] ?? '')
+  }
+  assert.deepEqual(seen, ['╭─ xyred ──────╮', '╭─ Transcript ─╮'])
+})
+
+test('a size, a padding or a gap of fewer than no cells, or of part of a cell, is drawn as the whole cells it holds, never fewer than none', async () => {
+  const { rows } = await drawn(5, 2, (binnacle) => {
+    binnacle.layout('talk', {
+      column: [
+        { place: 'a', size: { fixed: -3 } },
+        { place: 'b', padding: -1 },
+      ],
+      gap: 0.5,
+    })
+    binnacle.place('a', part('a'))
+    binnacle.place('b', part('b1', 'b2', 'b3'))
+  })
+  assert.deepEqual(rows, ['b2', 'b3'])
+})
+
+test('the wheel over a place’s border scrolls the place', async () => {
+  const { terminal } = await drawn(10, 3, (binnacle) => {
+    binnacle.layout('talk', { column: [{ place: 'a', border: true }] })
+    binnacle.place('a', part('a1', 'a2', 'a3', 'a4'))
+  })
+  terminal.type(wheelUpAt(1, 1))
+  assert.deepEqual((await terminal.read()).rows, ['╭────────╮', '│a1      │', '╰────────╯'])
+})
+
+test('a node is a place, a row or a column, never two at once', () => {
+  // @ts-expect-error A node with both a place and a row has no meaning.
+  const mixed: Layout = { place: 'a', row: [] }
+  assert.ok(mixed)
 })

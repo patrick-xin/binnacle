@@ -13,23 +13,23 @@ export type Size = { readonly fixed: number } | 'content' | 'fill'
 export type Side = 'top' | 'right' | 'bottom' | 'left'
 
 export interface Box {
-  readonly size?: Size
-  /** Blank cells inside the border. */
   readonly padding?: number | { readonly [side in Side]?: number }
-  /** Blank cells between a row's or a column's children. */
   readonly gap?: number
   /** `true` is every side; a gutter is `['left']`. */
   readonly border?: boolean | readonly Side[]
-  /** The name of the edge a border is drawn with. */
   readonly edge?: string
-  /** Set into the top border. */
+  /** Untrusted, as a part's lines are. */
   readonly title?: string
 }
 
+interface Node extends Box {
+  readonly size?: Size
+}
+
 export type Layout =
-  | (Box & { readonly place: string })
-  | (Box & { readonly row: readonly Layout[] })
-  | (Box & { readonly column: readonly Layout[] })
+  | (Node & { readonly place: string; readonly row?: never; readonly column?: never })
+  | (Node & { readonly row: readonly Layout[]; readonly place?: never; readonly column?: never })
+  | (Node & { readonly column: readonly Layout[]; readonly place?: never; readonly row?: never })
 
 export interface Screen {
   /** The name a plugin replaces the screen's layout by. */
