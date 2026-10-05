@@ -36,14 +36,17 @@ test('a Part placed in the transcript is drawn line by line, each line wrapped a
   assert.deepEqual((await terminal.read()).rows, ['first', 'a line too long for', 'twenty columns', 'last', '', ''])
 })
 
-test('a line with terminal control sequences in it is drawn as its plain text', async () => {
+test('a line keeps its colour and style, and loses every other control sequence', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 40, rows: 3 })
   ready()
   const before = terminal.written.length
   await ctx.plugin(probe(['plain \x1b[31mred\x1b[0m \x1b]0;title\x07 bell\x07 back\bspace\r end\x1b[2J']))
   const { rows } = await terminal.read()
-  assert.deepEqual(rows, ['plain red  bell backspace end', '', ''])
-  for (const control of ['\x1b]0;', '\x07', '\x1b[31m', '\x1b[2J'])
+  assert.deepEqual(
+    [rows, await terminal.colourAt(0, 0), await terminal.colourAt(6, 0), await terminal.colourAt(10, 0)],
+    [['plain red  bell backspace end', '', ''], 'default', 1, 'default'],
+  )
+  for (const control of ['\x1b]0;', '\x07', '\x1b[2J'])
     assert.ok(!terminal.written.slice(before).includes(control), JSON.stringify(control))
 })
 

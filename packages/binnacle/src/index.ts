@@ -19,6 +19,7 @@ import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
 export type { Binnacle, Box, Handle, Layout, Part, Screen, Side, Size } from './api.ts'
+export { toPlainText } from './core/view.ts'
 
 export const name = 'binnacle'
 

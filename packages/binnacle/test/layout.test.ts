@@ -245,3 +245,19 @@ test('a gap wider than the room between its children is given up before their ro
   })
   assert.deepEqual(rows, ['a', '', 'b'])
 })
+
+test("a Part's colour stays inside its Place: its border and the Place beside it are drawn in the default colour", async () => {
+  const { terminal, rows } = await drawn(12, 3, (binnacle) => {
+    binnacle.layout('chat', { row: [{ place: 'a', border: true, size: { fixed: 6 } }, { place: 'b' }] })
+    binnacle.place('a', part('\x1b[31mred'))
+    binnacle.place('b', part('b'))
+  })
+  const colours = await Promise.all([terminal.colourAt(1, 1), terminal.colourAt(5, 1), terminal.colourAt(6, 0)])
+  assert.deepEqual(
+    [rows, colours],
+    [
+      ['╭────╮b', '│red │', '╰────╯'],
+      [1, 'default', 'default'],
+    ],
+  )
+})

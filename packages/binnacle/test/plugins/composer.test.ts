@@ -19,7 +19,7 @@ const RULE = '─'.repeat(20)
 
 test('what a person types is drawn in the composer, between its rules', async () => {
   const { typed } = await chat()
-  assert.deepEqual(await typed('h', 'i'), ['', '', RULE, 'hi', RULE])
+  assert.deepEqual(await typed('h', 'i'), ['', '', RULE, 'hi ', RULE])
 })
 
 test('enter clears the draft and keeps it in the history, and up brings it back', async () => {
@@ -27,7 +27,7 @@ test('enter clears the draft and keeps it in the history, and up brings it back'
   assert.deepEqual(
     [await typed('h', 'i', '\r'), await typed('\x1b[A')],
     [
-      ['', '', RULE, '', RULE],
+      ['', '', RULE, ' ', RULE],
       ['', '', RULE, 'hi', RULE],
     ],
   )
@@ -41,18 +41,18 @@ test("ctrl+c passes the composer by to the core's key table, and quits", async (
 
 test('a key that the kitty protocol reports released is not typed a second time', async () => {
   const { typed } = await chat()
-  assert.deepEqual(await typed('\x1b[?7u', '\x1b[97u', '\x1b[97;1:3u'), ['', '', RULE, 'a', RULE])
+  assert.deepEqual(await typed('\x1b[?7u', '\x1b[97u', '\x1b[97;1:3u'), ['', '', RULE, 'a ', RULE])
 })
 
 test("shift+enter makes a new line, as the kitty protocol and modifyOtherKeys send it, and as pi-tui's fallbacks ctrl+j and a backslash before enter do", async () => {
   const { typed } = await chat(20, 8)
   const rows = await typed('a', '\x1b[13;2u', 'b', '\x1b[27;2;13~', 'c', '\n', 'd', '\\', '\r', 'e')
-  assert.deepEqual(rows, ['', RULE, 'a', 'b', 'c', 'd', 'e', RULE])
+  assert.deepEqual(rows, ['', RULE, 'a', 'b', 'c', 'd', 'e ', RULE])
 })
 
 test('a paste keeps its new lines in the draft, and is not sent', async () => {
   const { typed } = await chat(20, 6)
-  assert.deepEqual(await typed('\x1b[200~one\ntwo\x1b[201~'), ['', '', RULE, 'one', 'two', RULE])
+  assert.deepEqual(await typed('\x1b[200~one\ntwo\x1b[201~'), ['', '', RULE, 'one', 'two ', RULE])
 })
 
 async function authored(ctx: Context, author: (plugin: Context) => void) {
@@ -71,8 +71,8 @@ test('a Screen shown over the Chat that focuses no Place gives the composer no k
   assert.deepEqual(
     [whileShown, await typed('y')],
     [
-      ['', '', RULE, '', RULE],
-      ['', '', RULE, 'y', RULE],
+      ['', '', RULE, ' ', RULE],
+      ['', '', RULE, 'y ', RULE],
     ],
   )
 })
@@ -84,5 +84,5 @@ test('a layout of the Chat with no composer Place gives the composer no key', as
   })
   await typed('x')
   await laid.dispose()
-  assert.deepEqual(await typed('y'), ['', '', RULE, 'y', RULE])
+  assert.deepEqual(await typed('y'), ['', '', RULE, 'y ', RULE])
 })

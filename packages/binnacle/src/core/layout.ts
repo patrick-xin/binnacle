@@ -32,6 +32,7 @@ const SPARES: readonly Spare[] = ['nothing', 'spacing', 'borders']
 const NONE: Insets = { top: 0, right: 0, bottom: 0, left: 0 }
 const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left']
 
+const RESET_STYLE = '\x1b[0m'
 const blank = (width: number): string => ' '.repeat(Math.max(0, width))
 const fit = (row: string, width: number): string => truncateToWidth(row, width, '', true)
 // An author's numbers are not checked by a type: a size, a padding or a gap is whole cells, and never fewer than none.
@@ -197,7 +198,7 @@ class Arrangement {
   #place(place: string, width: number, height: number): string[] {
     const all = this.#places.rows(place, width)
     const end = all.length - Math.min(this.#places.scrolledUp(place), this.#maxScroll(place, width, height))
-    const shown = all.slice(Math.max(0, end - height), end).map((row) => fit(row, width))
+    const shown = all.slice(Math.max(0, end - height), end).map((row) => fit(row.includes('\x1b') ? row + RESET_STYLE : row, width))
     return [...shown, ...Array.from({ length: height - shown.length }, () => blank(width))]
   }
 
@@ -228,6 +229,28 @@ class Arrangement {
   }
 }
 
+const TRAILING_BLANKS = / +$/
+const TRAILING_RESET = /\x1b\[0?m$/
+const STYLES = /\x1b\[([\d;:]*)m/g
+
+// The display resets the style and clears each row to its end, so the blanks at a row's end in the default style are not
+// written. A blank after a colour or a style is kept: it is drawn.
+function withoutBlankEnd(row: string): string {
+  let end = row.length
+  for (;;) {
+    const head = row.slice(0, end)
+    const reset = TRAILING_RESET.exec(head)
+    if (reset !== null) {
+      end = reset.index
+      continue
+    }
+    const blanks = TRAILING_BLANKS.exec(head)
+    const style = blanks === null ? undefined : [...head.slice(0, blanks.index).matchAll(STYLES)].at(-1)?.[1]
+    if (blanks === null || (style !== undefined && style !== '' && style !== '0')) return head
+    end = blanks.index
+  }
+}
+
 function attempt(layout: Layout, width: number, height: number, places: Places, spare: Spare) {
   const arrangement = new Arrangement(places, spare)
   const rows = arrangement.draw(layout, 0, 0, width, height)
@@ -240,6 +263,5 @@ export function arrange(layout: Layout, width: number, height: number, places: P
     if (!arranged.overflowed) break
     arranged = attempt(layout, width, height, places, spare)
   }
-  // The display clears each row to its end, so the blanks that pad a row out to the width are not written.
-  return { rows: arranged.rows.map((row) => row.trimEnd()), placed: arranged.placed }
+  return { rows: arranged.rows.map(withoutBlankEnd), placed: arranged.placed }
 }
