@@ -17,9 +17,22 @@ export const name = 'binnacle'
 
 export const inject = ['appReady', 'appExit'] satisfies (keyof Context)[]
 
-export const internals: { terminal: () => Terminal } = {
+/** The process binnacle runs in: the signals and the exit it answers, and how it stops itself. */
+export interface Process {
+  on(event: 'exit' | 'SIGTSTP' | 'SIGCONT', listener: () => void): void
+  off(event: 'exit' | 'SIGTSTP' | 'SIGCONT', listener: () => void): void
+  /** Stop the process, as the terminal's own suspend does; it runs again on SIGCONT. */
+  stop(): void
+}
+
+export const internals: { terminal: () => Terminal; process: Process } = {
   terminal: () => {
     throw new Error('binnacle: no terminal yet')
+  },
+  process: {
+    on: () => {},
+    off: () => {},
+    stop: () => {},
   },
 }
 
@@ -29,6 +42,7 @@ const GIVE_BACK = '\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l'
 
 // In raw mode the terminal sends ctrl+c as a byte, and sends no signal.
 const CTRL_C = '\x03'
+const CTRL_Z = '\x1a'
 
 // A mouse event in SGR's form: the button, the column, the row, and M for a press.
 const MOUSE = /^\x1b\[<(\d+);\d+;\d+[Mm]$/
@@ -38,20 +52,61 @@ const WHEEL_DOWN = 65
 const NOTCH = 3
 
 export function apply(ctx: Context): void {
+  // The terminal once dsh is ready, and whether binnacle holds it now: it does not while suspended.
   let terminal: Terminal | undefined
-  let display: Display | undefined
+  let holding = false
+  const display = new Display((data) => {
+    terminal?.write(data)
+  })
   // How many rows the screen is scrolled up from its end.
   let back = 0
   const draw = (): void => {
-    if (terminal === undefined || display === undefined) return
+    if (terminal === undefined || !holding) return
     const { rows, most } = rowsOf(service.top, terminal.columns, terminal.rows, back)
     back = Math.min(back, most)
     display.draw(rows)
   }
+  const service = new BinnacleService(ctx, draw)
   const exit: AppExit = ctx.appExit!
-  const hear = (sequence: string): void => {
+  const input = new StdinBuffer()
+  const take = (): void => {
+    if (terminal === undefined || holding) return
+    holding = true
+    terminal.start(
+      (data) => {
+        input.process(data)
+      },
+      () => {
+        // The terminal may have moved what it showed, so every row is written again.
+        display.forget()
+        draw()
+      },
+    )
+    terminal.write(TAKE)
+    display.forget()
+    draw()
+  }
+  const giveBack = (): void => {
+    if (terminal === undefined || !holding) return
+    holding = false
+    terminal.write(GIVE_BACK)
+    terminal.stop()
+  }
+  const suspend = (): void => {
+    if (!holding) return
+    giveBack()
+    internals.process.stop()
+  }
+  const resume = (): void => {
+    take()
+  }
+  input.on('data', (sequence: string) => {
     if (sequence === CTRL_C) {
       exit(0)
+      return
+    }
+    if (sequence === CTRL_Z) {
+      suspend()
       return
     }
     const button = MOUSE.exec(sequence)?.[1]
@@ -60,41 +115,25 @@ export function apply(ctx: Context): void {
     else if (Number(button) === WHEEL_DOWN) back = Math.max(0, back - NOTCH)
     else return
     draw()
-  }
-  const input = new StdinBuffer()
-  input.on('data', hear)
-  const service = new BinnacleService(ctx, draw)
-  const release = (): void => {
-    if (terminal === undefined) return
-    terminal.write(GIVE_BACK)
-    terminal.stop()
-    terminal = undefined
-    display = undefined
-  }
+  })
   const ready: AppReady = ctx.appReady!
   const cancel = ready.onReady(() => {
-    const taken = internals.terminal()
-    terminal = taken
-    taken.start(
-      (data) => {
-        input.process(data)
-      },
-      () => {
-        // The terminal may have moved what it showed, so every row is written again.
-        display?.forget()
-        draw()
-      },
-    )
-    taken.write(TAKE)
-    display = new Display((data) => {
-      taken.write(data)
-    })
-    draw()
+    terminal = internals.terminal()
+    take()
   })
+  const { process } = internals
+  process.on('SIGTSTP', suspend)
+  process.on('SIGCONT', resume)
+  // A crash ends the process without unloading the tree; the terminal is given back on the way out.
+  process.on('exit', giveBack)
   ctx.effect(
     () => () => {
       cancel()
-      release()
+      process.off('SIGTSTP', suspend)
+      process.off('SIGCONT', resume)
+      process.off('exit', giveBack)
+      giveBack()
+      terminal = undefined
     },
     'binnacle: the terminal',
   )

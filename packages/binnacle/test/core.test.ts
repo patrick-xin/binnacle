@@ -37,6 +37,7 @@ test('a screen that a plugin shows is drawn line by line, each line wrapped at t
 test('a line with terminal control sequences in it is drawn as its plain text', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 40, rows: 3 })
   ready()
+  const before = terminal.written.length
   await ctx.plugin({
     name: 'probe',
     inject: ['binnacle'],
@@ -46,7 +47,8 @@ test('a line with terminal control sequences in it is drawn as its plain text', 
   })
   const { rows } = await terminal.read()
   assert.deepEqual(rows, ['plain red  bell backspace end', '', ''])
-  for (const control of ['\x1b]0;', '\x07', '\x1b[31m', '\x1b[2J']) assert.ok(!terminal.written.includes(control), JSON.stringify(control))
+  for (const control of ['\x1b]0;', '\x07', '\x1b[31m', '\x1b[2J'])
+    assert.ok(!terminal.written.slice(before).includes(control), JSON.stringify(control))
 })
 
 const WHEEL_UP = '\x1b[<64;5;2M'
@@ -118,4 +120,50 @@ test('ctrl+c asks dsh to exit, with code 0', async () => {
   ready()
   terminal.type('\x03')
   assert.deepEqual(exits, [0])
+})
+
+test('ctrl+z gives the terminal back and stops binnacle, and a resume takes the terminal again and draws the whole screen', async () => {
+  const { ctx, terminal, process, ready } = await mount({ columns: 20, rows: 3 })
+  ready()
+  await ctx.plugin({
+    name: 'probe',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.show({ lines: () => ['shown'] })
+    },
+  })
+  terminal.type('\x1a')
+  assert.deepEqual(await terminal.read().then(({ screen }) => ({ screen, raw: terminal.raw, stops: process.stops })), {
+    screen: 'normal',
+    raw: false,
+    stops: 1,
+  })
+  process.emit('SIGCONT')
+  assert.deepEqual(await terminal.read().then(({ screen, rows }) => ({ screen, rows, raw: terminal.raw })), {
+    screen: 'alternate',
+    rows: ['shown', '', ''],
+    raw: true,
+  })
+})
+
+test('a stop signal from outside gives the terminal back before binnacle stops', async () => {
+  const { terminal, process, ready } = await mount()
+  ready()
+  process.emit('SIGTSTP')
+  assert.deepEqual(await terminal.read().then(({ screen }) => ({ screen, raw: terminal.raw, stops: process.stops })), {
+    screen: 'normal',
+    raw: false,
+    stops: 1,
+  })
+})
+
+test('a process that exits while binnacle holds the terminal, as on a crash, gives the terminal back', async () => {
+  const { terminal, process, ready } = await mount()
+  ready()
+  process.emit('exit')
+  assert.deepEqual(await terminal.read().then(({ screen, mouse }) => ({ screen, mouse, raw: terminal.raw })), {
+    screen: 'normal',
+    mouse: 'none',
+    raw: false,
+  })
 })
