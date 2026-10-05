@@ -8,6 +8,7 @@ import type { AppReady } from '@deepseek-ai/dsh-cmdline'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
 import { rowsOf } from './core/view.ts'
+import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
 export type { Binnacle, Screen, Shown } from './api.ts'
@@ -26,13 +27,34 @@ export const internals: { terminal: () => Terminal } = {
 const TAKE = '\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h'
 const GIVE_BACK = '\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l'
 
+// A mouse event in SGR's form: the button, the column, the row, and M for a press.
+const MOUSE = /^\x1b\[<(\d+);\d+;\d+[Mm]$/
+const WHEEL_UP = 64
+const WHEEL_DOWN = 65
+// How many rows one notch of the wheel scrolls.
+const NOTCH = 3
+
 export function apply(ctx: Context): void {
   let terminal: Terminal | undefined
   let display: Display | undefined
+  // How many rows the screen is scrolled up from its end.
+  let back = 0
   const draw = (): void => {
     if (terminal === undefined || display === undefined) return
-    display.draw(rowsOf(service.top, terminal.columns, terminal.rows))
+    const { rows, most } = rowsOf(service.top, terminal.columns, terminal.rows, back)
+    back = Math.min(back, most)
+    display.draw(rows)
   }
+  const hear = (sequence: string): void => {
+    const button = MOUSE.exec(sequence)?.[1]
+    if (button === undefined) return
+    if (Number(button) === WHEEL_UP) back += NOTCH
+    else if (Number(button) === WHEEL_DOWN) back = Math.max(0, back - NOTCH)
+    else return
+    draw()
+  }
+  const input = new StdinBuffer()
+  input.on('data', hear)
   const service = new BinnacleService(ctx, draw)
   const release = (): void => {
     if (terminal === undefined) return
@@ -46,7 +68,9 @@ export function apply(ctx: Context): void {
     const taken = internals.terminal()
     terminal = taken
     taken.start(
-      () => {},
+      (data) => {
+        input.process(data)
+      },
       () => {},
     )
     taken.write(TAKE)

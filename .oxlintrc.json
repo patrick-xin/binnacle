@@ -25,8 +25,13 @@
     {
       "files": ["packages/binnacle/src/terminal/utils.ts", "packages/binnacle/src/terminal/stdin-buffer.ts"],
       "rules": {
-        "no-control-regex": "off",
         "no-shadow": "off"
+      }
+    },
+    {
+      "files": ["packages/binnacle/**"],
+      "rules": {
+        "no-control-regex": "off"
       }
     }
   ],
