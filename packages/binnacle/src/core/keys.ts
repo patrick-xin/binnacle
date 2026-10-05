@@ -1,5 +1,5 @@
 import { KeybindingsManager, TUI_KEYBINDINGS } from '../terminal/keybindings.ts'
-import type { KeybindingDefinitions } from '../terminal/keybindings.ts'
+import type { Keybinding, KeybindingDefinitions } from '../terminal/keybindings.ts'
 
 declare module '../terminal/keybindings.ts' {
   interface Keybindings {
@@ -22,9 +22,15 @@ const EDITOR_KEYS: KeybindingDefinitions = {
   'tui.select.cancel': { ...TUI_KEYBINDINGS['tui.select.cancel'], defaultKeys: 'escape' },
 }
 
-/** The one Key Table: the copied editor reads it through pi-tui's `getKeybindings`. */
-export const keyTable = new KeybindingsManager({ ...EDITOR_KEYS, ...CORE_KEYS })
+const ACTIONS = { ...EDITOR_KEYS, ...CORE_KEYS }
 
-export function coreActionOf(data: string): CoreAction | undefined {
-  return (Object.keys(CORE_KEYS) as CoreAction[]).find((action) => keyTable.matches(data, action))
+/** The one Key Table: the copied editor reads it through pi-tui's `getKeybindings`. */
+export const keyTable = new KeybindingsManager(ACTIONS)
+
+export function actionsOf(key: string): string[] {
+  return Object.keys(ACTIONS).filter((action) => keyTable.matches(key, action as Keybinding))
+}
+
+export function coreActionOf(key: string): CoreAction | undefined {
+  return (Object.keys(CORE_KEYS) as CoreAction[]).find((action) => keyTable.matches(key, action))
 }

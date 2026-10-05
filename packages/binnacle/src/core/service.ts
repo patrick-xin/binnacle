@@ -1,7 +1,8 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Handle, Layout, Part, Screen } from '../api.ts'
+import type { Binnacle, Handle, Keys, Layout, Part, Screen } from '../api.ts'
 import { CHAT } from './chat.ts'
+import { actionsOf } from './keys.ts'
 
 export class BinnacleService extends Service implements Binnacle {
   // TypeScript private, not #private: Cordis reaches the service through traced copies.
@@ -10,6 +11,7 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly parts = new Map<string, Part[]>()
   private readonly redraw: () => void
   readonly session: string | undefined
+  readonly keys: Keys = { actionsOf }
 
   constructor(ctx: Context, session: string | undefined, redraw: () => void) {
     super(ctx, 'binnacle')

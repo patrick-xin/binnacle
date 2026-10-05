@@ -18,7 +18,7 @@ import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
-export type { Binnacle, Box, Cursor, Handle, Layout, Part, Screen, Side, Size } from './api.ts'
+export type { Binnacle, Box, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
 export { toPlainText } from './core/view.ts'
 
 export const name = 'binnacle'

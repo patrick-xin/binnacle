@@ -280,3 +280,22 @@ test("a cursor in a line that wraps is put on the row and the column it wraps to
     [['╭──────────╮', '│abcdefghij│', '│klmno     │', '╰──────────╯'], { x: 3, y: 2 }],
   )
 })
+
+async function cursorInWrappedLineAt(column: number) {
+  const { terminal } = await drawn(5, 3, (binnacle) => {
+    binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a' } })
+    binnacle.place('a', { lines: () => ['aaaa bbbb cccc'], cursor: () => ({ line: 0, column }) })
+  })
+  return (await terminal.read()).cursor
+}
+
+test('a cursor in a line that wraps at its spaces is put on the word it is in, and at the end of the line where it ends it', async () => {
+  assert.deepEqual(
+    [await cursorInWrappedLineAt(11), await cursorInWrappedLineAt(9), await cursorInWrappedLineAt(14)],
+    [
+      { x: 1, y: 2 },
+      { x: 4, y: 1 },
+      { x: 4, y: 2 },
+    ],
+  )
+})

@@ -2,8 +2,8 @@ import { isKittyProtocolActive, setKittyProtocolActive } from '../terminal/keys.
 
 // Kitty's flags: 1 tells esc and ctrl keys apart, 2 reports releases, 4 reports the shifted and the base-layout key.
 const KITTY_FLAGS = 7
-// Kitty asks to push the flags before it is asked for them. Every terminal answers the trailing device-attributes query,
-// so its answer ends the wait in a terminal that does not know the kitty protocol.
+// Kitty's progressive enhancement reports only flags that were pushed, so they are pushed before the query. Every
+// terminal answers the trailing device-attributes query, so its answer ends the wait where kitty's never comes.
 const ASK = `\x1b[?2004h\x1b[>${KITTY_FLAGS}u\x1b[?u\x1b[c`
 const KITTY_OFF = '\x1b[<u'
 const PASTE_OFF = '\x1b[?2004l'

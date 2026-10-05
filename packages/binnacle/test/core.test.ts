@@ -196,3 +196,16 @@ test('--session <id> names the stored session that plugins read, and none is nam
   }
   assert.deepEqual(named, ['session-abc', undefined])
 })
+
+test('a plugin reads the actions of the Key Table that a key is bound to, in each form a terminal sends it', async () => {
+  const { ctx } = await mount()
+  const read: string[][] = []
+  await ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      for (const key of ['\x03', '\x1b[99;5u', '\x1b[27;5;99~', 'x']) read.push([...plugin.binnacle.keys.actionsOf(key)])
+    },
+  })
+  assert.deepEqual(read, [['binnacle.quit'], ['binnacle.quit'], ['binnacle.quit'], []])
+})

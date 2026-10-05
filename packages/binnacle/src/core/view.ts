@@ -28,17 +28,24 @@ export function rowsOf(part: Part | undefined, width: number): string[] {
   return part.lines(width).flatMap((line) => rowsOfLine(line, width))
 }
 
-/** A Part's cursor, moved to the rows its lines wrap to. */
 export function cursorOf(part: Part | undefined, width: number): { row: number; column: number } | undefined {
   const cursor = part?.cursor?.(width)
   if (part === undefined || cursor === undefined || width < 1) return undefined
   const lines = part.lines(width)
-  let row = lines.slice(0, cursor.line).reduce((rows, line) => rows + rowsOfLine(line, width).length, 0)
-  let column = cursor.column
-  for (const wrapped of rowsOfLine(lines[cursor.line] ?? '', width).slice(0, -1)) {
-    if (column < visibleWidth(wrapped)) break
-    column -= visibleWidth(wrapped)
-    row++
-  }
-  return { row, column }
+  const before = lines.slice(0, cursor.line).reduce((rows, line) => rows + rowsOfLine(line, width).length, 0)
+  const line = lines[cursor.line] ?? ''
+  // A wrap drops the blanks where it breaks, so each row is found in the line to know the column it starts at.
+  const plain = toPlainText(line)
+  let from = 0
+  const starts = rowsOfLine(line, width).map((wrapped) => {
+    const text = toPlainText(wrapped)
+    const at = Math.max(from, plain.indexOf(text, from))
+    from = at + text.length
+    return visibleWidth(plain.slice(0, at))
+  })
+  const row = Math.max(
+    0,
+    starts.findLastIndex((start) => start <= cursor.column),
+  )
+  return { row: before + row, column: cursor.column - (starts[row] ?? 0) }
 }

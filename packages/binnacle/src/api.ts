@@ -55,9 +55,15 @@ export interface Handle {
   dispose(): void
 }
 
+export interface Keys {
+  /** The ids of the actions a key is bound to, for the key as the terminal sent it. */
+  actionsOf(key: string): readonly string[]
+}
+
 export interface Binnacle {
   /** The id that `--session` names. */
   readonly session: string | undefined
+  readonly keys: Keys
   /** Only the newest Screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle
   /** Replaces the layout of the Screen by that name; the newest layout wins. */

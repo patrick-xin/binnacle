@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { Handle } from '../../api.ts'
-import { coreActionOf } from '../../core/keys.ts'
+import type { Cursor, Handle } from '../../api.ts'
 import { Editor } from '../../terminal/components/editor.ts'
 import type { EditorTheme } from '../../terminal/components/editor.ts'
 import { CURSOR_MARKER } from '../../terminal/tui.ts'
@@ -22,25 +21,43 @@ const ROWS = 24
 
 export function apply(ctx: Context): void {
   let placed: Handle | undefined
-  const editor = new Editor({ requestRender: () => placed?.redraw(), terminal: { rows: ROWS } }, THEME)
+  // The core asks for the lines and the cursor more than once in a draw; the editor renders once until it changes.
+  let rendered: { width: number; lines: string[]; cursor: Cursor | undefined } | undefined
+  const changed = (): void => {
+    rendered = undefined
+  }
+  const editor = new Editor(
+    {
+      requestRender: () => {
+        changed()
+        placed?.redraw()
+      },
+      terminal: { rows: ROWS },
+    },
+    THEME,
+  )
   editor.focused = true
   editor.onSubmit = (text) => {
     editor.addToHistory(text)
   }
   // The editor marks its cursor in its lines, as pi-tui's own drawing reads it.
   const drawn = (width: number) => {
+    if (rendered?.width === width) return rendered
     const lines = editor.render(width)
     const line = lines.findIndex((text) => text.includes(CURSOR_MARKER))
     const marked = lines[line] ?? ''
     const cursor = line === -1 ? undefined : { line, column: visibleWidth(marked.slice(0, marked.indexOf(CURSOR_MARKER))) }
-    return { lines: lines.map((text) => text.replace(CURSOR_MARKER, '')), cursor }
+    rendered = { width, lines: lines.map((text) => text.replace(CURSOR_MARKER, '')), cursor }
+    return rendered
   }
   placed = ctx.binnacle.place('composer', {
     lines: (width) => drawn(width).lines,
     cursor: (width) => drawn(width).cursor,
     key: (data) => {
-      if (coreActionOf(data) !== undefined) return false
+      // pi-tui's editor names its actions `tui.`; a key bound to any other action is not the editor's.
+      if (ctx.binnacle.keys.actionsOf(data).some((action) => !action.startsWith('tui.'))) return false
       editor.handleInput(data)
+      changed()
       return true
     },
   })
