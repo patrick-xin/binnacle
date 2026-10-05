@@ -3,8 +3,18 @@
 import '@deepseek-ai/cordis'
 
 export interface Part {
-  /** Unwrapped Untrusted Text: the core takes out its control sequences, then wraps each line at the width. */
+  /** Unwrapped. A line keeps its colour and style; the core takes out every other control sequence, then wraps it at the width. */
   lines(width: number): readonly string[]
+  /** Where the cursor is in the lines at that width, while the Part has the Focus. */
+  cursor?(width: number): Cursor | undefined
+  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key; the Key Table takes the rest. */
+  key?(data: string): boolean
+}
+
+/** A line of a Part's lines, and a column in cells. */
+export interface Cursor {
+  readonly line: number
+  readonly column: number
 }
 
 /** A `fixed` size is in cells, its box included; `content` is the cells its lines need; `fill` shares what is left. */
@@ -35,6 +45,8 @@ export interface Screen {
   /** The name a plugin replaces the Screen's layout by. */
   readonly name: string
   readonly layout: Layout
+  /** The Place that has the Focus while the Screen is on view. */
+  readonly focus?: string
 }
 
 export interface Handle {
@@ -43,9 +55,15 @@ export interface Handle {
   dispose(): void
 }
 
+export interface Keys {
+  /** The ids of the actions a key is bound to, for the key as the terminal sent it. */
+  actionsOf(key: string): readonly string[]
+}
+
 export interface Binnacle {
   /** The id that `--session` names. */
   readonly session: string | undefined
+  readonly keys: Keys
   /** Only the newest Screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle
   /** Replaces the layout of the Screen by that name; the newest layout wins. */

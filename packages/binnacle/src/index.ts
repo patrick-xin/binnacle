@@ -6,14 +6,20 @@ import { capture } from './core/capture.ts'
 import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
+import { Keyboard } from './core/keyboard.ts'
+import { coreActionOf, keyTable } from './core/keys.ts'
 import { arrange } from './core/layout.ts'
 import type { Placed } from './core/layout.ts'
-import { rowsOf } from './core/view.ts'
+import type { Part } from './api.ts'
+import { cursorOf, rowsOf } from './core/view.ts'
+import { setKeybindings } from './terminal/keybindings.ts'
+import { isKeyRelease } from './terminal/keys.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
-export type { Binnacle, Box, Handle, Layout, Part, Screen, Side, Size } from './api.ts'
+export type { Binnacle, Box, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
+export { toPlainText } from './core/view.ts'
 
 export const name = 'binnacle'
 
@@ -50,9 +56,8 @@ const CURSOR_SHOW = '\x1b[?25h'
 const MOUSE_ON = '\x1b[?1000h\x1b[?1006h'
 const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l'
 
-// Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as bytes.
-const CTRL_C = '\x03'
-const CTRL_Z = '\x1a'
+const PASTE_START = '\x1b[200~'
+const PASTE_END = '\x1b[201~'
 
 const SGR_MOUSE = /^\x1b\[<(?<button>\d+);(?<x>\d+);(?<y>\d+)[Mm]$/
 const WHEEL_UP = 64
@@ -79,6 +84,8 @@ function placedAt(placed: readonly Placed[], x: number, y: number): Placed | und
 }
 
 export function apply(ctx: Context): void {
+  // The copied editor reads its keys through pi-tui's global, so the core's table is set there.
+  setKeybindings(keyTable)
   let commandLine: CommandLine | undefined
   parseCmdline(
     ctx,
@@ -103,12 +110,16 @@ export function apply(ctx: Context): void {
     const arranged = arrange(service.layoutOnView, terminal.columns, terminal.rows, {
       rows: (place, width) => rowsOf(service.partIn(place), width),
       scrolledUp: (place) => scrolledUp.get(place) ?? 0,
+      cursor: (place, width) => (place === service.focusOnView ? cursorOf(service.partIn(place), width) : undefined),
     })
     placed = arranged.placed
     for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
-    display.draw(arranged.rows)
+    display.draw(arranged.rows, arranged.cursor)
   }
   const service = new BinnacleService(ctx, commandLine.session, draw)
+  const keyboard = new Keyboard((data) => {
+    terminal?.write(data)
+  })
 
   const redrawAll = (): void => {
     display.clear()
@@ -123,11 +134,13 @@ export function apply(ctx: Context): void {
       input.process(data)
     }, redrawAll)
     terminal.write(ALTERNATE_SCREEN_ON + CURSOR_HIDE + MOUSE_ON)
+    keyboard.take()
     redrawAll()
   }
   const giveBack = (): void => {
     if (terminal === undefined || !holdingTerminal) return
     holdingTerminal = false
+    keyboard.giveBack()
     terminal.write(MOUSE_OFF + CURSOR_SHOW + ALTERNATE_SCREEN_OFF)
     terminal.stop()
     printHeldBack?.()
@@ -140,15 +153,29 @@ export function apply(ctx: Context): void {
   }
 
   const exit: AppExit = ctx.appExit!
+  const focused = (): Part | undefined => {
+    const place = service.focusOnView
+    return place !== undefined && placed.some((drawn) => drawn.place === place) ? service.partIn(place) : undefined
+  }
   input.on('data', (sequence: string) => {
-    if (sequence === CTRL_C) exit(0)
-    else if (sequence === CTRL_Z) suspend()
-    else scroll(SGR_MOUSE.exec(sequence)?.groups)
+    // No Part asks for a key's release yet, and the editor would type it a second time.
+    if (keyboard.answered(sequence) || isKeyRelease(sequence)) return
+    const mouse = SGR_MOUSE.exec(sequence)?.groups
+    if (mouse !== undefined) return scroll(mouse)
+    if (focused()?.key?.(sequence) === true) return draw()
+    // Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as keys.
+    const action = coreActionOf(sequence)
+    if (action === 'binnacle.quit') exit(0)
+    else if (action === 'binnacle.suspend') suspend()
   })
-  const scroll = (mouse: { button?: string; x?: string; y?: string } | undefined): void => {
-    const notches = mouse?.button === String(WHEEL_UP) ? 1 : mouse?.button === String(WHEEL_DOWN) ? -1 : 0
+  // The buffer takes a bracketed paste out of its markers; the editor reads a paste by them.
+  input.on('paste', (content: string) => {
+    if (focused()?.key?.(`${PASTE_START}${content}${PASTE_END}`) === true) draw()
+  })
+  const scroll = (mouse: { button?: string; x?: string; y?: string }): void => {
+    const notches = mouse.button === String(WHEEL_UP) ? 1 : mouse.button === String(WHEEL_DOWN) ? -1 : 0
     // SGR mouse reports count columns and rows from 1.
-    const under = placedAt(placed, Number(mouse?.x) - 1, Number(mouse?.y) - 1)
+    const under = placedAt(placed, Number(mouse.x) - 1, Number(mouse.y) - 1)
     if (notches === 0 || under === undefined) return
     scrolledUp.set(under.place, Math.max(0, (scrolledUp.get(under.place) ?? 0) + notches * ROWS_PER_WHEEL_NOTCH))
     draw()

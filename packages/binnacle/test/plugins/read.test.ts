@@ -52,3 +52,9 @@ test('a session the Read view cannot read is said on the Screen, with why', asyn
   const { rows } = await readViewOver(['--session', 'session-gone'], [older], 2)
   assert.deepEqual(rows, ['Could not read the session: no session', 'session-gone'])
 })
+
+test("an event's type is Untrusted Text, so its colour and control sequences are taken out", async () => {
+  const styled: Stored = { id: 'session-styled', createdAt: 3, events: [{ seq: 0, type: 'test/\x1b[31mred\x07', time: 3, data: {} }] }
+  const { rows, terminal } = await readViewOver([], [styled], 3)
+  assert.deepEqual([rows[0], await terminal.colourAt(8, 0)], ['#0 test/red', 'default'])
+})

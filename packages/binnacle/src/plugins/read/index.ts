@@ -1,13 +1,14 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId, SessionEvent } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence, SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
+import { toPlainText } from '../../index.ts'
 
 export const name = 'binnacle-read'
 
 export const inject = ['binnacle', 'sessionPersistence'] satisfies (keyof Context)[]
 
 function linesOf(events: readonly SessionEvent[]): string[] {
-  return events.flatMap((event) => [`#${event.seq} ${event.type}`, ...JSON.stringify(event.data, null, 2).split('\n'), ''])
+  return events.flatMap((event) => [`#${event.seq} ${toPlainText(event.type)}`, ...JSON.stringify(event.data, null, 2).split('\n'), ''])
 }
 
 function newestSessionId(stored: readonly SessionPersistenceSnapshot[]): string | undefined {

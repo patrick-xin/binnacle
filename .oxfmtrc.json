@@ -10,7 +10,16 @@
     "**/dist/**",
     "intents/**",
     "packages/binnacle/src/terminal/utils.ts",
-    "packages/binnacle/src/terminal/stdin-buffer.ts"
+    "packages/binnacle/src/terminal/stdin-buffer.ts",
+    "packages/binnacle/src/terminal/keys.ts",
+    "packages/binnacle/src/terminal/keybindings.ts",
+    "packages/binnacle/src/terminal/kill-ring.ts",
+    "packages/binnacle/src/terminal/undo-stack.ts",
+    "packages/binnacle/src/terminal/word-navigation.ts",
+    "packages/binnacle/src/terminal/autocomplete.ts",
+    "packages/binnacle/src/terminal/tui.ts",
+    "packages/binnacle/src/terminal/components/editor.ts",
+    "packages/binnacle/src/terminal/components/select-list.ts"
   ],
   "printWidth": 140
 }

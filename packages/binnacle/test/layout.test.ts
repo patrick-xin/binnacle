@@ -245,3 +245,57 @@ test('a gap wider than the room between its children is given up before their ro
   })
   assert.deepEqual(rows, ['a', '', 'b'])
 })
+
+test("a Part's colour stays inside its Place: its border and the Place beside it are drawn in the default colour", async () => {
+  const { terminal, rows } = await drawn(12, 3, (binnacle) => {
+    binnacle.layout('chat', { row: [{ place: 'a', border: true, size: { fixed: 6 } }, { place: 'b' }] })
+    binnacle.place('a', part('\x1b[31mred'))
+    binnacle.place('b', part('b'))
+  })
+  const colours = await Promise.all([terminal.colourAt(1, 1), terminal.colourAt(5, 1), terminal.colourAt(6, 0)])
+  assert.deepEqual(
+    [rows, colours],
+    [
+      ['╭────╮b', '│red │', '╰────╯'],
+      [1, 'default', 'default'],
+    ],
+  )
+})
+
+test('a Part with the Focus, longer than its Place, shows the row of its cursor, and the terminal cursor is put there', async () => {
+  const { terminal, rows } = await drawn(10, 3, (binnacle) => {
+    binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a' } })
+    binnacle.place('a', { lines: () => ['1', '2', '3', '4', '5', '6'], cursor: () => ({ line: 1, column: 1 }) })
+  })
+  assert.deepEqual([rows, (await terminal.read()).cursor], [['2', '3', '4'], { x: 1, y: 0 }])
+})
+
+test("a cursor in a line that wraps is put on the row and the column it wraps to, inside the Place's box", async () => {
+  const { terminal, rows } = await drawn(12, 4, (binnacle) => {
+    binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a', border: true } })
+    binnacle.place('a', { lines: () => ['abcdefghijklmno'], cursor: () => ({ line: 0, column: 12 }) })
+  })
+  assert.deepEqual(
+    [rows, (await terminal.read()).cursor],
+    [['╭──────────╮', '│abcdefghij│', '│klmno     │', '╰──────────╯'], { x: 3, y: 2 }],
+  )
+})
+
+async function cursorInWrappedLineAt(column: number) {
+  const { terminal } = await drawn(5, 3, (binnacle) => {
+    binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a' } })
+    binnacle.place('a', { lines: () => ['aaaa bbbb cccc'], cursor: () => ({ line: 0, column }) })
+  })
+  return (await terminal.read()).cursor
+}
+
+test('a cursor in a line that wraps at its spaces is put on the word it is in, and at the end of the line where it ends it', async () => {
+  assert.deepEqual(
+    [await cursorInWrappedLineAt(11), await cursorInWrappedLineAt(9), await cursorInWrappedLineAt(14)],
+    [
+      { x: 1, y: 2 },
+      { x: 4, y: 1 },
+      { x: 4, y: 2 },
+    ],
+  )
+})

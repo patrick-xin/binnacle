@@ -46,7 +46,7 @@ export class XtermTerminal implements Terminal {
     this.#onResize?.()
   }
 
-  async read(): Promise<{ screen: 'normal' | 'alternate'; rows: string[]; mouse: string }> {
+  async read(): Promise<{ screen: 'normal' | 'alternate'; rows: string[]; mouse: string; cursor: { x: number; y: number } }> {
     // xterm parses writes asynchronously; an empty write's callback runs after every earlier one.
     await new Promise<void>((resolve) => {
       this.#xterm.write('', resolve)
@@ -54,6 +54,13 @@ export class XtermTerminal implements Terminal {
     const buffer = this.#xterm.buffer.active
     const rows: string[] = []
     for (let y = 0; y < this.#xterm.rows; y++) rows.push(buffer.getLine(buffer.viewportY + y)?.translateToString(true) ?? '')
-    return { screen: buffer.type, rows, mouse: this.#xterm.modes.mouseTrackingMode }
+    return { screen: buffer.type, rows, mouse: this.#xterm.modes.mouseTrackingMode, cursor: { x: buffer.cursorX, y: buffer.cursorY } }
+  }
+
+  /** The palette colour of the text in a cell, or `default`. */
+  async colourAt(x: number, y: number): Promise<number | 'default'> {
+    await this.read()
+    const cell = this.#xterm.buffer.active.getLine(this.#xterm.buffer.active.viewportY + y)?.getCell(x)
+    return cell === undefined || cell.isFgDefault() ? 'default' : cell.getFgColor()
   }
 }
