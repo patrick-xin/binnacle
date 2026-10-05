@@ -50,9 +50,9 @@ A change takes effect while the session runs, and a broken change does not stop 
 
 Each stage ends in a behaviour that the Maintainer can try under `dsh`. The Lead writes the specs for the current stage only.
 
-1. **Core.** binnacle owns the terminal, and draws screens, layout and focus. Keys and the mouse go through one gesture table. The Maintainer opens a recorded session in a temporary Read view, and scrolls it with keys and the wheel.
-2. **Talk.** The Maintainer types in the composer, sends a prompt, watches the answer stream, and interrupts it.
-3. **Waiting on a person.** The Maintainer answers each Request with the keyboard or the mouse. Focus and folds work.
+1. **Core.** binnacle boots under `dsh --profile binnacle`, and owns the terminal. The Maintainer opens a recorded session in a temporary Read view, and scrolls it with the wheel.
+2. **Talk.** The Maintainer types in the composer, sends a prompt, watches the answer stream, and interrupts it. The screen has a layout and a focus, and the keys reach the composer.
+3. **Waiting on a person.** The Maintainer answers each Request with the keyboard or the mouse. Keys and the mouse go through one gesture table. Focus and folds work.
 4. **Plugins.** Search, the model picker, settings and the trajectory are plugins. The Read view moves into the trajectory screen.
 5. **Finish.** The Maintainer resumes a session, selects and copies text, and sees the summary on exit. The theme and `NO_COLOR` work. The first 0.x release follows.
 

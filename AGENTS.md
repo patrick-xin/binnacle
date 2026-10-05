@@ -11,6 +11,8 @@ binnacle is a terminal app for [DeepSeek Harness](https://github.com/deepseek-ai
 
 ```text
 intents/<slug>/intent.md    what is wanted, why, and in which stages
+packages/binnacle/          the app: a dsh bundle, its core and its plugins
+docs/adr/                   the decisions that bind more than one task
 .agents/skills/             one skill for each role, and shared skills
 .agents/roles.json          the tool and the model that take each role
 .agents/task.md             a task's folders, states and hand-offs
@@ -28,4 +30,5 @@ A task is a GitHub issue. The intent lists the issues of its current stage.
 | `pnpm install && pnpm refs` | Installs, and fetches each reference into `.refs/` |
 | `pnpm test` | Runs every check, then every test. CI runs it on each PR. |
 | `pnpm fmt` | Formats the tree |
+| `pnpm build` | Builds the bundle. A `binnacle` dsh profile that links `packages/binnacle` then runs it with `dsh --profile binnacle`. |
 | `pnpm task` | Runs a Build task: `start`, `build`, `set`, `ask`, `answer`, `resend`, `status`, `watch`, `land`, `stop` |

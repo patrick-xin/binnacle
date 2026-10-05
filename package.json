@@ -16,8 +16,10 @@
     "check:links": "node scripts/check-links.mjs",
     "check:skills": "node scripts/check-skills.mjs",
     "task": "node scripts/task/task.mjs",
-    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:skills && pnpm run lint && pnpm run fmt:check",
-    "test": "pnpm run check && node --test --test-timeout=30000 \"scripts/**/*.test.mjs\""
+    "typecheck": "pnpm --filter binnacle exec tsc -p tsconfig.json",
+    "build": "pnpm --filter binnacle run build",
+    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:skills && pnpm run lint && pnpm run fmt:check && pnpm run typecheck",
+    "test": "pnpm run check && node --test --test-timeout=30000 \"scripts/**/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.3",
