@@ -3,7 +3,20 @@
  * @module binnacle/core/view
  */
 import type { Screen } from '../api.ts'
-import { wrapTextWithAnsi } from '../terminal/utils.ts'
+import { stripTerminalSequences, wrapTextWithAnsi } from '../terminal/utils.ts'
+
+// What stripping sequences leaves that a terminal still obeys: C0 controls but the tab, DEL, and C1 controls.
+// oxlint-disable-next-line no-control-regex
+const CONTROLS = /[\x00-\x08\x0a-\x1f\x7f-\x9f]/g
+
+/**
+ * Text from a model or a tool, as text alone: its control sequences and controls taken out, and each tab as three spaces.
+ * @param text - one line.
+ * @returns what is left to draw.
+ */
+export function plain(text: string): string {
+  return stripTerminalSequences(text).replace(CONTROLS, '').replaceAll('\t', '   ')
+}
 
 /**
  * The rows of a screen at a width and a height.
@@ -14,6 +27,6 @@ import { wrapTextWithAnsi } from '../terminal/utils.ts'
  */
 export function rowsOf(screen: Screen | undefined, width: number, height: number): string[] {
   if (screen === undefined) return []
-  const rows = screen.lines().flatMap((line) => wrapTextWithAnsi(line, width))
+  const rows = screen.lines().flatMap((line) => wrapTextWithAnsi(plain(line), width))
   return rows.slice(0, height)
 }

@@ -32,3 +32,18 @@ test('a screen that a plugin shows is drawn line by line, each line wrapped at t
   })
   assert.deepEqual((await terminal.read()).rows, ['first', 'a line too long for', 'twenty columns', 'last', '', ''])
 })
+
+test('a line with terminal control sequences in it is drawn as its plain text', async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 40, rows: 3 })
+  ready()
+  await ctx.plugin({
+    name: 'probe',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.show({ lines: () => ['plain \x1b[31mred\x1b[0m \x1b]0;title\x07 bell\x07 back\bspace\r end\x1b[2J'] })
+    },
+  })
+  const { rows } = await terminal.read()
+  assert.deepEqual(rows, ['plain red  bell backspace end', '', ''])
+  for (const control of ['\x1b]0;', '\x07', '\x1b[31m', '\x1b[2J']) assert.ok(!terminal.written.includes(control), JSON.stringify(control))
+})
