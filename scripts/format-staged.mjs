@@ -1,22 +1,10 @@
 #!/usr/bin/env node
-/**
- * Choose which staged files the pre-commit hook offers oxfmt, so a commit
- * never carries unstaged edits in with a format: the choice is pure, and the
- * git and oxfmt calls around it run only when this file is the entry point.
- * @module binnacle/scripts/format-staged
- */
+// A file with unstaged edits is not formatted: formatting it would carry those edits into the commit.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/**
- * Which staged files to format, and which to leave alone because they carry unstaged edits. A commit
- * through git's temporary index — `git commit -- <paths>` — formats nothing: a format staged into that
- * index is gone with it, and the next commit reverts it.
- * @param {{ staged: readonly { status: string, path: string }[], unstaged: readonly string[], exists: (path: string) => boolean, index: 'real' | 'temporary' }} change - the staged entries git reports, the paths with unstaged edits, what is on disk, and which index git commits through.
- * @returns {{ format: string[], skipped: string[] }} the paths to format, and the partially-staged ones left alone.
- */
 export function select({ staged, unstaged, exists, index = 'real' }) {
   if (index === 'temporary') return { format: [], skipped: [] }
   const carried = new Set(unstaged)
@@ -31,12 +19,6 @@ export function select({ staged, unstaged, exists, index = 'real' }) {
   return { format, skipped }
 }
 
-/**
- * What is staged and what carries unstaged edits, read from `git status --porcelain=v1 -z`: a rename's or
- * copy's old path arrives as a bare record after the new, and is consumed, never parsed.
- * @param {string} listed - the status output, NUL-separated.
- * @returns {{ staged: { status: string, path: string }[], unstaged: string[] }} the staged entries, and the paths with unstaged edits.
- */
 export function parseStatus(listed) {
   const staged = []
   const unstaged = []

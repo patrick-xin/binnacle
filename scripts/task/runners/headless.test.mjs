@@ -6,7 +6,6 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { makeHeadless } from './headless.mjs'
 
-/** A home with one task folder, and a headless runner whose processes are fakes. */
 function world(t) {
   const home = mkdtempSync(join(tmpdir(), 'binnacle-headless-'))
   t.after(() => rmSync(home, { recursive: true, force: true }))
@@ -35,7 +34,6 @@ function world(t) {
   return { home, dir, agent, runner, spawned, killed }
 }
 
-/** A process id that no process holds: a child that has ended. */
 function gonePid() {
   return spawnSync(process.execPath, ['-e', '']).pid
 }

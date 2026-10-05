@@ -1,28 +1,12 @@
 #!/usr/bin/env node
-/**
- * Resolve every relative link in the repository's Markdown, and hold decision
- * records to linking only each other.
- *
- * A link is resolved from the file that holds it, with any `#anchor` set
- * aside; a link to a website, a mail address or an anchor in the same page is
- * not checked. Links inside code spans and fenced blocks are text, not links.
- * A decision record is never edited to follow a move, so it links only other
- * records.
- * @module binnacle/scripts/check-links
- */
+// A decision record is never edited after a file moves, so it may link only other records.
 import { existsSync } from 'node:fs'
 import { dirname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { repositoryFiles } from './check-paths.mjs'
 
-/** Where the decision records are, repository-relative. */
 export const RECORDS = 'docs/adr/'
 
-/**
- * The relative links in one Markdown text, outside code.
- * @param {string} text - the text.
- * @returns {{ target: string, line: number }[]} each link's path, its anchor set aside, and its 1-based line.
- */
 function linksIn(text) {
   const links = []
   let fenced = false
@@ -40,12 +24,6 @@ function linksIn(text) {
   return links
 }
 
-/**
- * Find every relative link that resolves to nothing, or leads out of a decision record.
- * @param {{ path: string, text: string }[]} files - the Markdown files and their text.
- * @param {(path: string) => boolean} exists - whether a repository-relative path exists.
- * @returns {string[]} one line per broken link, with its file and 1-based line.
- */
 export function brokenLinks(files, exists) {
   return files.flatMap((file) =>
     linksIn(file.text).flatMap(({ target, line }) => {

@@ -1,25 +1,8 @@
-/**
- * What `task land` writes: the PR's title and body, and a comment for each
- * review report. Each function here reads text and answers text.
- * @module binnacle/scripts/task/land
- */
-
-/**
- * The round and the pass of a report's file name: `review-0.md` is pass 1.
- * @param {string} name - the file name.
- * @returns {[number, number]} the round and the pass.
- */
 function order(name) {
   const [, round, pass] = name.match(/^review-(\d+)(?:-(\d+))?\.md$/)
   return [Number(round), pass === undefined ? 1 : Number(pass)]
 }
 
-/**
- * The review reports of a task folder, oldest first: each pass of round 0,
- * then each later round.
- * @param {string[]} files - the names in the task folder.
- * @returns {string[]} the report files, in order.
- */
 export function reportsOf(files) {
   return files
     .filter((name) => /^review-\d+(?:-\d+)?\.md$/.test(name))
@@ -30,12 +13,6 @@ export function reportsOf(files) {
     })
 }
 
-/**
- * The text under a heading of a Markdown body, to the next `## ` heading.
- * @param {string} body - the Markdown.
- * @param {string} heading - the heading, such as `## Door`.
- * @returns {string} the text, trimmed; empty when the heading is not there.
- */
 export function section(body, heading) {
   const lines = body.split('\n')
   const at = lines.findIndex((line) => line.trim() === heading)
@@ -47,11 +24,6 @@ export function section(body, heading) {
     .trim()
 }
 
-/**
- * The door of a spec: the first word under its `## Door`.
- * @param {string} spec - the issue body.
- * @returns {'one-way' | 'two-way' | undefined} the door, or nothing when the spec names none.
- */
 export function doorOf(spec) {
   const word = section(spec, '## Door')
     .split(/[\s.,]/)[0]
@@ -59,11 +31,6 @@ export function doorOf(spec) {
   return word === 'one-way' || word === 'two-way' ? word : undefined
 }
 
-/**
- * Split a commit message into its header and its body, without its `Closes` lines.
- * @param {string} message - the message.
- * @returns {{ header: string, body: string }} the parts.
- */
 export function partsOf(message) {
   const [header, ...rest] = message.split('\n')
   const body = rest
@@ -73,11 +40,6 @@ export function partsOf(message) {
   return { header: header.trim(), body }
 }
 
-/**
- * The PR's body, in the shape of `.github/pull_request_template.md`.
- * @param {{ n: number, message: string, spec: string, checked: string, reports: string[] }} task - what the task has.
- * @returns {string} the body.
- */
 export function prBody({ n, message, spec, checked, reports }) {
   return [
     `Closes #${n}`,
@@ -111,22 +73,10 @@ export function prBody({ n, message, spec, checked, reports }) {
   ].join('\n')
 }
 
-/**
- * The comment of one review report. Its first line names the report, so a
- * second `task land` finds it on the PR and does not post it again.
- * @param {string} file - the report's file name.
- * @param {string} text - the report.
- * @returns {string} the comment.
- */
 export function reportComment(file, text) {
   return `${marker(file)}\n<details><summary>${file}</summary>\n\n${text.trim()}\n\n</details>\n`
 }
 
-/**
- * The first line of a report's comment.
- * @param {string} file - the report's file name.
- * @returns {string} the line.
- */
 export function marker(file) {
   return `<!-- binnacle-report: ${file} -->`
 }

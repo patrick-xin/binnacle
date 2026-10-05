@@ -1,34 +1,10 @@
 #!/usr/bin/env node
-/**
- * The references: every repository an agent reads here and never writes,
- * fetched under `.refs/<name>` at the commit `references.json` pins.
- *
- * `references.json` is public and names each reference by url and pin.
- * `references.local.json` is this machine's and ignored: it may point a
- * public reference at a local clone, which fetches faster and never moves the
- * pin, and it may add references of its own, which only this machine reads.
- *
- * `pnpm refs` fetches them all; `pnpm refs pi dsh` fetches the ones named.
- * @module binnacle/scripts/refs
- */
+// references.local.json may point a public reference at a local clone: it fetches faster, and never moves the pin.
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/**
- * One reference as it will be fetched; `tag`, when the manifest names one, must name the pinned commit.
- * @typedef {{ name: string, url: string, commit: string, local: boolean, tag?: string }} Ref
- */
-
-/**
- * Resolve the manifests into the references to fetch.
- * @param {Record<string, { url?: string, commit?: string, tag?: string }>} manifest - `references.json`.
- * @param {Record<string, { url?: string, commit?: string }> | undefined} local - `references.local.json`, when there is one.
- * @param {string[]} [names] - the references to plan; every one when omitted.
- * @returns {Ref[]} the public references in manifest order, then this machine's own.
- * @throws when a reference lacks a url or a commit, or a name is not a reference.
- */
 export function plan(manifest, local, names) {
   const refs = []
   for (const [name, ref] of Object.entries(manifest)) {
@@ -47,22 +23,12 @@ export function plan(manifest, local, names) {
   return refs.filter((ref) => names.includes(ref.name))
 }
 
-/**
- * Read both manifests at a repository root and plan every reference.
- * @param {string} root - the repository root.
- * @returns {Ref[]} every reference, as {@link plan} resolves them.
- */
 export function references(root) {
   const read = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'))
   const local = existsSync(join(root, 'references.local.json')) ? read('references.local.json') : undefined
   return plan(read('references.json'), local)
 }
 
-/**
- * The commit a fetched reference stands at.
- * @param {string} dir - the reference's directory under `.refs`.
- * @returns {string | undefined} the full commit, or undefined when nothing is fetched there.
- */
 export function fetchedAt(dir) {
   if (!existsSync(join(dir, '.git'))) return undefined
   try {
@@ -73,22 +39,11 @@ export function fetchedAt(dir) {
   }
 }
 
-/**
- * The commit a tag names, read from `git ls-remote` for the tag and its peel.
- * @param {string} listing - the output of `git ls-remote <url> refs/tags/<tag> refs/tags/<tag>^{}`.
- * @returns {string | undefined} the commit an annotated tag peels to, or a lightweight tag names; undefined when nothing is listed.
- */
 export function taggedCommit(listing) {
   const lines = listing.trim().split('\n').filter(Boolean)
   return (lines.find((line) => line.endsWith('^{}')) ?? lines[0])?.split('\t')[0]
 }
 
-/**
- * What is wrong when a reference's tag does not name its pinned commit.
- * @param {Ref} ref - the reference, with its tag.
- * @param {string | undefined} tagged - the commit its source says the tag names; undefined when the source has no such tag.
- * @returns {string | undefined} the error to throw; undefined when the tag names the pin.
- */
 export function tagMismatch(ref, tagged) {
   if (tagged?.startsWith(ref.commit)) return undefined
   if (tagged === undefined)
@@ -96,12 +51,6 @@ export function tagMismatch(ref, tagged) {
   return `${ref.name}: tag ${ref.tag} names ${tagged ?? 'nothing'}, pinned ${ref.commit}`
 }
 
-/**
- * Fetch one reference at its pin, shallow and detached.
- * @param {Ref} ref - the reference.
- * @param {string} root - the repository root.
- * @returns {string} one line saying what was done.
- */
 function fetchRef(ref, root) {
   const dir = join(root, '.refs', ref.name)
   const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: ['ignore', 'pipe', 'pipe'] })

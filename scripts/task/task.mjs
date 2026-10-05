@@ -1,13 +1,4 @@
-/**
- * The task tool: one tool holds the state of a Build task.
- *
- * Each command is `run(argv, deps)`, which answers `{ code, stdout, stderr }`,
- * so a test drives the tool as a process would. The deps hold the world: the
- * home folder that holds `tasks/` and `worktrees/`, the repository's checkout,
- * the issue reader, the clock and the sleep. Run as a main, the tool builds
- * them from the environment.
- * @module binnacle/scripts/task/task
- */
+// The deps hold the world: home, checkout, issue reader, clock and sleep. So a test drives the tool as a process would.
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -34,13 +25,10 @@ import {
 } from './state.mjs'
 import { lastRecord, watch } from './watch.mjs'
 
-/** A refusal the caller can do something about: exit code 1. */
 class Refusal extends Error {}
 
-/** A usage error: exit code 2. */
 class Usage extends Error {}
 
-/** A change of state that stays, whose hand-off failed: exit code 3. */
 class HandoffFailed extends Error {
   constructor(message) {
     super(message)
@@ -48,27 +36,14 @@ class HandoffFailed extends Error {
   }
 }
 
-/** The roles an agent can take, and `--as` can name. */
 const ROLES = ['lead', 'implementer', 'reviewer']
 
-/**
- * Run git in the repository, and answer its stdout.
- * @param {string} repo - the repository's checkout.
- * @param {string[]} args - the arguments to pass git.
- * @returns {string} its stdout, without the trailing newline.
- */
 function git(repo, args) {
   const done = spawnSync('git', args, { cwd: repo, encoding: 'utf8' })
   if (done.status !== 0) throw new Refusal(`git ${args.join(' ')} failed: ${(done.stderr || done.stdout).trim()}`)
   return done.stdout.trim()
 }
 
-/**
- * Each path in backticks between `## Code shape` and the next `## ` heading of
- * an issue body.
- * @param {string} body - the issue body, as Markdown.
- * @returns {string[]} the paths, in the order the issue lists them.
- */
 export function filesOfIssue(body) {
   const lines = body.split('\n')
   const heading = lines.findIndex((line) => line.trim() === '## Code shape')
@@ -81,13 +56,6 @@ export function filesOfIssue(body) {
   return paths
 }
 
-/**
- * Check a path the way decision 8 of the task tool's spec says: relative to
- * the repository, and in its normal form.
- * @param {string} path - the path.
- * @returns {string} the path, when it is well formed.
- * @throws {Refusal} when the path is not relative, or not in normal form.
- */
 function checkedPath(path) {
   if (path === '' || path === '.' || path === '..' || path.startsWith('/') || path.startsWith('./') || path.startsWith('../'))
     throw new Refusal(`${path}: not a path relative to the repository`)
@@ -95,37 +63,17 @@ function checkedPath(path) {
   return path
 }
 
-/**
- * The paths an issue lists under `## Code shape`, checked.
- * @param {number} n - the issue number.
- * @param {string} body - the issue body, as Markdown.
- * @returns {string[]} the paths.
- * @throws {Refusal} when the issue lists no path, or a path that is not well formed.
- */
 function filesFromIssue(n, body) {
   const paths = filesOfIssue(body).map(checkedPath)
   if (paths.length === 0) throw new Refusal(`issue ${n} lists no files under ## Code shape`)
   return paths
 }
 
-/**
- * Check that an argument is a task number, and answer it.
- * @param {string | undefined} text - the argument.
- * @returns {number} the task number.
- * @throws {Usage} when the argument is not a number.
- */
 function number(text) {
   if (!/^\d+$/.test(text ?? '')) throw new Usage(`${text ?? 'nothing'}: not a task number`)
   return Number(text)
 }
 
-/**
- * Read the options the commands take after their fixed arguments.
- * @param {string[]} args - the options.
- * @param {Record<string, string | undefined>} [env] - the environment: `BINNACLE_ROLE` is the role when `--as` is not given.
- * @returns {{ as: string, force: boolean }} the role a command acts as, and whether it forces.
- * @throws {Usage} when an option is not one the command takes.
- */
 function parseOptions(args, env = {}) {
   const read = { as: env.BINNACLE_ROLE ?? 'lead', force: false }
   for (let i = 0; i < args.length; i++) {
@@ -141,13 +89,6 @@ function parseOptions(args, env = {}) {
   return read
 }
 
-/**
- * Run one command of the task tool.
- * @param {string[]} argv - the arguments after the command name.
- * @param {{ home: string, repo: string, readIssue: (n: number) => Promise<string>, now: () => Date, sleep: (ms: number) => Promise<void> }} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function command(argv, deps, say) {
   const [name, ...rest] = argv
   const env = deps.env ?? {}
@@ -209,14 +150,6 @@ async function command(argv, deps, say) {
   }
 }
 
-/**
- * Start a task: check what the spec checks, make the branch, the worktree and
- * the task folder, and set the state `spec` at round 0.
- * @param {number} n - the issue number.
- * @param {{ home: string, repo: string, readIssue: (n: number) => Promise<string>, now: () => Date }} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function start(n, deps, say) {
   const roles = readRoles(deps)
   if (roles.implementer.family === roles.reviewer.family)
@@ -270,22 +203,10 @@ async function start(n, deps, say) {
   })
 }
 
-/**
- * Read `.agents/roles.json`.
- * @param {{ repo: string }} deps - the repository.
- * @returns {Record<string, { tool?: string, model?: string, family?: string, thinking?: string, runner?: string }>} each role's setting.
- */
 function readRoles(deps) {
   return JSON.parse(readFileSync(join(deps.repo, '.agents', 'roles.json'), 'utf8'))
 }
 
-/**
- * What a hand-off needs to know of its task, as the log and the events say.
- * @param {number} n - the task number.
- * @param {string} folder - the task's folder.
- * @param {{ home: string, repo: string }} deps - the world.
- * @returns {import('./handoffs.mjs').Context} the context.
- */
 function context(n, folder, deps) {
   const lines = readLog(folder)
   const last = lines.at(-1)
@@ -300,16 +221,6 @@ function context(n, folder, deps) {
   }
 }
 
-/**
- * Hand the task on: record the hand-off with a new id, then try it.
- * @param {number} n - the task number.
- * @param {string} folder - the task's folder.
- * @param {import('./handoffs.mjs').Handoff | undefined} handoff - the hand-off, or nothing.
- * @param {object} deps - the world.
- * @param {object} [extra] - more for the hand-off's detail, such as the tip.
- * @returns {Promise<void>}
- * @throws {HandoffFailed} when the hand-off failed; the change of state stays.
- */
 async function deliver(n, folder, handoff, deps, extra = {}) {
   if (handoff === undefined) return
   const id = `h${readEvents(folder).filter((event) => event.event === 'handoff').length + 1}`
@@ -322,18 +233,6 @@ async function deliver(n, folder, handoff, deps, extra = {}) {
   await tryHandoff(n, folder, id, handoff, deps, extra)
 }
 
-/**
- * Try a hand-off: start its agent first if it must, then send the prompt.
- * Each try that is tried again, and the end, go to the events log.
- * @param {number} n - the task number.
- * @param {string} folder - the task's folder.
- * @param {string} id - the hand-off's id.
- * @param {import('./handoffs.mjs').Handoff} handoff - the hand-off.
- * @param {object} deps - the world.
- * @param {object} extra - more for the `prompted` event's detail.
- * @returns {Promise<void>}
- * @throws {HandoffFailed} when the agent did not start, or the prompt did not land.
- */
 async function tryHandoff(n, folder, id, handoff, deps, extra) {
   const event = (name, detail) =>
     appendEvent(folder, { at: deps.now().toISOString(), event: name, role: handoff.role, detail: { id, ...detail } })
@@ -384,28 +283,12 @@ async function tryHandoff(n, folder, id, handoff, deps, extra) {
   }
 }
 
-/**
- * The runner a role's setting names.
- * @param {string | undefined} name - the runner's name.
- * @param {{ runners: Record<string, object> }} deps - the runners.
- * @returns {object} the runner.
- * @throws {Error} when no such runner exists.
- */
 function runnerOf(name, deps) {
   const runner = deps.runners?.[name]
   if (runner === undefined) throw new Error(`no runner ${name ?? '(none)'}; the runners are ${Object.keys(deps.runners ?? {}).join(', ')}`)
   return runner
 }
 
-/**
- * Build: start the Implementer after round 0 is approved, and send it the
- * spec; or, `--by lead`, record the Lead as the Implementer, and start no agent.
- * @param {number} n - the task number.
- * @param {boolean} byLead - whether the Lead builds the task itself.
- * @param {object} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function build(n, byLead, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
@@ -433,15 +316,6 @@ async function build(n, byLead, deps, say) {
   })
 }
 
-/**
- * Land: turn an approved task into its PR. Each check runs before anything
- * changes; each step is skipped when a run before did it, so a land that
- * failed part of the way can run again.
- * @param {number} n - the task number.
- * @param {object} deps - the world, with `gh`.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function land(n, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
@@ -537,13 +411,6 @@ async function land(n, deps, say) {
   })
 }
 
-/**
- * Resend the newest hand-off whose prompt did not land, with the same id.
- * @param {number} n - the task number.
- * @param {object} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function resend(n, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
@@ -559,24 +426,10 @@ async function resend(n, deps, say) {
   })
 }
 
-/**
- * Append one JSON line to the log.
- * @param {string} log - the log's path.
- * @param {{ at: string, role: string, from: string | null, to: string, round: number }} change - the change of state.
- */
 function appendLine(log, change) {
   writeFileSync(log, `${JSON.stringify(change)}\n`, { flag: 'a' })
 }
 
-/**
- * Set a state, as the table of states allows.
- * @param {number} n - the task number.
- * @param {string} state - the state to set.
- * @param {{ as: string }} read - the role the command acts as.
- * @param {{ home: string, repo: string, readIssue: (n: number) => Promise<string>, now: () => Date, sleep: (ms: number) => Promise<void> }} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function setState(n, state, read, deps, say) {
   if (state === 'blocked' || state === 'stopped')
     throw new Refusal(`task set cannot set ${state}; only task ${state === 'blocked' ? 'ask' : 'stop'} sets it`)
@@ -611,26 +464,12 @@ async function setState(n, state, read, deps, say) {
   })
 }
 
-/**
- * The tip of the last round, or the base the Implementer built from.
- * @param {string} folder - the task's folder.
- * @returns {string | undefined} the commit.
- */
 function lastTip(folder) {
   const marks = readEvents(folder).filter((event) => event.event === 'handoff' && (event.detail.tip ?? event.detail.base) !== undefined)
   const last = marks.at(-1)
   return last?.detail.tip ?? last?.detail.base
 }
 
-/**
- * Read a task's files from its issue again, for the Lead's new round of the
- * spec, and check them against each other running task.
- * @param {number} n - the task number.
- * @param {{ home: string, repo: string, readIssue: (n: number) => Promise<string> }} deps - the world.
- * @param {string} folder - the task's folder.
- * @returns {Promise<string[]>} the new files.
- * @throws {Refusal} when the new files overlap a running task; the task keeps its files and state from before.
- */
 async function filesAgain(n, deps, folder) {
   const files = filesFromIssue(n, await deps.readIssue(n))
   const others = tasksOf(deps.home)
@@ -642,13 +481,6 @@ async function filesAgain(n, deps, folder) {
   return files
 }
 
-/**
- * Say why a state cannot follow the current one, naming the states that can.
- * @param {number} n - the task number.
- * @param {string} state - the state that was asked for.
- * @param {{ to: string, round: number }} last - the last line of the log.
- * @returns {string} the refusal.
- */
 function refusal(n, state, last) {
   const can = followers(last.to, last.round)
   const after =
@@ -661,14 +493,6 @@ function refusal(n, state, last) {
           : `${can.join(', ')} can follow it`
   return `task ${n}: ${state} cannot follow ${last.to}; ${after}`
 }
-/**
- * Ask: set `blocked`, after the role wrote its question.
- * @param {number} n - the task number.
- * @param {{ as: string }} read - the role the command acts as.
- * @param {{ home: string, now: () => Date, sleep: (ms: number) => Promise<void> }} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function ask(n, read, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
@@ -688,15 +512,6 @@ async function ask(n, read, deps, say) {
   })
 }
 
-/**
- * Answer: set the state from before `blocked` again, at the same round, after
- * the Lead wrote its answer. The question and the answer are kept, numbered
- * by how many questions the task has asked.
- * @param {number} n - the task number.
- * @param {{ home: string, now: () => Date, sleep: (ms: number) => Promise<void> }} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function answer(n, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
@@ -720,15 +535,6 @@ async function answer(n, deps, say) {
   })
 }
 
-/**
- * Show each task, its state, its round, and the time since its last change;
- * under it, each agent with its runner, its state, and the time since its
- * last session record. A folder that cannot be read shows as one line.
- * @param {object} deps - the world.
- * @param {number | undefined} n - the one task to show, or each of them.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function status(deps, n, say) {
   const { tasks, unreadable } = readTasks(deps.home)
   if (n !== undefined) {
@@ -780,13 +586,6 @@ async function status(deps, n, say) {
   return 0
 }
 
-/**
- * The time between two dates, in the largest two of days, hours, minutes and
- * seconds that fit.
- * @param {Date} from - the earlier date.
- * @param {Date} to - the later date.
- * @returns {string} the time, such as `2h2m`.
- */
 function since(from, to) {
   let seconds = Math.max(0, Math.floor((to.getTime() - from.getTime()) / 1000))
   const parts = []
@@ -803,17 +602,6 @@ function since(from, to) {
   return parts.slice(0, 2).join('')
 }
 
-/**
- * Stop a task: remove its worktrees and its branch, then set `stopped`. The
- * task folder stays as the record. Each step that finds nothing to remove is
- * already done, so a stop that failed part of the way can run again.
- * `stopped` is logged only after each step is done.
- * @param {number} n - the task number.
- * @param {{ force: boolean }} read - whether uncommitted work and an unmerged branch go too.
- * @param {{ home: string, repo: string, now: () => Date, sleep: (ms: number) => Promise<void> }} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- */
 async function stop(n, read, deps, say) {
   if (read.as !== 'lead') throw new Refusal(`the ${read.as} cannot stop a task; the lead stops it`)
   return locked(deps, async () => {
@@ -865,12 +653,6 @@ async function stop(n, read, deps, say) {
   })
 }
 
-/**
- * Run the task tool.
- * @param {string[]} argv - the arguments after the command name.
- * @param {{ home: string, repo: string, readIssue: (n: number) => Promise<string>, now: () => Date, sleep: (ms: number) => Promise<void> }} deps - the world.
- * @returns {Promise<{ code: number, stdout: string, stderr: string }>} the exit code and the output.
- */
 export async function run(argv, deps) {
   const out = []
   const err = []
@@ -884,12 +666,6 @@ export async function run(argv, deps) {
   return { code, stdout: out.length === 0 ? '' : `${out.join('\n')}\n`, stderr: err.length === 0 ? '' : `${err.join('\n')}\n` }
 }
 
-/**
- * Run a process, and answer its exit code and output; never throw on its code.
- * @param {string} file - the executable.
- * @param {string[]} args - its arguments.
- * @returns {Promise<{ code: number, stdout: string, stderr: string }>} what it did.
- */
 function exec(file, args) {
   return new Promise((resolve) => {
     execFile(file, args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) =>
@@ -902,10 +678,6 @@ function exec(file, args) {
   })
 }
 
-/**
- * The processes of this machine, as `ps` sees them.
- * @returns {Promise<{ pid: number, ppid: number, command: string, cpuSeconds: number }[]>} each process.
- */
 async function processes() {
   const done = await exec('ps', ['-axo', 'pid=,ppid=,time=,command='])
   return done.stdout
@@ -915,11 +687,6 @@ async function processes() {
     .map(([, pid, ppid, time, line]) => ({ pid: Number(pid), ppid: Number(ppid), command: line, cpuSeconds: cpuSeconds(time) }))
 }
 
-/**
- * Read the CPU time that `ps` prints: `[[dd-]hh:]mm:ss[.ss]`.
- * @param {string} time - the time.
- * @returns {number} the seconds.
- */
 export function cpuSeconds(time) {
   const [days, clock] = time.includes('-') ? time.split('-') : ['0', time]
   return Number(days) * 86_400 + clock.split(':').reduce((sum, part) => sum * 60 + Number(part), 0)

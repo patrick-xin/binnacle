@@ -5,10 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { GRACE, IDLE, LIMIT, supervise, systemDeps } from './supervise.mjs'
 
-/**
- * An agent's folder with prompts in its queue, and the deps of a supervisor
- * whose clock moves only when it sleeps. `child` makes each run.
- */
 function world(t, prompts, child) {
   const home = mkdtempSync(join(tmpdir(), 'binnacle-supervise-'))
   t.after(() => rmSync(home, { recursive: true, force: true }))

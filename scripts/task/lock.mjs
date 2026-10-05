@@ -1,30 +1,10 @@
-/**
- * The lock: one command writes at a time.
- *
- * The task commands and the supervisor of a headless run share it, so a
- * prompt that comes as a supervisor exits starts a new supervisor.
- * @module binnacle/scripts/task/lock
- */
+// A supervisor takes the lock too, so a prompt that arrives as a supervisor exits starts a new supervisor.
 import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { alive, standalone } from './state.mjs'
 
-/** Counts the lock candidates of this process, so no two of its commands share one. */
 let ticket = 0
 
-/**
- * Run `body` as the one command that writes. The lock is a file that holds its
- * owner's process id: the pid is written to a temporary file and published with
- * `linkSync`, which fails when the lock exists, so a lock never appears without
- * its owner. A command that finds a lock waits for it while its process lives;
- * a lock whose process is gone makes it exit 1 naming the lock and the pid, and
- * the Lead removes the lock by hand, because a check of the owner and a
- * removal are two steps that another process can come between. A command
- * removes only the lock it holds, also when it gets SIGINT or SIGTERM.
- * @param {{ home: string, sleep: (ms: number) => Promise<void> }} deps - the home and the sleep.
- * @param {() => Promise<number> | number} body - the writing, answering the exit code.
- * @returns {Promise<number>} the exit code.
- */
 export async function locked(deps, body) {
   const tasks = join(deps.home, 'tasks')
   mkdirSync(tasks, { recursive: true })

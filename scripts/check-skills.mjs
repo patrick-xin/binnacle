@@ -1,34 +1,14 @@
 #!/usr/bin/env node
-/**
- * Hold the agent team's skills to one copy each.
- *
- * A skill lives in `.agents/skills/<name>/`, which codex and pi read, and
- * Claude Code reaches it through `.claude/skills/<name>`, a symlink to it. A
- * copy there drifts from the skill it copied, so every entry under
- * `.claude/skills` is a link to the skill of its own name, every skill has
- * one, and a skill's `SKILL.md` is named as its folder is: a harness finds a
- * skill by its folder, and an agent asks for it by its name.
- * @module binnacle/scripts/check-skills
- */
+// Claude Code reads a skill through .claude/skills/<name>. A copy there drifts from the skill, so each must be a symlink.
 import { lstatSync, readdirSync, readFileSync, readlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { load, YAMLException } from 'js-yaml'
 
-/**
- * What is at a path, a link read as itself.
- * @param {string} path - the path.
- * @returns {import('node:fs').Stats | undefined} its stats, or nothing when nothing is there.
- */
 function at(path) {
   return lstatSync(path, { throwIfNoEntry: false })
 }
 
-/**
- * Every way the skills under a repository root fall short.
- * @param {string} root - the repository root.
- * @returns {{ path: string, problem: string }[]} each problem, by the path it is found at: the skills' first, by name, then the links'.
- */
 export function findProblems(root) {
   const problems = []
   const skills = join(root, '.agents', 'skills')

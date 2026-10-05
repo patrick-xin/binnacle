@@ -6,7 +6,6 @@ import { spawnSync } from 'node:child_process'
 import { makeWorld } from './world.mjs'
 import { run } from './task.mjs'
 
-/** Drive a task to `ready` at round 1, one step a minute. */
 async function ready(world, n, path) {
   world.setIssue(n, world.shape(path))
   for (const argv of [

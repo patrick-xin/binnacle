@@ -1,34 +1,8 @@
-/**
- * The hand-offs: for each change that hands a task on, the role that gets a
- * prompt, and the prompt.
- * @module binnacle/scripts/task/handoffs
- */
-
-/**
- * What a hand-off needs to know of its task.
- * @typedef {{ n: number, repo: string, folder: string, worktree: string, review: string, round: number, pass: number, tip?: string, base?: string, k?: number }} Context
- * @typedef {{ role: string, start: boolean, text: string }} Handoff
- */
-
-/**
- * The report file of a round: `review-0.md` for the first pass of round 0,
- * `review-0-<p>.md` for pass `p`, and `review-<r>.md` for a later round.
- * @param {number} round - the round.
- * @param {number} pass - the pass of round 0.
- * @returns {string} the file's name.
- */
 export function reportFile(round, pass) {
   if (round > 0) return `review-${round}.md`
   return pass <= 1 ? 'review-0.md' : `review-0-${pass}.md`
 }
 
-/**
- * The hand-off of a change, if it has one.
- * @param {{ kind: 'start' | 'build' | 'answer' } | { kind: 'set', to: string }} change - the command, and the state it set.
- * @param {Context} c - the task.
- * @param {string} [asker] - for an answer, the role that asked.
- * @returns {Handoff | undefined} the hand-off, or nothing when the change wakes the Lead or no one.
- */
 export function handoffFor(change, c, asker) {
   const report = `${c.folder}/${reportFile(c.round, c.pass)}`
   // The tool of the main checkout: the agent's own checkout may hold another version of it.

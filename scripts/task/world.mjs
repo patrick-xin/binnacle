@@ -1,38 +1,15 @@
-/**
- * The world that a task-tool test runs in: a temporary home folder, a
- * repository with a bare `origin`, and a fake issue reader.
- *
- * The tests never touch the real home or the real repository: each one makes
- * its own, and removes it when it ends. The clock stands still until a test
- * moves it, so a line's time and a task's age are literals.
- * @module binnacle/scripts/task/world
- */
+// The clock stands still until a test moves it, so each time a test asserts is a literal.
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import assert from 'node:assert/strict'
+import { run } from './task.mjs'
 
-/**
- * Run git in a folder, and answer its stdout.
- * @param {string} cwd - the folder to run it in.
- * @param {string[]} args - the arguments to pass it.
- * @returns {string} its stdout, without the trailing newline.
- */
 export function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 }
 
-/**
- * Make the world of one test: an empty home, a repository whose `origin` is
- * bare and holds one commit on `main`, and deps whose issue bodies and clock
- * the test sets by hand.
- * @returns {{
- *   dir: string, home: string, repo: string,
- *   deps: { home: string, repo: string, readIssue: (n: number) => Promise<string>, now: () => Date, sleep: (ms: number) => Promise<void> },
- *   runner: ReturnType<typeof makeFakeRunner>, gh: ReturnType<typeof makeFakeGh>,
- *   setIssue(n: number, body: string): void, shape(...paths: string[]): string, tick(ms?: number): void, remove(): void
- * }} the world.
- */
 export function makeWorld() {
   const dir = mkdtempSync(join(tmpdir(), 'binnacle-task-'))
   const home = join(dir, 'home')
@@ -106,17 +83,6 @@ export function makeWorld() {
   }
 }
 
-/**
- * A runner that starts nothing. It records each start, prompt and close, and
- * answers each `activity` with the state a test sets for a role. A test can
- * make a start or a prompt fail.
- * @returns {{
- *   starts: object[], prompts: { role: string, text: string }[], closed: string[],
- *   states: Record<string, { state: string, root?: number }>, failStart: Set<string>, failPrompt: Set<string>,
- *   start(agent: object): Promise<object>, prompt(handle: object, text: string, onRetry?: Function): Promise<void>,
- *   activity(handle: object): Promise<object>, close(handle: object): Promise<void>
- * }} the runner.
- */
 export function makeFakeRunner() {
   const runner = {
     starts: [],
@@ -144,16 +110,6 @@ export function makeFakeRunner() {
   return runner
 }
 
-/**
- * A `gh` that keeps its PRs and comments in memory. A test can make the next
- * call that matches fail, before it does anything (`lost: false`), or after
- * GitHub took it but its answer was lost (`lost: true`).
- * @returns {{
- *   calls: string[], prs: Map<string, { url: string, title: string, body: string, labels: string[] }>, comments: { url: string, body: string }[],
- *   failures: { match: (args: string[]) => boolean, lost: boolean }[],
- *   call(args: string[], input?: string): Promise<{ code: number, stdout: string, stderr: string }>
- * }} the fake.
- */
 export function makeFakeGh() {
   const gh = {
     calls: [],
@@ -207,4 +163,19 @@ export function makeFakeGh() {
     },
   }
   return gh
+}
+
+export function logLines(world, n) {
+  return readFileSync(join(world.home, 'tasks', String(n), 'log.ndjson'), 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+}
+
+export async function steps(world, ...argvs) {
+  for (const argv of argvs) {
+    world.tick()
+    const result = await run(argv, world.deps)
+    assert.equal(result.code, 0, `${argv.join(' ')}: ${result.stderr}`)
+  }
 }

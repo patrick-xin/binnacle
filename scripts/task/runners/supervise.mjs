@@ -1,17 +1,5 @@
-/**
- * The supervisor of a headless agent: it owns the agent's runs after the
- * command that queued them exits.
- *
- * The agent's folder, `tasks/<n>/agents/<role>/`, holds `agent.json` (how to
- * run the tool), `queue/` (the prompts that wait, oldest first), `run.json`
- * (the run in progress) and `out.log`. The supervisor runs each prompt as one
- * process, with no standard input, because pi reads standard input to its
- * end before it starts when it is not a terminal
- * (`pi:packages/coding-agent/src/main.ts`), so an open input stops it forever.
- * Each run is the leader of its own process group, so the time limit stops
- * its children too.
- * @module binnacle/scripts/task/runners/supervise
- */
+// A run gets no standard input: when it is not a terminal, pi reads it to its end before it starts (`pi:packages/coding-agent/src/main.ts`).
+// Each run leads its own process group, so the time limit also stops its children.
 import { spawn as spawnProcess } from 'node:child_process'
 import { closeSync, existsSync, linkSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -19,33 +7,12 @@ import { fileURLToPath } from 'node:url'
 import { locked } from '../lock.mjs'
 import { alive, appendEvent, writeJson } from '../state.mjs'
 
-/** The time limit of a run: 45 minutes. */
 export const LIMIT = 45 * 60_000
 
-/** The time between `SIGTERM` and `SIGKILL` when a run is stopped. */
 export const GRACE = 10_000
 
-/** The time the supervisor waits with an empty queue before it exits. */
 export const IDLE = 10 * 60_000
 
-/**
- * A run: its process id, a promise of its exit code, and the error when the
- * tool could not start (then the code is -1, and the pid may be undefined).
- * @typedef {{ pid?: number, exited: Promise<number>, error?: string }} Child
- * @typedef {{
- *   spawn: (file: string, args: string[], options: { cwd: string, env: Record<string, string>, out: string }) => Child,
- *   kill: (pid: number, signal: string) => void,
- *   timer: (ms: number) => Promise<void>,
- *   now: () => Date,
- *   sleep: (ms: number) => Promise<void>,
- * }} SuperviseDeps
- */
-
-/**
- * The prompts that wait in a queue, oldest first.
- * @param {string} dir - the agent's folder.
- * @returns {string[]} the file names in `queue/`.
- */
 export function waiting(dir) {
   const queue = join(dir, 'queue')
   if (!existsSync(queue)) return []
@@ -54,15 +21,6 @@ export function waiting(dir) {
     .toSorted()
 }
 
-/**
- * Supervise one headless agent until its queue has been empty for `IDLE`.
- * Only one supervisor runs for an agent: it claims `supervisor.pid` the way a
- * command takes the lock, under the task lock, and a second supervisor exits
- * at once.
- * @param {string} dir - the agent's folder.
- * @param {SuperviseDeps} deps - the world.
- * @returns {Promise<void>}
- */
 export async function supervise(dir, deps) {
   const agent = JSON.parse(readFileSync(join(dir, 'agent.json'), 'utf8'))
   const folder = dirname(dirname(dir))
@@ -129,11 +87,6 @@ export async function supervise(dir, deps) {
   }
 }
 
-/**
- * Whether a supervisor lives for an agent.
- * @param {string} dir - the agent's folder.
- * @returns {boolean} whether `supervisor.pid` names a live process.
- */
 export function supervised(dir) {
   try {
     const owner = readFileSync(join(dir, 'supervisor.pid'), 'utf8').trim()
@@ -143,12 +96,6 @@ export function supervised(dir) {
   }
 }
 
-/**
- * The deps of a real supervisor. `spawn` gives each run no standard input,
- * and makes it the leader of its own process group.
- * @param {(pid: number) => void} [onSpawn] - told the process id of each run.
- * @returns {SuperviseDeps} the deps.
- */
 export function systemDeps(onSpawn = () => {}) {
   return {
     spawn(file, args, options) {

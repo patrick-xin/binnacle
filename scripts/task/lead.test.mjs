@@ -2,19 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { git, makeWorld } from './world.mjs'
+import { git, makeWorld, steps } from './world.mjs'
 import { run } from './task.mjs'
 
-/** Run each command, one minute apart, and check that each exits 0. */
-async function steps(world, ...argvs) {
-  for (const argv of argvs) {
-    world.tick()
-    const result = await run(argv, world.deps)
-    assert.equal(result.code, 0, `${argv.join(' ')}: ${result.stderr}`)
-  }
-}
-
-/** A task at round 0, approved, that the Lead builds. */
 async function byLead(world) {
   world.setIssue(140, world.shape('scripts/task/'))
   await steps(world, ['start', '140'], ['set', '140', 'approved', '--as', 'reviewer'], ['build', '140', '--by', 'lead'])

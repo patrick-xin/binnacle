@@ -1,59 +1,24 @@
-/**
- * The watch: the Lead's wake-up call.
- *
- * `task watch` reads each task's log and events log from the line the last
- * watch reported or passed, finds the oldest entry that the Lead acts on,
- * prints one line for it, and exits. When no entry waits, it sleeps two
- * seconds and reads again.
- *
- * Before each read, it looks at each agent of each running task, and writes
- * to the events log what the Lead must hear of: a stall, an agent that waits
- * in its pane, a runner that fails, and a hand-off that no command sent.
- * Each task's place in each log is kept in `tasks/watch.json`; a task that is
- * not there is read from its first line.
- * @module binnacle/scripts/task/watch
- */
 import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { alive, appendEvent, readAgents, readEvents, readTasks, standalone, writeJson } from './state.mjs'
 
-/** An agent that works with no session record for this long has stalled. */
 export const QUIET = 20 * 60_000
 
-/** The time over which a busy process is measured. */
 export const WINDOW = 5 * 60_000
 
-/** The CPU seconds in `WINDOW` that make a process busy: four minutes of five. */
 export const BUSY = 240
 
-/** The time between two CPU samples, at most. */
 const SAMPLE = 30_000
 
-/** The events that wake the Lead. */
 const WAKING = ['for-lead', 'handoff-failed', 'not-sent', 'stalled', 'timed-out', 'run-failed', 'waits', 'runner-error']
 
-/** Counts the watch candidates of this process, so no two of them share one. */
 let ticket = 0
 
-/**
- * Whether a change of state wakes the Lead: one that the Lead must act on,
- * and that the Lead did not set itself.
- * @param {{ role: string, to: string, round: number }} line - the change.
- * @returns {boolean} whether it wakes the Lead.
- */
 export function wakes(line) {
   if (line.role === 'lead') return false
   return line.to === 'blocked' || line.to === 'approved' || (line.to === 'changes' && line.round === 0)
 }
 
-/**
- * The time of an agent's last session record: the change time of the newest
- * session file, or of its last prompt if it has no file yet, or of its start.
- * @param {string} folder - the task's folder.
- * @param {{ role: string, startedAt: string }} agent - the agent.
- * @param {{ at: string, event: string, role: string }[]} events - the task's events.
- * @returns {Date} the time.
- */
 export function lastRecord(folder, agent, events) {
   const sessions = join(folder, 'agents', agent.role, 'sessions')
   if (existsSync(sessions)) {
@@ -66,17 +31,6 @@ export function lastRecord(folder, agent, events) {
   return new Date(prompted?.at ?? agent.startedAt)
 }
 
-/**
- * Watch for the oldest entry that waits, and report it. Only one watch runs:
- * each claims `watch.pid` with `linkSync`, which fails when a watch holds it.
- * A watch whose process is gone makes the next watch exit 1 naming the file,
- * and the Lead removes it by hand, as for the lock. A watch removes the pid
- * file only if it took it, also when it gets SIGINT or SIGTERM.
- * @param {object} deps - the world.
- * @param {(line: string) => void} say - prints a line of stdout.
- * @returns {Promise<number>} the exit code.
- * @throws {WatchTaken} when a watch runs already.
- */
 export async function watch(deps, say) {
   const tasks = join(deps.home, 'tasks')
   mkdirSync(tasks, { recursive: true })
@@ -138,7 +92,6 @@ export async function watch(deps, say) {
   }
 }
 
-/** A refusal that carries its own exit code: 2, as a watch that cannot start. */
 export class WatchTaken extends Error {
   constructor() {
     super('a watch runs already')
@@ -146,12 +99,6 @@ export class WatchTaken extends Error {
   }
 }
 
-/**
- * Look at each agent of each running task, and write to its events log what
- * the Lead must hear of. Each is written once.
- * @param {object} deps - the world.
- * @returns {Promise<void>}
- */
 async function look(deps) {
   const { tasks } = readTasks(deps.home)
   let table
@@ -200,13 +147,6 @@ async function look(deps) {
   }
 }
 
-/**
- * Write `not-sent` for each hand-off that no command finished: it has no
- * `prompted` and no `handoff-failed`, and no process holds the lock.
- * @param {object[]} events - the task's events.
- * @param {{ home: string }} deps - the world.
- * @param {(name: string, role: string, detail: object) => void} event - writes an event.
- */
 function notSent(events, deps, event) {
   if (lockHeld(deps.home)) return
   const ended = new Set(
@@ -216,11 +156,6 @@ function notSent(events, deps, event) {
     event('not-sent', handoff.role, { id: handoff.detail.id })
 }
 
-/**
- * Whether a live process holds the lock.
- * @param {string} home - the home folder.
- * @returns {boolean} whether it is held.
- */
 function lockHeld(home) {
   try {
     const owner = readFileSync(join(home, 'tasks', '.lock'), 'utf8').trim()
@@ -230,18 +165,6 @@ function lockHeld(home) {
   }
 }
 
-/**
- * Sample the CPU time of each process under a root, at any depth, and answer
- * those that used at least `BUSY` seconds in the last `WINDOW`. The samples
- * are kept in the agent's `cpu.json` across watches; with less than `WINDOW`
- * of samples, no process is busy.
- * @param {string} folder - the task's folder.
- * @param {string} role - the agent's role.
- * @param {number | undefined} root - the process to look under.
- * @param {{ pid: number, ppid: number, command: string, cpuSeconds: number }[]} table - the processes.
- * @param {Date} now - the time.
- * @returns {{ pid: number, command: string, cpu: number }[]} the busy processes.
- */
 function busyUnder(folder, role, root, table, now) {
   if (root === undefined) return []
   const under = new Map()
@@ -279,22 +202,11 @@ function busyUnder(folder, role, root, table, now) {
   return busy
 }
 
-/**
- * Seconds as `m:ss`.
- * @param {number} seconds - the seconds.
- * @returns {string} the time.
- */
 function clock(seconds) {
   const whole = Math.round(seconds)
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
 }
 
-/**
- * The line of an event that wakes the Lead.
- * @param {number} n - the task number.
- * @param {{ event: string, role: string, detail?: object }} event - the event.
- * @returns {string} the line.
- */
 function eventLine(n, event) {
   switch (event.event) {
     case 'for-lead':
@@ -316,14 +228,6 @@ function eventLine(n, event) {
   }
 }
 
-/**
- * The oldest entry across the tasks, in the log or the events log, that
- * wakes the Lead and that no watch reported. Equal times answer the smaller
- * task, and the log before the events log.
- * @param {string} home - the home folder.
- * @param {Map<number, { log: number, events: number }>} counts - for each task, the entries a watch reported or passed.
- * @returns {{ n: number, file: 'log' | 'events', index: number, at: string, text: string } | undefined} the entry to report.
- */
 function oldestWaiting(home, counts) {
   let oldest
   const offer = (entry) => {
@@ -353,12 +257,6 @@ function oldestWaiting(home, counts) {
   return oldest
 }
 
-/**
- * Read how far each task's logs were read. A count from before the events
- * log is the log's count.
- * @param {string} tasks - the tasks folder.
- * @returns {Map<number, { log: number, events: number }>} for each task, the entries a watch reported or passed.
- */
 function readCounts(tasks) {
   const path = join(tasks, 'watch.json')
   if (!existsSync(path)) return new Map()
