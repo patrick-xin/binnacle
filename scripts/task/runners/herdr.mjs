@@ -1,30 +1,10 @@
-/**
- * The `herdr` runner: each agent in a herdr tab of its own, where the
- * Maintainer can watch it.
- *
- * herdr answers each command with JSON: `{ "result": ... }`, or
- * `{ "error": { "code", "message" } }`.
- * @module binnacle/scripts/task/runners/herdr
- */
+// herdr answers each command with JSON: { result } or { error: { code, message } }.
 import { toolOf } from './tools.mjs'
 
-/** The herdr errors that a prompt tries again: the agent did not start to work in time. */
 const RETRY = ['agent_prompt_stalled', 'timeout']
 
-/** The tries of one prompt, in all. */
 const TRIES = 3
 
-/**
- * @typedef {(file: string, args: string[]) => Promise<{ code: number, stdout: string, stderr: string }>} Exec
- * @typedef {{ name: string, pane: string, tab: string }} HerdrHandle
- */
-
-/**
- * Run herdr, and answer its result, or throw its error with herdr's code.
- * @param {Exec} exec - runs a process.
- * @param {string[]} args - herdr's arguments.
- * @returns {Promise<object>} herdr's `result`.
- */
 async function herdr(exec, args) {
   const done = await exec('herdr', args)
   let answer
@@ -46,18 +26,8 @@ async function herdr(exec, args) {
   return answer.result
 }
 
-/**
- * Make the herdr runner.
- * @param {{ exec: Exec }} deps - runs a process.
- * @returns {object} the runner: `start`, `prompt`, `activity` and `close`.
- */
 export function makeHerdr({ exec }) {
   return {
-    /**
-     * Start an agent in a new tab. If the agent does not start, the tab goes.
-     * @param {import('./tools.mjs').Agent} agent - the agent.
-     * @returns {Promise<HerdrHandle>} the handle.
-     */
     async start(agent) {
       const tool = toolOf(agent.role, { tool: agent.tool })
       // herdr wants a name that starts with a lowercase letter.
@@ -74,15 +44,6 @@ export function makeHerdr({ exec }) {
       return handle
     },
 
-    /**
-     * Send a prompt, and resolve when the agent works on it. herdr's wait sees
-     * the agent's state, not this turn, so a try that timed out may have
-     * landed: the tries stop at three.
-     * @param {HerdrHandle} handle - the agent.
-     * @param {string} text - the prompt.
-     * @param {(tried: number, code: string) => void} [onRetry] - told of each try that is tried again.
-     * @returns {Promise<void>}
-     */
     async prompt(handle, text, onRetry = () => {}) {
       for (let tried = 1; ; tried++) {
         try {
@@ -95,11 +56,6 @@ export function makeHerdr({ exec }) {
       }
     },
 
-    /**
-     * What the agent does, and the process to look under for its children.
-     * @param {HerdrHandle} handle - the agent.
-     * @returns {Promise<{ state: string, root?: number }>} the state.
-     */
     async activity(handle) {
       let agent
       try {
@@ -113,11 +69,6 @@ export function makeHerdr({ exec }) {
       return { state, root: info.process_info.shell_pid }
     },
 
-    /**
-     * Close the agent's tab. A tab that is gone is a step already done.
-     * @param {HerdrHandle} handle - the agent.
-     * @returns {Promise<void>}
-     */
     async close(handle) {
       try {
         await herdr(exec, ['tab', 'close', handle.tab])

@@ -1,9 +1,4 @@
-/**
- * The `headless` runner: each prompt is one run of the tool in print mode,
- * owned by the agent's supervisor (`./supervise.mjs`), so no pane is needed.
- * Each function runs under the task lock, as each command does.
- * @module binnacle/scripts/task/runners/headless
- */
+// Each function runs under the task lock, as each command does.
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,21 +6,10 @@ import { alive, writeJson } from '../state.mjs'
 import { GRACE, supervised, waiting } from './supervise.mjs'
 import { toolOf } from './tools.mjs'
 
-/** The supervisor's module, run as its own process. */
 const SUPERVISOR = join(dirname(fileURLToPath(import.meta.url)), 'supervise.mjs')
 
-/** Counts the prompts this process queued, so two in one millisecond keep their order. */
 let ticket = 0
 
-/**
- * @typedef {{ dir: string }} HeadlessHandle
- */
-
-/**
- * Make the headless runner.
- * @param {{ home: string, spawnSupervisor: (script: string, dir: string) => void, kill: (pid: number, signal: string) => void, now: () => Date, alive?: (pid: number) => boolean, sleep?: (ms: number) => Promise<void> }} deps - the world.
- * @returns {object} the runner: `start`, `prompt`, `activity` and `close`.
- */
 export function makeHeadless(deps) {
   const isAlive = deps.alive ?? alive
   const pause = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
@@ -38,11 +22,6 @@ export function makeHeadless(deps) {
     deps.spawnSupervisor(SUPERVISOR, dir)
   }
   return {
-    /**
-     * Make the agent's folder, and start its supervisor.
-     * @param {import('./tools.mjs').Agent} agent - the agent.
-     * @returns {Promise<HeadlessHandle>} the handle.
-     */
     async start(agent) {
       const tool = toolOf(agent.role, { tool: agent.tool })
       const dir = dirname(agent.sessionDir)
@@ -61,12 +40,6 @@ export function makeHeadless(deps) {
       return { dir }
     },
 
-    /**
-     * Queue the prompt, start a supervisor if none lives, and resolve at once.
-     * @param {HeadlessHandle} handle - the agent.
-     * @param {string} text - the prompt.
-     * @returns {Promise<void>}
-     */
     async prompt(handle, text) {
       const name = `${deps.now().toISOString().replace(/[:.]/g, '-')}-${process.pid}-${String(++ticket).padStart(4, '0')}.txt`
       const tmp = join(handle.dir, 'queue', `${name}.tmp`)
@@ -75,25 +48,12 @@ export function makeHeadless(deps) {
       wake(handle.dir)
     },
 
-    /**
-     * `working` while a run lives, `idle` otherwise. A headless agent is never
-     * `gone`: a prompt starts its supervisor again.
-     * @param {HeadlessHandle} handle - the agent.
-     * @returns {Promise<{ state: string, root?: number }>} the state.
-     */
     async activity(handle) {
       const run = readRun(handle.dir)
       if (run !== undefined && alive(run.pid)) return { state: 'working', root: run.pid }
       return { state: 'idle' }
     },
 
-    /**
-     * Drop the queue, then stop the run's process group and the supervisor,
-     * and resolve only when both are gone: `SIGTERM`, then `SIGKILL` after
-     * `GRACE`.
-     * @param {HeadlessHandle} handle - the agent.
-     * @returns {Promise<void>}
-     */
     async close(handle) {
       for (const name of waiting(handle.dir)) rmSync(join(handle.dir, 'queue', name), { force: true })
       const run = readRun(handle.dir)
@@ -113,11 +73,6 @@ export function makeHeadless(deps) {
   }
 }
 
-/**
- * Read the run in progress.
- * @param {string} dir - the agent's folder.
- * @returns {{ supervisor: number, pid: number, prompt: string, startedAt: string } | undefined} the run, if one is recorded.
- */
 function readRun(dir) {
   try {
     return JSON.parse(readFileSync(join(dir, 'run.json'), 'utf8'))

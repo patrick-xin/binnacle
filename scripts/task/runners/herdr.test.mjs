@@ -2,10 +2,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { makeHerdr } from './herdr.mjs'
 
-/**
- * A fake herdr: each call answers the next of `answers`, and is recorded.
- * @param {object[]} answers - each a herdr JSON answer, or `{ code, stdout, stderr }`.
- */
 function fake(answers) {
   const calls = []
   const exec = async (file, args) => {

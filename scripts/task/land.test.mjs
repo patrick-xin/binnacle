@@ -2,21 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { appendFileSync, chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { git, makeWorld } from './world.mjs'
+import { git, makeWorld, steps } from './world.mjs'
 import { run } from './task.mjs'
 
 const MESSAGE = 'feat: the thing works\n\nWhat changed, and why.\n\nAuthor API: none.\n\nCloses #140\n'
 
-/** Run each command, one minute apart, and check that each exits 0. */
-async function steps(world, ...argvs) {
-  for (const argv of argvs) {
-    world.tick()
-    const result = await run(argv, world.deps)
-    assert.equal(result.code, 0, `${argv.join(' ')}: ${result.stderr}`)
-  }
-}
-
-/** A task that the Lead built in two commits, approved at round 1, with its message and its proofs. */
 async function approved(world, door = 'Two-way. Only the task tool changes.') {
   world.setIssue(140, `${world.shape('scripts/task/')}\n## Door\n\n${door}\n\n## Review level\n\nmedium\n`)
   await steps(world, ['start', '140'], ['set', '140', 'approved', '--as', 'reviewer'], ['build', '140', '--by', 'lead'])
@@ -43,8 +33,7 @@ async function approved(world, door = 'Two-way. Only the task tool changes.') {
   return { worktree, folder }
 }
 
-/** The commits of the task's branch on `origin`, newest first, as `subject`. */
-function originBranch(world) {
+function originSubjects(world) {
   git(world.repo, ['fetch', 'origin'])
   return git(world.repo, ['log', '--format=%s', 'origin/main..origin/task/140']).split('\n')
 }
@@ -55,7 +44,7 @@ test('`task land <n>` squashes the branch into one commit on top of `origin/main
   const { worktree } = await approved(world)
   const landed = await run(['land', '140'], world.deps)
   assert.equal(landed.code, 0, landed.stderr)
-  assert.deepEqual(originBranch(world), ['feat: the thing works'])
+  assert.deepEqual(originSubjects(world), ['feat: the thing works'])
   assert.equal(git(worktree, ['log', '-1', '--format=%B']), MESSAGE.trim())
   assert.equal(git(worktree, ['rev-parse', 'HEAD~1']), git(world.repo, ['rev-parse', 'origin/main']))
 })

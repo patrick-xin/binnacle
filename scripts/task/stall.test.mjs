@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import { makeWorld } from './world.mjs'
 import { cpuSeconds, run } from './task.mjs'
 
-/** A task whose Implementer works, from a pane whose shell is process 100. */
 async function working(world) {
   world.setIssue(140, world.shape('scripts/task/'))
   for (const argv of [
@@ -22,7 +21,6 @@ async function working(world) {
   world.runner.states.implementer = { state: 'working', root: 100 }
 }
 
-/** Write a session record of the Implementer at the world's time. */
 function record(world) {
   const sessions = join(world.home, 'tasks', '140', 'agents', 'implementer', 'sessions')
   mkdirSync(sessions, { recursive: true })
@@ -31,7 +29,6 @@ function record(world) {
   utimesSync(file, world.deps.now(), world.deps.now())
 }
 
-/** Deps whose sleep moves the clock a minute, and stops the test after `max` sleeps. */
 function minutes(world, max, also = () => {}) {
   let slept = 0
   return {

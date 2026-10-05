@@ -2,10 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { git, makeWorld } from './world.mjs'
+import { git, makeWorld, steps } from './world.mjs'
 import { run } from './task.mjs'
 
-/** The events of a task. */
 function events(world, n) {
   const path = join(world.home, 'tasks', String(n), 'events.ndjson')
   if (!existsSync(path)) return []
@@ -15,22 +14,11 @@ function events(world, n) {
     .map((line) => JSON.parse(line))
 }
 
-/** Run each command, one minute apart, and check that each exits 0. */
-async function steps(world, ...argvs) {
-  for (const argv of argvs) {
-    world.tick()
-    const result = await run(argv, world.deps)
-    assert.equal(result.code, 0, `${argv.join(' ')}: ${result.stderr}`)
-  }
-}
-
-/** A task at round 0, approved, with its Implementer started. */
 async function building(world, n) {
   world.setIssue(n, world.shape('scripts/task/'))
   await steps(world, ['start', String(n)], ['set', String(n), 'approved', '--as', 'reviewer'], ['build', String(n)])
 }
 
-/** Commit in the Implementer's worktree, and answer the new tip. */
 function commit(world, n, message) {
   const worktree = join(world.home, 'worktrees', String(n))
   appendFileSync(join(worktree, 'README.md'), `${message}\n`)

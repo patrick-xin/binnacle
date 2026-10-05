@@ -3,23 +3,13 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { makeWorld } from './world.mjs'
+import { logLines, makeWorld } from './world.mjs'
 import { run } from './task.mjs'
 
-/** The path of a task's log. */
 function logOf(world, n) {
   return join(world.home, 'tasks', String(n), 'log.ndjson')
 }
 
-/** The lines of a task's log. */
-function lines(world, n) {
-  return readFileSync(join(world.home, 'tasks', String(n), 'log.ndjson'), 'utf8')
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
-}
-
-/** Start a task in the world. */
 async function started(world, n, path) {
   world.setIssue(n, world.shape(path))
   return run(['start', String(n)], world.deps)
@@ -56,7 +46,7 @@ test('a command that finds a lock of a gone process removes nothing, and exits 1
   assert.equal(result.code, 1)
   assert.equal(result.stderr, `${lock}: its process ${gone.pid} is gone; check it, then remove the lock by hand\n`)
   assert.equal(readFileSync(lock, 'utf8'), `${gone.pid}`)
-  assert.deepEqual(lines(world, 140).at(-1), { at: '2026-10-05T10:00:00.000Z', role: 'lead', from: null, to: 'spec', round: 0 })
+  assert.deepEqual(logLines(world, 140).at(-1), { at: '2026-10-05T10:00:00.000Z', role: 'lead', from: null, to: 'spec', round: 0 })
 
   // The Lead removes the stale lock by hand, and the command runs.
   rmSync(lock)

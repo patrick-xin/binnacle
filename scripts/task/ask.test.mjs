@@ -2,23 +2,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { makeWorld } from './world.mjs'
+import { logLines, makeWorld } from './world.mjs'
 import { run } from './task.mjs'
 
-/** Start a task, approve round 0, and set it building. */
 async function building(world, n, path) {
   world.setIssue(n, world.shape(path))
   assert.equal((await run(['start', String(n)], world.deps)).code, 0)
   await run(['set', String(n), 'approved', '--as', 'reviewer'], world.deps)
   await run(['set', String(n), 'building', '--as', 'implementer'], world.deps)
-}
-
-/** The lines of a task's log. */
-function lines(world, n) {
-  return readFileSync(join(world.home, 'tasks', String(n), 'log.ndjson'), 'utf8')
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
 }
 
 test('`task ask` sets `blocked`. `task answer` sets the state from before `blocked` again, at the same round', async (t) => {
@@ -30,13 +21,13 @@ test('`task ask` sets `blocked`. `task answer` sets the state from before `block
   const withoutQuestion = await run(['ask', '140', '--as', 'implementer'], world.deps)
   assert.equal(withoutQuestion.code, 1)
   assert.match(withoutQuestion.stderr, /no question\.md in .*140; write it first/)
-  assert.equal(lines(world, 140).at(-1).to, 'building')
+  assert.equal(logLines(world, 140).at(-1).to, 'building')
 
   writeFileSync(join(folder, 'question.md'), 'Why?\n')
   world.tick()
   const asked = await run(['ask', '140', '--as', 'implementer'], world.deps)
   assert.equal(asked.code, 0)
-  assert.deepEqual(lines(world, 140).at(-1), {
+  assert.deepEqual(logLines(world, 140).at(-1), {
     at: '2026-10-05T10:01:00.000Z',
     role: 'implementer',
     from: 'building',
@@ -51,13 +42,13 @@ test('`task ask` sets `blocked`. `task answer` sets the state from before `block
   const withoutAnswer = await run(['answer', '140'], world.deps)
   assert.equal(withoutAnswer.code, 1)
   assert.match(withoutAnswer.stderr, /no answer\.md in .*140; write it first/)
-  assert.equal(lines(world, 140).at(-1).to, 'blocked')
+  assert.equal(logLines(world, 140).at(-1).to, 'blocked')
 
   world.tick()
   writeFileSync(join(folder, 'answer.md'), 'Because.\n')
   const answered = await run(['answer', '140'], world.deps)
   assert.equal(answered.code, 0)
-  assert.deepEqual(lines(world, 140).at(-1), {
+  assert.deepEqual(logLines(world, 140).at(-1), {
     at: '2026-10-05T10:02:00.000Z',
     role: 'lead',
     from: 'blocked',
@@ -86,7 +77,7 @@ test('A second question does not find the answer to the first one', async (t) =>
   const stale = await run(['answer', '140'], world.deps)
   assert.equal(stale.code, 1)
   assert.match(stale.stderr, /no answer\.md in .*140; write it first/)
-  assert.equal(lines(world, 140).at(-1).to, 'blocked')
+  assert.equal(logLines(world, 140).at(-1).to, 'blocked')
 
   writeFileSync(join(folder, 'answer.md'), 'Still because.\n')
   const answered = await run(['answer', '140'], world.deps)
