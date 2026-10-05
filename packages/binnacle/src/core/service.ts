@@ -18,8 +18,16 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   get layoutOnView(): Layout {
-    const screen = this.screens.at(-1) ?? CHAT
+    const screen = this.screenOnView
     return this.layouts.get(screen.name)?.at(-1) ?? screen.layout
+  }
+
+  get focusOnView(): string | undefined {
+    return this.screenOnView.focus
+  }
+
+  private get screenOnView(): Screen {
+    return this.screens.at(-1) ?? CHAT
   }
 
   partIn(place: string): Part | undefined {

@@ -16,6 +16,10 @@
       "types": "./dist/plugins/read/index.d.ts",
       "default": "./dist/plugins/read/index.js"
     },
+    "./plugins/composer": {
+      "types": "./dist/plugins/composer/index.d.ts",
+      "default": "./dist/plugins/composer/index.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },

@@ -2,6 +2,15 @@ binnacle copies these files from pi-tui (https://github.com/earendil-works/pi, p
 
 - src/terminal/utils.ts, from packages/tui/src/utils.ts
 - src/terminal/stdin-buffer.ts, from packages/tui/src/stdin-buffer.ts
+- src/terminal/keys.ts, from packages/tui/src/keys.ts
+- src/terminal/keybindings.ts, from packages/tui/src/keybindings.ts
+- src/terminal/kill-ring.ts, from packages/tui/src/kill-ring.ts
+- src/terminal/undo-stack.ts, from packages/tui/src/undo-stack.ts
+- src/terminal/word-navigation.ts, from packages/tui/src/word-navigation.ts
+- src/terminal/components/editor.ts, from packages/tui/src/components/editor.ts
+- src/terminal/components/select-list.ts, from packages/tui/src/components/select-list.ts
+- src/terminal/autocomplete.ts, the types of packages/tui/src/autocomplete.ts that the editor names
+- src/terminal/tui.ts, the types and the cursor marker of packages/tui/src/tui.ts that the editor names
 
 pi-tui's licence:
 

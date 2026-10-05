@@ -5,6 +5,8 @@ import '@deepseek-ai/cordis'
 export interface Part {
   /** Unwrapped Untrusted Text: the core takes out its control sequences, then wraps each line at the width. */
   lines(width: number): readonly string[]
+  /** A key, as the terminal sent it, while the Part is focused. It returns true when it used the key; the core's key table takes the rest. */
+  key?(data: string): boolean
 }
 
 /** A `fixed` size is in cells, its box included; `content` is the cells its lines need; `fill` shares what is left. */
@@ -35,6 +37,8 @@ export interface Screen {
   /** The name a plugin replaces the Screen's layout by. */
   readonly name: string
   readonly layout: Layout
+  /** The Place whose Part takes the keys first while the Screen is on view. */
+  readonly focus?: string
 }
 
 export interface Handle {
