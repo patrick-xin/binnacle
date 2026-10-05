@@ -2,7 +2,15 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { handoffFor, reportFile } from './handoffs.mjs'
 
-const task = { n: 140, folder: '/h/tasks/140', worktree: '/h/worktrees/140', review: '/h/worktrees/140-review', round: 0, pass: 1 }
+const task = {
+  n: 140,
+  repo: '/r',
+  folder: '/h/tasks/140',
+  worktree: '/h/worktrees/140',
+  review: '/h/worktrees/140-review',
+  round: 0,
+  pass: 1,
+}
 
 test('the report file names each pass of round 0 and each later round', () => {
   assert.deepEqual(
@@ -17,7 +25,7 @@ test('`ready` sends the Reviewer the round, the tip, the commits since the last 
   assert.equal(handoff.start, false)
   assert.equal(
     handoff.text,
-    'Round 2 of #140 at b2: the commits a1..b2. In your checkout /h/worktrees/140-review, run `git switch --detach b2`, install again only if the lockfile changed, and run `pnpm test`. Check each finding of the last round first, then what the commits touched. Write the report to /h/tasks/140/review-2.md, then set the state with `pnpm task set 140 changes` or `pnpm task set 140 approved`, and end your turn.',
+    'Round 2 of #140 at b2: the commits a1..b2. In your checkout /h/worktrees/140-review, run `git switch --detach b2`, install again only if the lockfile changed, and run `pnpm test`. Check each finding of the last round first, then what the commits touched. Write the report to /h/tasks/140/review-2.md, then set the state with `pnpm -C /r task set 140 changes` or `pnpm -C /r task set 140 approved`, and end your turn.',
   )
 })
 
@@ -40,4 +48,12 @@ test('each change hands the task to the role that acts next, or to no agent', ()
   assert.match(handoffFor({ kind: 'set', to: 'spec' }, { ...task, pass: 2 }).text, /pass 2 .*review-0-2\.md/)
   assert.match(handoffFor({ kind: 'set', to: 'approved' }, { ...task, round: 1 }).text, /message\.md/)
   assert.match(handoffFor({ kind: 'answer' }, { ...task, k: 2 }, 'reviewer').text, /answer-2\.md/)
+})
+
+test('each prompt names the tool of the main checkout, never the tool of the checkout the agent works in', () => {
+  const c = { ...task, repo: '/src/binnacle' }
+  const verdict = handoffFor({ kind: 'start' }, c).text
+  assert.match(verdict, /`pnpm -C \/src\/binnacle task set 140 changes` or `pnpm -C \/src\/binnacle task set 140 approved`/)
+  assert.match(handoffFor({ kind: 'build' }, c).text, /`pnpm -C \/src\/binnacle task set 140 <state>`/)
+  assert.match(handoffFor({ kind: 'set', to: 'changes' }, { ...c, round: 1 }).text, /`pnpm -C \/src\/binnacle task set 140 ready`/)
 })

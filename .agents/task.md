@@ -43,7 +43,8 @@ The log governs the state: the last line is the current state and round. If the 
 | `pnpm task watch` | Lead | Exits when the Lead must act |
 | `pnpm task stop <n> [--force]` | Lead | Closes the agents, removes the worktrees and the branch, and sets `stopped` |
 
-- Each agent that the tool starts gets `BINNACLE_TASK` and `BINNACLE_ROLE` in its environment. An agent leaves out the task number and `--as`: `pnpm task set ready`.
+- An agent runs the tool of the main checkout, as its prompt names it: `pnpm -C <main checkout> task ...`. Its own checkout can hold another version of the tool, and a branch's tool sends that branch's hand-offs.
+- Each agent that the tool starts gets `BINNACLE_TASK` and `BINNACLE_ROLE` in its environment. An agent leaves out the task number and `--as`: `pnpm -C <main checkout> task set ready`.
 - The Lead, outside an agent, passes `--as <role>` when it acts for a role. A command without `--as` acts as the Lead.
 - `task set` refuses `blocked` and `stopped`: only `task ask` and `task stop` set them.
 - A command whose change of state stays, but whose hand-off failed, exits 3. Run `pnpm task resend <n>`.
