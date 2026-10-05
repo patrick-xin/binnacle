@@ -3,7 +3,7 @@
 import '@deepseek-ai/cordis'
 
 export interface Part {
-  /** Unwrapped, and untrusted: the core takes out control sequences, then wraps each line at the width. */
+  /** Unwrapped Untrusted Text: the core takes out its control sequences, then wraps each line at the width. */
   lines(width: number): readonly string[]
 }
 
@@ -18,7 +18,7 @@ export interface Box {
   /** `true` is every side; a gutter is `['left']`. */
   readonly border?: boolean | readonly Side[]
   readonly edge?: string
-  /** Untrusted, as a part's lines are. */
+  /** Untrusted Text, as a Part's lines are. */
   readonly title?: string
 }
 
@@ -32,7 +32,7 @@ export type Layout =
   | (Node & { readonly column: readonly Layout[]; readonly place?: never; readonly row?: never })
 
 export interface Screen {
-  /** The name a plugin replaces the screen's layout by. */
+  /** The name a plugin replaces the Screen's layout by. */
   readonly name: string
   readonly layout: Layout
 }
@@ -46,11 +46,11 @@ export interface Handle {
 export interface Binnacle {
   /** The id that `--session` names. */
   readonly session: string | undefined
-  /** Only the newest screen shown is drawn. The Chat is the first. */
+  /** Only the newest Screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle
-  /** Replaces the layout of the screen by that name; the newest layout wins. */
+  /** Replaces the layout of the Screen by that name; the newest layout wins. */
   layout(screen: string, layout: Layout): Handle
-  /** Fills the place by that name on every screen; the newest part wins. */
+  /** Fills the Place by that name on every Screen; the newest Part wins. */
   place(name: string, part: Part): Handle
 }
 

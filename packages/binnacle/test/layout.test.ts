@@ -41,7 +41,7 @@ test("a plugin replaces the Chat's layout: the composer on top, and a sidebar of
   assert.deepEqual(rows, ['draft         files', 't2            a.ts', 't3', 't4'])
 })
 
-test('a screen shown is drawn with its own layout over the Chat, and the Chat is drawn again once the plugin that showed it unloads', async () => {
+test('a Screen shown is drawn with its own layout over the Chat, and the Chat is drawn again once the plugin that showed it unloads', async () => {
   const { ctx, plugin, terminal, rows } = await drawn(20, 2, (binnacle) => {
     binnacle.place('transcript', part('chat'))
     binnacle.place('detail', part('a', 'b'))
@@ -64,7 +64,7 @@ test('a screen shown is drawn with its own layout over the Chat, and the Chat is
   )
 })
 
-test('a layout goes when the plugin that set it unloads, and the screen is drawn with the layout beneath', async () => {
+test('a layout goes when the plugin that set it unloads, and the Screen is drawn with the layout beneath', async () => {
   const { ctx, plugin, terminal, rows } = await drawn(20, 2, (binnacle) => {
     binnacle.layout('chat', { column: [{ place: 'sidebar' }] })
     binnacle.place('sidebar', part('side'))
@@ -88,7 +88,7 @@ test('a layout goes when the plugin that set it unloads, and the screen is drawn
 
 const wheelUpAt = (column: number, row: number) => `\x1b[<64;${column};${row}M`
 
-test('the wheel scrolls the place under the pointer, and no other', async () => {
+test('the wheel scrolls the Place under the pointer, and no other', async () => {
   const { terminal, rows } = await drawn(10, 2, (binnacle) => {
     binnacle.layout('chat', { row: [{ place: 'transcript' }, { place: 'sidebar', size: { fixed: 5 } }] })
     binnacle.place('transcript', part('t1', 't2', 't3', 't4', 't5'))
@@ -161,7 +161,7 @@ test('a terminal too small for the layout loses padding first, then borders, and
   ])
 })
 
-test('a wide character never straddles the border between two places side by side', async () => {
+test('a wide character never straddles the border between two Places side by side', async () => {
   const { rows } = await drawn(10, 2, (binnacle) => {
     binnacle.layout('chat', { row: [{ place: 'a', size: { fixed: 3 } }, { place: 'b' }] })
     binnacle.place('a', part('日本'))
@@ -170,7 +170,7 @@ test('a wide character never straddles the border between two places side by sid
   assert.deepEqual(rows, ['日 b', '本'])
 })
 
-test('a column draws every row it is given, so its bottom border closes at its last row and the place under it stays at the bottom', async () => {
+test('a column draws every row it is given, so its bottom border closes at its last row and the Place under it stays at the bottom', async () => {
   const { rows } = await drawn(10, 5, (binnacle) => {
     binnacle.layout('chat', {
       column: [
@@ -222,7 +222,7 @@ test('a size, a padding or a gap of fewer than no cells, or of part of a cell, i
   assert.deepEqual(rows, ['b2', 'b3'])
 })
 
-test('the wheel over a place’s border scrolls the place', async () => {
+test('the wheel over a Place’s border scrolls the Place', async () => {
   const { terminal } = await drawn(10, 3, (binnacle) => {
     binnacle.layout('chat', { column: [{ place: 'a', border: true }] })
     binnacle.place('a', part('a1', 'a2', 'a3', 'a4'))
@@ -231,7 +231,7 @@ test('the wheel over a place’s border scrolls the place', async () => {
   assert.deepEqual((await terminal.read()).rows, ['╭────────╮', '│a1      │', '╰────────╯'])
 })
 
-test('a node is a place, a row or a column, never two at once', () => {
+test('a node is a Place, a row or a column, never two at once', () => {
   // @ts-expect-error A node with both a place and a row has no meaning.
   const mixed: Layout = { place: 'a', row: [] }
   assert.ok(mixed)

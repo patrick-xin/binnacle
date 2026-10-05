@@ -29,7 +29,7 @@ test('binnacle takes the alternate screen, raw mode and the mouse when dsh is re
   })
 })
 
-test('a part placed in the transcript is drawn line by line, each line wrapped at the width', async () => {
+test('a Part placed in the transcript is drawn line by line, each line wrapped at the width', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 6 })
   ready()
   await ctx.plugin(probe(['first', 'a line too long for twenty columns', 'last']))
@@ -50,7 +50,7 @@ test('a line with terminal control sequences in it is drawn as its plain text', 
 const WHEEL_UP = '\x1b[<64;5;2M'
 const WHEEL_DOWN = '\x1b[<65;5;2M'
 
-test('a part longer than its place starts at its end, and the wheel scrolls it three rows a notch, stopping at each end', async () => {
+test('a Part longer than its Place starts at its end, and the wheel scrolls it three rows a notch, stopping at each end', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
   ready()
   await ctx.plugin(probe(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']))
@@ -70,7 +70,7 @@ test('a part longer than its place starts at its end, and the wheel scrolls it t
   ])
 })
 
-test('a part drawn again writes only the rows that changed', async () => {
+test('a Part drawn again writes only the rows that changed', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
   ready()
   const lines = ['alpha', 'beta', 'gamma']
@@ -91,7 +91,7 @@ test('a part drawn again writes only the rows that changed', async () => {
   assert.ok(!after.includes('alpha') && !after.includes('gamma'), JSON.stringify(after))
 })
 
-test('a terminal that changes size has its parts drawn again at the new width', async () => {
+test('a terminal that changes size has its Parts drawn again at the new width', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 30, rows: 4 })
   ready()
   await ctx.plugin(probe(['one two three four five', 'six']))
@@ -106,7 +106,7 @@ test('ctrl+c asks dsh to exit, with code 0', async () => {
   assert.deepEqual(exits, [0])
 })
 
-test('ctrl+z gives the terminal back and stops binnacle, and a resume takes the terminal again and draws the whole screen', async () => {
+test('ctrl+z gives the terminal back and stops binnacle, and a resume takes the terminal again and draws the whole Screen', async () => {
   const { ctx, terminal, process, ready } = await mount({ columns: 20, rows: 3 })
   ready()
   await ctx.plugin(probe(['shown']))
@@ -146,7 +146,7 @@ test('a process that exits while binnacle holds the terminal, as on a crash, giv
   })
 })
 
-test('text other code writes while binnacle draws stays off the screen, and is printed once the terminal is given back', async () => {
+test('text other code writes while binnacle draws stays off the Screen, and is printed once the terminal is given back', async () => {
   const { terminal, stdout, stderr, printed, ready, fiber } = await mount({ columns: 20, rows: 3 })
   stdout.write('before\n')
   ready()
@@ -160,7 +160,7 @@ test('text other code writes while binnacle draws stays off the screen, and is p
   assert.deepEqual(printed, ['stdout: before\n', 'stdout: stray out\n', 'stderr: stray err\n'])
 })
 
-test('a plugin that unloads, as on a reload, takes its part with it, and the core keeps the terminal for the plugin loaded again', async () => {
+test('a plugin that unloads, as on a reload, takes its Part with it, and the core keeps the terminal for the plugin loaded again', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 2 })
   ready()
   const first = ctx.plugin(probe(['first']))

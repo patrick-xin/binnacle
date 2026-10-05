@@ -9,7 +9,7 @@ export interface Places {
   scrolledUp(place: string): number
 }
 
-/** A place as it was laid out: its box's cells, which the wheel hits. */
+/** A Place as it was laid out: its box's cells, which the wheel hits. */
 export interface Placed {
   readonly place: string
   readonly top: number

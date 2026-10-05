@@ -2,7 +2,7 @@
 
 **Status:** accepted, 2026-10-05
 
-binnacle's core is one Cordis row. It owns the terminal, and it provides the `binnacle` service. Each feature that a person sees is a Cordis plugin of its own, with its own row in the bundle's patch. A feature injects `binnacle`, and shows what it draws through the service. A screen that a plugin shows is tied to the context of that plugin, so the screen goes when the plugin unloads.
+binnacle's core is one Cordis row. It owns the terminal, and it provides the `binnacle` service. Each feature that a person sees is a Cordis plugin of its own, with its own row in the bundle's patch. A feature injects `binnacle`, and shows what it draws through the service. A Screen that a plugin shows is tied to the context of that plugin, so the Screen goes when the plugin unloads.
 
 ## Considered options
 
