@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Drawn } from '../src/api.ts'
+import type { Handle } from '../src/api.ts'
 import { mount } from './support/mount.ts'
 
 const probe = (lines: readonly string[]) => ({
@@ -74,17 +74,17 @@ test('a part drawn again writes only the rows that changed', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
   ready()
   const lines = ['alpha', 'beta', 'gamma']
-  let drawn: Drawn | undefined
+  let handle: Handle | undefined
   await ctx.plugin({
     name: 'probe',
     inject: ['binnacle'],
     apply: (plugin: Context) => {
-      drawn = plugin.binnacle.place('transcript', { lines: () => lines })
+      handle = plugin.binnacle.place('transcript', { lines: () => lines })
     },
   })
   const before = terminal.written.length
   lines[1] = 'BETA'
-  drawn?.redraw()
+  handle?.redraw()
   const after = terminal.written.slice(before)
   assert.deepEqual((await terminal.read()).rows, ['alpha', 'BETA', 'gamma', ''])
   assert.ok(after.includes('BETA'))

@@ -1,6 +1,6 @@
 # A screen is a layout tree of named places
 
-**Status:** proposed, 2026-10-05
+**Status:** accepted, 2026-10-05
 
 A screen is a layout tree. Its nodes are rows and columns, and its leaves are places, each with a name. Each child is sized `fixed n`, `content` (the rows its lines need) or `fill` (a share of what is left). A plugin fills a place by its name with a part: what a part draws is its lines at the width it is given. A plugin may replace a screen's tree; the newest tree wins, and it goes when its plugin unloads.
 
@@ -20,5 +20,6 @@ The wheel scrolls the place under the pointer. The focused part takes the keys a
 - A layout names places, never plugins, so an author moves the composer without changing it.
 - Nothing overlaps. A Request drawn over the screen needs an overlay layer, which is a decision of its own.
 - A terminal has whole cells and no stroke width: a border is thicker only by another edge, such as `heavy`, `double` or a block.
-- When the terminal is too small, `fill` places shrink first, then padding goes, then borders, and then content is cut. binnacle always draws.
+- When the terminal is too small, `fill` places shrink first, then padding and gaps go, then borders, and then content is cut. binnacle always draws. What goes, goes from the whole screen, so the screen keeps one look.
+- Padding and gaps are cells. Spacing by name comes with the theme, as `number | name`, and breaks no author.
 - What an author imports is the tree, the box and the part. A change to them is a one-way door.

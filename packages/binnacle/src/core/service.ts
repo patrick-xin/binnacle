@@ -1,6 +1,6 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Drawn, Layout, Part, Screen } from '../api.ts'
+import type { Binnacle, Handle, Layout, Part, Screen } from '../api.ts'
 import { TALK } from './talk.ts'
 
 export class BinnacleService extends Service implements Binnacle {
@@ -26,19 +26,19 @@ export class BinnacleService extends Service implements Binnacle {
     return this.parts.get(place)?.at(-1)
   }
 
-  show(screen: Screen): Drawn {
+  show(screen: Screen): Handle {
     return this.hold(this.screens, screen, 'binnacle: a screen shown')
   }
 
-  layout(screen: string, layout: Layout): Drawn {
+  layout(screen: string, layout: Layout): Handle {
     return this.hold(listIn(this.layouts, screen), layout, 'binnacle: a layout')
   }
 
-  place(name: string, part: Part): Drawn {
+  place(name: string, part: Part): Handle {
     return this.hold(listIn(this.parts, name), part, 'binnacle: a part placed')
   }
 
-  private hold<T>(list: T[], item: T, label: string): Drawn {
+  private hold<T>(list: T[], item: T, label: string): Handle {
     list.push(item)
     this.redraw()
     let held = true

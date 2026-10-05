@@ -82,6 +82,7 @@ These answer the design of stage 2, from the grill of 2026-10-05.
 15. **The transcript** is a plugin. It draws each event of the session raw, as its seq, its type and its JSON, and the answer that streams as one live block that the committed event replaces. Grouping and styling come later, and an author can do them too. The status line is a plugin of its own.
 16. **Requests** fail closed until stage 3: a tool that needs an approval fails.
 17. **Hot reload** is off until the core stays up while its plugins reload.
+18. **Styled lines.** A part's lines may carry colour and style. The core takes out every other control sequence, such as a cursor move, a clear or an OSC. A plugin makes untrusted text plain with a helper the core exports, and a part says where its cursor is.
 
 ## Open questions
 

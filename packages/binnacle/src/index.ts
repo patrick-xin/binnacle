@@ -13,7 +13,7 @@ import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
-export type { Binnacle, Box, Drawn, Layout, Part, Screen, Side, Size } from './api.ts'
+export type { Binnacle, Box, Handle, Layout, Part, Screen, Side, Size } from './api.ts'
 
 export const name = 'binnacle'
 

@@ -37,7 +37,7 @@ export interface Screen {
   readonly layout: Layout
 }
 
-export interface Drawn {
+export interface Handle {
   redraw(): void
   /** The core also disposes it when the plugin that drew it unloads. */
   dispose(): void
@@ -47,11 +47,11 @@ export interface Binnacle {
   /** The id that `--session` names. */
   readonly session: string | undefined
   /** Only the newest screen shown is drawn. Talk is the first. */
-  show(screen: Screen): Drawn
+  show(screen: Screen): Handle
   /** Replaces the layout of the screen by that name; the newest layout wins. */
-  layout(screen: string, layout: Layout): Drawn
+  layout(screen: string, layout: Layout): Handle
   /** Fills the place by that name on every screen; the newest part wins. */
-  place(name: string, part: Part): Drawn
+  place(name: string, part: Part): Handle
 }
 
 declare module '@deepseek-ai/cordis' {

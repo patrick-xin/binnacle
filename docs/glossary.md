@@ -35,5 +35,5 @@ The words of binnacle, for a person who uses it and an author who changes it. A 
 | **box** | A node's padding, gap, border, edge and title. | The node's size. | the spacing, the frame | Ours | `binnacle:packages/binnacle/src/api.ts#Box` |
 | **edge** | The glyphs a border is drawn with, by name: `rounded`, `square`, `heavy`, `double`, `block` or `none`. | A border, which says on which sides. | the border style | Ours | `binnacle:packages/binnacle/src/core/theme.ts#edges` |
 | **gutter** | A border on the left side alone. | A border on every side. | the bar | Ours | `binnacle:packages/binnacle/src/api.ts#Box` |
-| **drawn** | A screen shown, a layout set or a part placed: a plugin draws it again or disposes it. | What it holds. | | Ours | `binnacle:packages/binnacle/src/api.ts#Drawn` |
+| **handle** | What `show`, `layout` and `place` return: the plugin draws it again or disposes it. | What it holds, which may not be on view. | | Ours | `binnacle:packages/binnacle/src/api.ts#Handle` |
 | **untrusted text** | Text from a model, a tool or a stored session. binnacle takes out its control sequences before it draws it. | Text that binnacle writes. | | Ours | `binnacle:packages/binnacle/src/core/view.ts#toPlainText` |
