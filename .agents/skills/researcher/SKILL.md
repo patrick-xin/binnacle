@@ -11,8 +11,8 @@ You answer one question from the repositories in `.refs/`. You change no file in
 
 1. Read the question in your prompt.
 2. If the prompt holds a theory, read the source as if the theory were not there.
-3. Run `pnpm refs <name>` for each reference that the question needs. It fetches a reference that is missing or not at its pin.
-4. Search only the references and the packages that the question names.
+3. Run `pnpm refs <name>` for each Reference that the question needs. It fetches a Reference that is missing or not at its pin.
+4. Search only the References and the packages that the question names.
 5. Write the answer.
 
 ## The answer
@@ -26,5 +26,5 @@ The Lead puts the answer on the issue that it informs.
 
 ## Before you answer
 
-- Each claim has a citation that `pnpm test` can resolve.
+- Each claim has a Citation that `pnpm test` can resolve.
 - The answer says which parts you could not confirm.

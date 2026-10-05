@@ -9,11 +9,11 @@ A test is proven when a break of the code that it covers makes it fail. Writing 
 
 ## Before the first test
 
-1. Name the seams. A seam is a public boundary where a test observes the change from outside. The spec names them.
+1. Name the seams. A seam is a public boundary where a test observes the change from outside. The Spec names them.
 2. List the behaviours. Each one is a sentence that a person or a caller would say, and the name of one test.
 3. Order the behaviours so that each builds on the one before. The first is the thinnest one that crosses every seam.
 
-If a test needs a seam that the spec does not name, ask the Lead first.
+If a test needs a seam that the Spec does not name, ask the Lead first.
 
 ## One cycle
 
