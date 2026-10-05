@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
+import type { Shown } from '../src/api.ts'
 import { mount } from './support/mount.ts'
 
 test('binnacle takes the alternate screen, raw mode and the mouse when dsh is ready, and gives them back when it unloads', async () => {
@@ -75,4 +76,39 @@ test('a screen longer than the terminal starts at its end, and the wheel scrolls
     ['7', '8', '9', '10'],
     ['7', '8', '9', '10'],
   ])
+})
+
+test('a screen drawn again writes only the rows that changed', async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
+  ready()
+  const lines = ['alpha', 'beta', 'gamma']
+  let shown: Shown | undefined
+  await ctx.plugin({
+    name: 'probe',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      shown = plugin.binnacle.show({ lines: () => lines })
+    },
+  })
+  const before = terminal.written.length
+  lines[1] = 'BETA'
+  shown?.redraw()
+  const after = terminal.written.slice(before)
+  assert.deepEqual((await terminal.read()).rows, ['alpha', 'BETA', 'gamma', ''])
+  assert.ok(after.includes('BETA'))
+  assert.ok(!after.includes('alpha') && !after.includes('gamma'), JSON.stringify(after))
+})
+
+test('a terminal that changes size has the screen drawn again at its new width', async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 30, rows: 4 })
+  ready()
+  await ctx.plugin({
+    name: 'probe',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.show({ lines: () => ['one two three four five', 'six'] })
+    },
+  })
+  terminal.resize(12, 4)
+  assert.deepEqual((await terminal.read()).rows, ['one two', 'three four', 'five', 'six'])
 })

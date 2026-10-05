@@ -71,7 +71,11 @@ export function apply(ctx: Context): void {
       (data) => {
         input.process(data)
       },
-      () => {},
+      () => {
+        // The terminal may have moved what it showed, so every row is written again.
+        display?.forget()
+        draw()
+      },
     )
     taken.write(TAKE)
     display = new Display((data) => {
