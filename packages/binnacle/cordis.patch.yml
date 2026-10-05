@@ -1,0 +1,8 @@
+# The binnacle bundle, stacked by a profile over dsh-base.
+- insert:
+    # The core: it owns the terminal, and provides the binnacle service.
+    - id: binnacle
+      name: 'binnacle'
+    # The Read view, until the transcript can draw a session.
+    - id: binnacle-read
+      name: 'binnacle/plugins/read'
