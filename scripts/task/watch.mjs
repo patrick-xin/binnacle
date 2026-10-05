@@ -30,7 +30,7 @@ export const BUSY = 240
 const SAMPLE = 30_000
 
 /** The events that wake the Lead. */
-const WAKING = ['handoff-failed', 'not-sent', 'stalled', 'timed-out', 'run-failed', 'waits', 'runner-error']
+const WAKING = ['for-lead', 'handoff-failed', 'not-sent', 'stalled', 'timed-out', 'run-failed', 'waits', 'runner-error']
 
 /** Counts the watch candidates of this process, so no two of them share one. */
 let ticket = 0
@@ -169,6 +169,8 @@ async function look(deps) {
     const event = (name, role, detail) => appendEvent(task.folder, { at: deps.now().toISOString(), event: name, role, detail })
     notSent(events, deps, event)
     for (const agent of agents) {
+      // The Lead takes this role: there is no agent to look at.
+      if (agent.runner === 'lead') continue
       const since = events.findLastIndex((e) => e.role === agent.role && ['started', 'prompted'].includes(e.event))
       const after = events.slice(since + 1).filter((e) => e.role === agent.role)
       let activity
@@ -207,7 +209,9 @@ async function look(deps) {
  */
 function notSent(events, deps, event) {
   if (lockHeld(deps.home)) return
-  const ended = new Set(events.filter((e) => ['prompted', 'handoff-failed', 'not-sent'].includes(e.event)).map((e) => e.detail.id))
+  const ended = new Set(
+    events.filter((e) => ['prompted', 'for-lead', 'handoff-failed', 'not-sent'].includes(e.event)).map((e) => e.detail.id),
+  )
   for (const handoff of events.filter((e) => e.event === 'handoff' && !ended.has(e.detail.id)))
     event('not-sent', handoff.role, { id: handoff.detail.id })
 }
@@ -293,6 +297,8 @@ function clock(seconds) {
  */
 function eventLine(n, event) {
   switch (event.event) {
+    case 'for-lead':
+      return `${n} ${event.role} (lead): ${event.detail.text}`
     case 'handoff-failed':
       return `${n} ${event.role} hand-off ${event.detail.id} failed: ${event.detail.error}`
     case 'not-sent':
@@ -339,7 +345,7 @@ function oldestWaiting(home, counts) {
     }
     for (let index = place.events; index < events.length; index++) {
       const event = events[index]
-      if (!WAKING.includes(event.event)) continue
+      if (!WAKING.includes(event.event) || event.detail?.quiet) continue
       offer({ n: task.n, file: 'events', index, at: event.at, text: eventLine(task.n, event) })
       break
     }

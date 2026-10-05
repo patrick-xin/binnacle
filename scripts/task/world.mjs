@@ -29,7 +29,7 @@ export function git(cwd, args) {
  * @returns {{
  *   dir: string, home: string, repo: string,
  *   deps: { home: string, repo: string, readIssue: (n: number) => Promise<string>, now: () => Date, sleep: (ms: number) => Promise<void> },
- *   runner: ReturnType<typeof makeFakeRunner>,
+ *   runner: ReturnType<typeof makeFakeRunner>, gh: ReturnType<typeof makeFakeGh>,
  *   setIssue(n: number, body: string): void, shape(...paths: string[]): string, tick(ms?: number): void, remove(): void
  * }} the world.
  */
@@ -62,6 +62,7 @@ export function makeWorld() {
   const issues = new Map()
   let clock = new Date('2026-10-05T10:00:00.000Z')
   const runner = makeFakeRunner()
+  const gh = makeFakeGh()
   let slept = 0
   return {
     dir,
@@ -85,9 +86,11 @@ export function makeWorld() {
       },
       env: {},
       runners: { fake: runner },
+      gh: (args, input) => gh.call(args, input),
       processes: async () => [],
     },
     runner,
+    gh,
     setIssue(n, body) {
       issues.set(String(n), body)
     },
@@ -139,4 +142,69 @@ export function makeFakeRunner() {
     },
   }
   return runner
+}
+
+/**
+ * A `gh` that keeps its PRs and comments in memory. A test can make the next
+ * call that matches fail, before it does anything (`lost: false`), or after
+ * GitHub took it but its answer was lost (`lost: true`).
+ * @returns {{
+ *   calls: string[], prs: Map<string, { url: string, title: string, body: string, labels: string[] }>, comments: { url: string, body: string }[],
+ *   failures: { match: (args: string[]) => boolean, lost: boolean }[],
+ *   call(args: string[], input?: string): Promise<{ code: number, stdout: string, stderr: string }>
+ * }} the fake.
+ */
+export function makeFakeGh() {
+  const gh = {
+    calls: [],
+    prs: new Map(),
+    comments: [],
+    failures: [],
+    async call(args, input) {
+      gh.calls.push(args.join(' '))
+      const failure = gh.failures.find((f) => f.match(args))
+      if (failure !== undefined && !failure.lost) {
+        gh.failures.splice(gh.failures.indexOf(failure), 1)
+        return { code: 1, stdout: '', stderr: 'error connecting to api.github.com' }
+      }
+      const answer = gh.answer(args, input)
+      if (failure !== undefined) {
+        gh.failures.splice(gh.failures.indexOf(failure), 1)
+        return { code: 1, stdout: '', stderr: 'error connecting to api.github.com' }
+      }
+      return answer
+    },
+    answer(args, input) {
+      const [, verb, target] = args
+      const byUrl = [...gh.prs.values()].find((pr) => pr.url === target)
+      if (verb === 'view' && args.includes('url,state')) {
+        const pr = gh.prs.get(target)
+        return pr === undefined
+          ? { code: 1, stdout: '', stderr: `no pull requests found for branch "${target}"` }
+          : { code: 0, stdout: JSON.stringify({ url: pr.url, state: 'OPEN' }), stderr: '' }
+      }
+      if (verb === 'view' && args.includes('comments'))
+        return {
+          code: 0,
+          stdout: JSON.stringify({ comments: gh.comments.filter((c) => c.url === target).map((c) => ({ body: c.body })) }),
+          stderr: '',
+        }
+      if (verb === 'create') {
+        const head = args[args.indexOf('--head') + 1]
+        const url = `https://github.com/o/r/pull/${gh.prs.size + 1}`
+        gh.prs.set(head, { url, title: args[args.indexOf('--title') + 1], body: input, labels: [] })
+        return { code: 0, stdout: `${url}\n`, stderr: '' }
+      }
+      if (verb === 'edit') {
+        byUrl.labels.push(args[args.indexOf('--add-label') + 1])
+        return { code: 0, stdout: '', stderr: '' }
+      }
+      if (verb === 'comment') {
+        gh.comments.push({ url: target, body: input })
+        return { code: 0, stdout: '', stderr: '' }
+      }
+      return { code: 1, stdout: '', stderr: `the fake gh cannot ${args.join(' ')}` }
+    },
+  }
+  return gh
 }

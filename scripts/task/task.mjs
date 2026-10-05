@@ -14,6 +14,7 @@ import { homedir } from 'node:os'
 import { dirname, join, posix } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handoffFor } from './handoffs.mjs'
+import { doorOf, marker, partsOf, prBody, reportComment, reportsOf } from './land.mjs'
 import { locked } from './lock.mjs'
 import { makeHeadless } from './runners/headless.mjs'
 import { makeHerdr } from './runners/herdr.mjs'
@@ -163,8 +164,14 @@ async function command(argv, deps, say) {
     }
     case 'build': {
       const [nText, ...more] = args
-      if (more.length > 0) throw new Usage('usage: task build <n>')
-      return build(number(nText), deps, say)
+      const byLead = more.length === 2 && more[0] === '--by' && more[1] === 'lead'
+      if (more.length > 0 && !byLead) throw new Usage('usage: task build <n> [--by lead]')
+      return build(number(nText), byLead, deps, say)
+    }
+    case 'land': {
+      const [nText, ...more] = args
+      if (more.length > 0) throw new Usage('usage: task land <n>')
+      return land(number(nText), deps, say)
     }
     case 'set': {
       const [nText, state, ...more] = args
@@ -198,7 +205,7 @@ async function command(argv, deps, say) {
       if (args.length > 0) throw new Usage('usage: task watch')
       return watch(deps, say)
     default:
-      throw new Usage(`usage: task <start|build|set|ask|answer|resend|status|watch|stop> ...`)
+      throw new Usage(`usage: task <start|build|set|ask|answer|resend|status|watch|land|stop> ...`)
   }
 }
 
@@ -333,6 +340,12 @@ async function tryHandoff(n, folder, id, handoff, deps, extra) {
   try {
     const agents = readAgents(folder)
     let agent = agents[handoff.role]
+    // The Lead takes this role: the prompt wakes the Lead, and starts no agent.
+    if (agent?.runner === 'lead') {
+      // A hand-off that the Lead's own command made does not wake the Lead.
+      event('for-lead', { text: handoff.text, ...(extra.quiet ? { quiet: true } : {}) })
+      return
+    }
     let state = agent === undefined ? 'gone' : (await runnerOf(agent.runner, deps).activity(agent.handle)).state
     if (state === 'unknown') throw new Error(`the ${handoff.role}'s state is unknown; look at it before you resend`)
     if (state === 'gone') {
@@ -385,23 +398,141 @@ function runnerOf(name, deps) {
 }
 
 /**
- * Build: start the Implementer after round 0 is approved, and send it the spec.
+ * Build: start the Implementer after round 0 is approved, and send it the
+ * spec; or, `--by lead`, record the Lead as the Implementer, and start no agent.
  * @param {number} n - the task number.
+ * @param {boolean} byLead - whether the Lead builds the task itself.
  * @param {object} deps - the world.
  * @param {(line: string) => void} say - prints a line of stdout.
  * @returns {Promise<number>} the exit code.
  */
-async function build(n, deps, say) {
+async function build(n, byLead, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
     readTask(folder)
     const last = readLog(folder).at(-1)
     if (last.to !== 'approved' || last.round !== 0)
       throw new Refusal(`task ${n} is ${last.to} at round ${last.round}; task build follows approved at round 0`)
-    if (readAgents(folder).implementer !== undefined) throw new Refusal(`task ${n} has an implementer already; run task resend ${n}`)
+    const agents = readAgents(folder)
+    if (agents.implementer !== undefined) throw new Refusal(`task ${n} has an implementer already; run task resend ${n}`)
+    if (byLead) {
+      const roles = readRoles(deps)
+      if (roles.lead?.family === roles.reviewer?.family)
+        throw new Refusal(
+          `the lead and the reviewer are of the same family ${roles.reviewer?.family}; the Lead cannot build a task that this Reviewer reviews`,
+        )
+      writeJson(join(folder, 'agents.json'), {
+        ...agents,
+        implementer: { role: 'implementer', runner: 'lead', startedAt: deps.now().toISOString() },
+      })
+    }
     const base = git(deps.repo, ['rev-parse', 'origin/main'])
-    say(`task ${n}: the implementer builds from ${base.slice(0, 7)}`)
-    await deliver(n, folder, handoffFor({ kind: 'build' }, context(n, folder, deps)), deps, { base })
+    say(`task ${n}: the ${byLead ? 'Lead' : 'implementer'} builds from ${base.slice(0, 7)}`)
+    await deliver(n, folder, handoffFor({ kind: 'build' }, context(n, folder, deps)), deps, byLead ? { base, quiet: true } : { base })
+    return 0
+  })
+}
+
+/**
+ * Land: turn an approved task into its PR. Each check runs before anything
+ * changes; each step is skipped when a run before did it, so a land that
+ * failed part of the way can run again.
+ * @param {number} n - the task number.
+ * @param {object} deps - the world, with `gh`.
+ * @param {(line: string) => void} say - prints a line of stdout.
+ * @returns {Promise<number>} the exit code.
+ */
+async function land(n, deps, say) {
+  return locked(deps, async () => {
+    const folder = join(deps.home, 'tasks', String(n))
+    readTask(folder)
+    const events = readEvents(folder)
+    const landed = events.find((event) => event.event === 'landed')
+    if (landed !== undefined) throw new Refusal(`task ${n} has landed already: ${landed.detail.url}`)
+    const last = readLog(folder).at(-1)
+    if (last.to !== 'approved' || last.round === 0)
+      throw new Refusal(`task ${n} is ${last.to} at round ${last.round}; task land follows approved after round 0`)
+    const messagePath = join(folder, 'message.md')
+    if (!existsSync(messagePath)) throw new Refusal(`no message.md in ${folder}`)
+    const message = readFileSync(messagePath, 'utf8')
+    const { header } = partsOf(message)
+    if (header === '') throw new Refusal(`${messagePath}: its first line, the header, is empty`)
+    if (!existsSync(join(folder, 'checked.md'))) throw new Refusal(`no checked.md in ${folder}`)
+    const reports = reportsOf(readdirSync(folder))
+    if (!reports.some((file) => !file.startsWith('review-0'))) throw new Refusal(`no review report of a round after round 0 in ${folder}`)
+    const spec = await deps.readIssue(n)
+    const door = doorOf(spec)
+    if (door === undefined) throw new Refusal(`issue ${n}: the first word under ## Door is not One-way or Two-way`)
+    const worktree = join(deps.home, 'worktrees', String(n))
+    if (git(worktree, ['status', '--porcelain']) !== '') throw new Refusal(`${worktree} has changes that are not committed`)
+    git(worktree, ['fetch', 'origin', 'main'])
+    if (spawnSync('git', ['merge-base', '--is-ancestor', 'origin/main', 'HEAD'], { cwd: worktree }).status !== 0)
+      throw new Refusal(`task/${n} does not hold origin/main; merge or rebase it first`)
+
+    const step = async (name, body) => {
+      try {
+        return await body()
+      } catch (error) {
+        throw new Refusal(`task ${n}: land stopped at ${name}: ${error.message}; run task land ${n} again`)
+      }
+    }
+    const event = (name, detail) => appendEvent(folder, { at: deps.now().toISOString(), event: name, role: 'lead', detail })
+
+    await step('the squash', () => {
+      const one = git(worktree, ['rev-list', '--count', 'origin/main..HEAD']) === '1'
+      // Compare with the message as Git keeps it: the commit below cleans it
+      // with `--cleanup=whitespace`, as `git stripspace` does.
+      const kept = spawnSync('git', ['stripspace'], { cwd: worktree, input: message, encoding: 'utf8' }).stdout.trim()
+      if (one && git(worktree, ['log', '-1', '--format=%B']).trim() === kept) return
+      const before = git(worktree, ['rev-parse', 'HEAD'])
+      git(worktree, ['reset', '--soft', 'origin/main'])
+      // The cleanup is named, not taken from Git's settings, so that it is the one the check above undoes.
+      const done = spawnSync('git', ['commit', '--cleanup=whitespace', '-F', messagePath], { cwd: worktree, encoding: 'utf8' })
+      if (done.status !== 0) {
+        // Put the branch back, so the worktree is clean for the next run.
+        git(worktree, ['reset', '--soft', before])
+        throw new Error((done.stderr || done.stdout).trim())
+      }
+    })
+    await step('the push', () => git(worktree, ['push', '--force-with-lease', 'origin', `task/${n}`]))
+    const url = await step('the PR', async () => {
+      const open = await deps.gh(['pr', 'view', `task/${n}`, '--json', 'url,state'])
+      if (open.code === 0) {
+        const pr = JSON.parse(open.stdout)
+        if (pr.state === 'OPEN') return pr.url
+      }
+      const checked = readFileSync(join(folder, 'checked.md'), 'utf8')
+      const made = await deps.gh(
+        ['pr', 'create', '--base', 'main', '--head', `task/${n}`, '--title', header, '--body-file', '-'],
+        prBody({ n, message, spec, checked, reports }),
+      )
+      if (made.code !== 0) throw new Error(made.stderr.trim())
+      const address = made.stdout.trim().split('\n').at(-1)
+      event('pr', { url: address })
+      return address
+    })
+    if (door === 'one-way')
+      await step('the label', async () => {
+        const labelled = await deps.gh(['pr', 'edit', url, '--add-label', 'one-way'])
+        if (labelled.code !== 0) throw new Error(labelled.stderr.trim())
+      })
+    await step('the reports', async () => {
+      // GitHub is the record of what was posted: a comment that GitHub took,
+      // but whose answer was lost, is found here and not posted twice.
+      const read = await deps.gh(['pr', 'view', url, '--json', 'comments'])
+      if (read.code !== 0) throw new Error(read.stderr.trim())
+      const posted = JSON.parse(read.stdout).comments.map((comment) => comment.body)
+      for (const file of reports) {
+        if (posted.some((body) => body.startsWith(marker(file)))) continue
+        const sent = await deps.gh(
+          ['pr', 'comment', url, '--body-file', '-'],
+          reportComment(file, readFileSync(join(folder, file), 'utf8')),
+        )
+        if (sent.code !== 0) throw new Error(sent.stderr.trim())
+      }
+    })
+    event('landed', { url })
+    say(`task ${n}: landed ${url}${door === 'one-way' ? ' (one-way)' : ''}`)
     return 0
   })
 }
@@ -418,7 +549,7 @@ async function resend(n, deps, say) {
     const folder = join(deps.home, 'tasks', String(n))
     readTask(folder)
     const events = readEvents(folder)
-    const landed = new Set(events.filter((event) => event.event === 'prompted').map((event) => event.detail.id))
+    const landed = new Set(events.filter((event) => ['prompted', 'for-lead'].includes(event.event)).map((event) => event.detail.id))
     const open = events.findLast((event) => event.event === 'handoff' && !landed.has(event.detail.id))
     if (open === undefined) throw new Refusal(`task ${n} has no hand-off to resend`)
     const { id, start: starts, text, ...extra } = open.detail
@@ -631,6 +762,10 @@ async function status(deps, n, say) {
     }
     say(`${task.n} ${task.state} round ${task.round} (${since(new Date(task.lines.at(-1).at), deps.now())} ago)`)
     for (const agent of agents) {
+      if (agent.runner === 'lead') {
+        say(`  ${agent.role} lead`)
+        continue
+      }
       let state
       try {
         state = (await runnerOf(agent.runner, deps).activity(agent.handle)).state
@@ -691,6 +826,7 @@ async function stop(n, read, deps, say) {
     }
     const branch = `task/${n}`
     for (const agent of Object.values(readAgents(folder))) {
+      if (agent.runner === 'lead') continue
       await runnerOf(agent.runner, deps).close(agent.handle)
       appendEvent(folder, { at: deps.now().toISOString(), event: 'closed', role: agent.role })
     }
@@ -823,6 +959,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       }),
     },
   }
+  deps.gh = (args, input) =>
+    new Promise((resolve) => {
+      const child = spawn('gh', args, { stdio: ['pipe', 'pipe', 'pipe'] })
+      let stdout = ''
+      let stderr = ''
+      child.stdout.on('data', (data) => (stdout += data))
+      child.stderr.on('data', (data) => (stderr += data))
+      child.on('error', (error) => resolve({ code: 127, stdout, stderr: error.message }))
+      child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }))
+      child.stdin.end(input ?? '')
+    })
   const done = await run(process.argv.slice(2), deps)
   process.stdout.write(done.stdout)
   process.stderr.write(done.stderr)

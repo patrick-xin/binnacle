@@ -65,7 +65,7 @@ export function handoffFor(change, c, asker) {
           return {
             role: 'reviewer',
             start: false,
-            text: `Round ${c.round} of #${c.n} at ${c.tip}: the commits ${c.base}..${c.tip}. In your checkout ${c.review}, run \`git switch --detach ${c.tip}\`, install again only if the lockfile changed, and run \`pnpm test\`. ${c.round > 1 ? 'Check each finding of the last round first, then what the commits touched.' : 'Review the commits against the spec.'} ${verdict}`,
+            text: `Round ${c.round} of #${c.n} at ${c.tip}: the commits ${c.base}..${c.tip}. In your checkout ${c.review}, run \`git switch --detach ${c.tip}\`, install if \`node_modules\` is missing or the lockfile changed, and run \`pnpm test\`. ${c.round > 1 ? 'Check each finding of the last round first, then what the commits touched.' : 'Review the commits against the spec.'} ${verdict}`,
           }
         case 'changes':
           return c.round === 0
