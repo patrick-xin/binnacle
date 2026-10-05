@@ -1,38 +1,26 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { Command } from 'commander'
-import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
 import type { AppExit, AppReady } from '@deepseek-ai/dsh-cmdline'
-import { capture } from './core/capture.ts'
 import type { Stream } from './core/capture.ts'
-import { Display } from './core/display.ts'
+import { readCommandLine } from './core/command-line.ts'
+import { Drawing } from './core/drawing.ts'
+import { Host } from './core/host.ts'
+import type { Process } from './core/host.ts'
+import { route } from './core/input.ts'
+import { keyTable } from './core/keys.ts'
 import { BinnacleService } from './core/service.ts'
-import { openNew, openStored } from './core/session.ts'
-import { Keyboard } from './core/keyboard.ts'
-import { coreActionOf, keyTable } from './core/keys.ts'
-import { arrange } from './core/layout.ts'
-import type { Placed } from './core/layout.ts'
-import type { Part } from './api.ts'
-import { Rows } from './core/view.ts'
+import { openChat } from './core/session.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
-import { isKeyRelease } from './terminal/keys.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
 export type { Binnacle, Box, ChatSession, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
+export type { Process } from './core/host.ts'
 export { toPlainText } from './core/view.ts'
 
 export const name = 'binnacle'
 
 export const inject = ['cmdlineArgs', 'appReady', 'appExit'] satisfies (keyof Context)[]
-
-type ProcessEvent = 'exit' | 'SIGTSTP' | 'SIGCONT'
-
-export interface Process {
-  on(event: ProcessEvent, listener: () => void): void
-  off(event: ProcessEvent, listener: () => void): void
-  stop(): void
-}
 
 export const internals: { terminal: () => Terminal; process: Process; streams: { stdout: Stream; stderr: Stream } } = {
   terminal: () => new ProcessTerminal(),
@@ -50,198 +38,50 @@ export const internals: { terminal: () => Terminal; process: Process; streams: {
   streams: { stdout: process.stdout, stderr: process.stderr },
 }
 
-const ALTERNATE_SCREEN_ON = '\x1b[?1049h'
-const ALTERNATE_SCREEN_OFF = '\x1b[?1049l'
-const CURSOR_HIDE = '\x1b[?25l'
-const CURSOR_SHOW = '\x1b[?25h'
-const MOUSE_ON = '\x1b[?1000h\x1b[?1006h'
-const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l'
-
-const PASTE_START = '\x1b[200~'
-const PASTE_END = '\x1b[201~'
-
-const SGR_MOUSE = /^\x1b\[<(?<button>\d+);(?<x>\d+);(?<y>\d+)[Mm]$/
-const WHEEL_UP = 64
-const WHEEL_DOWN = 65
-const ROWS_PER_WHEEL_NOTCH = 3
-
-interface CommandLine {
-  readonly session: string | undefined
-}
-
-function program(parsed: (commandLine: CommandLine) => void): Command {
-  return new Command()
-    .name('dsh --profile binnacle')
-    .description('A terminal app for dsh. The wheel scrolls; ctrl+c quits; ctrl+z suspends.')
-    .helpOption('-h, --help', 'show this help')
-    .option('--session <id>', 'the stored session to read; the newest when none is named')
-    .action((options: { session?: string }) => {
-      parsed({ session: options.session })
-    })
-}
-
-function placedAt(placed: readonly Placed[], x: number, y: number): Placed | undefined {
-  return placed.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
-}
-
+// The core only puts its parts together; each job is a module of its own in core/.
 export function apply(ctx: Context): void {
   // The copied editor reads its keys through pi-tui's global, so the core's table is set there.
   setKeybindings(keyTable)
-  let commandLine: CommandLine | undefined
-  parseCmdline(
-    ctx,
-    program((parsed) => {
-      commandLine = parsed
-    }),
-  )
+  const commandLine = readCommandLine(ctx)
   // On --help or a refused command line, the launcher exits, and binnacle must not take the terminal.
   if (commandLine === undefined) return
 
-  let terminal: Terminal | undefined
-  let holdingTerminal = false
-  let printHeldBack: (() => void) | undefined
-  const scrolledUp = new Map<string, number>()
-  let placed: readonly Placed[] = []
-  const display = new Display((data) => {
-    terminal?.write(data)
-  })
-
-  // While a person reads scrolled up, the rows a Part adds or takes away at its end move the view with them.
-  // A Place sized by its content is also measured at other widths, so it moves once a draw, at the first width asked.
-  const counted = new Map<string, number>()
-  const anchored = new Set<string>()
-  const anchor = (place: string, width: number, count: number): void => {
-    const key = `${width} ${place}`
-    const before = counted.get(key) ?? count
-    counted.set(key, count)
-    const up = scrolledUp.get(place) ?? 0
-    if (up === 0 || anchored.has(place)) return
-    anchored.add(place)
-    scrolledUp.set(place, Math.max(0, up + count - before))
-  }
-  const draw = (): void => {
-    if (terminal === undefined || !holdingTerminal) return
-    anchored.clear()
-    const arranged = arrange(service.layoutOnView, terminal.columns, terminal.rows, {
-      rows: (place, width) => {
-        const drawn = rows.of(service.partIn(place), width)
-        anchor(place, width, drawn.length)
-        return drawn
-      },
-      scrolledUp: (place) => scrolledUp.get(place) ?? 0,
-      cursor: (place, width) => (place === service.focusOnView ? rows.cursorOf(service.partIn(place), width) : undefined),
-    })
-    placed = arranged.placed
-    for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
-    display.draw(arranged.rows, arranged.cursor)
-  }
-  const rows = new Rows()
-  const service = new BinnacleService(ctx, draw, (part) => {
-    rows.forget(part)
-  })
-  const keyboard = new Keyboard((data) => {
-    terminal?.write(data)
-  })
-
-  const redrawAll = (): void => {
-    display.clear()
-    draw()
-  }
+  const { streams } = internals
   const input = new StdinBuffer()
-  const take = (): void => {
-    if (terminal === undefined || holdingTerminal) return
-    holdingTerminal = true
-    printHeldBack = capture([internals.streams.stdout, internals.streams.stderr])
-    terminal.start((data) => {
-      input.process(data)
-    }, redrawAll)
-    terminal.write(ALTERNATE_SCREEN_ON + CURSOR_HIDE + MOUSE_ON)
-    keyboard.take()
-    redrawAll()
-  }
-  const giveBack = (): void => {
-    if (terminal === undefined || !holdingTerminal) return
-    holdingTerminal = false
-    keyboard.giveBack()
-    terminal.write(MOUSE_OFF + CURSOR_SHOW + ALTERNATE_SCREEN_OFF)
-    terminal.stop()
-    printHeldBack?.()
-    printHeldBack = undefined
-  }
-  const suspend = (): void => {
-    if (!holdingTerminal) return
-    giveBack()
-    internals.process.stop()
-  }
-
-  const exit: AppExit = ctx.appExit!
-  const focused = (): Part | undefined => {
-    const place = service.focusOnView
-    return place !== undefined && placed.some((drawn) => drawn.place === place) ? service.partIn(place) : undefined
-  }
-  // A Part that takes a key has changed its lines, and the core draws it again.
-  const keyTaken = (data: string): boolean => {
-    const part = focused()
-    if (part?.key?.(data) !== true) return false
-    rows.forget(part)
-    return true
-  }
-  input.on('data', (sequence: string) => {
-    // No Part asks for a key's release yet, and the editor would type it a second time.
-    if (keyboard.answered(sequence) || isKeyRelease(sequence)) return
-    const mouse = SGR_MOUSE.exec(sequence)?.groups
-    if (mouse !== undefined) return scroll(mouse)
-    if (keyTaken(sequence)) return draw()
-    // Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as keys.
-    const action = coreActionOf(sequence)
-    if (action === 'binnacle.quit') exit(0)
-    else if (action === 'binnacle.suspend') suspend()
-  })
-  // The buffer takes a bracketed paste out of its markers; the editor reads a paste by them.
-  input.on('paste', (content: string) => {
-    if (keyTaken(`${PASTE_START}${content}${PASTE_END}`)) draw()
-  })
-  const scroll = (mouse: { button?: string; x?: string; y?: string }): void => {
-    const notches = mouse.button === String(WHEEL_UP) ? 1 : mouse.button === String(WHEEL_DOWN) ? -1 : 0
-    // SGR mouse reports count columns and rows from 1.
-    const under = placedAt(placed, Number(mouse.x) - 1, Number(mouse.y) - 1)
-    if (notches === 0 || under === undefined) return
-    scrolledUp.set(under.place, Math.max(0, (scrolledUp.get(under.place) ?? 0) + notches * ROWS_PER_WHEEL_NOTCH))
-    draw()
-  }
-
-  const named = commandLine.session
-  void (named === undefined ? openNew(ctx) : openStored(ctx, named)).then(
-    (session) => {
-      // A service provided with no value is still there for Cordis, so it is provided once the session is open.
-      if (session !== undefined) ctx.provide('binnacleSession', session)
-    },
-    (error: unknown) => {
-      internals.streams.stderr.write(
-        `binnacle: could not ${named === undefined ? 'open a session' : `read ${named}`}: ${error instanceof Error ? error.message : String(error)}\n`,
-      )
-      exit(1)
-    },
+  const host = new Host(
+    [streams.stdout, streams.stderr],
+    internals.process,
+    (data) => input.process(data),
+    () => drawing.redrawAll(),
   )
+  const drawing = new Drawing(
+    () => host.size,
+    (data) => host.write(data),
+    () => service,
+  )
+  const service = new BinnacleService(ctx, drawing.draw, (part) => drawing.forget(part))
+  const exit: AppExit = ctx.appExit!
+  route(input, {
+    answered: (sequence) => host.answered(sequence),
+    focused: () => drawing.focused(),
+    taken: (part) => {
+      drawing.forget(part)
+      drawing.draw()
+    },
+    wheel: (notches, x, y) => drawing.wheel(notches, x, y),
+    act: (action) => (action === 'binnacle.quit' ? exit(0) : host.suspend()),
+  })
+  openChat(ctx, commandLine.session, (why) => {
+    streams.stderr.write(`binnacle: ${why}\n`)
+    exit(1)
+  })
 
   const ready: AppReady = ctx.appReady!
-  const cancelReady = ready.onReady(() => {
-    terminal = internals.terminal()
-    take()
-  })
-  const { process } = internals
-  process.on('SIGTSTP', suspend)
-  process.on('SIGCONT', take)
-  // A crash exits without unloading the tree, so this effect's disposer would never run.
-  process.on('exit', giveBack)
+  const cancelReady = ready.onReady(() => host.open(internals.terminal()))
   ctx.effect(
     () => () => {
       cancelReady()
-      process.off('SIGTSTP', suspend)
-      process.off('SIGCONT', take)
-      process.off('exit', giveBack)
-      giveBack()
-      terminal = undefined
+      host.close()
     },
     'binnacle: the terminal',
   )
