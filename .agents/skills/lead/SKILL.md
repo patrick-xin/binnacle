@@ -49,22 +49,22 @@ If a Fix needs a decision or a third source file, stop. Move it to Build.
 
 The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 
-1. Make the task's folder.
-2. Make the Implementer's worktree.
-3. Send the spec to the Reviewer for round 0.
-4. Change the spec for each finding of round 0.
-5. Send the changed spec to the Reviewer again, until round 0 is `approved`.
-6. If the door is one-way, get the Maintainer's agreement on the spec.
-7. Start the Implementer and the Reviewer, with the settings in `.agents/roles.json`.
-8. Watch the state files.
-9. Send each hand-off, as `.agents/task.md` says.
-10. If an answer changes the spec, edit the spec body.
-11. Link the edit in a comment on the issue.
-12. Read each review report in full.
-13. After the third round with findings, choose one narrow round more, or ask the Maintainer.
-14. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
-15. Open the PR, as `.agents/task.md` says.
-16. If you tried the branch, write in the PR what you drove and what it drew.
+1. Run `pnpm task start <n>`.
+2. Send the spec to the Reviewer for round 0.
+3. Change the spec for each finding of round 0, and set the state as [`.agents/task.md`](../../task.md) says.
+4. Send the changed spec to the Reviewer again, until round 0 is `approved`.
+5. If the door is one-way, get the Maintainer's agreement on the spec.
+6. Start the Implementer and the Reviewer, with the settings in `.agents/roles.json`.
+7. Run `pnpm task watch` in the background. When it exits, act on its line, then run it again.
+8. Send each hand-off, as `.agents/task.md` says.
+9. If an answer changes the spec, edit the spec body.
+10. Link the edit in a comment on the issue.
+11. Read each review report in full.
+12. After the third round with findings, choose one narrow round more, or ask the Maintainer.
+13. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
+14. Open the PR, as `.agents/task.md` says.
+15. If you tried the branch, write in the PR what you drove and what it drew.
+16. After the PR merges or closes, run `pnpm task stop <n>`.
 
 ## A Fix or a Chore task
 
@@ -96,7 +96,7 @@ The Maintainer merges a one-way PR. Every other PR is **two-way**, and it merges
 
 ## Before you end a session
 
-- Each Build in flight has its state in its task folder.
+- Each Build in flight has its state in the task tool: `pnpm task status` shows each one.
 - Each Fix or Chore in flight has its branch pushed, and a note on its issue that says where it stopped.
 - Each decision that you took for the Maintainer is in an ADR.
 - If the Maintainer asked for it, the `handoff` skill wrote what the next Lead needs.

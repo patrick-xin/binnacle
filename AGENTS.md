@@ -14,7 +14,7 @@ intents/<slug>/intent.md    what is wanted, why, and in which stages
 .agents/skills/             one skill for each role, and shared skills
 .agents/roles.json          the tool and the model that take each role
 .agents/task.md             a task's folders, states and hand-offs
-scripts/                    the checks, each with its test
+scripts/                    the checks and the task tool, each with its test
 references.json             the repositories that pnpm refs fetches into .refs/
 .refs/<name>/               each reference at its pin, to read and never to write
 ```
@@ -28,3 +28,4 @@ A task is a GitHub issue. The intent lists the issues of its current stage.
 | `pnpm install && pnpm refs` | Installs, and fetches each reference into `.refs/` |
 | `pnpm test` | Runs every check, then every test. CI runs it on each PR. |
 | `pnpm fmt` | Formats the tree |
+| `pnpm task` | Holds the state of a Build task: `start`, `set`, `ask`, `answer`, `status`, `watch`, `stop` |
