@@ -1,18 +1,11 @@
-/**
- * Mount binnacle's core on a real Cordis context, with the launcher's facts
- * faked: the command line, the exit request and the startup signal.
- * @module binnacle/test/support/mount
- */
 import { Context } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import * as core from '../../src/index.ts'
 import { XtermTerminal } from './terminal.ts'
 
-/** The process binnacle runs in: its signals and its exit, raised by a test. */
 export class FakeProcess {
   readonly #listeners = new Map<string, Set<() => void>>()
-  /** How many times binnacle stopped the process. */
-  stops = 0
+  stopCount = 0
   on(event: string, listener: () => void): void {
     const set = this.#listeners.get(event) ?? new Set()
     set.add(listener)
@@ -22,7 +15,7 @@ export class FakeProcess {
     this.#listeners.get(event)?.delete(listener)
   }
   stop(): void {
-    this.stops++
+    this.stopCount++
   }
   emit(event: string): void {
     for (const listener of this.#listeners.get(event) ?? []) listener()
@@ -37,7 +30,6 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
   cmdline.stdout = { write: (chunk: string) => out.push(chunk) }
   cmdline.stderr = { write: (chunk: string) => out.push(chunk) }
   const process = new FakeProcess()
-  // The process's own stdout and stderr, which other code writes to: what reaches them, in order.
   const printed: string[] = []
   const stdout = { write: (chunk: string) => printed.push(`stdout: ${chunk}`) > 0 }
   const stderr = { write: (chunk: string) => printed.push(`stderr: ${chunk}`) > 0 }
@@ -71,7 +63,6 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
     printed,
     exits,
     out,
-    /** The launcher commits startup: every row has mounted. */
     ready: () => {
       for (const listener of listeners) listener()
       listeners.clear()

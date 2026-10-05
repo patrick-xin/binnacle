@@ -1,8 +1,11 @@
-/**
- * The rows on the terminal, and the bytes that change them.
- * @module binnacle/core/display
- */
+const moveTo = (row: number): string => `\x1b[${row + 1};1H`
+const RESET_STYLE = '\x1b[0m'
+const CLEAR_TO_LINE_END = '\x1b[K'
+const CLEAR_SCREEN = '\x1b[2J'
+const BEGIN_SYNCHRONIZED = '\x1b[?2026h'
+const END_SYNCHRONIZED = '\x1b[?2026l'
 
+/** Writes only the rows that changed since the last draw. */
 export class Display {
   #drawn: readonly string[] = []
   readonly #write: (data: string) => void
@@ -11,26 +14,21 @@ export class Display {
     this.#write = write
   }
 
-  /**
-   * Bring the terminal to these rows, writing only the rows that changed.
-   * @param rows - each row's text, already cut to the width, top first.
-   */
+  /** Each row must already fit the terminal's width. */
   draw(rows: readonly string[]): void {
-    let out = ''
+    let changes = ''
     const count = Math.max(rows.length, this.#drawn.length)
     for (let y = 0; y < count; y++) {
       const row = rows[y] ?? ''
       if (row === (this.#drawn[y] ?? '')) continue
-      out += `\x1b[${y + 1};1H${row}\x1b[0m\x1b[K`
+      changes += moveTo(y) + row + RESET_STYLE + CLEAR_TO_LINE_END
     }
     this.#drawn = rows
-    // Synchronized output: the terminal shows the frame whole, never half drawn.
-    if (out !== '') this.#write(`\x1b[?2026h${out}\x1b[?2026l`)
+    if (changes !== '') this.#write(BEGIN_SYNCHRONIZED + changes + END_SYNCHRONIZED)
   }
 
-  /** Forget what is drawn: the next draw writes every row, as after the screen was cleared. */
-  forget(): void {
+  clear(): void {
     this.#drawn = []
-    this.#write('\x1b[2J')
+    this.#write(CLEAR_SCREEN)
   }
 }

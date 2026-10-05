@@ -1,10 +1,3 @@
-/**
- * A stand-in for dsh's session persistence: stored sessions, each with its
- * header and its events, opened only to read.
- * @module binnacle/test/support/sessions
- */
-
-/** One stored session: its id, when it was made, and its events. */
 export interface Stored {
   readonly id: string
   readonly createdAt: number

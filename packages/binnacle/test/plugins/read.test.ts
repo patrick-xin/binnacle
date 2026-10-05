@@ -20,8 +20,7 @@ const newer: Stored = {
   ],
 }
 
-/** binnacle's core, ready, with the Read view loaded over these stored sessions. */
-async function opened(args: string[], stored: readonly Stored[], rows = 10) {
+async function readViewOver(args: string[], stored: readonly Stored[], rows = 10) {
   const mounted = await mount({ args, columns: 40, rows })
   const store = persistence(stored)
   mounted.ctx.provide('sessionPersistence', store)
@@ -33,23 +32,23 @@ async function opened(args: string[], stored: readonly Stored[], rows = 10) {
 }
 
 test('the Read view shows each event of the session the command line names: its seq and type, then its data', async () => {
-  const { rows, store } = await opened(['--session', 'session-older'], [older, newer])
+  const { rows, store } = await readViewOver(['--session', 'session-older'], [older, newer])
   assert.deepEqual(store.opened, ['session-older'])
   assert.deepEqual(rows, ['#0 test/marker', '{', '  "said": "older"', '}', '', '', '', '', '', ''])
 })
 
 test('with no session named, the Read view reads the newest stored session', async () => {
-  const { rows, store } = await opened([], [newer, older])
+  const { rows, store } = await readViewOver([], [newer, older])
   assert.deepEqual(store.opened, ['session-newer'])
   assert.deepEqual(rows.slice(0, 4), ['#0 user/message', '{', '  "text": "hello"', '}'])
 })
 
 test('with no stored session, the Read view says so', async () => {
-  const { rows } = await opened([], [], 2)
+  const { rows } = await readViewOver([], [], 2)
   assert.deepEqual(rows, ['No stored session to read.', ''])
 })
 
 test('a session the Read view cannot read is said on the screen, with why', async () => {
-  const { rows } = await opened(['--session', 'session-gone'], [older], 2)
+  const { rows } = await readViewOver(['--session', 'session-gone'], [older], 2)
   assert.deepEqual(rows, ['Could not read the session: no session', 'session-gone'])
 })

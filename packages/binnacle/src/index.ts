@@ -1,8 +1,3 @@
-/**
- * binnacle's core: the Cordis row that owns the terminal, and provides the
- * `binnacle` service that plugins show their screens through.
- * @module binnacle
- */
 import type { Context } from '@deepseek-ai/cordis'
 import { Command } from 'commander'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
@@ -22,11 +17,11 @@ export const name = 'binnacle'
 
 export const inject = ['cmdlineArgs', 'appReady', 'appExit'] satisfies (keyof Context)[]
 
-/** The process binnacle runs in: the signals and the exit it answers, and how it stops itself. */
+type ProcessEvent = 'exit' | 'SIGTSTP' | 'SIGCONT'
+
 export interface Process {
-  on(event: 'exit' | 'SIGTSTP' | 'SIGCONT', listener: () => void): void
-  off(event: 'exit' | 'SIGTSTP' | 'SIGCONT', listener: () => void): void
-  /** Stop the process, as the terminal's own suspend does; it runs again on SIGCONT. */
+  on(event: ProcessEvent, listener: () => void): void
+  off(event: ProcessEvent, listener: () => void): void
   stop(): void
 }
 
@@ -46,133 +41,121 @@ export const internals: { terminal: () => Terminal; process: Process; streams: r
   streams: [process.stdout, process.stderr],
 }
 
-// The alternate screen, the cursor hidden, and the mouse's presses and wheel reported in SGR's form.
-const TAKE = '\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h'
-const GIVE_BACK = '\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l'
+const ALTERNATE_SCREEN_ON = '\x1b[?1049h'
+const ALTERNATE_SCREEN_OFF = '\x1b[?1049l'
+const CURSOR_HIDE = '\x1b[?25l'
+const CURSOR_SHOW = '\x1b[?25h'
+const MOUSE_ON = '\x1b[?1000h\x1b[?1006h'
+const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l'
 
-// In raw mode the terminal sends ctrl+c as a byte, and sends no signal.
+// Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as bytes.
 const CTRL_C = '\x03'
 const CTRL_Z = '\x1a'
 
-// A mouse event in SGR's form: the button, the column, the row, and M for a press.
-const MOUSE = /^\x1b\[<(\d+);\d+;\d+[Mm]$/
+const SGR_MOUSE = /^\x1b\[<(?<button>\d+);\d+;\d+[Mm]$/
 const WHEEL_UP = 64
 const WHEEL_DOWN = 65
-// How many rows one notch of the wheel scrolls.
-const NOTCH = 3
+const ROWS_PER_WHEEL_NOTCH = 3
 
-/** What the command line asks for. */
-interface Asked {
-  /** The id of the stored session to read, if one is named. */
+interface CommandLine {
   readonly session: string | undefined
 }
 
-function program(chosen: (asked: Asked) => void): Command {
+function program(parsed: (commandLine: CommandLine) => void): Command {
   return new Command()
     .name('dsh --profile binnacle')
     .description('A terminal app for dsh. The wheel scrolls; ctrl+c quits; ctrl+z suspends.')
     .helpOption('-h, --help', 'show this help')
     .option('--session <id>', 'the stored session to read; the newest when none is named')
     .action((options: { session?: string }) => {
-      chosen({ session: options.session })
+      parsed({ session: options.session })
     })
 }
 
 export function apply(ctx: Context): void {
-  let asked: Asked | undefined
+  let commandLine: CommandLine | undefined
   parseCmdline(
     ctx,
-    program((chosen) => {
-      asked = chosen
+    program((parsed) => {
+      commandLine = parsed
     }),
   )
-  // Help, or a command line binnacle refuses: the launcher exits, and binnacle takes nothing.
-  if (asked === undefined) return
-  // The terminal once dsh is ready, and whether binnacle holds it now: it does not while suspended.
+  // On --help or a refused command line, the launcher exits, and binnacle must not take the terminal.
+  if (commandLine === undefined) return
+
   let terminal: Terminal | undefined
-  let holding = false
-  // While binnacle holds the terminal, what other code writes is held back; this ends that.
-  let release: (() => void) | undefined
+  let holdingTerminal = false
+  let printHeldBack: (() => void) | undefined
+  let scrolledUp = 0
   const display = new Display((data) => {
     terminal?.write(data)
   })
-  // How many rows the screen is scrolled up from its end.
-  let back = 0
+
   const draw = (): void => {
-    if (terminal === undefined || !holding) return
-    const { rows, most } = rowsOf(service.top, terminal.columns, terminal.rows, back)
-    back = Math.min(back, most)
+    if (terminal === undefined || !holdingTerminal) return
+    const { rows, maxScroll } = rowsOf(service.onView, terminal.columns, terminal.rows, scrolledUp)
+    scrolledUp = Math.min(scrolledUp, maxScroll)
     display.draw(rows)
   }
-  const service = new BinnacleService(ctx, asked.session, draw)
-  const exit: AppExit = ctx.appExit!
-  const input = new StdinBuffer()
-  const take = (): void => {
-    if (terminal === undefined || holding) return
-    holding = true
-    release = capture(internals.streams)
-    terminal.start(
-      (data) => {
-        input.process(data)
-      },
-      () => {
-        // The terminal may have moved what it showed, so every row is written again.
-        display.forget()
-        draw()
-      },
-    )
-    terminal.write(TAKE)
-    display.forget()
+  const service = new BinnacleService(ctx, commandLine.session, draw)
+
+  const redrawAll = (): void => {
+    display.clear()
     draw()
   }
+  const input = new StdinBuffer()
+  const take = (): void => {
+    if (terminal === undefined || holdingTerminal) return
+    holdingTerminal = true
+    printHeldBack = capture(internals.streams)
+    terminal.start((data) => {
+      input.process(data)
+    }, redrawAll)
+    terminal.write(ALTERNATE_SCREEN_ON + CURSOR_HIDE + MOUSE_ON)
+    redrawAll()
+  }
   const giveBack = (): void => {
-    if (terminal === undefined || !holding) return
-    holding = false
-    terminal.write(GIVE_BACK)
+    if (terminal === undefined || !holdingTerminal) return
+    holdingTerminal = false
+    terminal.write(MOUSE_OFF + CURSOR_SHOW + ALTERNATE_SCREEN_OFF)
     terminal.stop()
-    // Printed on the main screen, now that binnacle no longer draws over it.
-    release?.()
-    release = undefined
+    printHeldBack?.()
+    printHeldBack = undefined
   }
   const suspend = (): void => {
-    if (!holding) return
+    if (!holdingTerminal) return
     giveBack()
     internals.process.stop()
   }
-  const resume = (): void => {
-    take()
-  }
+
+  const exit: AppExit = ctx.appExit!
   input.on('data', (sequence: string) => {
-    if (sequence === CTRL_C) {
-      exit(0)
-      return
-    }
-    if (sequence === CTRL_Z) {
-      suspend()
-      return
-    }
-    const button = MOUSE.exec(sequence)?.[1]
-    if (button === undefined) return
-    if (Number(button) === WHEEL_UP) back += NOTCH
-    else if (Number(button) === WHEEL_DOWN) back = Math.max(0, back - NOTCH)
+    if (sequence === CTRL_C) exit(0)
+    else if (sequence === CTRL_Z) suspend()
+    else scroll(SGR_MOUSE.exec(sequence)?.groups?.button)
+  })
+  const scroll = (button: string | undefined): void => {
+    if (button === String(WHEEL_UP)) scrolledUp += ROWS_PER_WHEEL_NOTCH
+    else if (button === String(WHEEL_DOWN)) scrolledUp = Math.max(0, scrolledUp - ROWS_PER_WHEEL_NOTCH)
     else return
     draw()
-  })
+  }
+
   const ready: AppReady = ctx.appReady!
-  const cancel = ready.onReady(() => {
+  const cancelReady = ready.onReady(() => {
     terminal = internals.terminal()
     take()
   })
   const { process } = internals
   process.on('SIGTSTP', suspend)
-  process.on('SIGCONT', resume)
-  // A crash ends the process without unloading the tree; the terminal is given back on the way out.
+  process.on('SIGCONT', take)
+  // A crash exits without unloading the tree, so this effect's disposer would never run.
   process.on('exit', giveBack)
   ctx.effect(
     () => () => {
-      cancel()
+      cancelReady()
       process.off('SIGTSTP', suspend)
-      process.off('SIGCONT', resume)
+      process.off('SIGCONT', take)
       process.off('exit', giveBack)
       giveBack()
       terminal = undefined

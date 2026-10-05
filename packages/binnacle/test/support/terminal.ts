@@ -1,9 +1,3 @@
-/**
- * A terminal that a test of the core drives: what binnacle writes lands in
- * xterm's emulation, so the screens themselves are the claim, and a test
- * types bytes into it and resizes it.
- * @module binnacle/test/support/terminal
- */
 import xterm from '@xterm/headless'
 import type { Terminal } from '../../src/terminal/terminal.ts'
 
@@ -11,9 +5,7 @@ export class XtermTerminal implements Terminal {
   readonly #xterm: InstanceType<typeof xterm.Terminal>
   #onInput: ((data: string) => void) | undefined
   #onResize: (() => void) | undefined
-  /** Whether binnacle holds the terminal in raw mode. */
   raw = false
-  /** Everything binnacle wrote, in order. */
   written = ''
 
   constructor(columns: number, rows: number) {
@@ -45,22 +37,17 @@ export class XtermTerminal implements Terminal {
     return this.#xterm.rows
   }
 
-  /** Bytes a person typed, or a mouse event the terminal reports. */
   type(data: string): void {
     this.#onInput?.(data)
   }
 
-  /** The window changed size. */
   resize(columns: number, rows: number): void {
     this.#xterm.resize(columns, rows)
     this.#onResize?.()
   }
 
-  /**
-   * What the terminal shows, once everything written has landed.
-   * @returns which screen is active, each of its rows with trailing spaces cut, and the mouse mode.
-   */
   async read(): Promise<{ screen: 'normal' | 'alternate'; rows: string[]; mouse: string }> {
+    // xterm parses writes asynchronously; an empty write's callback runs after every earlier one.
     await new Promise<void>((resolve) => {
       this.#xterm.write('', resolve)
     })

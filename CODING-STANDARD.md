@@ -29,3 +29,11 @@ These rules apply to every file that is committed, and to issues and PRs. `pnpm 
 - All prose follows [`STE.md`](STE.md).
 - A document that agents load also follows the `writing-for-agents` skill.
 - Use the owner's word: dsh's, Cordis's or pi-tui's. Make a new word only when no owner has one.
+
+## Comments
+
+- Write no comment by default. Names and types are the documentation.
+- Write a comment only for what the code cannot say: a reason that is not obvious, a rule that must stay true, or a surprising edge case.
+- A comment says why. It never says what the code does.
+- A file has no header comment, unless it holds a reason of this kind.
+- A test needs no comment: its name says the behaviour.

@@ -4,7 +4,6 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Shown } from '../src/api.ts'
 import { mount } from './support/mount.ts'
 
-/** A plugin that shows a screen of these lines. */
 const probe = (lines: readonly string[]) => ({
   name: 'probe',
   inject: ['binnacle'],
@@ -112,10 +111,10 @@ test('ctrl+z gives the terminal back and stops binnacle, and a resume takes the 
   ready()
   await ctx.plugin(probe(['shown']))
   terminal.type('\x1a')
-  assert.deepEqual(await terminal.read().then(({ screen }) => ({ screen, raw: terminal.raw, stops: process.stops })), {
+  assert.deepEqual(await terminal.read().then(({ screen }) => ({ screen, raw: terminal.raw, stopCount: process.stopCount })), {
     screen: 'normal',
     raw: false,
-    stops: 1,
+    stopCount: 1,
   })
   process.emit('SIGCONT')
   assert.deepEqual(await terminal.read().then(({ screen, rows }) => ({ screen, rows, raw: terminal.raw })), {
@@ -129,10 +128,10 @@ test('a stop signal from outside gives the terminal back before binnacle stops',
   const { terminal, process, ready } = await mount()
   ready()
   process.emit('SIGTSTP')
-  assert.deepEqual(await terminal.read().then(({ screen }) => ({ screen, raw: terminal.raw, stops: process.stops })), {
+  assert.deepEqual(await terminal.read().then(({ screen }) => ({ screen, raw: terminal.raw, stopCount: process.stopCount })), {
     screen: 'normal',
     raw: false,
-    stops: 1,
+    stopCount: 1,
   })
 })
 
