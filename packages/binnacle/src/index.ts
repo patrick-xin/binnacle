@@ -12,6 +12,7 @@ import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
 import { rowsOf } from './core/view.ts'
+import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
@@ -30,15 +31,19 @@ export interface Process {
 }
 
 export const internals: { terminal: () => Terminal; process: Process; streams: readonly Stream[] } = {
-  terminal: () => {
-    throw new Error('binnacle: no terminal yet')
-  },
+  terminal: () => new ProcessTerminal(),
   process: {
-    on: () => {},
-    off: () => {},
-    stop: () => {},
+    on: (event, listener) => {
+      process.on(event, listener)
+    },
+    off: (event, listener) => {
+      process.off(event, listener)
+    },
+    stop: () => {
+      process.kill(process.pid, 'SIGSTOP')
+    },
   },
-  streams: [],
+  streams: [process.stdout, process.stderr],
 }
 
 // The alternate screen, the cursor hidden, and the mouse's presses and wheel reported in SGR's form.
