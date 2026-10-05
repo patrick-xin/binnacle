@@ -61,7 +61,8 @@ export async function openNew(ctx: Context): Promise<ChatSession | undefined> {
       else agent.followup(message)
     },
     interrupt: () => {
-      agent.cancel({ kind: 'user' })
+      // As dsh's own stop does: what was queued for the turn waits for the next one.
+      agent.cancel({ kind: 'user' }, { keepInbox: true })
     },
   }
 }

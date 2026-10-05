@@ -10,7 +10,7 @@ export interface Acts {
   interrupt(): void
 }
 
-/** What the core does for each action of its own that a key reaches it with. */
+/** The core's own actions, in one place, so a second ctrl+c is told from the first. */
 export function coreActions(acts: Acts): (action: CoreAction) => void {
   // A Part with a draft takes the clear itself, so here the draft is empty.
   let clearedAt = Number.NEGATIVE_INFINITY

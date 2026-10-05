@@ -129,12 +129,12 @@ test('ctrl+c on a draft clears it, and only two more on the empty draft quit', a
   assert.deepEqual([afterOne, exits], [[], [0]])
 })
 
-test('esc interrupts the turn that runs, and leaves the draft', async () => {
+test("esc interrupts the turn that runs, keeping what was queued for it as dsh's own stop does, and leaves the draft", async () => {
   const dsh = agents()
   const { typed } = await chat(20, 5, dsh.provide)
   await typed('h', 'i')
   const rows = await typed('\x1b')
   // A lone escape is told from the start of a sequence once nothing follows it.
   await new Promise((resolve) => setTimeout(resolve, 80))
-  assert.deepEqual([dsh.cancels, rows], [[{ kind: 'user' }], ['', '', RULE, 'hi ', RULE]])
+  assert.deepEqual([dsh.cancels, rows], [[{ cause: { kind: 'user' }, options: { keepInbox: true } }], ['', '', RULE, 'hi ', RULE]])
 })

@@ -9,6 +9,7 @@ declare module '../terminal/keybindings.ts' {
   }
 }
 
+// Escape is also the editor's select.cancel. The composer has no popup yet; once it has one, it keeps escape while the popup is open, as pi does.
 const CORE_KEYS = {
   'binnacle.clear': { defaultKeys: 'ctrl+c', description: 'Clear the draft; pressed twice on an empty draft, quit binnacle' },
   'binnacle.interrupt': { defaultKeys: 'escape', description: 'Interrupt the turn that runs' },

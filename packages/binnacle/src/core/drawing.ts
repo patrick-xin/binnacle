@@ -6,14 +6,14 @@ import type { Placed } from './layout.ts'
 import { Scroll } from './scroll.ts'
 import { Rows } from './view.ts'
 
-/** What is on view: the service's Screen and its Parts. */
+/** The service, read through this: the service draws through Drawing, so neither is whole when the other is made. */
 export interface OnView {
   readonly layoutOnView: Layout
   readonly focusOnView: string | undefined
   partIn(place: string): Part | undefined
 }
 
-/** Draws the Screen on view onto the terminal, and knows where each Place was drawn. */
+/** The wheel and the Focus need where each Place was last drawn, so what draws keeps it. */
 export class Drawing {
   readonly #size: () => Size | undefined
   readonly #onView: () => OnView

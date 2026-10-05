@@ -25,7 +25,7 @@ export function agents() {
     },
     followup: (message: Parameters<typeof textOf>[0]) => sent.push({ how: 'followup', text: textOf(message) }),
     steer: (message: Parameters<typeof textOf>[0]) => sent.push({ how: 'steer', text: textOf(message) }),
-    cancel: (cause: unknown) => cancels.push(cause),
+    cancel: (cause: unknown, options?: unknown) => cancels.push({ cause, options }),
   }
   const provide = (ctx: Context): void => {
     ctx.provide('agentDefaultModel', { currentSelection: () => SELECTION })
