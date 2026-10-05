@@ -3,9 +3,9 @@
     # The core: it owns the terminal, and provides the binnacle service.
     - id: binnacle
       name: 'binnacle'
-    # The Read view, until the transcript can draw a session.
-    - id: binnacle-read
-      name: 'binnacle/plugins/read'
+    # The transcript: the session's events, raw.
+    - id: binnacle-transcript
+      name: 'binnacle/plugins/transcript'
     # The composer: what a person types, before it is sent.
     - id: binnacle-composer
       name: 'binnacle/plugins/composer'

@@ -10,12 +10,10 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly layouts = new Map<string, Layout[]>()
   private readonly parts = new Map<string, Part[]>()
   private readonly redraw: () => void
-  readonly session: string | undefined
   readonly keys: Keys = { actionsOf }
 
-  constructor(ctx: Context, session: string | undefined, redraw: () => void) {
+  constructor(ctx: Context, redraw: () => void) {
     super(ctx, 'binnacle')
-    this.session = session
     this.redraw = redraw
   }
 

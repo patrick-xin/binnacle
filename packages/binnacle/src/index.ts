@@ -6,6 +6,7 @@ import { capture } from './core/capture.ts'
 import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
+import { openNew, openStored } from './core/session.ts'
 import { Keyboard } from './core/keyboard.ts'
 import { coreActionOf, keyTable } from './core/keys.ts'
 import { arrange } from './core/layout.ts'
@@ -18,7 +19,7 @@ import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
-export type { Binnacle, Box, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
+export type { Binnacle, Box, ChatSession, Cursor, Handle, Keys, Layout, Part, Screen, Side, Size } from './api.ts'
 export { toPlainText } from './core/view.ts'
 
 export const name = 'binnacle'
@@ -33,7 +34,7 @@ export interface Process {
   stop(): void
 }
 
-export const internals: { terminal: () => Terminal; process: Process; streams: readonly Stream[] } = {
+export const internals: { terminal: () => Terminal; process: Process; streams: { stdout: Stream; stderr: Stream } } = {
   terminal: () => new ProcessTerminal(),
   process: {
     on: (event, listener) => {
@@ -46,7 +47,7 @@ export const internals: { terminal: () => Terminal; process: Process; streams: r
       process.kill(process.pid, 'SIGSTOP')
     },
   },
-  streams: [process.stdout, process.stderr],
+  streams: { stdout: process.stdout, stderr: process.stderr },
 }
 
 const ALTERNATE_SCREEN_ON = '\x1b[?1049h'
@@ -116,7 +117,7 @@ export function apply(ctx: Context): void {
     for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
     display.draw(arranged.rows, arranged.cursor)
   }
-  const service = new BinnacleService(ctx, commandLine.session, draw)
+  const service = new BinnacleService(ctx, draw)
   const keyboard = new Keyboard((data) => {
     terminal?.write(data)
   })
@@ -129,7 +130,7 @@ export function apply(ctx: Context): void {
   const take = (): void => {
     if (terminal === undefined || holdingTerminal) return
     holdingTerminal = true
-    printHeldBack = capture(internals.streams)
+    printHeldBack = capture([internals.streams.stdout, internals.streams.stderr])
     terminal.start((data) => {
       input.process(data)
     }, redrawAll)
@@ -180,6 +181,20 @@ export function apply(ctx: Context): void {
     scrolledUp.set(under.place, Math.max(0, (scrolledUp.get(under.place) ?? 0) + notches * ROWS_PER_WHEEL_NOTCH))
     draw()
   }
+
+  ctx.provide('binnacleSession')
+  const named = commandLine.session
+  void (named === undefined ? openNew(ctx) : openStored(ctx, named)).then(
+    (session) => {
+      if (session !== undefined) ctx.set('binnacleSession', session)
+    },
+    (error: unknown) => {
+      internals.streams.stderr.write(
+        `binnacle: could not ${named === undefined ? 'open a session' : `read ${named}`}: ${error instanceof Error ? error.message : String(error)}\n`,
+      )
+      exit(1)
+    },
+  )
 
   const ready: AppReady = ctx.appReady!
   const cancelReady = ready.onReady(() => {

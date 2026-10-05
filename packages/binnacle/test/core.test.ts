@@ -182,21 +182,6 @@ test('--help prints how to start binnacle, and exits without taking the terminal
   assert.deepEqual([exits, (await terminal.read()).screen], [[0], 'normal'])
 })
 
-test('--session <id> names the stored session that plugins read, and none is named without it', async () => {
-  const named: (string | undefined)[] = []
-  for (const args of [['--session', 'session-abc'], []]) {
-    const { ctx } = await mount({ args })
-    await ctx.plugin({
-      name: 'reader',
-      inject: ['binnacle'],
-      apply: (plugin: Context) => {
-        named.push(plugin.binnacle.session)
-      },
-    })
-  }
-  assert.deepEqual(named, ['session-abc', undefined])
-})
-
 test('a plugin reads the actions of the Key Table that a key is bound to, in each form a terminal sends it', async () => {
   const { ctx } = await mount()
   const read: string[][] = []

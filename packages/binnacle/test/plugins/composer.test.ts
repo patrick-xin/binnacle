@@ -3,11 +3,15 @@ import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import * as composer from '../../src/plugins/composer/index.ts'
 import { mount } from '../support/mount.ts'
+import { agents } from '../support/agents.ts'
+import { persistence } from '../support/sessions.ts'
 
-async function chat(columns = 20, rows = 5) {
-  const mounted = await mount({ columns, rows })
+async function chat(columns = 20, rows = 5, provide?: (ctx: Context) => void, args: string[] = []) {
+  const mounted = await mount({ args, columns, rows, ...(provide === undefined ? {} : { provide }) })
   mounted.ready()
   await mounted.ctx.plugin(composer)
+  // The session opens after the core loads; let it settle.
+  await new Promise((resolve) => setImmediate(resolve))
   const typed = async (...keys: string[]) => {
     for (const key of keys) mounted.terminal.type(key)
     return (await mounted.terminal.read()).rows
@@ -23,7 +27,7 @@ test('what a person types is drawn in the composer, between its rules', async ()
 })
 
 test('enter clears the draft and keeps it in the history, and up brings it back', async () => {
-  const { typed } = await chat()
+  const { typed } = await chat(20, 5, agents().provide)
   assert.deepEqual(
     [await typed('h', 'i', '\r'), await typed('\x1b[A')],
     [
@@ -45,7 +49,7 @@ test('a key that the kitty protocol reports released is not typed a second time'
 })
 
 test("shift+enter makes a new line, as the kitty protocol and modifyOtherKeys send it, and as pi-tui's fallbacks ctrl+j and a backslash before enter do", async () => {
-  const { typed } = await chat(20, 8)
+  const { typed } = await chat(20, 8, agents().provide)
   const rows = await typed('a', '\x1b[13;2u', 'b', '\x1b[27;2;13~', 'c', '\n', 'd', '\\', '\r', 'e')
   assert.deepEqual(rows, ['', RULE, 'a', 'b', 'c', 'd', 'e ', RULE])
 })
@@ -91,4 +95,29 @@ test("the terminal's cursor is put on the composer's cursor, for an input method
   const { typed, terminal } = await chat()
   await typed('h', 'i', '\x1b[D')
   assert.deepEqual((await terminal.read()).cursor, { x: 1, y: 3 })
+})
+
+test('enter sends the draft to the agent as a prompt, and steers the turn that runs', async () => {
+  const dsh = agents()
+  const { typed } = await chat(20, 5, dsh.provide)
+  await typed('h', 'i', '\r')
+  dsh.agent.status = 'running'
+  await typed('o', 'k', '\r')
+  assert.deepEqual(dsh.sent, [
+    { how: 'followup', text: 'hi' },
+    { how: 'steer', text: 'ok' },
+  ])
+})
+
+test('enter keeps the draft while no agent takes it: a stored session that is read, or a session not open yet', async () => {
+  const store = persistence([{ id: 'session-stored', createdAt: 1, events: [] }])
+  const { typed: typedToStored } = await chat(20, 5, (ctx) => ctx.provide('sessionPersistence', store), ['--session', 'session-stored'])
+  const { typed: typedBeforeOpen } = await chat()
+  assert.deepEqual(
+    [await typedToStored('h', 'i', '\r'), await typedBeforeOpen('h', 'i', '\r')],
+    [
+      ['', '', RULE, 'hi ', RULE],
+      ['', '', RULE, 'hi ', RULE],
+    ],
+  )
 })
