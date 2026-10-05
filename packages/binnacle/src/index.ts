@@ -4,7 +4,7 @@
  * @module binnacle
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { AppReady } from '@deepseek-ai/dsh-cmdline'
+import type { AppExit, AppReady } from '@deepseek-ai/dsh-cmdline'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
 import { rowsOf } from './core/view.ts'
@@ -15,7 +15,7 @@ export type { Binnacle, Screen, Shown } from './api.ts'
 
 export const name = 'binnacle'
 
-export const inject = ['appReady'] satisfies (keyof Context)[]
+export const inject = ['appReady', 'appExit'] satisfies (keyof Context)[]
 
 export const internals: { terminal: () => Terminal } = {
   terminal: () => {
@@ -26,6 +26,9 @@ export const internals: { terminal: () => Terminal } = {
 // The alternate screen, the cursor hidden, and the mouse's presses and wheel reported in SGR's form.
 const TAKE = '\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h'
 const GIVE_BACK = '\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l'
+
+// In raw mode the terminal sends ctrl+c as a byte, and sends no signal.
+const CTRL_C = '\x03'
 
 // A mouse event in SGR's form: the button, the column, the row, and M for a press.
 const MOUSE = /^\x1b\[<(\d+);\d+;\d+[Mm]$/
@@ -45,7 +48,12 @@ export function apply(ctx: Context): void {
     back = Math.min(back, most)
     display.draw(rows)
   }
+  const exit: AppExit = ctx.appExit!
   const hear = (sequence: string): void => {
+    if (sequence === CTRL_C) {
+      exit(0)
+      return
+    }
     const button = MOUSE.exec(sequence)?.[1]
     if (button === undefined) return
     if (Number(button) === WHEEL_UP) back += NOTCH

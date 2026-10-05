@@ -112,3 +112,10 @@ test('a terminal that changes size has the screen drawn again at its new width',
   terminal.resize(12, 4)
   assert.deepEqual((await terminal.read()).rows, ['one two', 'three four', 'five', 'six'])
 })
+
+test('ctrl+c asks dsh to exit, with code 0', async () => {
+  const { terminal, ready, exits } = await mount()
+  ready()
+  terminal.type('\x03')
+  assert.deepEqual(exits, [0])
+})
