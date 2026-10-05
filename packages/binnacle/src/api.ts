@@ -3,10 +3,18 @@
 import '@deepseek-ai/cordis'
 
 export interface Part {
-  /** Unwrapped Untrusted Text: the core takes out its control sequences, then wraps each line at the width. */
+  /** Unwrapped. A line keeps its colour and style; the core takes out every other control sequence, then wraps it at the width. */
   lines(width: number): readonly string[]
+  /** Where the cursor is in the lines at that width, while the Part is focused. */
+  cursor?(width: number): Cursor | undefined
   /** A key, as the terminal sent it, while the Part is focused. It returns true when it used the key; the core's key table takes the rest. */
   key?(data: string): boolean
+}
+
+/** A line of a Part's lines, and a column in cells. */
+export interface Cursor {
+  readonly line: number
+  readonly column: number
 }
 
 /** A `fixed` size is in cells, its box included; `content` is the cells its lines need; `fill` shares what is left. */

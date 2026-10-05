@@ -261,3 +261,22 @@ test("a Part's colour stays inside its Place: its border and the Place beside it
     ],
   )
 })
+
+test('a focused Part longer than its Place shows the row of its cursor, and the terminal cursor is put there', async () => {
+  const { terminal, rows } = await drawn(10, 3, (binnacle) => {
+    binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a' } })
+    binnacle.place('a', { lines: () => ['1', '2', '3', '4', '5', '6'], cursor: () => ({ line: 1, column: 1 }) })
+  })
+  assert.deepEqual([rows, (await terminal.read()).cursor], [['2', '3', '4'], { x: 1, y: 0 }])
+})
+
+test("a cursor in a line that wraps is put on the row and the column it wraps to, inside the Place's box", async () => {
+  const { terminal, rows } = await drawn(12, 4, (binnacle) => {
+    binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a', border: true } })
+    binnacle.place('a', { lines: () => ['abcdefghijklmno'], cursor: () => ({ line: 0, column: 12 }) })
+  })
+  assert.deepEqual(
+    [rows, (await terminal.read()).cursor],
+    [['╭──────────╮', '│abcdefghij│', '│klmno     │', '╰──────────╯'], { x: 3, y: 2 }],
+  )
+})

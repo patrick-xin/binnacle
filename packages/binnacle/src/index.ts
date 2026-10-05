@@ -11,14 +11,14 @@ import { coreActionOf, keyTable } from './core/keys.ts'
 import { arrange } from './core/layout.ts'
 import type { Placed } from './core/layout.ts'
 import type { Part } from './api.ts'
-import { rowsOf } from './core/view.ts'
+import { cursorOf, rowsOf } from './core/view.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
 import { isKeyRelease } from './terminal/keys.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
 
-export type { Binnacle, Box, Handle, Layout, Part, Screen, Side, Size } from './api.ts'
+export type { Binnacle, Box, Cursor, Handle, Layout, Part, Screen, Side, Size } from './api.ts'
 export { toPlainText } from './core/view.ts'
 
 export const name = 'binnacle'
@@ -110,10 +110,11 @@ export function apply(ctx: Context): void {
     const arranged = arrange(service.layoutOnView, terminal.columns, terminal.rows, {
       rows: (place, width) => rowsOf(service.partIn(place), width),
       scrolledUp: (place) => scrolledUp.get(place) ?? 0,
+      cursor: (place, width) => (place === service.focusOnView ? cursorOf(service.partIn(place), width) : undefined),
     })
     placed = arranged.placed
     for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
-    display.draw(arranged.rows)
+    display.draw(arranged.rows, arranged.cursor)
   }
   const service = new BinnacleService(ctx, commandLine.session, draw)
   const keyboard = new Keyboard((data) => {

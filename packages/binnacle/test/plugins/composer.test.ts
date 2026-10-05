@@ -86,3 +86,9 @@ test('a layout of the Chat with no composer Place gives the composer no key', as
   await laid.dispose()
   assert.deepEqual(await typed('y'), ['', '', RULE, 'y ', RULE])
 })
+
+test("the terminal's cursor is put on the composer's cursor, for an input method", async () => {
+  const { typed, terminal } = await chat()
+  await typed('h', 'i', '\x1b[D')
+  assert.deepEqual((await terminal.read()).cursor, { x: 1, y: 3 })
+})

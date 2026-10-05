@@ -7,6 +7,13 @@ import { toPlainText } from './view.ts'
 export interface Places {
   rows(place: string, width: number): readonly string[]
   scrolledUp(place: string): number
+  /** In the Place's rows; only the focused Place has one. */
+  cursor(place: string, width: number): Position | undefined
+}
+
+export interface Position {
+  readonly row: number
+  readonly column: number
 }
 
 /** A Place as it was laid out: its box's cells, which the wheel hits. */
@@ -22,6 +29,8 @@ export interface Placed {
 export interface Arranged {
   readonly rows: string[]
   readonly placed: Placed[]
+  /** On the terminal, where the focused Part's cursor is drawn. */
+  readonly cursor: Position | undefined
 }
 
 type Insets = { readonly [side in Side]: number }
@@ -102,6 +111,7 @@ function gapsOf(node: Layout, spare: Spare): number {
 class Arrangement {
   readonly placed: Placed[] = []
   overflowed = false
+  cursor: Position | undefined
   readonly #places: Places
   readonly #spare: Spare
 
@@ -159,7 +169,7 @@ class Arrangement {
   }
 
   #drawInner(node: Layout, width: number, height: number, top: number, left: number): string[] {
-    if ('place' in node) return this.#place(node.place, width, height)
+    if ('place' in node) return this.#place(node.place, top, left, width, height)
     if ('row' in node) return this.#row(node, top, left, width, height)
     return this.#column(node, top, left, width, height)
   }
@@ -195,10 +205,16 @@ class Arrangement {
     return Math.max(0, this.#places.rows(place, width).length - height)
   }
 
-  #place(place: string, width: number, height: number): string[] {
+  #place(place: string, top: number, left: number, width: number, height: number): string[] {
     const all = this.#places.rows(place, width)
-    const end = all.length - Math.min(this.#places.scrolledUp(place), this.#maxScroll(place, width, height))
-    const shown = all.slice(Math.max(0, end - height), end).map((row) => fit(row.includes('\x1b') ? row + RESET_STYLE : row, width))
+    const cursor = this.#places.cursor(place, width)
+    let end = all.length - Math.min(this.#places.scrolledUp(place), this.#maxScroll(place, width, height))
+    // A focused Part shows the row of its cursor, however it was scrolled.
+    if (cursor !== undefined) end = Math.min(Math.max(end, cursor.row + 1), cursor.row + height)
+    const start = Math.max(0, end - height)
+    if (cursor !== undefined && height > 0 && cursor.column < width)
+      this.cursor = { row: top + cursor.row - start, column: left + cursor.column }
+    const shown = all.slice(start, end).map((row) => fit(row.includes('\x1b') ? row + RESET_STYLE : row, width))
     return [...shown, ...Array.from({ length: height - shown.length }, () => blank(width))]
   }
 
@@ -254,7 +270,7 @@ function withoutBlankEnd(row: string): string {
 function attempt(layout: Layout, width: number, height: number, places: Places, spare: Spare) {
   const arrangement = new Arrangement(places, spare)
   const rows = arrangement.draw(layout, 0, 0, width, height)
-  return { rows, placed: arrangement.placed, overflowed: arrangement.overflowed }
+  return { rows, placed: arrangement.placed, cursor: arrangement.cursor, overflowed: arrangement.overflowed }
 }
 
 export function arrange(layout: Layout, width: number, height: number, places: Places): Arranged {
@@ -263,5 +279,5 @@ export function arrange(layout: Layout, width: number, height: number, places: P
     if (!arranged.overflowed) break
     arranged = attempt(layout, width, height, places, spare)
   }
-  return { rows: arranged.rows.map(withoutBlankEnd), placed: arranged.placed }
+  return { rows: arranged.rows.map(withoutBlankEnd), placed: arranged.placed, cursor: arranged.cursor }
 }
