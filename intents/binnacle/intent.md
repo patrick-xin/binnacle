@@ -51,9 +51,9 @@ A change takes effect while the session runs, and a broken change does not stop 
 Each stage ends in a behaviour that the Maintainer can try under `dsh`. The Lead writes the specs for the current stage only.
 
 1. **Core.** binnacle boots under `dsh --profile binnacle`, and owns the terminal. The Maintainer opens a recorded session in a temporary Read view, and scrolls it with the wheel.
-2. **Talk.** The Maintainer types in the composer, sends a prompt, watches the answer stream, and interrupts it. The screen has a layout and a focus, and the keys reach the composer.
+2. **Talk.** The Maintainer types in the composer, sends a prompt, watches the answer stream as raw events, and interrupts it. The screen is a layout tree that an author can replace, and the keys reach the composer through one key table.
 3. **Waiting on a person.** The Maintainer answers each Request with the keyboard or the mouse. Keys and the mouse go through one gesture table. Focus and folds work.
-4. **Plugins.** Search, the model picker, settings and the trajectory are plugins. The Read view moves into the trajectory screen.
+4. **Plugins.** Search, the model picker, settings and the trajectory are plugins. The trajectory is a screen of its own, with charts, tabs and filters.
 5. **Finish.** The Maintainer resumes a session, selects and copies text, and sees the summary on exit. The theme and `NO_COLOR` work. The first 0.x release follows.
 
 Authoring gets its own stages, toward 1.0.
@@ -71,6 +71,17 @@ These answer the open questions of the first draft, from the grill of 2026-10-04
 7. **Screen readers.** The first release has no plain mode. dsh's web app serves screen readers.
 8. **Authors** get no promise of stability before 0.X release.
 9. **Wide content** wraps, as in pi. A table wraps each cell. A table that is too narrow to draw falls back to its raw markdown, wrapped.
+
+These answer the design of stage 2, from the grill of 2026-10-05.
+
+10. **The agent** is composed as dsh's headless bundle composes it: on `dsh-base`, with no presets, on the default model.
+11. **`dsh --profile binnacle`** opens Talk on a new session. `--session <id>` draws a stored session, and nothing can be sent to it.
+12. **Layout.** A screen is a layout tree of named places, and every node may have a box ([ADR 2](../../docs/adr/0002-a-screen-is-a-layout-tree-of-named-places.md)). Edges, glyphs and spacing are named tables behind one lookup. An author overrides an entry or registers a new name with the theme, in stage 5.
+13. **Keys.** The core owns one key table: each action has an id, its default keys and a description. The copied editor reads its keys from it. A key goes to the focused part first, then to the core. Stage 3 adds the mouse to the same table.
+14. **The keys of Talk.** Enter sends a prompt, or steers the turn that runs. Shift+enter is a new line, with pi's fallbacks where a terminal cannot tell it from enter. Esc interrupts the turn. Ctrl+c clears the draft, and pressed twice on an empty draft it quits. Ctrl+z suspends.
+15. **The transcript** is a plugin. It draws each event of the session raw, as its seq, its type and its JSON, and the answer that streams as one live block that the committed event replaces. Grouping and styling come later, and an author can do them too. The status line is a plugin of its own.
+16. **Requests** fail closed until stage 3: a tool that needs an approval fails.
+17. **Hot reload** is off until the core stays up while its plugins reload.
 
 ## Open questions
 
