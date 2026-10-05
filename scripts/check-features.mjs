@@ -2,12 +2,12 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { load } from 'js-yaml'
+import { DEFAULT_SCHEMA, load, Type } from 'js-yaml'
 
 const CORE = 'binnacle'
 
 function featureRows(patch) {
-  const inserted = (load(patch) ?? []).flatMap((entry) => entry.insert ?? [])
+  const inserted = (load(patch, { schema: DSH_SCHEMA }) ?? []).flatMap((entry) => entry.insert ?? [])
   return inserted.map((row) => row.id).filter((id) => id !== CORE)
 }
 
@@ -22,6 +22,9 @@ function mappedRows(map) {
   const column = cellsOf(lines[0] ?? '').indexOf('Row')
   return lines.slice(2).flatMap((line) => /^`([^`]+)`$/.exec(cellsOf(line)[column] ?? '')?.[1] ?? [])
 }
+
+// dsh evaluates a `!!js` value at load; the check reads only the rows, so it keeps the source.
+const DSH_SCHEMA = DEFAULT_SCHEMA.extend([new Type('tag:yaml.org,2002:js', { kind: 'scalar' })])
 
 export function findProblems(patch, map) {
   const rows = featureRows(patch)

@@ -114,3 +114,11 @@ test('a transcript loaded with the core, as dsh loads them, draws the session on
   dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
   assert.deepEqual((await terminal.read()).rows, ['#0 turn/start', '{}', ''])
 })
+
+test("a tool call's name that streams after its first delta still labels it", async () => {
+  const { ctx, dsh, drawn } = await talking(3)
+  dsh.stream(ctx, { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 })
+  dsh.stream(ctx, chunk(0, { type: 'tool-call-delta', index: 0, id: 't1', argumentsDelta: '{' }))
+  dsh.stream(ctx, chunk(1, { type: 'tool-call-delta', index: 0, id: 't1', name: 'read', argumentsDelta: '}' }))
+  assert.deepEqual(await drawn(), ['~ streaming', 'tool-call read', '{}'])
+})

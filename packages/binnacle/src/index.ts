@@ -107,16 +107,21 @@ export function apply(ctx: Context): void {
   })
 
   // While a person reads scrolled up, the rows a Part adds or takes away at its end move the view with them.
+  // A Place sized by its content is also measured at other widths, so it moves once a draw, at the first width asked.
   const counted = new Map<string, number>()
+  const anchored = new Set<string>()
   const anchor = (place: string, width: number, count: number): void => {
     const key = `${width} ${place}`
     const before = counted.get(key) ?? count
     counted.set(key, count)
     const up = scrolledUp.get(place) ?? 0
-    if (up > 0) scrolledUp.set(place, Math.max(0, up + count - before))
+    if (up === 0 || anchored.has(place)) return
+    anchored.add(place)
+    scrolledUp.set(place, Math.max(0, up + count - before))
   }
   const draw = (): void => {
     if (terminal === undefined || !holdingTerminal) return
+    anchored.clear()
     const arranged = arrange(service.layoutOnView, terminal.columns, terminal.rows, {
       rows: (place, width) => {
         const drawn = rows.of(service.partIn(place), width)

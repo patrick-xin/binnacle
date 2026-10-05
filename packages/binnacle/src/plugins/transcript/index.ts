@@ -13,7 +13,7 @@ function linesOf(event: SessionEvent): string[] {
 
 /** A content block of the answer that streams, its deltas glued. */
 interface Streamed {
-  readonly kind: string
+  kind: string
   text: string
 }
 
@@ -57,8 +57,11 @@ export function apply(plugin: Context): void {
       const { chunk } = frame
       if (chunk.type === 'reasoning-delta') glue(live, chunk.index, 'reasoning', chunk.text)
       else if (chunk.type === 'text-delta') glue(live, chunk.index, 'text', chunk.text)
-      else if (chunk.type === 'tool-call-delta')
-        glue(live, chunk.index, `tool-call ${toPlainText(chunk.name ?? '')}`.trimEnd(), chunk.argumentsDelta)
+      else if (chunk.type === 'tool-call-delta') {
+        const block = glue(live, chunk.index, 'tool-call', chunk.argumentsDelta)
+        // A provider sends the tool's name in the delta where it learns it, which may not be the first.
+        if (chunk.name !== undefined) block.kind = `tool-call ${toPlainText(chunk.name)}`
+      }
     }
     ctx.on('agent/assistant-stream', ({ agent, frame }) => {
       if (agent !== chat.agent) return
@@ -69,8 +72,9 @@ export function apply(plugin: Context): void {
   })
 }
 
-function glue(blocks: Map<number, Streamed>, index: number, kind: string, text: string): void {
-  const block = blocks.get(index)
-  if (block === undefined) blocks.set(index, { kind, text })
-  else block.text += text
+function glue(blocks: Map<number, Streamed>, index: number, kind: string, text: string): Streamed {
+  const block = blocks.get(index) ?? { kind, text: '' }
+  block.text += text
+  blocks.set(index, block)
+  return block
 }

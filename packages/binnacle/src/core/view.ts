@@ -26,7 +26,7 @@ const rowsOfLine = (line: string, width: number): string[] => wrapTextWithAnsi(t
 interface Wrapped {
   readonly width: number
   readonly lines: readonly string[]
-  // The rows each line wraps to, then all of them.
+  // The cursor is found in its own line's rows, and the layout reads all of them.
   readonly rowsOfLines: readonly (readonly string[])[]
   readonly rows: readonly string[]
 }
@@ -34,20 +34,39 @@ interface Wrapped {
 /** Each Part's lines, wrapped at a width, kept until the Part redraws. A draw then costs only what changed. */
 export class Rows {
   private wrapped = new WeakMap<Part, Wrapped>()
+  // A Part such as the transcript redraws on each delta with nearly every line as it was, so each line is wrapped once.
+  private byLine = new WeakMap<Part, { width: number; rows: Map<string, readonly string[]> }>()
+  private readonly wrap: (line: string, width: number) => readonly string[]
+
+  constructor(wrap: (line: string, width: number) => readonly string[] = rowsOfLine) {
+    this.wrap = wrap
+  }
 
   forget(part: Part): void {
     this.wrapped.delete(part)
   }
 
   of(part: Part | undefined, width: number): readonly string[] {
-    return part === undefined ? [] : this.#wrap(part, width).rows
+    return part === undefined ? [] : this.#wrapped(part, width).rows
   }
 
-  #wrap(part: Part, width: number): Wrapped {
+  #wrapped(part: Part, width: number): Wrapped {
     const kept = this.wrapped.get(part)
     if (kept?.width === width) return kept
     const lines = width < 1 ? [] : part.lines(width)
-    const rowsOfLines = lines.map((line) => rowsOfLine(line, width))
+    let known = this.byLine.get(part)
+    if (known?.width !== width) {
+      known = { width, rows: new Map() }
+      this.byLine.set(part, known)
+    }
+    const seen = new Map<string, readonly string[]>()
+    const rowsOfLines = lines.map((line) => {
+      const rows = seen.get(line) ?? known.rows.get(line) ?? this.wrap(line, width)
+      seen.set(line, rows)
+      return rows
+    })
+    // Only the lines the Part still has are kept, so a line it took away is not held.
+    known.rows = seen
     const wrapped = { width, lines, rowsOfLines, rows: rowsOfLines.flat() }
     this.wrapped.set(part, wrapped)
     return wrapped
@@ -56,7 +75,7 @@ export class Rows {
   cursorOf(part: Part | undefined, width: number): { row: number; column: number } | undefined {
     const cursor = part?.cursor?.(width)
     if (part === undefined || cursor === undefined || width < 1) return undefined
-    const { lines, rowsOfLines } = this.#wrap(part, width)
+    const { lines, rowsOfLines } = this.#wrapped(part, width)
     const before = rowsOfLines.slice(0, cursor.line).reduce((rows, wrapped) => rows + wrapped.length, 0)
     // A wrap drops the blanks where it breaks, so each row is found in the line to know the column it starts at.
     const plain = toPlainText(lines[cursor.line] ?? '')
