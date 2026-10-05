@@ -206,6 +206,7 @@ class Arrangement {
   }
 
   #share(children: readonly Layout[], available: number, natural: (child: Layout) => number): number[] {
+    if (available < 0) this.overflowed = true
     let left = Math.max(0, available)
     const sizes = children.map((child) => {
       const size = sizeOf(child)

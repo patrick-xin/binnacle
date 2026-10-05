@@ -236,3 +236,12 @@ test('a node is a place, a row or a column, never two at once', () => {
   const mixed: Layout = { place: 'a', row: [] }
   assert.ok(mixed)
 })
+
+test('a gap wider than the room between its children is given up before their rows are cut', async () => {
+  const { rows } = await drawn(6, 3, (binnacle) => {
+    binnacle.layout('talk', { column: [{ place: 'a' }, { place: 'b' }], gap: 5 })
+    binnacle.place('a', part('a'))
+    binnacle.place('b', part('b'))
+  })
+  assert.deepEqual(rows, ['a', '', 'b'])
+})
