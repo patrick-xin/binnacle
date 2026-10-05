@@ -72,7 +72,11 @@ export interface Binnacle {
   place(name: string, part: Part): Handle
 }
 
-/** The session that the Chat shows. The core opens it, and provides it as `binnacleSession` once it is open. */
+/**
+ * The session that the Chat shows. The core opens it, and provides it as `binnacleSession` once it is open.
+ * It opens after dsh's plugins settle, so a plugin waits for it with `ctx.inject(['binnacleSession'], …)` in its apply:
+ * dsh reports a plugin that injects it at load as one that did not activate.
+ */
 export interface ChatSession {
   /** Its id, as dsh names it. */
   readonly id: string

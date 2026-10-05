@@ -205,11 +205,11 @@ export function apply(ctx: Context): void {
     draw()
   }
 
-  ctx.provide('binnacleSession')
   const named = commandLine.session
   void (named === undefined ? openNew(ctx) : openStored(ctx, named)).then(
     (session) => {
-      if (session !== undefined) ctx.set('binnacleSession', session)
+      // A service provided with no value is still there for Cordis, so it is provided once the session is open.
+      if (session !== undefined) ctx.provide('binnacleSession', session)
     },
     (error: unknown) => {
       internals.streams.stderr.write(

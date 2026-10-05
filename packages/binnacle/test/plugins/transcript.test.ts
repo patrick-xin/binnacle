@@ -98,3 +98,19 @@ test("another session's events and another agent's answer, such as a subagent's,
   ctx.emit('agent/assistant-stream', { agent: {}, frame: { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 } } as never)
   assert.deepEqual(await drawn(), ['', '', ''])
 })
+
+test('a transcript loaded with the core, as dsh loads them, draws the session once it opens', async () => {
+  const dsh = agents()
+  const { ctx, ready, terminal } = await mount({
+    columns: 40,
+    rows: 3,
+    provide: (each) => {
+      dsh.provide(each)
+      void each.plugin(transcript)
+    },
+  })
+  ready()
+  await settled()
+  dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
+  assert.deepEqual((await terminal.read()).rows, ['#0 turn/start', '{}', ''])
+})
