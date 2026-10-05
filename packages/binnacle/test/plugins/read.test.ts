@@ -37,3 +37,19 @@ test('the Read view shows each event of the session the command line names: its 
   assert.deepEqual(store.opened, ['session-older'])
   assert.deepEqual(rows, ['#0 test/marker', '{', '  "said": "older"', '}', '', '', '', '', '', ''])
 })
+
+test('with no session named, the Read view reads the newest stored session', async () => {
+  const { rows, store } = await opened([], [newer, older])
+  assert.deepEqual(store.opened, ['session-newer'])
+  assert.deepEqual(rows.slice(0, 4), ['#0 user/message', '{', '  "text": "hello"', '}'])
+})
+
+test('with no stored session, the Read view says so', async () => {
+  const { rows } = await opened([], [], 2)
+  assert.deepEqual(rows, ['No stored session to read.', ''])
+})
+
+test('a session the Read view cannot read is said on the screen, with why', async () => {
+  const { rows } = await opened(['--session', 'session-gone'], [older], 2)
+  assert.deepEqual(rows, ['Could not read the session: no session', 'session-gone'])
+})
