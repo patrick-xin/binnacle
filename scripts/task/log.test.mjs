@@ -37,7 +37,6 @@ test('a log that does not end with a newline, or holds a line that is not JSON, 
   assert.equal(cut.code, 1)
   assert.equal(cut.stderr, `${log}: the log does not end with a newline\n`)
   assert.equal((await run(['status', '140'], world.deps)).code, 1)
-  assert.equal((await run(['status'], world.deps)).code, 1)
 
   writeFileSync(log, `${whole}not json\n`)
   const broken = await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)

@@ -57,11 +57,20 @@ test('`task status` shows each task, its state, its round, and the time since it
 
   const all = await run(['status'], world.deps)
   assert.equal(all.code, 0)
-  assert.equal(all.stdout, '140 approved round 0 (2h ago)\n141 spec round 0 (2h2m ago)\n')
+  assert.equal(
+    all.stdout,
+    [
+      '140 approved round 0 (2h ago)',
+      '  reviewer fake idle, last session record 2h2m ago',
+      '141 spec round 0 (2h2m ago)',
+      '  reviewer fake idle, last session record 2h2m ago',
+      '',
+    ].join('\n'),
+  )
 
   const one = await run(['status', '141'], world.deps)
   assert.equal(one.code, 0)
-  assert.equal(one.stdout, '141 spec round 0 (2h2m ago)\n')
+  assert.equal(one.stdout, '141 spec round 0 (2h2m ago)\n  reviewer fake idle, last session record 2h2m ago\n')
 
   const none = await run(['status', '999'], world.deps)
   assert.equal(none.code, 1)

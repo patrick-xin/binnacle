@@ -49,22 +49,21 @@ If a Fix needs a decision or a third source file, stop. Move it to Build.
 
 The folders, states and hand-offs are in [`.agents/task.md`](../../task.md).
 
-1. Run `pnpm task start <n>`.
-2. Send the spec to the Reviewer for round 0.
-3. Change the spec for each finding of round 0, and set the state as [`.agents/task.md`](../../task.md) says.
-4. Send the changed spec to the Reviewer again, until round 0 is `approved`.
-5. If the door is one-way, get the Maintainer's agreement on the spec.
-6. Start the Implementer and the Reviewer, with the settings in `.agents/roles.json`.
-7. Run `pnpm task watch` in the background. When it exits, act on its line, then run it again.
-8. Send each hand-off, as `.agents/task.md` says.
-9. If an answer changes the spec, edit the spec body.
-10. Link the edit in a comment on the issue.
-11. Read each review report in full.
-12. After the third round with findings, choose one narrow round more, or ask the Maintainer.
-13. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
-14. Open the PR, as `.agents/task.md` says.
-15. If you tried the branch, write in the PR what you drove and what it drew.
-16. After the PR merges or closes, run `pnpm task stop <n>`.
+1. Run `pnpm task start <n>`. It starts the Reviewer, and sends it round 0.
+2. Run `pnpm task watch` in the background. When it exits, act on its line, then run it again.
+3. Change the spec for each finding of round 0, then run `pnpm task set <n> spec`. The tool sends the Reviewer its next pass.
+4. When round 0 is `approved`, and the door is one-way, get the Maintainer's agreement on the spec.
+5. Run `pnpm task build <n>`. It starts the Implementer. From here, the tool sends each hand-off.
+6. If a command exits 3, or the watch says that a hand-off failed or was not sent, run `pnpm task resend <n>`.
+7. If the watch reports a stall, read its busy processes first. Decide what to do: the tool stops no agent.
+8. If an answer changes the spec, edit the spec body.
+9. Link the edit in a comment on the issue.
+10. Read each review report in full.
+11. After the third round with findings, choose one narrow round more, or ask the Maintainer.
+12. If the task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
+13. Open the PR, as `.agents/task.md` says.
+14. If you tried the branch, write in the PR what you drove and what it drew.
+15. After the PR merges or closes, run `pnpm task stop <n>`.
 
 ## A Fix or a Chore task
 

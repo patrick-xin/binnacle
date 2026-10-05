@@ -24,11 +24,9 @@ async function merged(world, n, path) {
   git(worktree, ['push', 'origin', `task/${n}:main`])
 }
 
-/** Make the Reviewer's checkout, detached at the tip. */
+/** The Reviewer's checkout, which `task start` made. */
 function reviewOf(world, n) {
-  const review = join(world.home, 'worktrees', `${n}-review`)
-  git(world.repo, ['worktree', 'add', '--detach', review, 'HEAD'])
-  return review
+  return join(world.home, 'worktrees', `${n}-review`)
 }
 
 test('`task stop <n>` removes the worktrees and the branch, sets `stopped`, and keeps the task folder as the record', async (t) => {
