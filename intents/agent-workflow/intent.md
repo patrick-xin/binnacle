@@ -56,7 +56,7 @@ Agents write most of binnacle's code, reviews and records. Without a plan and cl
 Each stage ends in a behaviour that the Maintainer can try. The coordinator writes the specs for the current stage only.
 
 1. **The records.** The repository starts again from an empty tree, with the instructions for each role. The Maintainer reads them and starts a brainstorm for the binnacle intent. Specs: #123, #124, #125, #126.
-2. **The task tool.** One tool moves a task between roles. The Maintainer tries it on one small fix.
+2. **The task tool.** One tool moves a task between roles. The Maintainer tries it on one small task. Specs: #133, #137, #141. Fix: #139.
 3. **Merging.** A change that can be reversed merges with no person. The Maintainer sees one merge with no person, and one change that waits.
 4. **Words.** The checks refuse a retired word and a sentence that breaks STE. The Maintainer sees both refusals.
 
