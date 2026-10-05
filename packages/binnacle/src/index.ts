@@ -12,7 +12,7 @@ import { coreActionOf, keyTable } from './core/keys.ts'
 import { arrange } from './core/layout.ts'
 import type { Placed } from './core/layout.ts'
 import type { Part } from './api.ts'
-import { cursorOf, rowsOf } from './core/view.ts'
+import { Rows } from './core/view.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
 import { isKeyRelease } from './terminal/keys.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
@@ -106,18 +106,34 @@ export function apply(ctx: Context): void {
     terminal?.write(data)
   })
 
+  // While a person reads scrolled up, the rows a Part adds or takes away at its end move the view with them.
+  const counted = new Map<string, number>()
+  const anchor = (place: string, width: number, count: number): void => {
+    const key = `${width} ${place}`
+    const before = counted.get(key) ?? count
+    counted.set(key, count)
+    const up = scrolledUp.get(place) ?? 0
+    if (up > 0) scrolledUp.set(place, Math.max(0, up + count - before))
+  }
   const draw = (): void => {
     if (terminal === undefined || !holdingTerminal) return
     const arranged = arrange(service.layoutOnView, terminal.columns, terminal.rows, {
-      rows: (place, width) => rowsOf(service.partIn(place), width),
+      rows: (place, width) => {
+        const drawn = rows.of(service.partIn(place), width)
+        anchor(place, width, drawn.length)
+        return drawn
+      },
       scrolledUp: (place) => scrolledUp.get(place) ?? 0,
-      cursor: (place, width) => (place === service.focusOnView ? cursorOf(service.partIn(place), width) : undefined),
+      cursor: (place, width) => (place === service.focusOnView ? rows.cursorOf(service.partIn(place), width) : undefined),
     })
     placed = arranged.placed
     for (const { place, maxScroll } of placed) scrolledUp.set(place, Math.min(scrolledUp.get(place) ?? 0, maxScroll))
     display.draw(arranged.rows, arranged.cursor)
   }
-  const service = new BinnacleService(ctx, draw)
+  const rows = new Rows()
+  const service = new BinnacleService(ctx, draw, (part) => {
+    rows.forget(part)
+  })
   const keyboard = new Keyboard((data) => {
     terminal?.write(data)
   })
@@ -158,12 +174,19 @@ export function apply(ctx: Context): void {
     const place = service.focusOnView
     return place !== undefined && placed.some((drawn) => drawn.place === place) ? service.partIn(place) : undefined
   }
+  // A Part that takes a key has changed its lines, and the core draws it again.
+  const keyTaken = (data: string): boolean => {
+    const part = focused()
+    if (part?.key?.(data) !== true) return false
+    rows.forget(part)
+    return true
+  }
   input.on('data', (sequence: string) => {
     // No Part asks for a key's release yet, and the editor would type it a second time.
     if (keyboard.answered(sequence) || isKeyRelease(sequence)) return
     const mouse = SGR_MOUSE.exec(sequence)?.groups
     if (mouse !== undefined) return scroll(mouse)
-    if (focused()?.key?.(sequence) === true) return draw()
+    if (keyTaken(sequence)) return draw()
     // Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as keys.
     const action = coreActionOf(sequence)
     if (action === 'binnacle.quit') exit(0)
@@ -171,7 +194,7 @@ export function apply(ctx: Context): void {
   })
   // The buffer takes a bracketed paste out of its markers; the editor reads a paste by them.
   input.on('paste', (content: string) => {
-    if (focused()?.key?.(`${PASTE_START}${content}${PASTE_END}`) === true) draw()
+    if (keyTaken(`${PASTE_START}${content}${PASTE_END}`)) draw()
   })
   const scroll = (mouse: { button?: string; x?: string; y?: string }): void => {
     const notches = mouse.button === String(WHEEL_UP) ? 1 : mouse.button === String(WHEEL_DOWN) ? -1 : 0

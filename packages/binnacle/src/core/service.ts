@@ -10,11 +10,13 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly layouts = new Map<string, Layout[]>()
   private readonly parts = new Map<string, Part[]>()
   private readonly redraw: () => void
+  private readonly forget: (part: Part) => void
   readonly keys: Keys = { actionsOf }
 
-  constructor(ctx: Context, redraw: () => void) {
+  constructor(ctx: Context, redraw: () => void, forget: (part: Part) => void) {
     super(ctx, 'binnacle')
     this.redraw = redraw
+    this.forget = forget
   }
 
   get layoutOnView(): Layout {
@@ -43,10 +45,12 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   place(name: string, part: Part): Handle {
-    return this.hold(listIn(this.parts, name), part, 'binnacle: a part placed')
+    return this.hold(listIn(this.parts, name), part, 'binnacle: a part placed', () => {
+      this.forget(part)
+    })
   }
 
-  private hold<T>(list: T[], item: T, label: string): Handle {
+  private hold<T>(list: T[], item: T, label: string, changed?: () => void): Handle {
     list.push(item)
     this.redraw()
     let held = true
@@ -60,7 +64,9 @@ export class BinnacleService extends Service implements Binnacle {
     const dispose = this.ctx.effect(() => release, label)
     return {
       redraw: () => {
-        if (held) this.redraw()
+        if (!held) return
+        changed?.()
+        this.redraw()
       },
       dispose: () => {
         void dispose()

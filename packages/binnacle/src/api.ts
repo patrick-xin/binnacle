@@ -9,7 +9,7 @@ export interface Part {
   lines(width: number): readonly string[]
   /** Where the cursor is in the lines at that width, while the Part has the Focus. */
   cursor?(width: number): Cursor | undefined
-  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key; the Key Table takes the rest. */
+  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key, and the core draws the Part again; the Key Table takes the rest. */
   key?(data: string): boolean
 }
 
