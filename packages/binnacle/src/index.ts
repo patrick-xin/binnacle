@@ -6,12 +6,14 @@ import { capture } from './core/capture.ts'
 import type { Stream } from './core/capture.ts'
 import { Display } from './core/display.ts'
 import { BinnacleService } from './core/service.ts'
+import { Keyboard } from './core/keyboard.ts'
 import { coreActionOf, keyTable } from './core/keys.ts'
 import { arrange } from './core/layout.ts'
 import type { Placed } from './core/layout.ts'
 import type { Part } from './api.ts'
 import { rowsOf } from './core/view.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
+import { isKeyRelease } from './terminal/keys.ts'
 import { ProcessTerminal } from './terminal/process-terminal.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 import type { Terminal } from './terminal/terminal.ts'
@@ -52,6 +54,9 @@ const CURSOR_HIDE = '\x1b[?25l'
 const CURSOR_SHOW = '\x1b[?25h'
 const MOUSE_ON = '\x1b[?1000h\x1b[?1006h'
 const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l'
+
+const PASTE_START = '\x1b[200~'
+const PASTE_END = '\x1b[201~'
 
 const SGR_MOUSE = /^\x1b\[<(?<button>\d+);(?<x>\d+);(?<y>\d+)[Mm]$/
 const WHEEL_UP = 64
@@ -110,6 +115,9 @@ export function apply(ctx: Context): void {
     display.draw(arranged.rows)
   }
   const service = new BinnacleService(ctx, commandLine.session, draw)
+  const keyboard = new Keyboard((data) => {
+    terminal?.write(data)
+  })
 
   const redrawAll = (): void => {
     display.clear()
@@ -124,11 +132,13 @@ export function apply(ctx: Context): void {
       input.process(data)
     }, redrawAll)
     terminal.write(ALTERNATE_SCREEN_ON + CURSOR_HIDE + MOUSE_ON)
+    keyboard.take()
     redrawAll()
   }
   const giveBack = (): void => {
     if (terminal === undefined || !holdingTerminal) return
     holdingTerminal = false
+    keyboard.giveBack()
     terminal.write(MOUSE_OFF + CURSOR_SHOW + ALTERNATE_SCREEN_OFF)
     terminal.stop()
     printHeldBack?.()
@@ -143,9 +153,11 @@ export function apply(ctx: Context): void {
   const exit: AppExit = ctx.appExit!
   const focused = (): Part | undefined => {
     const place = service.focusOnView
-    return placed.some((drawn) => drawn.place === place) && place !== undefined ? service.partIn(place) : undefined
+    return place !== undefined && placed.some((drawn) => drawn.place === place) ? service.partIn(place) : undefined
   }
   input.on('data', (sequence: string) => {
+    // No Part asks for a key's release yet, and the editor would type it a second time.
+    if (keyboard.answered(sequence) || isKeyRelease(sequence)) return
     const mouse = SGR_MOUSE.exec(sequence)?.groups
     if (mouse !== undefined) return scroll(mouse)
     if (focused()?.key?.(sequence) === true) return draw()
@@ -153,6 +165,10 @@ export function apply(ctx: Context): void {
     const action = coreActionOf(sequence)
     if (action === 'binnacle.quit') exit(0)
     else if (action === 'binnacle.suspend') suspend()
+  })
+  // The buffer takes a bracketed paste out of its markers; the editor reads a paste by them.
+  input.on('paste', (content: string) => {
+    if (focused()?.key?.(`${PASTE_START}${content}${PASTE_END}`) === true) draw()
   })
   const scroll = (mouse: { button?: string; x?: string; y?: string }): void => {
     const notches = mouse.button === String(WHEEL_UP) ? 1 : mouse.button === String(WHEEL_DOWN) ? -1 : 0
