@@ -262,7 +262,7 @@ test("a Part's colour stays inside its Place: its border and the Place beside it
   )
 })
 
-test('a focused Part longer than its Place shows the row of its cursor, and the terminal cursor is put there', async () => {
+test('a Part with the Focus, longer than its Place, shows the row of its cursor, and the terminal cursor is put there', async () => {
   const { terminal, rows } = await drawn(10, 3, (binnacle) => {
     binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a' } })
     binnacle.place('a', { lines: () => ['1', '2', '3', '4', '5', '6'], cursor: () => ({ line: 1, column: 1 }) })

@@ -5,9 +5,9 @@ import '@deepseek-ai/cordis'
 export interface Part {
   /** Unwrapped. A line keeps its colour and style; the core takes out every other control sequence, then wraps it at the width. */
   lines(width: number): readonly string[]
-  /** Where the cursor is in the lines at that width, while the Part is focused. */
+  /** Where the cursor is in the lines at that width, while the Part has the Focus. */
   cursor?(width: number): Cursor | undefined
-  /** A key, as the terminal sent it, while the Part is focused. It returns true when it used the key; the core's key table takes the rest. */
+  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key; the Key Table takes the rest. */
   key?(data: string): boolean
 }
 
@@ -45,7 +45,7 @@ export interface Screen {
   /** The name a plugin replaces the Screen's layout by. */
   readonly name: string
   readonly layout: Layout
-  /** The Place whose Part takes the keys first while the Screen is on view. */
+  /** The Place that has the Focus while the Screen is on view. */
   readonly focus?: string
 }
 

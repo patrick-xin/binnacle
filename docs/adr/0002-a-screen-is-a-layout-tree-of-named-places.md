@@ -8,7 +8,7 @@ A Screen is a layout tree. Its nodes are rows and columns, and its leaves are Pl
 
 Every node may have a box: `padding` and `gap`, in cells; a `border` on any of its sides, so a gutter is a left border; the `edge` its border is drawn with, by name; and a `title` set into its top edge. Edges, glyphs and spacing are named tables behind one lookup, and the theme gives their defaults.
 
-The wheel scrolls the Place under the pointer. The focused Part takes the keys and shows the cursor.
+The wheel scrolls the Place under the pointer. The Part with the Focus takes the keys and shows the cursor.
 
 ## Considered options
 

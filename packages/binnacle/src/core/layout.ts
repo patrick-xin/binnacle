@@ -7,7 +7,7 @@ import { toPlainText } from './view.ts'
 export interface Places {
   rows(place: string, width: number): readonly string[]
   scrolledUp(place: string): number
-  /** In the Place's rows; only the focused Place has one. */
+  /** In the Place's rows; only the Place with the Focus has one. */
   cursor(place: string, width: number): Position | undefined
 }
 
@@ -29,7 +29,7 @@ export interface Placed {
 export interface Arranged {
   readonly rows: string[]
   readonly placed: Placed[]
-  /** On the terminal, where the focused Part's cursor is drawn. */
+  /** On the terminal, where the cursor of the Part with the Focus is drawn. */
   readonly cursor: Position | undefined
 }
 
@@ -209,7 +209,7 @@ class Arrangement {
     const all = this.#places.rows(place, width)
     const cursor = this.#places.cursor(place, width)
     let end = all.length - Math.min(this.#places.scrolledUp(place), this.#maxScroll(place, width, height))
-    // A focused Part shows the row of its cursor, however it was scrolled.
+    // The Part with the Focus shows the row of its cursor, however it was scrolled.
     if (cursor !== undefined) end = Math.min(Math.max(end, cursor.row + 1), cursor.row + height)
     const start = Math.max(0, end - height)
     if (cursor !== undefined && height > 0 && cursor.column < width)

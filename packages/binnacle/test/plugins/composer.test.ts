@@ -33,7 +33,7 @@ test('enter clears the draft and keeps it in the history, and up brings it back'
   )
 })
 
-test("ctrl+c passes the composer by to the core's key table, and quits", async () => {
+test('ctrl+c passes the composer by to the Key Table, and quits', async () => {
   const { typed, exits } = await chat()
   await typed('h', '\x03')
   assert.deepEqual(exits, [0])
@@ -61,7 +61,7 @@ async function authored(ctx: Context, author: (plugin: Context) => void) {
   return plugin
 }
 
-test('a Screen shown over the Chat that focuses no Place gives the composer no key, though it draws it', async () => {
+test('a Screen shown over the Chat that gives no Place the Focus gives the composer no key, though it draws it', async () => {
   const { ctx, typed } = await chat()
   const shown = await authored(ctx, (plugin) => {
     plugin.binnacle.show({ name: 'detail', layout: { column: [{ place: 'detail' }, { place: 'composer', size: 'content' }] } })

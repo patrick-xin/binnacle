@@ -22,7 +22,7 @@ const EDITOR_KEYS: KeybindingDefinitions = {
   'tui.select.cancel': { ...TUI_KEYBINDINGS['tui.select.cancel'], defaultKeys: 'escape' },
 }
 
-/** The one key table: the copied editor reads it through pi-tui's `getKeybindings`. */
+/** The one Key Table: the copied editor reads it through pi-tui's `getKeybindings`. */
 export const keyTable = new KeybindingsManager({ ...EDITOR_KEYS, ...CORE_KEYS })
 
 export function coreActionOf(data: string): CoreAction | undefined {
