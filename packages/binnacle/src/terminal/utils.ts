@@ -575,7 +575,7 @@ class AnsiCodeTracker {
 		const match = ansiCode.match(/\x1b\[([\d;]*)m/);
 		if (!match) return;
 
-		const params = match[1];
+		const params = match[1]!;
 		if (params === "" || params === "0") {
 			// Full reset
 			this.reset();
@@ -586,7 +586,7 @@ class AnsiCodeTracker {
 		const parts = params.split(";");
 		let i = 0;
 		while (i < parts.length) {
-			const code = Number.parseInt(parts[i], 10);
+			const code = Number.parseInt(parts[i]!, 10);
 
 			// Handle 256-color and RGB codes which consume multiple parameters
 			if (code === 38 || code === 48) {
@@ -952,7 +952,7 @@ function wrapSingleLine(line: string, width: number): string[] {
 			for (let i = 0; i < broken.length - 1; i++) {
 				wrapped.push(broken[i]!);
 			}
-			currentLine = broken[broken.length - 1];
+			currentLine = broken[broken.length - 1]!;
 			currentVisibleLength = visibleWidth(currentLine);
 			continue;
 		}
