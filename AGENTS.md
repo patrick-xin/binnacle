@@ -24,7 +24,7 @@ references.json             the repositories that pnpm refs fetches into .refs/
 .refs/<name>/               each Reference at its pin, to read and never to write
 ```
 
-A Task is a GitHub issue. The Intent lists the issues of its current Stage.
+A Task is a GitHub issue that is built: a Ticket, a Fix or a Chore. A Spec designs one feature of a Stage, and its Tickets are its sub-issues. The Intent lists the Specs of its current Stage.
 
 A change that adds a feature or a row edits the feature map in the same commit. A concept that is ours, and that could be read two ways, goes in its glossary in the same commit, capitalized there and wherever it is used in that meaning.
 
@@ -36,4 +36,4 @@ A change that adds a feature or a row edits the feature map in the same commit. 
 | `pnpm test` | Runs every check, then every test. CI runs it on each PR. |
 | `pnpm fmt` | Formats the tree |
 | `pnpm build` | Builds the bundle. A `binnacle` dsh profile that links `packages/binnacle` then runs it with `dsh --profile binnacle`. |
-| `pnpm task` | Runs a Build Task: `start`, `build`, `set`, `ask`, `answer`, `resend`, `status`, `watch`, `land`, `stop` |
+| `pnpm task` | Runs a Spec's Round 0 and its Tickets: `start`, `build`, `set`, `ask`, `answer`, `resend`, `status`, `watch`, `land`, `stop` |

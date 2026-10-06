@@ -1,16 +1,20 @@
 ---
-name: Spec (Build)
-about: One Build task, from an approved intent. The spec skill says how to fill it.
-labels: build
+name: Spec
+about: The design of one feature of a Stage, from an approved Intent. The spec skill says how to fill it.
+labels: spec
 ---
 
 ## Intent
 
-<!-- A link to the intent, and the stage that this task serves. -->
+<!-- A link to the Intent, and the Stage that this Spec serves. -->
+
+## Problem
+
+<!-- What a person or an author cannot do today, as they would say it. -->
 
 ## Behaviour
 
-<!-- One sentence for each behaviour, as a person or an author would say it. Each sentence is the name of one test. -->
+<!-- One sentence for each behaviour, as a person or an author would say it. The Tickets take these as the names of their tests. -->
 
 1.
 
@@ -22,20 +26,8 @@ labels: build
 
 <!-- Each choice that the build needs, with its answer. -->
 
-## Code shape
-
-<!-- The files and the layers that change. -->
-
-## Records
-
-<!-- The docs, notes and glossary rows that change with the code. -->
-
 ## Out of scope
 
 ## Door
 
 <!-- One-way or two-way, and why. -->
-
-## Review level
-
-medium

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { git, makeWorld, steps } from './world.mjs'
+import { built, git, makeWorld, SPEC, steps } from './world.mjs'
 import { run } from './task.mjs'
 
 function events(world, n) {
@@ -15,8 +15,7 @@ function events(world, n) {
 }
 
 async function building(world, n) {
-  world.setIssue(n, world.shape('scripts/task/'))
-  await steps(world, ['start', String(n)], ['set', String(n), 'approved', '--as', 'reviewer'], ['build', String(n)])
+  await built(world, n)
 }
 
 function commit(world, n, message) {
@@ -29,7 +28,7 @@ function commit(world, n, message) {
 test("`task start <n>` makes the Reviewer's checkout, starts the Reviewer with the runner and the model that `.agents/roles.json` names, and sends it round 0", async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   await steps(world, ['start', '140'])
 
   const review = join(world.home, 'worktrees', '140-review')
@@ -47,34 +46,25 @@ test("`task start <n>` makes the Reviewer's checkout, starts the Reviewer with t
   })
   assert.equal(world.runner.prompts.length, 1)
   assert.equal(world.runner.prompts[0].role, 'reviewer')
-  assert.match(world.runner.prompts[0].text, /^You are the Reviewer\. .*Round 0 of #140.*tasks\/140\/review-0\.md/)
+  assert.match(world.runner.prompts[0].text, /^You are the Reviewer\. .*Round 0 of the Spec #140.*tasks\/140\/review-0\.md/)
   assert.deepEqual(
     events(world, 140).map((event) => `${event.event} ${event.role} ${event.detail.id}`),
     ['handoff reviewer h1', 'started reviewer h1', 'prompted reviewer h1'],
   )
 })
 
-test('`task build <n>` starts the Implementer after round 0 is approved, and sends it the spec', async (t) => {
+test('`task build <ticket>` starts the Implementer with the runner and the model that `.agents/roles.json` names, and sends it the Ticket', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
-  await steps(world, ['start', '140'])
-  const early = await run(['build', '140'], world.deps)
-  assert.equal(early.code, 1)
-  assert.match(early.stderr, /task 140 is spec at round 0; task build follows approved at round 0/)
-
-  await steps(world, ['set', '140', 'approved', '--as', 'reviewer'], ['build', '140'])
+  await built(world, 140)
   assert.deepEqual(
     world.runner.starts.map((agent) => `${agent.role} ${agent.model} ${agent.cwd}`),
     [
-      `reviewer openai-codex/gpt-6.1-sol ${join(world.home, 'worktrees', '140-review')}`,
+      `reviewer openai-codex/gpt-6.1-sol ${join(world.home, 'worktrees', `${SPEC}-review`)}`,
       `implementer zai/glm-5.3 ${join(world.home, 'worktrees', '140')}`,
     ],
   )
-  assert.match(world.runner.prompts.at(-1).text, /^You are the Implementer\. .*Build issue #140/)
-  const again = await run(['build', '140'], world.deps)
-  assert.equal(again.code, 1)
-  assert.match(again.stderr, /has an implementer already; run task resend 140/)
+  assert.match(world.runner.prompts.at(-1).text, /^You are the Implementer\. .*Build the Ticket #140/)
 })
 
 test('Each agent that the tool starts knows its task and its role, so `task set` needs no `--as`', async (t) => {
@@ -99,7 +89,10 @@ test('A state that hands the task on sends the hand-off to the next role: `ready
   await steps(world, ['set', '140', 'building', '--as', 'implementer'], ['set', '140', 'ready', '--as', 'implementer'])
   const review = world.runner.prompts.at(-1)
   assert.equal(review.role, 'reviewer')
-  assert.match(review.text, new RegExp(`^Round 1 of #140 at ${first}: the commits ${base}\\.\\.${first}\\..*review-1\\.md`))
+  assert.match(
+    review.text,
+    new RegExp(`^You are the Reviewer\\. .*Round 1 of the Ticket #140 at ${first}: the commits ${base}\\.\\.${first}\\..*review-1\\.md`),
+  )
 
   await steps(world, ['set', '140', 'changes', '--as', 'reviewer'])
   assert.equal(world.runner.prompts.at(-1).role, 'implementer')
@@ -107,7 +100,10 @@ test('A state that hands the task on sends the hand-off to the next role: `ready
 
   const second = commit(world, 140, 'two')
   await steps(world, ['set', '140', 'ready', '--as', 'implementer'])
-  assert.match(world.runner.prompts.at(-1).text, new RegExp(`^Round 2 of #140 at ${second}: the commits ${first}\\.\\.${second}\\.`))
+  assert.match(
+    world.runner.prompts.at(-1).text,
+    new RegExp(`^Round 2 of the Ticket #140 at ${second}: the commits ${first}\\.\\.${second}\\.`),
+  )
 })
 
 test('`approved` after round 0 asks the Implementer for `message.md`, and wakes the Lead', async (t) => {
@@ -123,7 +119,7 @@ test('`approved` after round 0 asks the Implementer for `message.md`, and wakes 
   )
   assert.equal(world.runner.prompts.at(-1).role, 'implementer')
   assert.match(world.runner.prompts.at(-1).text, /^Round 1 of #140 is approved\. Write .*tasks\/140\/message\.md/)
-  assert.equal((await run(['watch'], world.deps)).stdout, '140 approved round 0 (reviewer)\n')
+  assert.equal((await run(['watch'], world.deps)).stdout, `${SPEC} approved round 0 (reviewer)\n`)
   assert.equal((await run(['watch'], world.deps)).stdout, '140 approved round 1 (reviewer)\n')
 })
 
@@ -143,7 +139,7 @@ test('`task answer` sends the answer to the role that asked', async (t) => {
 test('Setting `spec` again at round 0 sends the spec to the Reviewer for its next pass, and names a new report file', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   await steps(world, ['start', '140'], ['set', '140', 'changes', '--as', 'reviewer'], ['set', '140', 'spec', '--as', 'lead'])
   assert.equal(world.runner.prompts.length, 2)
   assert.match(world.runner.prompts[1].text, /^Round 0, pass 2 of #140: .*tasks\/140\/review-0-2\.md/)
@@ -153,7 +149,7 @@ test('Setting `spec` again at round 0 sends the spec to the Reviewer for its nex
 test('A change that the Lead sets does not wake the Lead', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   await steps(world, ['start', '140'])
   // The Lead asks, and answers, a question of its own: `blocked` by the Lead.
   const folder = join(world.home, 'tasks', '140')
@@ -176,29 +172,30 @@ test('A prompt that did not land fails the hand-off: the command exits 3, the ch
   const ready = await run(['set', '140', 'ready', '--as', 'implementer'], world.deps)
   assert.equal(ready.code, 3)
   assert.equal(ready.stdout, 'task 140: ready round 1\n')
-  assert.match(ready.stderr, /task 140: the hand-off h3 to the reviewer failed: agent_prompt_stalled; run task resend 140/)
+  assert.match(ready.stderr, /task 140: the hand-off h2 to the reviewer failed: agent_prompt_stalled; run task resend 140/)
   assert.equal((await run(['status', '140'], world.deps)).stdout.split('\n')[0].startsWith('140 ready round 1'), true)
   await run(['watch'], world.deps)
-  assert.equal((await run(['watch'], world.deps)).stdout, '140 reviewer hand-off h3 failed: agent_prompt_stalled\n')
+  assert.equal((await run(['watch'], world.deps)).stdout, '140 reviewer hand-off h2 failed: agent_prompt_stalled\n')
 })
 
 test('`task resend <n>` sends the hand-off of the last change again, and starts the agent first if it is not running', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
-  await steps(world, ['start', '140'], ['set', '140', 'approved', '--as', 'reviewer'])
+  world.spec(SPEC)
+  world.ticket(140, SPEC)
+  await steps(world, ['start', String(SPEC)], ['set', String(SPEC), 'approved', '--as', 'reviewer'])
   world.runner.failStart.add('implementer')
   assert.equal((await run(['build', '140'], world.deps)).code, 3)
   world.runner.failStart.delete('implementer')
 
   const resent = await run(['resend', '140'], world.deps)
   assert.equal(resent.code, 0, resent.stderr)
-  assert.equal(resent.stdout, 'task 140: resend h2 to the implementer\n')
+  assert.equal(resent.stdout, 'task 140: resend h1 to the implementer\n')
   assert.equal(world.runner.starts.at(-1).role, 'implementer')
   assert.match(world.runner.prompts.at(-1).text, /^You are the Implementer\./)
   assert.deepEqual(
     events(world, 140)
-      .filter((event) => event.detail?.id === 'h2')
+      .filter((event) => event.detail?.id === 'h1')
       .map((event) => event.event),
     ['handoff', 'handoff-failed', 'started', 'prompted'],
   )
@@ -210,7 +207,7 @@ test('`task resend <n>` sends the hand-off of the last change again, and starts 
 test('A hand-off that no command sent, because the command stopped after the change, is reported by the watch', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   await steps(world, ['start', '140'])
   // A command that stopped after it wrote its hand-off, before it tried it.
   appendFileSync(
@@ -223,7 +220,7 @@ test('A hand-off that no command sent, because the command stopped after the cha
 test('`task status` shows a folder that it cannot read as one line with the reason, and still shows each other task', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   await steps(world, ['start', '140'])
   const old = join(world.home, 'tasks', '133')
   mkdirSync(old)
@@ -240,6 +237,8 @@ test('`task stop` closes each agent of the task, and its pane or its run', async
   const world = makeWorld()
   t.after(() => world.remove())
   await building(world, 140)
+  commit(world, 140, 'one')
+  await steps(world, ['set', '140', 'building', '--as', 'implementer'], ['set', '140', 'ready', '--as', 'implementer'])
   assert.equal((await run(['stop', '140', '--force'], world.deps)).code, 0)
   assert.deepEqual(world.runner.closed.toSorted(), ['implementer', 'reviewer'])
   assert.deepEqual(
@@ -254,8 +253,8 @@ test('`task stop` closes each agent of the task, and its pane or its run', async
 test('`task status` shows a task whose events or agents cannot be read as one line, and still shows each other task', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
-  world.setIssue(141, world.shape('docs/'))
+  world.spec(140)
+  world.spec(141)
   await steps(world, ['start', '140'], ['start', '141'])
   const folder = join(world.home, 'tasks', '140')
   const whole = readFileSync(join(folder, 'events.ndjson'), 'utf8')

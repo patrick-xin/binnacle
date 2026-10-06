@@ -1,6 +1,6 @@
 // The clock stands still until a test moves it, so each time a test asserts is a literal.
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
@@ -27,8 +27,10 @@ export function makeWorld() {
   writeFileSync(
     join(repo, '.agents', 'roles.json'),
     JSON.stringify({
+      lead: { tool: 'claude-code', model: 'claude-opus-5-5', family: 'anthropic' },
       implementer: { tool: 'pi', model: 'zai/glm-5.3', family: 'zai', thinking: 'max', runner: 'fake' },
       reviewer: { tool: 'pi', model: 'openai-codex/gpt-6.1-sol', family: 'openai', thinking: 'medium', runner: 'fake' },
+      families: { 'openai-codex': 'openai', zai: 'zai', google: 'google', anthropic: 'anthropic' },
     }),
   )
   writeFileSync(join(repo, 'README.md'), 'one\n')
@@ -37,6 +39,8 @@ export function makeWorld() {
   execFileSync('git', ['push', '-u', 'origin', 'main'], { cwd: repo, stdio: 'ignore' })
 
   const issues = new Map()
+  const titles = new Map()
+  const parents = new Map()
   let clock = new Date('2026-10-05T10:00:00.000Z')
   const runner = makeFakeRunner()
   const gh = makeFakeGh()
@@ -52,6 +56,13 @@ export function makeWorld() {
         const body = issues.get(String(n))
         return body === undefined ? Promise.reject(new Error(`no issue ${n}`)) : Promise.resolve(body)
       },
+      parentOf: async (n) => parents.get(String(n)),
+      titleOf: async (n) => titles.get(String(n)) ?? `issue ${n}`,
+      subIssues: async (n) =>
+        [...parents]
+          .filter(([, spec]) => spec === n)
+          .map(([ticket]) => Number(ticket))
+          .toSorted((a, b) => a - b),
       now: () => clock,
       // A sleep that yields to the event loop, and ends a watch that finds
       // nothing: a test's timeout fails the test, but cannot stop its loop,
@@ -62,7 +73,8 @@ export function makeWorld() {
         return new Promise((resolve) => setImmediate(resolve))
       },
       env: {},
-      runners: { fake: runner },
+      // A choice names herdr or headless; in a test, each is the fake.
+      runners: { fake: runner, herdr: runner, headless: runner },
       gh: (args, input) => gh.call(args, input),
       processes: async () => [],
     },
@@ -71,8 +83,13 @@ export function makeWorld() {
     setIssue(n, body) {
       issues.set(String(n), body)
     },
-    shape(...paths) {
-      return `## Intent\n\nSome work.\n\n## Code shape\n\n${paths.map((path) => `- \`${path}\`\n`).join('')}\n## Records\n\n- none.\n`
+    spec(n, title = `The spec ${n}`) {
+      issues.set(String(n), '## Intent\n\nSome work.\n\n## Door\n\nTwo-way.\n')
+      titles.set(String(n), title)
+    },
+    ticket(n, spec, body = '## Spec\n\nA slice.\n\n## Door\n\nTwo-way. Only the task tool changes.\n\n## Review level\n\nmedium\n') {
+      issues.set(String(n), body)
+      parents.set(String(n), spec)
     },
     tick(ms = 60_000) {
       clock = new Date(clock.getTime() + ms)
@@ -170,6 +187,18 @@ export function logLines(world, n) {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line))
+}
+
+export const SPEC = 100
+
+// A Ticket `n` of the Spec 100, built: the Spec is started and approved first, once.
+export async function built(world, n, ...options) {
+  if (!existsSync(join(world.home, 'tasks', String(SPEC)))) {
+    world.spec(SPEC)
+    await steps(world, ['start', String(SPEC)], ['set', String(SPEC), 'approved', '--as', 'reviewer'])
+  }
+  world.ticket(n, SPEC)
+  await steps(world, ['build', String(n), ...options])
 }
 
 export async function steps(world, ...argvs) {

@@ -31,6 +31,19 @@ export function doorOf(spec) {
   return word === 'one-way' || word === 'two-way' ? word : undefined
 }
 
+function who(agent) {
+  return [agent.tool ?? agent.runner, agent.model].filter(Boolean).join(' ')
+}
+
+// The builder's commits name no model, so the Reviewer does not know who built. The squash names both.
+export function withTrailers(message, { builder, reviewer }) {
+  const trailers = [
+    ...(builder === undefined ? [] : [`Built-by: ${who(builder)}`]),
+    ...(reviewer === undefined ? [] : [`Reviewed-by: ${who(reviewer)}`]),
+  ]
+  return trailers.length === 0 ? message : `${message.trimEnd()}\n\n${trailers.join('\n')}\n`
+}
+
 export function partsOf(message) {
   const [header, ...rest] = message.split('\n')
   const body = rest
@@ -40,11 +53,11 @@ export function partsOf(message) {
   return { header: header.trim(), body }
 }
 
-export function prBody({ n, message, spec, checked, reports }) {
+export function prBody({ n, message, ticket, checked, reports, place }) {
   return [
-    `Closes #${n}`,
-    '',
     '## Summary',
+    '',
+    `Ticket ${place.k} of ${place.of} of #${place.spec}, ${place.title}.`,
     '',
     partsOf(message).body,
     '',
@@ -58,7 +71,7 @@ export function prBody({ n, message, spec, checked, reports }) {
     '',
     '## Merge danger',
     '',
-    `**Door:** ${section(spec, '## Door')}`,
+    `**Door:** ${section(ticket, '## Door')}`,
     '',
     '**Blast radius:** <!-- the Lead fills this in -->',
     '',
@@ -69,6 +82,9 @@ export function prBody({ n, message, spec, checked, reports }) {
     `- [x] Each review round: ${reports.length} report${reports.length === 1 ? '' : 's'}, each in a comment below, oldest first.`,
     '- [ ] Tried under `dsh`, if the change draws or boots: what was driven, and what it drew.',
     '- [ ] The author API: unchanged, or the commit says what changed.',
+    '',
+    `Closes #${n}`,
+    `Part of #${place.spec}`,
     '',
   ].join('\n')
 }

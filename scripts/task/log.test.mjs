@@ -10,15 +10,15 @@ function logOf(world, n) {
   return join(world.home, 'tasks', String(n), 'log.ndjson')
 }
 
-async function started(world, n, path) {
-  world.setIssue(n, world.shape(path))
+async function started(world, n) {
+  world.spec(n)
   return run(['start', String(n)], world.deps)
 }
 
 test('a log that does not end with a newline, or holds a line that is not JSON, makes each command for that task refuse and name the file', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
+  assert.equal((await started(world, 140)).code, 0)
 
   const log = logOf(world, 140)
   const whole = readFileSync(log, 'utf8')
@@ -37,7 +37,7 @@ test('a log that does not end with a newline, or holds a line that is not JSON, 
 test('a command that finds a lock of a gone process removes nothing, and exits 1 naming the lock and the process id', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
+  assert.equal((await started(world, 140)).code, 0)
   const lock = join(world.home, 'tasks', '.lock')
   const gone = spawnSync('true')
   writeFileSync(lock, `${gone.pid}`)
@@ -56,7 +56,7 @@ test('a command that finds a lock of a gone process removes nothing, and exits 1
 
 test('a start whose git step fails removes what it made, and exits with the error', async (t) => {
   const world = makeWorld()
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   const worktrees = join(world.home, 'worktrees')
   mkdirSync(worktrees)
   chmodSync(worktrees, 0o555)
@@ -78,7 +78,7 @@ test('a start whose git step fails removes what it made, and exits with the erro
 test('a command that holds the lock releases it when it gets SIGINT', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
+  assert.equal((await started(world, 140)).code, 0)
   await run(['set', '140', 'changes', '--as', 'reviewer'], world.deps)
   const lock = join(world.home, 'tasks', '.lock')
 
@@ -90,9 +90,11 @@ test('a command that holds the lock releases it when it gets SIGINT', async (t) 
   t.after(() => letGo())
   const parked = run(['set', '140', 'spec'], {
     ...world.deps,
-    readIssue: async () => {
-      await gate
-      return world.shape('scripts/task/')
+    runners: {
+      fake: {
+        ...world.runner,
+        prompt: () => gate,
+      },
     },
   })
   await new Promise((resolve) => setImmediate(resolve))

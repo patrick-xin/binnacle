@@ -1,6 +1,6 @@
 # Notices
 
-These skills began as Matt Pocock's [`skills`](https://github.com/mattpocock/skills) and were rewritten for binnacle: `architecture`, `diagnosing-bugs`, `grill`, `handoff`, `retro`, `spec`, `triage` and `writing-for-agents`. The PR template's Summary began as Dex Horthy's `show-me`, in HumanLayer's [`skills`](https://github.com/humanlayer/skills). Both are under the MIT License:
+These skills began as Matt Pocock's [`skills`](https://github.com/mattpocock/skills) and were rewritten for binnacle: `architecture`, `diagnosing-bugs`, `grill`, `handoff`, `retro`, `spec`, `tickets` (from `to-tickets`), `triage` and `writing-for-agents`. The PR template's Summary began as Dex Horthy's `show-me`, in HumanLayer's [`skills`](https://github.com/humanlayer/skills). Both are under the MIT License:
 
 ## mattpocock/skills
 

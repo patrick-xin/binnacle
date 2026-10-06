@@ -5,7 +5,7 @@ description: The Lead's role skill. Load it first when your prompt makes you the
 
 # Lead
 
-You turn what the Maintainer wants into Tasks, start each Task, answer its questions, and check what comes back. You build Fix and Chore Tasks, and a Build Task only when the Maintainer asks you to. You hold at most three things in flight: for example one Build, one review and one Fix.
+You turn what the Maintainer wants into Tasks, start each Task, answer its questions, and check what comes back. You build Fix and Chore Tasks, and a Ticket when the Maintainer chooses you as its builder. You hold at most three things in flight: for example one Build, one review and one Fix.
 
 ## From Intent to Tasks
 
@@ -14,14 +14,14 @@ You turn what the Maintainer wants into Tasks, start each Task, answer its quest
 3. Write `intents/<slug>/intent.md`: title, metadata, problem, proposed outcome, affected users and systems, constraints, Stages and open questions.
 4. Show the Intent to the Maintainer with the doc tool.
 5. Change the Intent until the Maintainer approves it.
-6. Write the Tasks of the current Stage as GitHub issues.
-7. For a Build Task, use the `spec` skill.
-8. List the issues of the Stage in the Intent.
+6. Write the Specs of the current Stage, with the `spec` skill: one for each feature.
+7. When a Spec's Round 0 is approved, slice it into Tickets, with the `tickets` skill.
+8. List the Specs of the Stage in the Intent.
 9. When every Task of the Stage is merged, tell the Maintainer what to try.
 10. If the Maintainer makes a small change to the Intent, edit it.
 11. If the change is large, use `grill` again.
 
-- An Intent says what is wanted and why. The design goes in the Specs.
+- An Intent says what is wanted and why. The design goes in the Specs, never in the Intent.
 - An answer to an open question is an edit to the Intent.
 - A decision that binds more than one Task is an ADR, written in the Task that needs it.
 - A decision that you take for the Maintainer is an ADR too.
@@ -34,36 +34,62 @@ Choose the Lane when you file the issue. A Task moves up a Lane, never down.
 |---|---|---|---|
 | **Fix** | One behaviour is wrong or missing, and you and the Maintainer agree that it is small enough. No change to the author API, no new decision, two source files at most. | You | Optional: one Round by your subagent |
 | **Chore** | Records, a dependency or a check. Nothing that a person or an author sees changes. | You | The checks and CI |
-| **Build** | All other work | The Implementer | Round 0, then Rounds |
+| **Build** | A Ticket of a Spec: all other work | The builder that the Maintainer chooses | Round 0 on its Spec, then Rounds on the Ticket |
 
 If a Fix needs a decision or a third source file, stop. Move it to Build.
 
-## Before a Task starts
+## Before a Ticket starts
 
-1. List the files that the Task changes, from its Spec.
-2. Compare them with the files of each running Task.
-3. If a file is in both, wait until the running Task merges.
-4. If a running Task finds that it must change another Task's file, stop the later Task.
+1. Each Ticket that blocks it is merged.
+2. Two Tickets with no edge between them can be built at the same time. If both change one shared file, such as a table, a registry or a type, add an edge with `gh issue edit <n> --add-blocked-by <m>`, and wait.
 
-## A Build Task
+## A Spec and its Tickets
 
 The folders, states and Hand-offs are in [`.agents/task.md`](../../task.md).
 
-1. Run `pnpm task start <n>`. It starts the Reviewer, and sends it Round 0.
+1. Run `pnpm task start <spec>`, with the Reviewer of *Builders and Reviewers* below. It sends the Reviewer Round 0.
 2. Run `pnpm task watch` in the background. When it exits, act on its line, then run it again.
-3. Change the Spec for each finding of Round 0, then run `pnpm task set <n> spec`. The tool sends the Reviewer its next pass.
+3. Change the Spec for each finding of Round 0, then run `pnpm task set <spec> spec`. The tool sends the Reviewer its next pass.
 4. When Round 0 is `approved`, and the Door is one-way, get the Maintainer's agreement on the Spec.
-5. Run `pnpm task build <n>`. It starts the Implementer. From here, the tool sends each Hand-off. If the Maintainer asks you to build the Task, run `pnpm task build <n> --by lead` instead.
-6. If a command exits 3, or the watch says that a Hand-off failed or was not sent, run `pnpm task resend <n>`.
-7. If the watch reports a stall, read its busy processes first. Decide what to do: the tool stops no agent.
-8. If an answer changes the Spec, edit the Spec body.
-9. Link the edit in a comment on the issue.
-10. Read each review report in full.
-11. After the third Round with findings, choose one narrow Round more, or ask the Maintainer.
-12. If the Task changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
-13. Run `pnpm task land <n>` to open the PR, as `.agents/task.md` says.
-14. If you tried the branch, write in the PR what you drove and what it drew.
-15. After the PR merges or closes, run `pnpm task stop <n>`.
+5. Slice the Spec into Tickets, with the `tickets` skill.
+6. For each Ticket whose blockers are merged, run `pnpm task build <ticket>`, with the builder of *Builders and Reviewers* below.
+7. If a command exits 3, or the watch says that a Hand-off failed or was not sent, run `pnpm task resend <n>`.
+8. If the watch reports a stall, read its busy processes first. Decide what to do: the tool stops no agent.
+9. If an answer changes the Spec, edit the Spec body.
+10. Link the edit in a comment on the Spec.
+11. Read each review report in full.
+12. After the third Round with findings, choose one narrow Round more, or ask the Maintainer.
+13. If the Ticket changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
+14. Run `pnpm task land <ticket>` to open the PR, as `.agents/task.md` says.
+15. If `task land` says that the branch does not hold `origin/main`, send the Ticket back to its builder to rebase. The builder knows why its change was made. Rebase it yourself only when you built it.
+16. If you tried the branch, write in the PR what you drove and what it drew.
+17. After the PR merges or closes, run `pnpm task stop <ticket>`. After the last Ticket of a Spec merges, run `pnpm task stop <spec>`.
+
+## Builders and Reviewers
+
+The Maintainer names the model of each role at the start of a session, or before a builder writes code. For example: "a Claude subagent as the Implementer, pi on gpt-6.1-sol as the Reviewer". With no name, `.agents/roles.json` holds the default.
+
+| The Maintainer names | Pass |
+|---|---|
+| you, as the builder | `task build <ticket> --by lead` |
+| a Claude subagent as the builder | `task build <ticket> --by subagent:<model>` |
+| pi as the builder | `task build <ticket> --by pi:<provider>/<model>` |
+| pi as the Reviewer | `task start <spec> --reviewer herdr:<provider>/<model>`, or `headless:` |
+| a Claude subagent as the Reviewer | `task start <spec> --reviewer subagent:<model>` |
+
+- A Ticket's Reviewer is its Spec's, unless `task build` gets `--reviewer`.
+- The builder and the Reviewer are of different families. The tool refuses one family for both. Pass `--same-family` only when the Maintainer asks for it.
+- The tool starts no subagent. For a subagent, the command or the watch prints `<n> <role> (subagent): <prompt>`. Start the subagent with that prompt, in the background. For each later prompt to that role of that Task, continue the same subagent.
+- The review is blind. Give the Reviewer only the prompts that the tool prints. Never name the builder to the Reviewer.
+
+## A PR
+
+A PR reads alone: a person or an agent knows what it does and why, with no other record.
+
+- Its title says what a person or an author can do now.
+- Its Summary starts with where it fits: "Ticket 2 of 4 of #160, Stage 3". `task land` writes this line.
+- It quotes each decision that it follows. It does not name only the decision's number.
+- It ends with `Closes #<ticket>` and `Part of #<spec>`. A Fix or a Chore ends with `Closes #<n>`.
 
 ## A Fix or a Chore Task
 
@@ -95,7 +121,8 @@ The Maintainer merges a one-way PR. Every other PR is **two-way**, and it merges
 
 ## Before you end a session
 
-- Each Build in flight has its state in the Task tool: `pnpm task status` shows each one.
+- Each Spec and Ticket in flight has its state in the Task tool: `pnpm task status` shows each one.
+- Each subagent in flight has ended its turn. Its Ticket is in a state that the tool holds.
 - Each Fix or Chore in flight has its branch pushed, and a note on its issue that says where it stopped.
 - Each decision that you took for the Maintainer is in an ADR.
 - If the Maintainer asked for it, the `handoff` skill wrote what the next Lead needs.

@@ -29,6 +29,11 @@ export function readLog(folder) {
     })
 }
 
+// A folder from before Specs had no kind: each one was built, as a Ticket is.
+export function kindOf(record) {
+  return record.kind ?? 'ticket'
+}
+
 export function readTask(folder) {
   const path = join(folder, 'task.json')
   if (!existsSync(path)) throw new Error(`${folder}: no task folder`)
@@ -40,12 +45,20 @@ export function readTask(folder) {
   }
 }
 
-export function followers(from, round) {
+// A Spec has only Round 0, and its approval ends it. A Ticket begins at its Spec's approval, so it has no Round 0 of its own.
+export function followers(kind, from, round) {
+  if (kind === 'spec')
+    switch (from) {
+      case 'spec':
+        return ['changes', 'approved']
+      case 'changes':
+        return ['spec']
+      default:
+        return []
+    }
   switch (from) {
-    case 'spec':
-      return ['changes', 'approved']
     case 'changes':
-      return round === 0 ? ['spec'] : ['building', 'ready']
+      return ['building', 'ready']
     case 'approved':
       return round === 0 ? ['building'] : []
     case 'building':
@@ -55,10 +68,6 @@ export function followers(from, round) {
     default:
       return []
   }
-}
-
-export function overlap(one, other) {
-  return one === other || (one.endsWith('/') && other.startsWith(one)) || (other.endsWith('/') && one.startsWith(other))
 }
 
 export function alive(pid) {
@@ -89,18 +98,12 @@ export function readTasks(home) {
       const record = readTask(join(folder, entry.name))
       const lines = readLog(join(folder, entry.name))
       const last = lines.at(-1)
-      tasks.set(n, { n, folder: join(folder, entry.name), files: record.files, state: last.to, round: last.round, lines })
+      tasks.set(n, { n, folder: join(folder, entry.name), kind: kindOf(record), state: last.to, round: last.round, lines })
     } catch (error) {
       unreadable.push({ n, reason: error.message })
     }
   }
   return { tasks, unreadable }
-}
-
-export function tasksOf(home) {
-  const { tasks, unreadable } = readTasks(home)
-  if (unreadable.length > 0) throw new Error(unreadable[0].reason)
-  return tasks
 }
 
 export function readAgents(folder) {

@@ -116,8 +116,8 @@ async function look(deps) {
     const event = (name, role, detail) => appendEvent(task.folder, { at: deps.now().toISOString(), event: name, role, detail })
     notSent(events, deps, event)
     for (const agent of agents) {
-      // The Lead takes this role: there is no agent to look at.
-      if (agent.runner === 'lead') continue
+      // The Lead takes this role, or its subagent does, or it has not started: there is no agent to look at.
+      if (agent.runner === 'lead' || agent.runner === 'subagent' || agent.handle === undefined) continue
       const since = events.findLastIndex((e) => e.role === agent.role && ['started', 'prompted'].includes(e.event))
       const after = events.slice(since + 1).filter((e) => e.role === agent.role)
       let activity
@@ -210,7 +210,7 @@ function clock(seconds) {
 function eventLine(n, event) {
   switch (event.event) {
     case 'for-lead':
-      return `${n} ${event.role} (lead): ${event.detail.text}`
+      return `${n} ${event.role} (${event.detail.runner ?? 'lead'}): ${event.detail.text}`
     case 'handoff-failed':
       return `${n} ${event.role} hand-off ${event.detail.id} failed: ${event.detail.error}`
     case 'not-sent':
