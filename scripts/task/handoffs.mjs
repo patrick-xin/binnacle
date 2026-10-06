@@ -7,19 +7,19 @@ export function handoffFor(change, c, asker) {
   const report = `${c.folder}/${reportFile(c.round, c.pass)}`
   // The tool of the main checkout: the agent's own checkout may hold another version of it.
   const tool = `pnpm -C ${c.repo} task`
-  const verdict = `Write the report to ${report}, then set the state with \`${tool} set ${c.n} changes\` or \`${tool} set ${c.n} approved\`, and end your turn.`
+  const verdict = `Write the report to ${report}, then set the state with \`${tool} set ${c.n} changes --as reviewer\` or \`${tool} set ${c.n} approved --as reviewer\`, and end your turn.`
   switch (change.kind) {
     case 'start':
       return {
         role: 'reviewer',
         start: true,
-        text: `You are the Reviewer. Load the reviewer skill in .agents/skills/reviewer/ first. Round 0 of #${c.n}: check the spec only (\`gh issue view ${c.n}\`). ${verdict}`,
+        text: `You are the Reviewer. Load the reviewer skill in .agents/skills/reviewer/ first. Round 0 of the Spec #${c.n}: check the Spec only (\`gh issue view ${c.n}\`). ${verdict}`,
       }
     case 'build':
       return {
         role: 'implementer',
         start: true,
-        text: `You are the Implementer. Load the implementer skill in .agents/skills/implementer/ first. Build issue #${c.n} in ${c.worktree}, on the branch task/${c.n}. Round 0 is approved. Your task folder is ${c.folder}. Set your state with \`${tool} set ${c.n} <state>\`, as .agents/task.md says.`,
+        text: `You are the Implementer. Load the implementer skill in .agents/skills/implementer/ first. Build the Ticket #${c.n} in ${c.worktree}, on the branch task/${c.n}. Its Spec is its parent issue, and its Round 0 is approved. Your task folder is ${c.folder}. Set your state with \`${tool} set ${c.n} <state> --as implementer\`, as .agents/task.md says.`,
       }
     case 'answer':
       return {
@@ -39,7 +39,8 @@ export function handoffFor(change, c, asker) {
           return {
             role: 'reviewer',
             start: false,
-            text: `Round ${c.round} of #${c.n} at ${c.tip}: the commits ${c.base}..${c.tip}. In your checkout ${c.review}, run \`git switch --detach ${c.tip}\`, install if \`node_modules\` is missing or the lockfile changed, and run \`pnpm test\`. ${c.round > 1 ? 'Check each finding of the last round first, then what the commits touched.' : 'Review the commits against the spec.'} ${verdict}`,
+            // A Ticket's Reviewer starts at its Round 1, so that prompt is its first.
+            text: `${c.round === 1 ? 'You are the Reviewer. Load the reviewer skill in .agents/skills/reviewer/ first. ' : ''}Round ${c.round} of the Ticket #${c.n} at ${c.tip}: the commits ${c.base}..${c.tip}. In your checkout ${c.review}, run \`git switch --detach ${c.tip}\`, install if \`node_modules\` is missing or the lockfile changed, and run \`pnpm test\`. ${c.round > 1 ? 'Check each finding of the last round first, then what the commits touched.' : `Review the commits against the Ticket (\`gh issue view ${c.n}\`) and its Spec, its parent issue.`} ${verdict}`,
           }
         case 'changes':
           return c.round === 0
@@ -47,7 +48,7 @@ export function handoffFor(change, c, asker) {
             : {
                 role: 'implementer',
                 start: false,
-                text: `Round ${c.round} of #${c.n} has findings: read ${report} in full, fix each finding, prove each new test, and set \`ready\` again with \`${tool} set ${c.n} ready\`.`,
+                text: `Round ${c.round} of #${c.n} has findings: read ${report} in full, fix each finding, prove each new test, and set \`ready\` again with \`${tool} set ${c.n} ready --as implementer\`.`,
               }
         case 'approved':
           return c.round === 0

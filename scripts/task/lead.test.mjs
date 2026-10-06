@@ -2,12 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { git, makeWorld, steps } from './world.mjs'
+import { built, git, makeWorld, SPEC, steps } from './world.mjs'
 import { run } from './task.mjs'
 
 async function byLead(world) {
-  world.setIssue(140, world.shape('scripts/task/'))
-  await steps(world, ['start', '140'], ['set', '140', 'approved', '--as', 'reviewer'], ['build', '140', '--by', 'lead'])
+  await built(world, 140, '--by', 'lead')
 }
 
 test('`task build <n> --by lead` records the Lead as the Implementer, and starts no agent', async (t) => {
@@ -28,11 +27,12 @@ test('`task build --by lead` refuses when the Lead and the Reviewer are of the s
   t.after(() => world.remove())
   const roles = join(world.repo, '.agents', 'roles.json')
   writeFileSync(roles, JSON.stringify({ ...JSON.parse(readFileSync(roles, 'utf8')), lead: { family: 'openai' } }))
-  world.setIssue(140, world.shape('scripts/task/'))
-  await steps(world, ['start', '140'], ['set', '140', 'approved', '--as', 'reviewer'])
+  world.spec(SPEC)
+  world.ticket(140, SPEC)
+  await steps(world, ['start', String(SPEC)], ['set', String(SPEC), 'approved', '--as', 'reviewer'])
   const refused = await run(['build', '140', '--by', 'lead'], world.deps)
   assert.equal(refused.code, 1)
-  assert.match(refused.stderr, /the lead and the reviewer are of the same family openai/)
+  assert.match(refused.stderr, /the builder and the reviewer are of the same family openai/)
 })
 
 test("A hand-off to an Implementer that is the Lead starts no agent, and wakes the Lead with the prompt's text", async (t) => {
@@ -73,5 +73,5 @@ test('`task status` shows the Lead as the Implementer, and `task stop` and the w
   const quiet = await run(['watch'], deps)
   assert.equal(quiet.stderr, 'nothing to report\n')
   assert.equal((await run(['stop', '140', '--force'], world.deps)).code, 0)
-  assert.deepEqual(world.runner.closed, ['reviewer'])
+  assert.deepEqual(world.runner.closed, [], "the Ticket's Reviewer had no Round, so it never started")
 })

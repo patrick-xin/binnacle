@@ -1,12 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { logLines, makeWorld } from './world.mjs'
+import { built, logLines, makeWorld } from './world.mjs'
 import { run } from './task.mjs'
 
-async function started(world, n, path) {
-  world.setIssue(n, world.shape(path))
+async function started(world, n) {
+  world.spec(n)
   return run(['start', String(n)], world.deps)
 }
 
@@ -18,7 +16,7 @@ function stateOf(world, n) {
 test('The Reviewer sets `approved` or `changes` after round 0', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
+  assert.equal((await started(world, 140)).code, 0)
   world.tick()
 
   const approved = await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)
@@ -33,17 +31,16 @@ test('The Reviewer sets `approved` or `changes` after round 0', async (t) => {
     round: 0,
   })
 
-  assert.equal((await started(world, 141, 'docs/')).code, 0)
+  assert.equal((await started(world, 141)).code, 0)
   const changed = await run(['set', '141', 'changes', '--as', 'reviewer'], world.deps)
   assert.equal(changed.code, 0)
   assert.deepEqual(stateOf(world, 141), { state: 'changes', round: 0 })
 })
 
-test('The Implementer sets `building` after round 0 is approved, and `ready` when the tip is ready for a round', async (t) => {
+test("The Implementer sets `building` on a Ticket, which begins at its Spec's approval, and `ready` when the tip is ready for a round", async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
-  assert.equal((await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)).code, 0)
+  await built(world, 140)
 
   const building = await run(['set', '140', 'building', '--as', 'implementer'], world.deps)
   assert.equal(building.code, 0)
@@ -59,8 +56,7 @@ test('The Implementer sets `building` after round 0 is approved, and `ready` whe
 test('Each `ready` starts the next round. The round number goes up by one', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
-  await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)
+  await built(world, 140)
   await run(['set', '140', 'building', '--as', 'implementer'], world.deps)
   await run(['set', '140', 'ready', '--as', 'implementer'], world.deps)
 
@@ -80,8 +76,7 @@ test('Each `ready` starts the next round. The round number goes up by one', asyn
 test('A role that sets a state it does not own is refused, and the state does not change', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
-  await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)
+  await built(world, 140)
 
   const byLead = await run(['set', '140', 'building'], world.deps)
   assert.equal(byLead.code, 1)
@@ -101,7 +96,7 @@ test('A role that sets a state it does not own is refused, and the state does no
 test('A state that cannot follow the current state is refused, and the error names the states that can follow', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'scripts/task/')).code, 0)
+  assert.equal((await started(world, 140)).code, 0)
 
   // At round 0, from spec, only the Reviewer's verdict follows.
   const fromSpec = await run(['set', '140', 'ready', '--as', 'implementer'], world.deps)
@@ -115,13 +110,19 @@ test('A state that cannot follow the current state is refused, and the error nam
   assert.equal(fromChanges.code, 1)
   assert.match(fromChanges.stderr, /building cannot follow changes; spec can follow it/)
 
+  // A Ticket has no Round 0 of its own, so `spec` never follows on it.
+  await built(world, 141)
+  await run(['set', '141', 'building', '--as', 'implementer'], world.deps)
+  await run(['set', '141', 'ready', '--as', 'implementer'], world.deps)
+  await run(['set', '141', 'changes', '--as', 'reviewer'], world.deps)
+  const specOnTicket = await run(['set', '141', 'spec'], world.deps)
+  assert.equal(specOnTicket.code, 1)
+  assert.match(specOnTicket.stderr, /spec cannot follow changes; building, ready can follow it/)
+
   // After a later round's approval, nothing follows: the Lead takes the message and the PR.
-  await run(['set', '140', 'spec'], world.deps)
-  await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)
-  await run(['set', '140', 'building', '--as', 'implementer'], world.deps)
-  await run(['set', '140', 'ready', '--as', 'implementer'], world.deps)
-  await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)
-  const fromApproved = await run(['set', '140', 'building', '--as', 'implementer'], world.deps)
+  await run(['set', '141', 'ready', '--as', 'implementer'], world.deps)
+  await run(['set', '141', 'approved', '--as', 'reviewer'], world.deps)
+  const fromApproved = await run(['set', '141', 'building', '--as', 'implementer'], world.deps)
   assert.equal(fromApproved.code, 1)
   assert.match(fromApproved.stderr, /building cannot follow approved; nothing can follow it/)
 
@@ -131,30 +132,13 @@ test('A state that cannot follow the current state is refused, and the error nam
   assert.match(blocked.stderr, /task set cannot set blocked; only task ask sets it/)
 })
 
-test("The Lead sets `spec` again after an edit of the spec at round 0, and the tool reads the task's files from the issue again. If the new files overlap a running task, it refuses, and keeps the files and the state from before", async (t) => {
+test('The Lead sets `spec` again after an edit of the Spec at round 0', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  assert.equal((await started(world, 140, 'docs/')).code, 0)
-  assert.equal((await started(world, 141, 'scripts/task/')).code, 0)
+  assert.equal((await started(world, 141)).code, 0)
   await run(['set', '141', 'changes', '--as', 'reviewer'], world.deps)
 
-  // The Lead edits the issue, and the tool reads the new files.
-  world.setIssue(141, world.shape('scripts/task/', 'AGENTS.md'))
   const again = await run(['set', '141', 'spec'], world.deps)
   assert.equal(again.code, 0)
-  assert.deepEqual(stateOf(world, 141), { state: 'spec', round: 0 })
-  const record = JSON.parse(readFileSync(join(world.home, 'tasks', '141', 'task.json'), 'utf8'))
-  assert.deepEqual(record.files, ['scripts/task/', 'AGENTS.md'])
   assert.deepEqual(logLines(world, 141).at(-1), { at: '2026-10-05T10:00:00.000Z', role: 'lead', from: 'changes', to: 'spec', round: 0 })
-
-  // An edit that overlaps a running task is refused, and changes nothing.
-  await run(['set', '141', 'changes', '--as', 'reviewer'], world.deps)
-  world.setIssue(141, world.shape('docs/'))
-  const overlapping = await run(['set', '141', 'spec'], world.deps)
-  assert.equal(overlapping.code, 1)
-  assert.match(overlapping.stderr, /docs\/ overlaps docs\/ of running task 140/)
-  assert.deepEqual(stateOf(world, 141), { state: 'changes', round: 0 })
-  const kept = JSON.parse(readFileSync(join(world.home, 'tasks', '141', 'task.json'), 'utf8'))
-  assert.deepEqual(kept.files, ['scripts/task/', 'AGENTS.md'])
-  assert.equal(logLines(world, 141).length, 4)
 })

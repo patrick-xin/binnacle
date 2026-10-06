@@ -2,20 +2,18 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { logLines, makeWorld } from './world.mjs'
+import { built, logLines, makeWorld } from './world.mjs'
 import { run } from './task.mjs'
 
-async function building(world, n, path) {
-  world.setIssue(n, world.shape(path))
-  assert.equal((await run(['start', String(n)], world.deps)).code, 0)
-  await run(['set', String(n), 'approved', '--as', 'reviewer'], world.deps)
+async function building(world, n) {
+  await built(world, n)
   await run(['set', String(n), 'building', '--as', 'implementer'], world.deps)
 }
 
 test('`task ask` sets `blocked`. `task answer` sets the state from before `blocked` again, at the same round', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  await building(world, 140, 'scripts/task/')
+  await building(world, 140)
   const folder = join(world.home, 'tasks', '140')
 
   const withoutQuestion = await run(['ask', '140', '--as', 'implementer'], world.deps)
@@ -28,7 +26,7 @@ test('`task ask` sets `blocked`. `task answer` sets the state from before `block
   const asked = await run(['ask', '140', '--as', 'implementer'], world.deps)
   assert.equal(asked.code, 0)
   assert.deepEqual(logLines(world, 140).at(-1), {
-    at: '2026-10-05T10:01:00.000Z',
+    at: '2026-10-05T10:04:00.000Z',
     role: 'implementer',
     from: 'building',
     to: 'blocked',
@@ -49,7 +47,7 @@ test('`task ask` sets `blocked`. `task answer` sets the state from before `block
   const answered = await run(['answer', '140'], world.deps)
   assert.equal(answered.code, 0)
   assert.deepEqual(logLines(world, 140).at(-1), {
-    at: '2026-10-05T10:02:00.000Z',
+    at: '2026-10-05T10:05:00.000Z',
     role: 'lead',
     from: 'blocked',
     to: 'building',
@@ -64,7 +62,7 @@ test('`task ask` sets `blocked`. `task answer` sets the state from before `block
 test('A second question does not find the answer to the first one', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  await building(world, 140, 'scripts/task/')
+  await building(world, 140)
   const folder = join(world.home, 'tasks', '140')
 
   writeFileSync(join(folder, 'question.md'), 'Why?\n')

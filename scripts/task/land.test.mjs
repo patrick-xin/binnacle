@@ -2,14 +2,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { appendFileSync, chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { git, makeWorld, steps } from './world.mjs'
+import { built, git, makeWorld, SPEC, steps } from './world.mjs'
 import { run } from './task.mjs'
 
 const MESSAGE = 'feat: the thing works\n\nWhat changed, and why.\n\nAuthor API: none.\n\nCloses #140\n'
 
 async function approved(world, door = 'Two-way. Only the task tool changes.') {
-  world.setIssue(140, `${world.shape('scripts/task/')}\n## Door\n\n${door}\n\n## Review level\n\nmedium\n`)
-  await steps(world, ['start', '140'], ['set', '140', 'approved', '--as', 'reviewer'], ['build', '140', '--by', 'lead'])
+  await built(world, 140, '--by', 'lead')
+  world.setIssue(140, `## Spec\n\nA slice.\n\n## Door\n\n${door}\n\n## Review level\n\nmedium\n`)
   const worktree = join(world.home, 'worktrees', '140')
   for (const line of ['one', 'two']) {
     appendFileSync(join(worktree, 'README.md'), `${line}\n`)
@@ -24,12 +24,7 @@ async function approved(world, door = 'Two-way. Only the task tool changes.') {
   const folder = join(world.home, 'tasks', '140')
   writeFileSync(join(folder, 'message.md'), MESSAGE)
   writeFileSync(join(folder, 'checked.md'), '# The proof of each test\n\n## one\n\n- **Break:** x\n')
-  for (const [file, text] of [
-    ['review-0.md', 'Round 0: changes.'],
-    ['review-0-2.md', 'Round 0, pass 2: approved.'],
-    ['review-1.md', 'Round 1: approved.'],
-  ])
-    writeFileSync(join(folder, file), text)
+  writeFileSync(join(folder, 'review-1.md'), 'Round 1: approved.')
   return { worktree, folder }
 }
 
@@ -38,18 +33,21 @@ function originSubjects(world) {
   return git(world.repo, ['log', '--format=%s', 'origin/main..origin/task/140']).split('\n')
 }
 
-test('`task land <n>` squashes the branch into one commit on top of `origin/main`, with `message.md` as its message, and pushes it', async (t) => {
+test('`task land <n>` squashes the branch into one commit on top of `origin/main`, with `message.md` as its message and who built and who reviewed as its trailers, and pushes it', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
   const { worktree } = await approved(world)
   const landed = await run(['land', '140'], world.deps)
   assert.equal(landed.code, 0, landed.stderr)
   assert.deepEqual(originSubjects(world), ['feat: the thing works'])
-  assert.equal(git(worktree, ['log', '-1', '--format=%B']), MESSAGE.trim())
+  assert.equal(
+    git(worktree, ['log', '-1', '--format=%B']),
+    `${MESSAGE.trim()}\n\nBuilt-by: claude-code claude-opus-5-5\nReviewed-by: pi openai-codex/gpt-6.1-sol`,
+  )
   assert.equal(git(worktree, ['rev-parse', 'HEAD~1']), git(world.repo, ['rev-parse', 'origin/main']))
 })
 
-test("`task land` opens the PR: its title is the message's header, its body holds the message, the door and `checked.md`, and each report goes to a comment of its own", async (t) => {
+test("`task land` opens the PR: its title is the message's header, its body says where the Ticket fits and holds the message, the door and `checked.md`, it closes the Ticket as part of its Spec, and each report goes to a comment of its own", async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
   await approved(world)
@@ -57,16 +55,20 @@ test("`task land` opens the PR: its title is the message's header, its body hold
   assert.equal(landed.stdout, 'task 140: landed https://github.com/o/r/pull/1\n')
   const pr = world.gh.prs.get('task/140')
   assert.equal(pr.title, 'feat: the thing works')
-  assert.match(pr.body, /^Closes #140\n\n## Summary\n\nWhat changed, and why\.\n\nAuthor API: none\.\n\n## Evidence\n/)
-  assert.doesNotMatch(pr.body.split('## Evidence')[0], /Closes #140\n\n## Summary[\s\S]*Closes/)
+  assert.match(
+    pr.body,
+    /^## Summary\n\nTicket 1 of 1 of #100, The spec 100\.\n\nWhat changed, and why\.\n\nAuthor API: none\.\n\n## Evidence\n/,
+  )
+  assert.ok(pr.body.endsWith('\n\nCloses #140\nPart of #100\n'), pr.body)
+  assert.doesNotMatch(pr.body, /Built-by/)
   assert.match(pr.body, /## Evidence\n\n<details><summary>.*checked\.md.*<\/summary>\n\n# The proof of each test/)
   assert.match(pr.body, /\*\*Door:\*\* Two-way\. Only the task tool changes\./)
   assert.deepEqual(pr.labels, [])
   assert.deepEqual(
     world.gh.comments.map((comment) => comment.body.split('\n')[0]),
-    ['<!-- binnacle-report: review-0.md -->', '<!-- binnacle-report: review-0-2.md -->', '<!-- binnacle-report: review-1.md -->'],
+    ['<!-- binnacle-report: review-1.md -->'],
   )
-  assert.match(world.gh.comments[2].body, /<details><summary>review-1\.md<\/summary>\n\nRound 1: approved\./)
+  assert.match(world.gh.comments[0].body, /<details><summary>review-1\.md<\/summary>\n\nRound 1: approved\./)
 })
 
 test('A spec whose door is one-way gives its PR the label `one-way`', async (t) => {
@@ -81,8 +83,10 @@ test('A spec whose door is one-way gives its PR the label `one-way`', async (t) 
 test('`task land` refuses before a round after round 0 is approved, and when an input is missing or wrong, and changes nothing', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(141, world.shape('docs/'))
-  await steps(world, ['start', '141'], ['set', '141', 'approved', '--as', 'reviewer'])
+  await built(world, 141, '--by', 'lead')
+  const spec = await run(['land', String(SPEC)], world.deps)
+  assert.equal(spec.code, 1)
+  assert.match(spec.stderr, /task 100 is not a Ticket; task land lands a Ticket/)
   const early = await run(['land', '141'], world.deps)
   assert.equal(early.code, 1)
   assert.match(early.stderr, /task 141 is approved at round 0; task land follows approved after round 0/)
@@ -107,9 +111,11 @@ test('`task land` refuses before a round after round 0 is approved, and when an 
   rmSync(join(folder, 'review-1.md'))
   await refuses(/no review report of a round after round 0/)
   writeFileSync(join(folder, 'review-1.md'), 'Round 1.')
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.setIssue(140, '## Spec\n\nA slice.\n')
   await refuses(/the first word under ## Door is not One-way or Two-way/)
-  world.setIssue(140, `${world.shape('scripts/task/')}\n## Door\n\nTwo-way.\n`)
+  world.ticket(140, 99)
+  await refuses(/issue 140 is not a sub-issue of its Spec 100/)
+  world.ticket(140, SPEC, '## Spec\n\nA slice.\n\n## Door\n\nTwo-way.\n')
   appendFileSync(join(worktree, 'README.md'), 'not committed\n')
   await refuses(/has changes that are not committed/)
   git(worktree, ['checkout', 'README.md'])
@@ -125,7 +131,7 @@ test('A `task land` that failed part of the way can run again: it finishes, and 
   t.after(() => world.remove())
   const { worktree } = await approved(world)
   // GitHub takes the second comment, but its answer is lost.
-  world.gh.failures.push({ match: (args) => args[1] === 'comment' && world.gh.comments.length === 1, lost: true })
+  world.gh.failures.push({ match: (args) => args[1] === 'comment' && world.gh.comments.length === 0, lost: true })
   const first = await run(['land', '140'], world.deps)
   assert.equal(first.code, 1)
   assert.match(first.stderr, /task 140: land stopped at the reports: error connecting to api\.github\.com; run task land 140 again/)
@@ -138,7 +144,7 @@ test('A `task land` that failed part of the way can run again: it finishes, and 
   assert.equal(world.gh.calls.filter((call) => call.startsWith('pr create')).length, 1)
   assert.deepEqual(
     world.gh.comments.map((comment) => comment.body.split('\n')[0]),
-    ['<!-- binnacle-report: review-0.md -->', '<!-- binnacle-report: review-0-2.md -->', '<!-- binnacle-report: review-1.md -->'],
+    ['<!-- binnacle-report: review-1.md -->'],
   )
 })
 

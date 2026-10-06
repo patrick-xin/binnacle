@@ -2,22 +2,15 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { makeWorld } from './world.mjs'
+import { built, makeWorld, SPEC } from './world.mjs'
 import { cpuSeconds, run } from './task.mjs'
 
 async function working(world) {
-  world.setIssue(140, world.shape('scripts/task/'))
-  for (const argv of [
-    ['start', '140'],
-    ['set', '140', 'approved', '--as', 'reviewer'],
-    ['build', '140'],
-    ['set', '140', 'building', '--as', 'implementer'],
-  ]) {
-    world.tick()
-    assert.equal((await run(argv, world.deps)).code, 0)
-  }
-  // The Lead heard of round 0's approval.
-  assert.equal((await run(['watch'], world.deps)).stdout, '140 approved round 0 (reviewer)\n')
+  await built(world, 140)
+  world.tick()
+  assert.equal((await run(['set', '140', 'building', '--as', 'implementer'], world.deps)).code, 0)
+  // The Lead heard of the Spec's approval.
+  assert.equal((await run(['watch'], world.deps)).stdout, `${SPEC} approved round 0 (reviewer)\n`)
   world.runner.states.implementer = { state: 'working', root: 100 }
 }
 

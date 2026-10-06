@@ -2,27 +2,15 @@
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join, posix } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handoffFor } from './handoffs.mjs'
-import { doorOf, marker, partsOf, prBody, reportComment, reportsOf } from './land.mjs'
+import { doorOf, marker, partsOf, prBody, reportComment, reportsOf, withTrailers } from './land.mjs'
 import { locked } from './lock.mjs'
 import { makeHeadless } from './runners/headless.mjs'
 import { makeHerdr } from './runners/herdr.mjs'
 import { toolOf } from './runners/tools.mjs'
-import {
-  appendEvent,
-  followers,
-  OWNERS,
-  overlap,
-  readAgents,
-  readEvents,
-  readLog,
-  readTask,
-  readTasks,
-  tasksOf,
-  writeJson,
-} from './state.mjs'
+import { appendEvent, followers, kindOf, OWNERS, readAgents, readEvents, readLog, readTask, readTasks, writeJson } from './state.mjs'
 import { lastRecord, watch } from './watch.mjs'
 
 class Refusal extends Error {}
@@ -42,31 +30,6 @@ function git(repo, args) {
   const done = spawnSync('git', args, { cwd: repo, encoding: 'utf8' })
   if (done.status !== 0) throw new Refusal(`git ${args.join(' ')} failed: ${(done.stderr || done.stdout).trim()}`)
   return done.stdout.trim()
-}
-
-export function filesOfIssue(body) {
-  const lines = body.split('\n')
-  const heading = lines.findIndex((line) => line.trim() === '## Code shape')
-  if (heading === -1) return []
-  const paths = []
-  for (const line of lines.slice(heading + 1)) {
-    if (line.startsWith('## ')) break
-    for (const span of line.matchAll(/`([^`]+)`/g)) paths.push(span[1])
-  }
-  return paths
-}
-
-function checkedPath(path) {
-  if (path === '' || path === '.' || path === '..' || path.startsWith('/') || path.startsWith('./') || path.startsWith('../'))
-    throw new Refusal(`${path}: not a path relative to the repository`)
-  if (posix.normalize(path) !== path) throw new Refusal(`${path}: not in its normal form`)
-  return path
-}
-
-function filesFromIssue(n, body) {
-  const paths = filesOfIssue(body).map(checkedPath)
-  if (paths.length === 0) throw new Refusal(`issue ${n} lists no files under ## Code shape`)
-  return paths
 }
 
 function number(text) {
@@ -89,6 +52,64 @@ function parseOptions(args, env = {}) {
   return read
 }
 
+// The Lead takes a role that runs as `lead` or `subagent`: the tool starts no agent for it, and gives the Lead each prompt.
+const RELAYED = ['lead', 'subagent']
+
+function familyOf(model, roles) {
+  const provider = model.split('/')[0]
+  const family = roles.families?.[provider]
+  if (family === undefined) throw new Refusal(`${model}: no family for the provider ${provider}; add it to families in .agents/roles.json`)
+  return family
+}
+
+function defaultOf(role, roles) {
+  const setting = roles[role]
+  if (setting === undefined) throw new Refusal(`.agents/roles.json names no ${role}`)
+  return { role, ...setting }
+}
+
+// A choice is `<runner>:<model>`. A subagent is Claude Code's, so its family is anthropic.
+function chosen(role, text, roles) {
+  if (role === 'implementer' && text === 'lead') return { role, runner: 'lead', family: roles.lead?.family }
+  const at = text.indexOf(':')
+  const runner = at === -1 ? text : text.slice(0, at)
+  const model = at === -1 ? '' : text.slice(at + 1)
+  const form = role === 'implementer' ? 'lead, subagent:<model> or pi:<model>' : 'herdr:<model>, headless:<model> or subagent:<model>'
+  if (model === '') throw new Usage(`${text}: the ${role} is ${form}`)
+  if (runner === 'subagent') return { role, runner, tool: 'claude-code', model, family: 'anthropic' }
+  const base = roles[role] ?? {}
+  const thinking = base.tool === 'pi' && base.thinking !== undefined ? { thinking: base.thinking } : {}
+  if (role === 'implementer' && runner === 'pi')
+    return { role, runner: base.tool === 'pi' ? base.runner : 'herdr', tool: 'pi', model, family: familyOf(model, roles), ...thinking }
+  if (role === 'reviewer' && (runner === 'herdr' || runner === 'headless'))
+    return { role, runner, tool: 'pi', model, family: familyOf(model, roles), ...thinking }
+  throw new Usage(`${text}: the ${role} is ${form}`)
+}
+
+function settingOf(agent) {
+  const { handle: _handle, startedAt: _startedAt, ...setting } = agent
+  return setting
+}
+
+function checkTool(setting) {
+  if (!RELAYED.includes(setting.runner)) toolOf(setting.role, setting)
+}
+
+function parseChoices(args, allowed, usage) {
+  const read = { sameFamily: false }
+  for (let i = 0; i < args.length; i++) {
+    const option = args[i]
+    if (!allowed.includes(option)) throw new Usage(usage)
+    if (option === '--same-family') read.sameFamily = true
+    else {
+      if (args[i + 1] === undefined) throw new Usage(usage)
+      read[option.slice(2)] = args[i + 1]
+      i += 1
+    }
+  }
+  return read
+}
+
 async function command(argv, deps, say) {
   const [name, ...rest] = argv
   const env = deps.env ?? {}
@@ -100,14 +121,13 @@ async function command(argv, deps, say) {
   switch (name) {
     case 'start': {
       const [nText, ...more] = args
-      if (more.length > 0) throw new Usage('usage: task start <n>')
-      return start(number(nText), deps, say)
+      const usage = 'usage: task start <spec> [--reviewer <runner>:<model>]'
+      return start(number(nText), parseChoices(more, ['--reviewer'], usage), deps, say)
     }
     case 'build': {
       const [nText, ...more] = args
-      const byLead = more.length === 2 && more[0] === '--by' && more[1] === 'lead'
-      if (more.length > 0 && !byLead) throw new Usage('usage: task build <n> [--by lead]')
-      return build(number(nText), byLead, deps, say)
+      const usage = 'usage: task build <ticket> [--by lead|subagent:<model>|pi:<model>] [--reviewer <runner>:<model>] [--same-family]'
+      return build(number(nText), parseChoices(more, ['--by', '--reviewer', '--same-family'], usage), deps, say)
     }
     case 'land': {
       const [nText, ...more] = args
@@ -150,57 +170,42 @@ async function command(argv, deps, say) {
   }
 }
 
-async function start(n, deps, say) {
+async function start(n, read, deps, say) {
   const roles = readRoles(deps)
-  if (roles.implementer.family === roles.reviewer.family)
-    throw new Refusal(`the implementer and the reviewer are of the same family ${roles.implementer.family}; change .agents/roles.json`)
-  for (const role of ['implementer', 'reviewer']) toolOf(role, roles[role])
-  const files = filesFromIssue(n, await deps.readIssue(n))
+  const reviewer = read.reviewer === undefined ? defaultOf('reviewer', roles) : chosen('reviewer', read.reviewer, roles)
+  checkTool(reviewer)
+  await deps.readIssue(n)
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
-    const worktree = join(deps.home, 'worktrees', String(n))
-    const review = `${worktree}-review`
+    const review = join(deps.home, 'worktrees', `${n}-review`)
     for (const [what, path] of [
       ['task folder', folder],
-      ['worktree', worktree],
       ['worktree', review],
     ])
       if (existsSync(path)) throw new Refusal(`task ${n}: the ${what} ${path} exists already`)
-    const branch = `task/${n}`
-    const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', branch], { cwd: deps.repo })
-    if (probe.status === 0) throw new Refusal(`task ${n}: the branch ${branch} exists already`)
-    for (const [m, task] of tasksOf(deps.home)) {
-      if (task.state === 'stopped') continue
-      for (const path of files)
-        for (const held of task.files) if (overlap(path, held)) throw new Refusal(`${path} overlaps ${held} of running task ${m}`)
-    }
     mkdirSync(join(deps.home, 'worktrees'), { recursive: true })
     try {
       git(deps.repo, ['fetch', 'origin', 'main'])
-      git(deps.repo, ['worktree', 'add', '-b', branch, worktree, 'origin/main'])
       git(deps.repo, ['worktree', 'add', '--detach', review, 'origin/main'])
       mkdirSync(folder, { recursive: true })
-      writeJson(join(folder, 'task.json'), {
-        n,
-        branch,
-        worktree,
-        files,
-        createdAt: deps.now().toISOString(),
-      })
+      writeJson(join(folder, 'task.json'), { n, kind: 'spec', createdAt: deps.now().toISOString() })
+      writeJson(join(folder, 'agents.json'), { reviewer })
       appendLine(join(folder, 'log.ndjson'), { at: deps.now().toISOString(), role: 'lead', from: null, to: 'spec', round: 0 })
     } catch (error) {
-      // The checks above proved that none of these existed, so each one that
-      // is there now is this start's own doing.
-      spawnSync('git', ['worktree', 'remove', '--force', worktree], { cwd: deps.repo })
+      // The checks above proved that neither existed, so each one that is there now is this start's own doing.
       spawnSync('git', ['worktree', 'remove', '--force', review], { cwd: deps.repo })
-      spawnSync('git', ['branch', '-D', branch], { cwd: deps.repo })
       rmSync(folder, { recursive: true, force: true })
       throw error
     }
-    say(`task ${n}: spec round 0, worktree ${worktree}`)
-    await deliver(n, folder, handoffFor({ kind: 'start' }, context(n, folder, deps)), deps)
+    say(`task ${n}: spec round 0, review checkout ${review}`)
+    relay(n, await deliver(n, folder, handoffFor({ kind: 'start' }, context(n, folder, deps)), deps, { quiet: true }), say)
     return 0
   })
+}
+
+// A prompt for a role that the Lead takes, from a command that the Lead ran: the Lead reads it here, and the watch stays quiet.
+function relay(n, relayed, say) {
+  if (relayed !== undefined) say(`task ${n}: for the ${relayed.role} (${relayed.runner}): ${relayed.text}`)
 }
 
 function readRoles(deps) {
@@ -222,7 +227,7 @@ function context(n, folder, deps) {
 }
 
 async function deliver(n, folder, handoff, deps, extra = {}) {
-  if (handoff === undefined) return
+  if (handoff === undefined) return undefined
   const id = `h${readEvents(folder).filter((event) => event.event === 'handoff').length + 1}`
   appendEvent(folder, {
     at: deps.now().toISOString(),
@@ -230,7 +235,7 @@ async function deliver(n, folder, handoff, deps, extra = {}) {
     role: handoff.role,
     detail: { id, start: handoff.start, text: handoff.text, ...extra },
   })
-  await tryHandoff(n, folder, id, handoff, deps, extra)
+  return tryHandoff(n, folder, id, handoff, deps, extra)
 }
 
 async function tryHandoff(n, folder, id, handoff, deps, extra) {
@@ -239,44 +244,37 @@ async function tryHandoff(n, folder, id, handoff, deps, extra) {
   try {
     const agents = readAgents(folder)
     let agent = agents[handoff.role]
-    // The Lead takes this role: the prompt wakes the Lead, and starts no agent.
-    if (agent?.runner === 'lead') {
+    // The Lead takes this role, or passes the prompt to its subagent: the prompt wakes the Lead, and starts no agent.
+    if (RELAYED.includes(agent?.runner)) {
       // A hand-off that the Lead's own command made does not wake the Lead.
-      event('for-lead', { text: handoff.text, ...(extra.quiet ? { quiet: true } : {}) })
-      return
+      event('for-lead', { runner: agent.runner, text: handoff.text, ...(extra.quiet ? { quiet: true } : {}) })
+      return extra.quiet ? { role: handoff.role, runner: agent.runner, text: handoff.text } : undefined
     }
-    let state = agent === undefined ? 'gone' : (await runnerOf(agent.runner, deps).activity(agent.handle)).state
+    // An agent that was chosen, but not yet started, has no handle.
+    let state = agent?.handle === undefined ? 'gone' : (await runnerOf(agent.runner, deps).activity(agent.handle)).state
     if (state === 'unknown') throw new Error(`the ${handoff.role}'s state is unknown; look at it before you resend`)
     if (state === 'gone') {
-      const setting = readRoles(deps)[handoff.role]
-      const tool = setting?.tool
-      toolOf(handoff.role, { tool })
+      const setting = agent === undefined ? defaultOf(handoff.role, readRoles(deps)) : settingOf(agent)
+      toolOf(handoff.role, setting)
       const runner = runnerOf(setting.runner, deps)
       const sessionDir = join(folder, 'agents', handoff.role, 'sessions')
       const handle = await runner.start({
         n,
         role: handoff.role,
-        tool,
+        tool: setting.tool,
         model: setting.model,
         ...(setting.thinking === undefined ? {} : { thinking: setting.thinking }),
         cwd: join(deps.home, 'worktrees', handoff.role === 'reviewer' ? `${n}-review` : String(n)),
         sessionDir,
         env: { BINNACLE_TASK: String(n), BINNACLE_ROLE: handoff.role },
       })
-      agent = {
-        role: handoff.role,
-        runner: setting.runner,
-        tool,
-        model: setting.model,
-        thinking: setting.thinking,
-        handle,
-        startedAt: deps.now().toISOString(),
-      }
+      agent = { ...setting, role: handoff.role, handle, startedAt: deps.now().toISOString() }
       writeJson(join(folder, 'agents.json'), { ...agents, [handoff.role]: agent })
       event('started', { runner: setting.runner })
     }
     await runnerOf(agent.runner, deps).prompt(agent.handle, handoff.text, (tried, code) => event('resent', { try: tried, code }))
     event('prompted', extra)
+    return undefined
   } catch (error) {
     event('handoff-failed', { error: error.message })
     throw new HandoffFailed(`task ${n}: the hand-off ${id} to the ${handoff.role} failed: ${error.message}; run task resend ${n}`)
@@ -289,29 +287,68 @@ function runnerOf(name, deps) {
   return runner
 }
 
-async function build(n, byLead, deps, say) {
+async function build(n, read, deps, say) {
+  const roles = readRoles(deps)
+  const spec = await deps.parentOf(n)
+  if (spec === undefined) throw new Refusal(`issue ${n} has no parent; a Ticket is a sub-issue of its Spec`)
   return locked(deps, async () => {
-    const folder = join(deps.home, 'tasks', String(n))
-    readTask(folder)
-    const last = readLog(folder).at(-1)
+    const specFolder = join(deps.home, 'tasks', String(spec))
+    if (!existsSync(join(specFolder, 'task.json')))
+      throw new Refusal(`the Spec ${spec} of ${n} has no task folder; run task start ${spec} first`)
+    if (kindOf(readTask(specFolder)) !== 'spec') throw new Refusal(`the parent ${spec} of ${n} is not a Spec`)
+    const last = readLog(specFolder).at(-1)
     if (last.to !== 'approved' || last.round !== 0)
-      throw new Refusal(`task ${n} is ${last.to} at round ${last.round}; task build follows approved at round 0`)
-    const agents = readAgents(folder)
-    if (agents.implementer !== undefined) throw new Refusal(`task ${n} has an implementer already; run task resend ${n}`)
-    if (byLead) {
-      const roles = readRoles(deps)
-      if (roles.lead?.family === roles.reviewer?.family)
-        throw new Refusal(
-          `the lead and the reviewer are of the same family ${roles.reviewer?.family}; the Lead cannot build a task that this Reviewer reviews`,
-        )
+      throw new Refusal(`the Spec ${spec} is ${last.to} at round ${last.round}; task build follows its approved at round 0`)
+    const builder = read.by === undefined ? defaultOf('implementer', roles) : chosen('implementer', read.by, roles)
+    const ofSpec = readAgents(specFolder).reviewer
+    const reviewer =
+      read.reviewer !== undefined
+        ? chosen('reviewer', read.reviewer, roles)
+        : ofSpec !== undefined
+          ? settingOf(ofSpec)
+          : defaultOf('reviewer', roles)
+    if (!read.sameFamily && builder.family === reviewer.family)
+      throw new Refusal(`the builder and the reviewer are of the same family ${builder.family}; choose another, or pass --same-family`)
+    checkTool(builder)
+    checkTool(reviewer)
+
+    const folder = join(deps.home, 'tasks', String(n))
+    const worktree = join(deps.home, 'worktrees', String(n))
+    const review = `${worktree}-review`
+    for (const [what, path] of [
+      ['task folder', folder],
+      ['worktree', worktree],
+      ['worktree', review],
+    ])
+      if (existsSync(path)) throw new Refusal(`task ${n}: the ${what} ${path} exists already`)
+    const branch = `task/${n}`
+    const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', branch], { cwd: deps.repo })
+    if (probe.status === 0) throw new Refusal(`task ${n}: the branch ${branch} exists already`)
+    mkdirSync(join(deps.home, 'worktrees'), { recursive: true })
+    let base
+    try {
+      git(deps.repo, ['fetch', 'origin', 'main'])
+      git(deps.repo, ['worktree', 'add', '-b', branch, worktree, 'origin/main'])
+      git(deps.repo, ['worktree', 'add', '--detach', review, 'origin/main'])
+      base = git(deps.repo, ['rev-parse', 'origin/main'])
+      mkdirSync(folder, { recursive: true })
+      writeJson(join(folder, 'task.json'), { n, kind: 'ticket', spec, branch, worktree, createdAt: deps.now().toISOString() })
       writeJson(join(folder, 'agents.json'), {
-        ...agents,
-        implementer: { role: 'implementer', runner: 'lead', startedAt: deps.now().toISOString() },
+        implementer: { ...builder, ...(RELAYED.includes(builder.runner) ? { startedAt: deps.now().toISOString() } : {}) },
+        reviewer,
       })
+      // A Ticket begins where its Spec's Round 0 ended.
+      appendLine(join(folder, 'log.ndjson'), { at: deps.now().toISOString(), role: 'lead', from: null, to: 'approved', round: 0 })
+    } catch (error) {
+      spawnSync('git', ['worktree', 'remove', '--force', worktree], { cwd: deps.repo })
+      spawnSync('git', ['worktree', 'remove', '--force', review], { cwd: deps.repo })
+      spawnSync('git', ['branch', '-D', branch], { cwd: deps.repo })
+      rmSync(folder, { recursive: true, force: true })
+      throw error
     }
-    const base = git(deps.repo, ['rev-parse', 'origin/main'])
-    say(`task ${n}: the ${byLead ? 'Lead' : 'implementer'} builds from ${base.slice(0, 7)}`)
-    await deliver(n, folder, handoffFor({ kind: 'build' }, context(n, folder, deps)), deps, byLead ? { base, quiet: true } : { base })
+    say(`task ${n}: a Ticket of ${spec}, built from ${base.slice(0, 7)}`)
+    const quiet = RELAYED.includes(builder.runner) ? { quiet: true } : {}
+    relay(n, await deliver(n, folder, handoffFor({ kind: 'build' }, context(n, folder, deps)), deps, { base, ...quiet }), say)
     return 0
   })
 }
@@ -319,7 +356,8 @@ async function build(n, byLead, deps, say) {
 async function land(n, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
-    readTask(folder)
+    const record = readTask(folder)
+    if (kindOf(record) !== 'ticket' || record.spec === undefined) throw new Refusal(`task ${n} is not a Ticket; task land lands a Ticket`)
     const events = readEvents(folder)
     const landed = events.find((event) => event.event === 'landed')
     if (landed !== undefined) throw new Refusal(`task ${n} has landed already: ${landed.detail.url}`)
@@ -334,9 +372,19 @@ async function land(n, deps, say) {
     if (!existsSync(join(folder, 'checked.md'))) throw new Refusal(`no checked.md in ${folder}`)
     const reports = reportsOf(readdirSync(folder))
     if (!reports.some((file) => !file.startsWith('review-0'))) throw new Refusal(`no review report of a round after round 0 in ${folder}`)
-    const spec = await deps.readIssue(n)
-    const door = doorOf(spec)
+    const ticket = await deps.readIssue(n)
+    const door = doorOf(ticket)
     if (door === undefined) throw new Refusal(`issue ${n}: the first word under ## Door is not One-way or Two-way`)
+    const tickets = await deps.subIssues(record.spec)
+    const k = tickets.indexOf(n) + 1
+    if (k === 0) throw new Refusal(`issue ${n} is not a sub-issue of its Spec ${record.spec}`)
+    const place = { k, of: tickets.length, spec: record.spec, title: await deps.titleOf(record.spec) }
+    const agents = readAgents(folder)
+    const roles = readRoles(deps)
+    const full = withTrailers(message, {
+      builder: agents.implementer?.runner === 'lead' ? { ...roles.lead, runner: 'lead' } : agents.implementer,
+      reviewer: agents.reviewer,
+    })
     const worktree = join(deps.home, 'worktrees', String(n))
     if (git(worktree, ['status', '--porcelain']) !== '') throw new Refusal(`${worktree} has changes that are not committed`)
     git(worktree, ['fetch', 'origin', 'main'])
@@ -356,12 +404,12 @@ async function land(n, deps, say) {
       const one = git(worktree, ['rev-list', '--count', 'origin/main..HEAD']) === '1'
       // Compare with the message as Git keeps it: the commit below cleans it
       // with `--cleanup=whitespace`, as `git stripspace` does.
-      const kept = spawnSync('git', ['stripspace'], { cwd: worktree, input: message, encoding: 'utf8' }).stdout.trim()
+      const kept = spawnSync('git', ['stripspace'], { cwd: worktree, input: full, encoding: 'utf8' }).stdout.trim()
       if (one && git(worktree, ['log', '-1', '--format=%B']).trim() === kept) return
       const before = git(worktree, ['rev-parse', 'HEAD'])
       git(worktree, ['reset', '--soft', 'origin/main'])
       // The cleanup is named, not taken from Git's settings, so that it is the one the check above undoes.
-      const done = spawnSync('git', ['commit', '--cleanup=whitespace', '-F', messagePath], { cwd: worktree, encoding: 'utf8' })
+      const done = spawnSync('git', ['commit', '--cleanup=whitespace', '-F', '-'], { cwd: worktree, input: full, encoding: 'utf8' })
       if (done.status !== 0) {
         // Put the branch back, so the worktree is clean for the next run.
         git(worktree, ['reset', '--soft', before])
@@ -378,7 +426,7 @@ async function land(n, deps, say) {
       const checked = readFileSync(join(folder, 'checked.md'), 'utf8')
       const made = await deps.gh(
         ['pr', 'create', '--base', 'main', '--head', `task/${n}`, '--title', header, '--body-file', '-'],
-        prBody({ n, message, spec, checked, reports }),
+        prBody({ n, message, ticket, checked, reports, place }),
       )
       if (made.code !== 0) throw new Error(made.stderr.trim())
       const address = made.stdout.trim().split('\n').at(-1)
@@ -436,15 +484,10 @@ async function setState(n, state, read, deps, say) {
   if (!(state in OWNERS)) throw new Usage(`${state}: not a state`)
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
-    const record = readTask(folder)
+    const kind = kindOf(readTask(folder))
     const last = readLog(folder).at(-1)
     if (OWNERS[state] !== read.as) throw new Refusal(`the ${read.as} cannot set ${state}; the ${OWNERS[state]} sets it`)
-    const can = followers(last.to, last.round)
-    if (!can.includes(state)) throw new Refusal(refusal(n, state, last))
-    if (state === 'spec') {
-      record.files = await filesAgain(n, deps, folder)
-      writeJson(join(folder, 'task.json'), record)
-    }
+    if (!followers(kind, last.to, last.round).includes(state)) throw new Refusal(refusal(n, kind, state, last))
     const round = state === 'ready' ? last.round + 1 : last.round
     appendLine(join(folder, 'log.ndjson'), {
       at: deps.now().toISOString(),
@@ -459,7 +502,8 @@ async function setState(n, state, read, deps, say) {
       c.tip = git(join(deps.home, 'worktrees', String(n)), ['rev-parse', 'HEAD'])
       c.base = lastTip(folder) ?? c.tip
     }
-    await deliver(n, folder, handoffFor({ kind: 'set', to: state }, c), deps, state === 'ready' ? { tip: c.tip } : {})
+    const extra = { ...(state === 'ready' ? { tip: c.tip } : {}), ...(read.as === 'lead' ? { quiet: true } : {}) }
+    relay(n, await deliver(n, folder, handoffFor({ kind: 'set', to: state }, c), deps, extra), say)
     return 0
   })
 }
@@ -470,19 +514,8 @@ function lastTip(folder) {
   return last?.detail.tip ?? last?.detail.base
 }
 
-async function filesAgain(n, deps, folder) {
-  const files = filesFromIssue(n, await deps.readIssue(n))
-  const others = tasksOf(deps.home)
-  for (const [m, other] of others) {
-    if (other.folder === folder || other.state === 'stopped') continue
-    for (const path of files)
-      for (const held of other.files) if (overlap(path, held)) throw new Refusal(`${path} overlaps ${held} of running task ${m}`)
-  }
-  return files
-}
-
-function refusal(n, state, last) {
-  const can = followers(last.to, last.round)
+function refusal(n, kind, state, last) {
+  const can = followers(kind, last.to, last.round)
   const after =
     last.to === 'blocked'
       ? 'task answer sets the state from before blocked'
@@ -496,9 +529,9 @@ function refusal(n, state, last) {
 async function ask(n, read, deps, say) {
   return locked(deps, async () => {
     const folder = join(deps.home, 'tasks', String(n))
-    readTask(folder)
+    const kind = kindOf(readTask(folder))
     const last = readLog(folder).at(-1)
-    if (last.to === 'blocked' || last.to === 'stopped') throw new Refusal(refusal(n, 'blocked', last))
+    if (last.to === 'blocked' || last.to === 'stopped') throw new Refusal(refusal(n, kind, 'blocked', last))
     if (!existsSync(join(folder, 'question.md'))) throw new Refusal(`no question.md in ${folder}; write it first`)
     appendLine(join(folder, 'log.ndjson'), {
       at: deps.now().toISOString(),
@@ -530,7 +563,12 @@ async function answer(n, deps, say) {
       round: last.round,
     })
     say(`task ${n}: ${last.from} round ${last.round}; the answer is answer-${k}.md`)
-    if (last.role !== 'lead') await deliver(n, folder, handoffFor({ kind: 'answer' }, { ...context(n, folder, deps), k }, last.role), deps)
+    if (last.role !== 'lead')
+      relay(
+        n,
+        await deliver(n, folder, handoffFor({ kind: 'answer' }, { ...context(n, folder, deps), k }, last.role), deps, { quiet: true }),
+        say,
+      )
     return 0
   })
 }
@@ -570,6 +608,14 @@ async function status(deps, n, say) {
     for (const agent of agents) {
       if (agent.runner === 'lead') {
         say(`  ${agent.role} lead`)
+        continue
+      }
+      if (agent.runner === 'subagent') {
+        say(`  ${agent.role} subagent ${agent.model}`)
+        continue
+      }
+      if (agent.handle === undefined) {
+        say(`  ${agent.role} ${agent.runner} ${agent.model}, not started`)
         continue
       }
       let state
@@ -614,7 +660,7 @@ async function stop(n, read, deps, say) {
     }
     const branch = `task/${n}`
     for (const agent of Object.values(readAgents(folder))) {
-      if (agent.runner === 'lead') continue
+      if (RELAYED.includes(agent.runner) || agent.handle === undefined) continue
       await runnerOf(agent.runner, deps).close(agent.handle)
       appendEvent(folder, { at: deps.now().toISOString(), event: 'closed', role: agent.role })
     }
@@ -666,6 +712,14 @@ export async function run(argv, deps) {
   return { code, stdout: out.length === 0 ? '' : `${out.join('\n')}\n`, stderr: err.length === 0 ? '' : `${err.join('\n')}\n` }
 }
 
+function ghRead(args, what) {
+  try {
+    return Promise.resolve(execFileSync('gh', args, { encoding: 'utf8' }))
+  } catch (error) {
+    return Promise.reject(new Error(`cannot read ${what}: ${error.stderr?.trim() ?? error.message}`))
+  }
+}
+
 function exec(file, args) {
   return new Promise((resolve) => {
     execFile(file, args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) =>
@@ -698,12 +752,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     home,
     repo: join(dirname(fileURLToPath(import.meta.url)), '..', '..'),
     env: process.env,
-    readIssue(n) {
-      try {
-        return Promise.resolve(execFileSync('gh', ['issue', 'view', String(n), '--json', 'body', '--jq', '.body'], { encoding: 'utf8' }))
-      } catch (error) {
-        return Promise.reject(new Error(`cannot read issue ${n}: ${error.stderr?.trim() ?? error.message}`))
-      }
+    readIssue: (n) => ghRead(['issue', 'view', String(n), '--json', 'body', '--jq', '.body'], `issue ${n}`),
+    titleOf: async (n) => (await ghRead(['issue', 'view', String(n), '--json', 'title', '--jq', '.title'], `issue ${n}`)).trim(),
+    async parentOf(n) {
+      const parent = (await ghRead(['issue', 'view', String(n), '--json', 'parent', '--jq', '.parent.number // ""'], `issue ${n}`)).trim()
+      return parent === '' ? undefined : Number(parent)
+    },
+    async subIssues(n) {
+      const text = await ghRead(['api', `repos/{owner}/{repo}/issues/${n}/sub_issues`, '--jq', '.[].number'], `the sub-issues of ${n}`)
+      return text.split('\n').filter(Boolean).map(Number)
     },
     now: () => new Date(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),

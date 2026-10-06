@@ -16,10 +16,11 @@ These rules apply to every file that is committed, and to issues and PRs. `pnpm 
 | Record | Home |
 |---|---|
 | What is wanted, why, and in which Stages | the Intent |
+| The design of one feature of a Stage | its Spec |
 | One Task | its GitHub issue |
 | A decision that binds more than one Task | an ADR in `docs/adr/` |
 | What one change did, and why | its commit message, in Conventional Commits |
-| The proof of each test, and each review Round | its PR |
+| The proof of each test, each review Round, and where the change fits | its PR |
 
 - Each fact has one home. Everywhere else links to it.
 - An ADR stands on its own. It cites nothing, and it links only other ADRs.

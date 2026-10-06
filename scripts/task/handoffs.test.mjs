@@ -25,7 +25,7 @@ test('`ready` sends the Reviewer the round, the tip, the commits since the last 
   assert.equal(handoff.start, false)
   assert.equal(
     handoff.text,
-    'Round 2 of #140 at b2: the commits a1..b2. In your checkout /h/worktrees/140-review, run `git switch --detach b2`, install if `node_modules` is missing or the lockfile changed, and run `pnpm test`. Check each finding of the last round first, then what the commits touched. Write the report to /h/tasks/140/review-2.md, then set the state with `pnpm -C /r task set 140 changes` or `pnpm -C /r task set 140 approved`, and end your turn.',
+    'Round 2 of the Ticket #140 at b2: the commits a1..b2. In your checkout /h/worktrees/140-review, run `git switch --detach b2`, install if `node_modules` is missing or the lockfile changed, and run `pnpm test`. Check each finding of the last round first, then what the commits touched. Write the report to /h/tasks/140/review-2.md, then set the state with `pnpm -C /r task set 140 changes --as reviewer` or `pnpm -C /r task set 140 approved --as reviewer`, and end your turn.',
   )
 })
 
@@ -50,10 +50,16 @@ test('each change hands the task to the role that acts next, or to no agent', ()
   assert.match(handoffFor({ kind: 'answer' }, { ...task, k: 2 }, 'reviewer').text, /answer-2\.md/)
 })
 
-test('each prompt names the tool of the main checkout, never the tool of the checkout the agent works in', () => {
+test('each prompt names the tool of the main checkout, never the tool of the checkout the agent works in, and the role, which a subagent has in no environment', () => {
   const c = { ...task, repo: '/src/binnacle' }
   const verdict = handoffFor({ kind: 'start' }, c).text
-  assert.match(verdict, /`pnpm -C \/src\/binnacle task set 140 changes` or `pnpm -C \/src\/binnacle task set 140 approved`/)
-  assert.match(handoffFor({ kind: 'build' }, c).text, /`pnpm -C \/src\/binnacle task set 140 <state>`/)
-  assert.match(handoffFor({ kind: 'set', to: 'changes' }, { ...c, round: 1 }).text, /`pnpm -C \/src\/binnacle task set 140 ready`/)
+  assert.match(
+    verdict,
+    /`pnpm -C \/src\/binnacle task set 140 changes --as reviewer` or `pnpm -C \/src\/binnacle task set 140 approved --as reviewer`/,
+  )
+  assert.match(handoffFor({ kind: 'build' }, c).text, /`pnpm -C \/src\/binnacle task set 140 <state> --as implementer`/)
+  assert.match(
+    handoffFor({ kind: 'set', to: 'changes' }, { ...c, round: 1 }).text,
+    /`pnpm -C \/src\/binnacle task set 140 ready --as implementer`/,
+  )
 })

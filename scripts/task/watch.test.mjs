@@ -6,13 +6,11 @@ import { spawnSync } from 'node:child_process'
 import { makeWorld } from './world.mjs'
 import { run } from './task.mjs'
 
-async function ready(world, n, path) {
-  world.setIssue(n, world.shape(path))
+async function approved(world, n) {
+  world.spec(n)
   for (const argv of [
     ['start', String(n)],
     ['set', String(n), 'approved', '--as', 'reviewer'],
-    ['set', String(n), 'building', '--as', 'implementer'],
-    ['set', String(n), 'ready', '--as', 'implementer'],
   ]) {
     world.tick()
     assert.equal((await run(argv, world.deps)).code, 0, `${argv.join(' ')} failed`)
@@ -22,12 +20,11 @@ async function ready(world, n, path) {
 test('`task watch` exits with one line for the oldest change that the Lead acts on and that no watch reported', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  await ready(world, 140, 'scripts/task/')
+  await approved(world, 140)
   world.tick(30_000)
-  await ready(world, 141, 'docs/')
+  await approved(world, 141)
 
-  // Each run takes the oldest change that waits: task 140 first. The Lead's
-  // own `spec`, `building`, and `ready`, which goes to the Reviewer, wake no one.
+  // Each run takes the oldest change that waits: task 140 first. The Lead's own `spec` wakes no one.
   const reports = ['140 approved round 0 (reviewer)', '141 approved round 0 (reviewer)']
   for (const [i, expected] of reports.entries()) {
     const result = await run(['watch'], world.deps)
@@ -43,7 +40,7 @@ test('`task watch` exits with one line for the oldest change that the Lead acts 
 test('Two changes that wait are reported by two runs of `task watch`, one each', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
   world.tick()
   await run(['set', '140', 'changes', '--as', 'reviewer'], world.deps)
@@ -61,7 +58,7 @@ test('Two changes that wait are reported by two runs of `task watch`, one each',
 test('`task watch` sleeps and reads again when no line waits', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  await ready(world, 140, 'scripts/task/')
+  await approved(world, 140)
   // Drain the one change that waits: `approved` at round 0.
   await run(['watch'], world.deps)
 
@@ -86,7 +83,7 @@ test('`task watch` sleeps and reads again when no line waits', async (t) => {
 test('a second watch exits 2 while one runs', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
 
   // The first watch sleeps until the test lets it go, and ends by reporting
@@ -132,7 +129,7 @@ test('a second watch exits 2 while one runs', async (t) => {
 test('a watch that finds a gone process in watch.pid changes nothing, and exits 1 naming the file', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
   const gone = spawnSync('true')
   const pidFile = join(world.home, 'tasks', 'watch.pid')
@@ -155,7 +152,7 @@ test('a watch that finds a gone process in watch.pid changes nothing, and exits 
 test('a watch that holds the pid file releases it when it gets SIGTERM', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  world.setIssue(140, world.shape('scripts/task/'))
+  world.spec(140)
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
   const pidFile = join(world.home, 'tasks', 'watch.pid')
 
