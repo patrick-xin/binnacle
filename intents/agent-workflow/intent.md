@@ -17,6 +17,8 @@ Agents write most of binnacle's code, reviews and records. Without a plan and cl
 6. **Each merge waits for a person.** Agents make many pull requests in a short time.
 7. **Words drift.** One thing has many names, and one name has many meanings.
 8. **Lessons are not used again.** They collect in one place, and no one reads them back into the instructions.
+9. **A pull request cannot be read alone.** binnacle's Stage 2 had no Spec and no issue for each slice. Its design went into the Intent, and its PRs name "slice 4" and "decision 14". A person or an agent must find and read other records to know what a PR does and why.
+10. **The process fits one builder only.** A Build Task needs a pi Implementer in a herdr pane, and a Round 0 for each Task. When the Lead builds, it goes around the Task tool.
 
 ## Proposed outcome
 
@@ -30,13 +32,15 @@ Agents write most of binnacle's code, reviews and records. Without a plan and cl
 8. All prose follows one writing standard, and each word has one meaning.
 9. Lessons go back into the role instructions at regular times.
 10. The Maintainer reviews a long document in one view. The Lead receives the Maintainer's edits and comments together.
+11. A Spec holds the design of one feature of a Stage, and its Tickets slice it. A person or an agent reads a PR, and it says what changed, why, and where it fits.
+12. The Lead, a Claude Code subagent or a pi agent builds a Ticket, through the same Task tool. The Maintainer chooses the model of each role for a session.
 
 ## Affected users and systems
 
 - **The Maintainer:** approves Intents, tries each Stage, and decides the changes that cannot be reversed.
 - **The agents:** the coordinator, the builders, the reviewers and the researchers.
 - **herdr:** the terminal panes where agents run, when they do not run headless.
-- **The agent tools:** pi, Claude Code and Codex today. A setting names the tool and the model for each role. When binnacle has enough features, an agent in binnacle can take a role too.
+- **The agent tools:** pi, Claude Code and its subagents, and Codex today. A setting names the tool and the model for each role. When binnacle has enough features, an agent in binnacle can take a role too.
 - **GitHub:** issues, pull requests, labels, CI and auto-merge.
 - **The repository:** `AGENTS.md`, the skills, the records and the gates.
 
@@ -57,17 +61,36 @@ Each Stage ends in a behaviour that the Maintainer can try. The coordinator writ
 
 1. **The records.** The repository starts again from an empty tree, with the instructions for each role. The Maintainer reads them and starts a brainstorm for the binnacle Intent. Specs: #123, #124, #125, #126.
 2. **The Task tool.** One tool moves a Task between roles. The Maintainer tries it on one small Task. Specs: #133, #137, #141. Fix: #139.
-3. **Merging.** A change that can be reversed merges with no person. The Maintainer sees one merge with no person, and one change that waits.
-4. **Words.** The checks refuse a retired word and a sentence that breaks STE. The Maintainer sees both refusals.
+3. **Specs and Tickets.** A Spec holds the design of one feature, and its Tickets are sub-issues with blocking edges. The `tickets` skill begins as Matt Pocock's `to-tickets`. The Task tool takes the builder and the Reviewer that the Maintainer names. The Maintainer tries it on binnacle's Stage 3: one Spec, its Tickets, a Ticket built by a subagent, and a PR that reads alone.
+4. **Merging.** A change that can be reversed merges with no person. The Maintainer sees one merge with no person, and one change that waits.
+5. **Words.** The checks refuse a retired word and a sentence that breaks STE. The Maintainer sees both refusals.
 
 ## Decisions
 
 These answer the open questions of the first draft.
 
-1. Two Tasks do not change the same files at the same time.
+1. Two Tasks do not change the same files at the same time. Decision 11 replaces this.
 2. A decision that the coordinator takes for the Maintainer is written as an ADR. An ADR cannot be reversed, so the Maintainer merges it.
 3. A file that is longer than 800 lines causes a warning, not a failure.
 4. One file lists the kinds of change that cannot be reversed. A change to that file cannot be reversed either.
+
+These answer the design of Stage 3, from the grill of 2026-10-06.
+
+5. **Spec.** A Spec is one GitHub issue for one feature of a Stage. A Stage has one Spec or more. A Spec holds its Intent and Stage, the problem, the behaviours, the seams, the decisions, what is out of scope, and the Door.
+6. **Ticket.** A Ticket is one vertical slice of a Spec: a sub-issue of it, with `gh issue create --parent`. It holds its Spec, what the Maintainer can try when it merges, its behaviours as the names of its tests, its records, the Tickets that block it, its Door and its review level. A Ticket names no file path.
+7. **Task** is the word for each issue that is built: a Ticket, a Fix or a Chore. The Build Lane holds the Tickets.
+8. **The design** goes in the Spec. The Intent holds only what is wanted, why, and in which Stages. An ADR holds a decision that binds more than one Spec.
+9. **Round 0** checks the Spec once. `task start <spec>` starts it. `task build <ticket>` refuses until the Ticket's Spec is approved. A Ticket's Rounds start at Round 1.
+10. **Code shape** goes away, with the check of overlapping files.
+11. **Blocking edges** order the Tickets, with `--blocked-by`. Two Tickets with no edge between them can be built at the same time. If both change one shared file, the Lead adds an edge.
+12. **The builder** of a Ticket is the Lead, a Claude Code subagent, or a pi agent on any model. The Maintainer names the model of each role at the start of a session, or before the builder writes code. With no name, `.agents/roles.json` holds the default.
+13. **The tool takes the choice** as flags, and records it for each Task: `task start <spec> --reviewer <runner>:<model>`, and `task build <ticket> --by lead|subagent:<model>|pi:<model>`.
+14. **One state machine** serves each builder. For the Lead and a subagent, the tool starts no agent, and the Lead sets the Implementer's states with `--as implementer`. The Reviewer's Hand-offs, the Rounds and `task land` do not change.
+15. **The Reviewer** runs through pi, in herdr or headless with `--session-id`, or as a Claude Code subagent that the Lead continues between Rounds.
+16. **Blind review.** No prompt to the Reviewer names the builder. A builder's commits have no model trailer, and `task land` adds it. The Reviewer does not read `agents.json`.
+17. **Families.** The tool finds a model's family from its provider. It refuses a builder and a Reviewer of one family, unless the Lead passes `--same-family`.
+18. **A PR reads alone.** Its title says what a person or an author can do now. Its Summary starts with where it fits: "Ticket 2 of 4 of #160, Stage 3". It quotes each decision that it follows, and does not name only its number. It ends with `Closes #<ticket>` and `Part of #<spec>`.
+19. **Order.** This is Stage 3 of this Intent. binnacle's Stage 3 waits for it, and is its first Spec.
 
 ## Open questions
 

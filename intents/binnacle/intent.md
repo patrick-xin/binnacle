@@ -72,7 +72,7 @@ These answer the open questions of the first draft, from the grill of 2026-10-04
 8. **Authors** get no promise of stability before 0.X release.
 9. **Wide content** wraps, as in pi. A table wraps each cell. A table that is too narrow to draw falls back to its raw markdown, wrapped.
 
-These answer the design of stage 2, from the grill of 2026-10-05.
+These answer the design of stage 2, from the grill of 2026-10-05. They were written before a Spec held the design of a Stage. From Stage 3, the design goes in its Specs.
 
 10. **The agent** is composed as dsh's headless bundle composes it: on `dsh-base`, with no presets, on the default model.
 11. **`dsh --profile binnacle`** opens the Chat on a new session. `--session <id>` draws a stored session, and nothing can be sent to it.
