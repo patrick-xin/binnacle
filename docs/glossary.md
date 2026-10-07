@@ -14,6 +14,11 @@ One canonical term for each concept that is binnacle's own, for a person who use
 - **Focus** — the Place whose Part takes each key first. A Screen names where it starts, a person moves it by a click or shift+tab, and the Chat's starts on the composer. A key that the Part does not take goes to the Gesture Table. Not the focus of the terminal's window. <a id="focus"></a>
 - **Gesture Table** — the core's one table of actions: each has an id, its default gestures — a key, as the terminal sends it, or a mouse gesture by name — and a description. The copied editor reads its keys from it. <a id="gesture-table"></a>
 
+## The transcript
+
+- **Fold** — an event of the transcript drawn as its one header line, which ends with how many of its lines it hides. Enter folds and unfolds the Marked event, and a click on an event's header line folds that event. <a id="fold"></a>
+- **Mark** — the event of the transcript that its keys act on, which up and down move. The transcript Marks its newest event when it first has the Focus, and a click Marks the event it hits. Drawn in inverse video while the transcript has the Focus. Not the terminal's cursor. <a id="mark"></a>
+
 ## Waiting on a person
 
 - **Request** — a box that the agent waits on: an approval or a question, in dsh's words. Never an "ask" or an "offer". <a id="request"></a>

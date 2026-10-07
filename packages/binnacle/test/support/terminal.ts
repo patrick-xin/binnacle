@@ -63,4 +63,11 @@ export class XtermTerminal implements Terminal {
     const cell = this.#xterm.buffer.active.getLine(this.#xterm.buffer.active.viewportY + y)?.getCell(x)
     return cell === undefined || cell.isFgDefault() ? 'default' : cell.getFgColor()
   }
+
+  /** Whether the cell is drawn in inverse video. */
+  async inverseAt(x: number, y: number): Promise<boolean> {
+    await this.read()
+    const cell = this.#xterm.buffer.active.getLine(this.#xterm.buffer.active.viewportY + y)?.getCell(x)
+    return cell !== undefined && cell.isInverse() !== 0
+  }
 }
