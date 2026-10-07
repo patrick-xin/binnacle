@@ -85,6 +85,29 @@ test('`task watch` reports an agent sooner, after 5 minutes, when a process unde
   )
 })
 
+test("The agent's own process is not busy: an agent that thinks for minutes, with its session records recent, is not reported", async (t) => {
+  const world = makeWorld()
+  t.after(() => world.remove())
+  await working(world)
+  record(world)
+  let cpu = 0
+  // The pane's shell 100 runs pi 150, which thinks: it uses the CPU, and writes a session record each minute.
+  world.deps.processes = async () => [
+    { pid: 100, ppid: 1, command: '-zsh', cpuSeconds: 1 },
+    { pid: 150, ppid: 100, command: 'pi', cpuSeconds: cpu },
+  ]
+  const result = await run(
+    ['watch'],
+    minutes(world, 10, () => {
+      cpu += 58
+      record(world)
+    }),
+  )
+  assert.equal(result.code, 1)
+  assert.equal(result.stdout, '')
+  assert.match(result.stderr, /no report after 10 minutes/)
+})
+
 test('A stall is reported once, until the agent writes a new session record and stalls again', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
