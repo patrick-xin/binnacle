@@ -80,7 +80,7 @@ These answer the design of Stage 3, from the grill of 2026-10-06.
 6. **Ticket.** A Ticket is one vertical slice of a Spec: a sub-issue of it, with `gh issue create --parent`. It holds its Spec, what the Maintainer can try when it merges, its behaviours as the names of its tests, its records, the Tickets that block it, its Door and its review level. A Ticket names no file path.
 7. **Task** is the word for each issue that is built: a Ticket, a Fix or a Chore. The Build Lane holds the Tickets.
 8. **The design** goes in the Spec. The Intent holds only what is wanted, why, and in which Stages. An ADR holds a decision that binds more than one Spec.
-9. **Round 0** checks the Spec once. `task start <spec>` starts it. `task build <ticket>` refuses until the Ticket's Spec is approved. A Ticket's Rounds start at Round 1.
+9. **Round 0** checks the Spec, with its Tickets (decision 20). `task start <spec>` starts it. `task build <ticket>` refuses until the Ticket's Spec is approved. A Ticket's Rounds start at Round 1.
 10. **Code shape** goes away, with the check of overlapping files.
 11. **Blocking edges** order the Tickets, with `--blocked-by`. Two Tickets with no edge between them can be built at the same time. If both change one shared file, the Lead adds an edge.
 12. **The builder** of a Ticket is the Lead, a Claude Code subagent, or a pi agent on any model. The Maintainer names the model of each role at the start of a session, or before the builder writes code. With no name, `.agents/roles.json` holds the default.
@@ -91,6 +91,13 @@ These answer the design of Stage 3, from the grill of 2026-10-06.
 17. **Families.** The tool finds a model's family from its provider. It refuses a builder and a Reviewer of one family, unless the Lead passes `--same-family`.
 18. **A PR reads alone.** Its title says what a person or an author can do now. Its Summary starts with where it fits: "Ticket 2 of 4 of #160, Stage 3". It quotes each decision that it follows, and does not name only its number. It ends with `Closes #<ticket>` and `Part of #<spec>`.
 19. **Order.** This is Stage 3 of this Intent. binnacle's Stage 3 waits for it, and is its first Spec.
+
+These come from binnacle's Stage 3, on 2026-10-06, before its first Ticket.
+
+20. **Round 0 checks the slicing.** A Spec holds its Tickets: each one's title, its behaviours and its blocking edges. Round 0 checks them with the Spec, and the Maintainer agrees to both at once. An approved Spec goes back to `spec` for another pass until a Ticket of it is built.
+21. **One Reviewer for each Spec.** The Reviewer of a Spec's Round 0 reviews each Round of its Tickets, in the Spec's checkout. Each Round still names one Ticket and its commits, so the Reviewer checks a small diff with the whole Spec in mind. It stops with the Spec, after the last Ticket.
+22. **A session continues.** An agent that the tool starts again continues its pi session, so a closed tab or a crash loses nothing.
+23. **A fresh Reviewer** starts from a copy of the Spec Reviewer's session: `task build --fresh-reviewer`. The Lead uses it for two Tickets of one Spec in review at once, or for a Reviewer that has reviewed long and may have grown lenient.
 
 ## Open questions
 

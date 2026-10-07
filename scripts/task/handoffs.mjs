@@ -39,8 +39,8 @@ export function handoffFor(change, c, asker) {
           return {
             role: 'reviewer',
             start: false,
-            // A Ticket's Reviewer starts at its Round 1, so that prompt is its first.
-            text: `${c.round === 1 ? 'You are the Reviewer. Load the reviewer skill in .agents/skills/reviewer/ first. ' : ''}Round ${c.round} of the Ticket #${c.n} at ${c.tip}: the commits ${c.base}..${c.tip}. In your checkout ${c.review}, run \`git switch --detach ${c.tip}\`, install if \`node_modules\` is missing or the lockfile changed, and run \`pnpm test\`. ${c.round > 1 ? 'Check each finding of the last round first, then what the commits touched.' : `Review the commits against the Ticket (\`gh issue view ${c.n}\`) and its Spec, its parent issue.`} ${verdict}`,
+            // A Ticket's own Reviewer starts at its Round 1, so that prompt is its first. The Spec's Reviewer knows its role already.
+            text: `${c.round === 1 && c.sharedReviewer !== true ? 'You are the Reviewer. Load the reviewer skill in .agents/skills/reviewer/ first. ' : ''}Round ${c.round} of the Ticket #${c.n} at ${c.tip}: the commits ${c.base}..${c.tip}. In your checkout ${c.review}, run \`git switch --detach ${c.tip}\`, install if \`node_modules\` is missing or the lockfile changed, and run \`pnpm test\`. ${c.round > 1 ? 'Check each finding of the last round first, then what the commits touched.' : `Review the commits against the Ticket (\`gh issue view ${c.n}\`) and its Spec, its parent issue.`} ${verdict}`,
           }
         case 'changes':
           return c.round === 0

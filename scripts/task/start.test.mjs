@@ -25,14 +25,14 @@ test("`task start <spec>` makes the Reviewer's checkout `~/.binnacle/worktrees/<
   assert.deepEqual(logLines(world, 139), [{ at: '2026-10-05T10:00:00.000Z', role: 'lead', from: null, to: 'spec', round: 0 }])
 })
 
-test("A Spec's approval at round 0 ends it: no state follows", async (t) => {
+test("A Spec's approval at round 0 is followed only by another pass, `spec`", async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
   world.spec(139)
   await steps(world, ['start', '139'], ['set', '139', 'approved', '--as', 'reviewer'])
   const building = await run(['set', '139', 'building', '--as', 'implementer'], world.deps)
   assert.equal(building.code, 1)
-  assert.match(building.stderr, /task 139: building cannot follow approved; nothing can follow it/)
+  assert.match(building.stderr, /task 139: building cannot follow approved; spec can follow it/)
 })
 
 test('`task start` refuses a number whose task folder or review checkout exists, and changes nothing', async (t) => {
@@ -77,7 +77,7 @@ test('`task build <ticket>` refuses an issue with no parent, a Spec that was not
   assert.equal(existsSync(join(world.home, 'worktrees', '140')), false)
 })
 
-test("`task build <ticket>` makes the worktree on a new branch `task/<n>` from `origin/main`, the Reviewer's checkout, and a Ticket's folder that begins at its Spec's approval", async (t) => {
+test("`task build <ticket>` makes the worktree on a new branch `task/<n>` from `origin/main`, and a Ticket's folder that begins at its Spec's approval. The Spec's Reviewer reviews it in the Spec's checkout", async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
   world.spec(139)
@@ -92,7 +92,8 @@ test("`task build <ticket>` makes the worktree on a new branch `task/<n>` from `
   const worktree = join(world.home, 'worktrees', '140')
   assert.equal(git(worktree, ['rev-parse', '--abbrev-ref', 'HEAD']), 'task/140')
   assert.equal(git(worktree, ['rev-parse', 'HEAD']), base)
-  assert.equal(git(join(world.home, 'worktrees', '140-review'), ['rev-parse', 'HEAD']), base)
+  assert.equal(existsSync(join(world.home, 'worktrees', '140-review')), false)
+  assert.equal(existsSync(join(world.home, 'worktrees', '139-review')), true)
   assert.deepEqual(JSON.parse(readFileSync(join(world.home, 'tasks', '140', 'task.json'), 'utf8')), {
     n: 140,
     kind: 'ticket',

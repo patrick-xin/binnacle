@@ -9,7 +9,7 @@ Run the tool as `pnpm task <command>`. It reads its issue with `gh`, and works o
 | Path | Holds | Made by |
 |---|---|---|
 | `~/.binnacle/worktrees/<ticket>` | The builder's worktree, on the branch `task/<ticket>` | `task build` |
-| `~/.binnacle/worktrees/<n>-review` | The Reviewer's checkout, made at `origin/main`. Before each Round, the Reviewer moves it to the tip that its prompt names. | `task start`, `task build` |
+| `~/.binnacle/worktrees/<n>-review` | The Reviewer's checkout, made at `origin/main`. A Spec's Reviewer reviews each of its Tickets here too. Before each Round, the Reviewer moves it to the tip that its prompt names. | `task start`, and `task build` for a Reviewer of the Ticket's own |
 | `~/.binnacle/tasks/<n>/` | The files of the Spec or the Ticket, below | `task start`, `task build` |
 
 The files of Spec or Ticket `<n>`:
@@ -34,7 +34,7 @@ The log governs the state: the last line is the current state and Round. If the 
 | Command | Role | Does |
 |---|---|---|
 | `pnpm task start <spec> [--reviewer <runner>:<model>]` | Lead | Makes the Reviewer's checkout and the Spec's folder. Starts the Reviewer, and sends it Round 0. |
-| `pnpm task build <ticket> [--by <builder>] [--reviewer <runner>:<model>] [--same-family]` | Lead | After its Spec's Round 0 is `approved`, checks the families, makes the branch, the worktrees and the Ticket's folder, and sends the builder the Ticket. See *Builders and Reviewers*. |
+| `pnpm task build <ticket> [--by <builder>] [--reviewer <runner>:<model> \| --fresh-reviewer] [--same-family]` | Lead | After its Spec's Round 0 is `approved`, checks the families, makes the branch, the worktree and the Ticket's folder, and sends the builder the Ticket. See *Builders and Reviewers*. |
 | `pnpm task set <n> <state>` | the role that owns the state | Sets `spec`, `building`, `ready`, `changes` or `approved`, as the table below allows, and sends its Hand-off |
 | `pnpm task ask <n>` | any role | Sets `blocked` |
 | `pnpm task answer <n>` | Lead | Sets the state from before `blocked`, and sends the answer to the role that asked |
@@ -64,7 +64,10 @@ Each command that writes takes the lock `~/.binnacle/tasks/.lock`, and the watch
 | A Claude Code subagent | `--by subagent:<model>` | `--reviewer subagent:<model>` |
 | A pi agent | `--by pi:<provider>/<model>`, on the runner of the default Implementer | `--reviewer herdr:<provider>/<model>`, or `headless:` |
 
-- A Ticket's Reviewer is its Spec's, unless `task build` gets `--reviewer`.
+- A Ticket's Reviewer is its Spec's own agent: the one that reviewed Round 0 reviews each Round of each Ticket, in the Spec's checkout. The Ticket's `agents.json` holds `{ "of": <spec> }`, and the agent is kept in the Spec's folder.
+- `--reviewer` gives the Ticket a Reviewer of its own, with a checkout of its own. `--fresh-reviewer` does too, and starts it from a copy of the Spec Reviewer's newest session, with pi's `--fork`. Use it for two Tickets of one Spec in review at once, or for a Reviewer that has reviewed long. It forks only a herdr Reviewer.
+- A Spec stops after its Tickets: `task stop <spec>` refuses while a Ticket of it is not stopped, unless it gets `--force`.
+- An approved Spec goes back to `spec`, for another pass of Round 0, until a Ticket of it is built.
 - A subagent's family is `anthropic`. A pi model's family comes from its provider, the part before `/`, through `families` in `.agents/roles.json`. The tool refuses a provider that has no family there.
 - `task build` refuses a builder and a Reviewer of one family. `--same-family` lets it through.
 - The tool starts a Ticket's Reviewer at its first `ready`, so that prompt also tells it its role.
@@ -75,7 +78,7 @@ The Task tool starts only `pi`. The Lead takes the roles that run as `lead` or `
 
 | Runner | An agent is | A prompt |
 |---|---|---|
-| `herdr` | an interactive pi in a herdr tab of its own, named `<role>-<n>`, where the Maintainer can watch it | `herdr agent prompt`, three tries in all |
+| `herdr` | an interactive pi in a herdr tab of its own, named `<role>-<n>`, where the Maintainer can watch it. Started again, it continues its session with pi's `--continue`. | `herdr agent prompt`, three tries in all |
 | `headless` | a supervisor, which runs each prompt as one `pi -p` with no standard input, under a time limit of 45 minutes. One supervisor runs for an agent: it takes its claim under the Task lock. | a file in the agent's queue. The command does not wait. |
 | `subagent` | a Claude Code subagent that the Lead starts, and continues for each later prompt | the command prints `task <n>: for the <role> (subagent): <prompt>` when the Lead ran it, and the watch prints `<n> <role> (subagent): <prompt>` otherwise |
 | `lead` | the Lead itself | as for `subagent`, with `(lead)` |

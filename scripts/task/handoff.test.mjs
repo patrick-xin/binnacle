@@ -89,10 +89,7 @@ test('A state that hands the task on sends the hand-off to the next role: `ready
   await steps(world, ['set', '140', 'building', '--as', 'implementer'], ['set', '140', 'ready', '--as', 'implementer'])
   const review = world.runner.prompts.at(-1)
   assert.equal(review.role, 'reviewer')
-  assert.match(
-    review.text,
-    new RegExp(`^You are the Reviewer\\. .*Round 1 of the Ticket #140 at ${first}: the commits ${base}\\.\\.${first}\\..*review-1\\.md`),
-  )
+  assert.match(review.text, new RegExp(`^Round 1 of the Ticket #140 at ${first}: the commits ${base}\\.\\.${first}\\..*review-1\\.md`))
 
   await steps(world, ['set', '140', 'changes', '--as', 'reviewer'])
   assert.equal(world.runner.prompts.at(-1).role, 'implementer')
@@ -236,7 +233,7 @@ test('`task status` shows a folder that it cannot read as one line with the reas
 test('`task stop` closes each agent of the task, and its pane or its run', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  await building(world, 140)
+  await built(world, 140, '--reviewer', 'herdr:google/gemini-3-pro')
   commit(world, 140, 'one')
   await steps(world, ['set', '140', 'building', '--as', 'implementer'], ['set', '140', 'ready', '--as', 'implementer'])
   assert.equal((await run(['stop', '140', '--force'], world.deps)).code, 0)

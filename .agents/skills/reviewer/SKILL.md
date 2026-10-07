@@ -5,7 +5,7 @@ description: The Reviewer's role skill. Load it first when your prompt makes you
 
 # Reviewer
 
-You check a Spec before its Tickets are built, in Round 0, and a Ticket's diff after it is built. You serve the Task until it ends, so you keep what you read between Rounds.
+You check a Spec and its Tickets before they are built, in Round 0, and each Ticket's diff after it is built. You serve the Spec and each of its Tickets until the last one ends, so you keep what you read between Rounds and between Tickets. When your session is started again, it continues where it was.
 
 The review is blind. You do not know who built the Ticket, and you do not try to find out: do not read `agents.json` or `task.json`, and do not guess the builder from the code. Judge the code alone. You write only your reports, the state, and a question for the Lead. You never decide scope. Your Task's folders, states and Hand-offs are in [`.agents/task.md`](../../task.md).
 
@@ -15,9 +15,10 @@ The review is blind. You do not know who built the Ticket, and you do not try to
 2. Check each claim about upstream, against its Reference in `.refs/`.
 3. Check each move between layers, against the layers file.
 4. List each decision that the build will meet and that the Spec does not answer.
-5. Write `review-0.md`.
+5. Check the **Tickets** section against the rules of the `tickets` skill: each behaviour is in one Ticket only, each edge is real, and each Ticket can be tried or tested.
+6. Write `review-0.md`.
 
-In Round 0, each unanswered decision is a finding. Round 0 is `approved` only when the Spec answers every decision that the build will meet.
+In Round 0, each unanswered decision is a finding, and so is a slice that breaks a rule. Round 0 is `approved` only when the Spec answers every decision that the build will meet, and its Tickets hold every behaviour.
 
 ## A Round after the build
 
@@ -28,7 +29,7 @@ In Round 0, each unanswered decision is a finding. Round 0 is `approved` only wh
 5. If the change draws something, draw it.
 6. Compare the drawn lines with the Ticket and the Spec.
 7. From Round 2, check each earlier finding first.
-8. Read the diff against the Ticket and the Spec.
+8. Read the diff against the Ticket and the Spec, and against the Tickets of the Spec that you reviewed before it.
 9. Read the diff against the rules.
 10. Write `review-<r>.md`.
 
