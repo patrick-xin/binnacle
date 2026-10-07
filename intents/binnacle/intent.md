@@ -87,7 +87,7 @@ These answer the design of stage 2, from the grill of 2026-10-05. They were writ
 13. **Keys.** The core owns one Key Table: each action has an id, its default keys and a description. The copied editor reads its keys from it. A key goes to the Part with the Focus first, then to the core. Stage 3 adds the mouse to the same table.
 14. **The keys of the Chat.** Enter sends a prompt, or steers the turn that runs. Shift+enter is a new line, with pi's fallbacks where a terminal cannot tell it from enter. pi's fallback for macOS's Terminal and for Windows reads the shift key through a native helper, and binnacle does not copy it: there, ctrl+j or a backslash before enter is a new line. Esc interrupts the turn. Ctrl+c clears the draft, and pressed twice on an empty draft it quits. Ctrl+z suspends.
 15. **The transcript** is a plugin. It draws each event of the session raw, as its seq, its type and its JSON, and the answer that streams as one live block that the committed event replaces. Grouping and styling come later, and an author can do them too. The status line is a plugin of its own.
-16. **Requests** fail closed until stage 3: a tool that needs an approval fails.
+16. **Requests** fail closed until stage 3: a tool that needs an approval fails. (Ended by [#163](https://github.com/patrick-xin/binnacle/issues/163): a person allows or rejects it.)
 17. **Hot reload** is off until the core stays up while its plugins reload.
 18. **Styled lines.** A Part's lines may carry colour and style. The core takes out every other control sequence, such as a cursor move, a clear or an OSC. A plugin makes Untrusted Text plain with a helper the core exports, and a Part says where its cursor is.
 
