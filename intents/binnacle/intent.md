@@ -58,6 +58,13 @@ Each stage ends in a behaviour that the Maintainer can try under `dsh`. The Lead
 
 Authoring gets its own stages, toward 1.0.
 
+The Specs of Stage 3:
+
+- [#156](https://github.com/patrick-xin/binnacle/issues/156) Gestures: a person clicks a Part, and moves the Focus by key or click, through one Gesture Table.
+- [#157](https://github.com/patrick-xin/binnacle/issues/157) Approvals: a person allows or rejects a tool that needs an approval.
+- [#158](https://github.com/patrick-xin/binnacle/issues/158) Questions: a person answers the agent's questions, and reviews its plan.
+- [#159](https://github.com/patrick-xin/binnacle/issues/159) Folds: a person folds the transcript's events, and moves through them by key.
+
 ## Decisions
 
 These answer the open questions of the first draft, from the grill of 2026-10-04.
