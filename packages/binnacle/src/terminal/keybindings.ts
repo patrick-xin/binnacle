@@ -1,6 +1,25 @@
 import { type KeyId, matchesKey } from "./keys.ts";
 
 /**
+ * A mouse gesture, by name: the left button's press, or a notch of the wheel, with
+ * `shift+`, `alt+` and `ctrl+` before it as the SGR report's modifier bits give them.
+ */
+export type MouseGestureId = `${MouseModifiers}${MouseGestureName}`;
+type MouseModifiers =
+	| ""
+	| "shift+"
+	| "alt+"
+	| "ctrl+"
+	| "shift+alt+"
+	| "shift+ctrl+"
+	| "alt+ctrl+"
+	| "shift+alt+ctrl+";
+type MouseGestureName = "click" | "wheelup" | "wheeldown";
+
+/** A key id, or a mouse gesture's name: how the table binds a gesture. */
+export type GestureId = KeyId | MouseGestureId;
+
+/**
  * Global keybinding registry.
  * Downstream packages can add keybindings via declaration merging.
  */
@@ -61,12 +80,12 @@ export interface Keybindings {
 export type Keybinding = keyof Keybindings;
 
 export interface KeybindingDefinition {
-	defaultKeys: KeyId | KeyId[];
+	defaultKeys: GestureId | GestureId[];
 	description?: string;
 }
 
 export type KeybindingDefinitions = Record<string, KeybindingDefinition>;
-export type KeybindingsConfig = Record<string, KeyId | KeyId[] | undefined>;
+export type KeybindingsConfig = Record<string, GestureId | GestureId[] | undefined>;
 
 export const TUI_KEYBINDINGS = {
 	"tui.editor.cursorUp": { defaultKeys: "up", description: "Move cursor up" },
@@ -210,15 +229,15 @@ export const TUI_KEYBINDINGS = {
 } as const satisfies KeybindingDefinitions;
 
 export interface KeybindingConflict {
-	key: KeyId;
+	key: GestureId;
 	keybindings: string[];
 }
 
-function normalizeKeys(keys: KeyId | KeyId[] | undefined): KeyId[] {
+function normalizeKeys(keys: GestureId | GestureId[] | undefined): GestureId[] {
 	if (keys === undefined) return [];
 	const keyList = Array.isArray(keys) ? keys : [keys];
-	const seen = new Set<KeyId>();
-	const result: KeyId[] = [];
+	const seen = new Set<GestureId>();
+	const result: GestureId[] = [];
 	for (const key of keyList) {
 		if (!seen.has(key)) {
 			seen.add(key);
@@ -231,7 +250,7 @@ function normalizeKeys(keys: KeyId | KeyId[] | undefined): KeyId[] {
 export class KeybindingsManager {
 	private definitions: KeybindingDefinitions;
 	private userBindings: KeybindingsConfig;
-	private keysById = new Map<Keybinding, KeyId[]>();
+	private keysById = new Map<Keybinding, GestureId[]>();
 	private conflicts: KeybindingConflict[] = [];
 
 	constructor(definitions: KeybindingDefinitions, userBindings: KeybindingsConfig = {}) {
@@ -244,7 +263,7 @@ export class KeybindingsManager {
 		this.keysById.clear();
 		this.conflicts = [];
 
-		const userClaims = new Map<KeyId, Set<Keybinding>>();
+		const userClaims = new Map<GestureId, Set<Keybinding>>();
 		for (const [keybinding, keys] of Object.entries(this.userBindings)) {
 			if (!(keybinding in this.definitions)) continue;
 			for (const key of normalizeKeys(keys)) {
@@ -270,12 +289,13 @@ export class KeybindingsManager {
 	matches(data: string, keybinding: Keybinding): boolean {
 		const keys = this.keysById.get(keybinding) ?? [];
 		for (const key of keys) {
-			if (matchesKey(data, key)) return true;
+			// A mouse gesture is bound by its name; a key is matched as the terminal sends it.
+			if (key === data || matchesKey(data, key as KeyId)) return true;
 		}
 		return false;
 	}
 
-	getKeys(keybinding: Keybinding): KeyId[] {
+	getKeys(keybinding: Keybinding): GestureId[] {
 		return [...(this.keysById.get(keybinding) ?? [])];
 	}
 

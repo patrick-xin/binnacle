@@ -175,17 +175,26 @@ test('--help prints how to start binnacle, and exits without taking the terminal
   assert.deepEqual([exits, (await terminal.read()).screen], [[0], 'normal'])
 })
 
-test('a plugin reads the actions of the Key Table that a key is bound to, in each form a terminal sends it', async () => {
+test('a plugin reads the actions of the Gesture Table that a key is bound to, in each form a terminal sends it', async () => {
   const { ctx } = await mount()
   const read: string[][] = []
   await ctx.plugin({
     name: 'author',
     inject: ['binnacle'],
     apply: (plugin: Context) => {
-      for (const key of ['\x03', '\x1b[99;5u', '\x1b[27;5;99~', 'x']) read.push([...plugin.binnacle.keys.actionsOf(key)])
+      for (const key of ['\x03', '\x1b[99;5u', '\x1b[27;5;99~', 'x']) read.push([...plugin.binnacle.gestures.actionsOf(key)])
     },
   })
   assert.deepEqual(read, [['binnacle.clear'], ['binnacle.clear'], ['binnacle.clear'], []])
+})
+
+test("gestures.actionsOf('wheelup') names binnacle.scroll.up, and the wheel scrolls the Place under the pointer, as it does today", async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 20, rows: 4 })
+  ready()
+  await ctx.plugin(probe(['1', '2', '3', '4', '5', '6', '7', '8']))
+  const actions = ctx.binnacle.gestures.actionsOf('wheelup')
+  terminal.type(WHEEL_UP)
+  assert.deepEqual([actions, (await terminal.read()).rows], [['binnacle.scroll.up'], ['2', '3', '4', '5']])
 })
 
 test("a Part is asked for its lines once at a width, until it redraws: another Part's redraw does not ask it again", async () => {

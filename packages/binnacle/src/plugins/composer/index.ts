@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { Cursor, Handle } from '../../api.ts'
+import type { Handle, Point } from '../../api.ts'
 import { Editor } from '../../terminal/components/editor.ts'
 import type { EditorTheme } from '../../terminal/components/editor.ts'
 import { CURSOR_MARKER } from '../../terminal/tui.ts'
@@ -22,7 +22,7 @@ const ROWS = 24
 export function apply(ctx: Context): void {
   let placed: Handle | undefined
   // The core asks for the lines and the cursor more than once in a draw; the editor renders once until it changes.
-  let rendered: { width: number; lines: string[]; cursor: Cursor | undefined } | undefined
+  let rendered: { width: number; lines: string[]; cursor: Point | undefined } | undefined
   const changed = (): void => {
     rendered = undefined
   }
@@ -56,8 +56,8 @@ export function apply(ctx: Context): void {
     cursor: (width) => drawn(width).cursor,
     key: (data) => {
       // pi-tui's editor names its actions `tui.`; a key bound to any other action is not the editor's.
-      const actions = ctx.binnacle.keys.actionsOf(data)
-      // The Key Table's clear is the draft's to do while there is one; on an empty draft it goes on to the core.
+      const actions = ctx.binnacle.gestures.actionsOf(data)
+      // The Gesture Table's clear is the draft's to do while there is one; on an empty draft it goes on to the core.
       if (actions.includes('binnacle.clear') && editor.getText() !== '') {
         editor.setText('')
         changed()

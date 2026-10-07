@@ -1,17 +1,19 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Handle, Keys, Layout, Part, Screen } from '../api.ts'
+import type { Binnacle, Gestures, Handle, Layout, Part, Screen } from '../api.ts'
 import { CHAT } from './chat.ts'
-import { actionsOf } from './keys.ts'
+import { actionsOf } from './gestures.ts'
 
 export class BinnacleService extends Service implements Binnacle {
   // TypeScript private, not #private: Cordis reaches the service through traced copies.
   private readonly screens: Screen[] = [CHAT]
   private readonly layouts = new Map<string, Layout[]>()
   private readonly parts = new Map<string, Part[]>()
+  // The Place a person moved the Focus to, for each Screen shown; null once the core forgot it.
+  private readonly moved = new Map<Screen, string | null>()
   private readonly redraw: () => void
   private readonly forget: (part: Part) => void
-  readonly keys: Keys = { actionsOf }
+  readonly gestures: Gestures = { actionsOf }
 
   constructor(ctx: Context, redraw: () => void, forget: (part: Part) => void) {
     super(ctx, 'binnacle')
@@ -24,12 +26,23 @@ export class BinnacleService extends Service implements Binnacle {
     return this.layouts.get(screen.name)?.at(-1) ?? screen.layout
   }
 
-  get focusOnView(): string | undefined {
-    return this.screenOnView.focus
+  get screenOnView(): Screen {
+    return this.screens.at(-1) ?? CHAT
   }
 
-  private get screenOnView(): Screen {
-    return this.screens.at(-1) ?? CHAT
+  focusMovedTo(): string | null | undefined {
+    return this.moved.get(this.screenOnView)
+  }
+
+  /** A person moved the Focus on the Screen on view. */
+  moveFocus(place: string): void {
+    this.moved.set(this.screenOnView, place)
+    this.redraw()
+  }
+
+  /** The Focus a person moved on the Screen on view is forgotten: its Place stopped taking keys. */
+  forgetMovedFocus(): void {
+    this.moved.set(this.screenOnView, null)
   }
 
   partIn(place: string): Part | undefined {
@@ -37,7 +50,7 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   show(screen: Screen): Handle {
-    return this.hold(this.screens, screen, 'binnacle: a screen shown')
+    return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, () => this.moved.delete(screen))
   }
 
   layout(screen: string, layout: Layout): Handle {
@@ -50,7 +63,7 @@ export class BinnacleService extends Service implements Binnacle {
     })
   }
 
-  private hold<T>(list: T[], item: T, label: string, changed?: () => void): Handle {
+  private hold<T>(list: T[], item: T, label: string, changed?: () => void, off?: () => void): Handle {
     list.push(item)
     this.redraw()
     let held = true
@@ -58,6 +71,7 @@ export class BinnacleService extends Service implements Binnacle {
       if (!held) return
       held = false
       list.splice(list.indexOf(item), 1)
+      off?.()
       this.redraw()
     }
     // In a traced copy, `this.ctx` is the calling plugin's context, so what it holds goes when that plugin unloads.

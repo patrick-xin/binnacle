@@ -1,4 +1,4 @@
-import type { Part } from '../api.ts'
+import type { Part, Point } from '../api.ts'
 import { stripTerminalSequences, visibleWidth, wrapTextWithAnsi } from '../terminal/utils.ts'
 
 // Stripping sequences leaves single controls that a terminal still obeys: C0 but the tab, DEL, and C1.
@@ -78,18 +78,41 @@ export class Rows {
     const { lines, rowsOfLines } = this.#wrapped(part, width)
     const before = rowsOfLines.slice(0, cursor.line).reduce((rows, wrapped) => rows + wrapped.length, 0)
     // A wrap drops the blanks where it breaks, so each row is found in the line to know the column it starts at.
-    const plain = toPlainText(lines[cursor.line] ?? '')
-    let from = 0
-    const starts = (rowsOfLines[cursor.line] ?? []).map((wrapped) => {
-      const text = toPlainText(wrapped)
-      const at = Math.max(from, plain.indexOf(text, from))
-      from = at + text.length
-      return visibleWidth(plain.slice(0, at))
-    })
+    const starts = this.#startsOf(lines, rowsOfLines, cursor.line)
     const row = Math.max(
       0,
       starts.findLastIndex((start) => start <= cursor.column),
     )
     return { row: before + row, column: cursor.column - (starts[row] ?? 0) }
+  }
+
+  /** A row of the Part's rows and a column on it, as the Part's line and the column in that line. A column past a row's end is past its line's, on a wrapped line's last row from where the row starts. */
+  pointAt(part: Part, width: number, row: number, column: number): Point | undefined {
+    if (width < 1) return undefined
+    const { lines, rowsOfLines } = this.#wrapped(part, width)
+    let before = 0
+    let line = -1
+    for (let nth = 0; nth < rowsOfLines.length; nth++) {
+      const rows = rowsOfLines[nth]!.length
+      if (row < before + rows) {
+        line = nth
+        break
+      }
+      before += rows
+    }
+    if (line === -1) return undefined
+    const starts = this.#startsOf(lines, rowsOfLines, line)
+    return { line, column: (starts[row - before] ?? 0) + column }
+  }
+
+  #startsOf(lines: readonly string[], rowsOfLines: readonly (readonly string[])[], line: number): readonly number[] {
+    const plain = toPlainText(lines[line] ?? '')
+    let from = 0
+    return (rowsOfLines[line] ?? []).map((wrapped) => {
+      const text = toPlainText(wrapped)
+      const at = Math.max(from, plain.indexOf(text, from))
+      from = at + text.length
+      return visibleWidth(plain.slice(0, at))
+    })
   }
 }
