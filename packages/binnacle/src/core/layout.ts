@@ -16,7 +16,7 @@ export interface Position {
   readonly column: number
 }
 
-/** A Place as it was laid out: its box's cells, which the wheel hits. */
+/** A Place as it was laid out: its box's cells, which the wheel hits, and the Part's rows inside, which a click hits. */
 export interface Placed {
   readonly place: string
   readonly top: number
@@ -24,6 +24,9 @@ export interface Placed {
   readonly width: number
   readonly height: number
   readonly maxScroll: number
+  readonly content: { readonly top: number; readonly left: number; readonly width: number; readonly height: number }
+  /** The Part's row shown at the top of its box, however the Place is scrolled. */
+  readonly shownFrom: number
 }
 
 export interface Arranged {
@@ -112,6 +115,7 @@ class Arrangement {
   readonly placed: Placed[] = []
   overflowed = false
   cursor: Position | undefined
+  readonly #shownFrom = new Map<string, number>()
   readonly #places: Places
   readonly #spare: Spare
 
@@ -139,7 +143,16 @@ class Arrangement {
     const innerHeight = Math.max(0, height - insets.top - insets.bottom)
     const inner = this.#drawInner(node, innerWidth, innerHeight, top + insets.top, left + insets.left)
     if ('place' in node)
-      this.placed.push({ place: node.place, top, left, width, height, maxScroll: this.#maxScroll(node.place, innerWidth, innerHeight) })
+      this.placed.push({
+        place: node.place,
+        top,
+        left,
+        width,
+        height,
+        maxScroll: this.#maxScroll(node.place, innerWidth, innerHeight),
+        content: { top: top + insets.top, left: left + insets.left, width: innerWidth, height: innerHeight },
+        shownFrom: this.#shownFrom.get(node.place) ?? 0,
+      })
     const paddedWidth = Math.max(0, width - borders.left - borders.right)
     const padded = [
       ...Array.from({ length: padding.top }, () => blank(paddedWidth)),
@@ -212,6 +225,7 @@ class Arrangement {
     // The Part with the Focus shows the row of its cursor, however it was scrolled.
     if (cursor !== undefined) end = Math.min(Math.max(end, cursor.row + 1), cursor.row + height)
     const start = Math.max(0, end - height)
+    this.#shownFrom.set(place, start)
     if (cursor !== undefined && height > 0 && cursor.column < width)
       this.cursor = { row: top + cursor.row - start, column: left + cursor.column }
     const shown = all.slice(start, end).map((row) => fit(row.includes('\x1b') ? row + RESET_STYLE : row, width))
