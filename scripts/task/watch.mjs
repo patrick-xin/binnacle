@@ -194,6 +194,8 @@ function busyUnder(folder, role, root, table, now) {
   if (before === undefined) return []
   const busy = []
   for (const process of under.values()) {
+    // The pane's shell runs the agent's own tool, which uses the CPU while it thinks: only what runs under it can be stuck.
+    if (process.ppid === root && /^(\S*\/)?pi(\s|$)/.test(process.command)) continue
     const then = before.cpu[process.pid]
     if (then === undefined) continue
     const cpu = process.cpuSeconds - then
