@@ -8,7 +8,11 @@ const CORE = 'binnacle'
 
 function featureRows(patch) {
   const inserted = (load(patch, { schema: DSH_SCHEMA }) ?? []).flatMap((entry) => entry.insert ?? [])
-  return inserted.map((row) => row.id).filter((id) => id !== CORE)
+  // A row that names a dsh package composes dsh's own plugin; a feature of binnacle's is a plugin of its own.
+  return inserted
+    .filter((row) => !String(row.name ?? '').startsWith('@'))
+    .map((row) => row.id)
+    .filter((id) => id !== CORE)
 }
 
 const cellsOf = (line) =>

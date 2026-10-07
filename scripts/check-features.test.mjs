@@ -33,3 +33,8 @@ test("a patch with a row configured by dsh's `!!js` tag is read, as dsh reads it
   const configured = `${patch}- id: tools\n  config:\n    mode: !!js process.env.DSH_TOOLS_MODE\n`
   assert.deepEqual(findProblems(configured, map('| Read view | a session | `binnacle-read` | `x` |')), [])
 })
+
+test('a row that composes a dsh package is not a feature, so the map needs no row for it', () => {
+  const composed = `${patch.replace('- id: hmr', `    - id: tool-ask-user\n      name: '@deepseek-ai/dsh-tool-ask-user'\n- id: hmr`)}`
+  assert.deepEqual(findProblems(composed, map('| Read view | a session | `binnacle-read` | `x` |')), [])
+})

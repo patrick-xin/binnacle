@@ -2,8 +2,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { ApprovalOutcome, ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { Handle, Part } from '../../api.ts'
+import type { Part } from '../../api.ts'
 import { toPlainText } from '../../index.ts'
+import { queueOf } from '../requests/index.ts'
+import type { Standing } from '../requests/index.ts'
 import { visibleWidth } from '../../terminal/utils.ts'
 
 export const name = 'binnacle-approvals'
@@ -26,12 +28,12 @@ const CHOICES: readonly Choice[] = [
 // The arguments are capped before they wrap, so a Request's lines are the same at every width and a click keeps its line.
 const MOST_LINES = 12
 
-interface Standing {
+interface Asked extends Standing {
   readonly title: string
   readonly why: string | undefined
   readonly argumentLines: readonly string[]
   marked: number
-  readonly withdrawn: () => void
+  withdrawn: () => void
   readonly done: (outcome: ApprovalOutcome) => void
 }
 
@@ -71,31 +73,26 @@ export function apply(ctx: Context): void {
     // A stored session has no agent to answer for, and dsh fails closed as before.
     if (chat.agent === undefined) return
     const chatAgent = chat.agent
-    const standing: Standing[] = []
+    const queue = queueOf(chat)
+    const binnacle = scope.binnacle
+    const standing: Asked[] = []
     scope.effect(
       () => () => {
-        for (const request of standing.splice(0)) request.done('unavailable')
+        // Each Request leaves the queue before it is answered, so the queue never places one through a plugin that unloads.
+        const mine = standing.splice(0)
+        queue.settled(...mine)
+        for (const request of mine) request.done('unavailable')
       },
       'binnacle-approvals: what still stands, answered as unavailable',
     )
-    let shown: Standing | undefined
-    let placed: Handle | undefined
-    const show = (): void => {
-      const first = standing[0]
-      if (first === shown) return
-      placed?.dispose()
-      placed = undefined
-      shown = first
-      if (first !== undefined) placed = scope.binnacle.place('composer', partOf(first))
-    }
-    const answer = (request: Standing, outcome: ApprovalOutcome): void => {
+    const answer = (request: Asked, outcome: ApprovalOutcome): void => {
       const at = standing.indexOf(request)
       if (at === -1) return
       standing.splice(at, 1)
+      queue.settled(request)
       request.done(outcome)
-      show()
     }
-    const partOf = (request: Standing): Part => {
+    const partOf = (request: Asked): Part => {
       const choicesFrom = 1 + (request.why === undefined ? 0 : 1) + request.argumentLines.length
       return {
         lines: (width) => {
@@ -133,11 +130,14 @@ export function apply(ctx: Context): void {
       if (req.signal?.aborted) return Promise.resolve('cancelled')
       return new Promise<ApprovalOutcome>((resolve) => {
         let answered = false
-        const request: Standing = {
+        const request: Asked = {
           title: titleOf(req, chatAgent),
           why: whyOf(req),
           argumentLines: argumentLinesOf(req, chat.events),
           marked: 0,
+          // The Part closes over the Request, so it is set here and not in its field, before the Request is shown.
+          part: undefined as unknown as Part,
+          place: (part) => binnacle.place('composer', part),
           withdrawn: () => answer(request, 'cancelled'),
           done: (outcome) => {
             if (answered) return
@@ -146,9 +146,10 @@ export function apply(ctx: Context): void {
             resolve(outcome)
           },
         }
+        request.part = partOf(request)
         standing.push(request)
+        queue.add(request)
         req.signal?.addEventListener('abort', request.withdrawn, { once: true })
-        show()
       })
     })
   })

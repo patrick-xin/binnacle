@@ -19,6 +19,7 @@
     "packages/binnacle/src/terminal/autocomplete.ts",
     "packages/binnacle/src/terminal/tui.ts",
     "packages/binnacle/src/terminal/components/editor.ts",
+    "packages/binnacle/src/terminal/components/input.ts",
     "packages/binnacle/src/terminal/components/select-list.ts"
   ],
   "printWidth": 140
