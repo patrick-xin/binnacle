@@ -16,7 +16,7 @@ One canonical term for each concept of the workflow that builds binnacle. A term
 - **Stage** — a part of an Intent that ends in a behaviour the Maintainer can try under dsh. Home: the Intent. <a id="stage"></a>
 - **Task** — one GitHub issue that is built, in one Lane: a Ticket, a Fix or a Chore. Home: [`task.md`](task.md). <a id="task"></a>
 - **Lane** — how a Task is built and reviewed: Fix, Chore or Build. Not a Door. Home: [the `lead` skill](skills/lead/SKILL.md). <a id="lane"></a>
-- **Spec** — the issue that designs one feature of a Stage: its behaviours, its seams and its decisions. Round 0 checks it. It is not a Ticket. Home: [the `spec` skill](skills/spec/SKILL.md). <a id="spec"></a>
+- **Spec** — the issue that designs one feature of a Stage: its behaviours, its seams, its decisions and its Tickets. Round 0 checks it. It is not a Ticket. Home: [the `spec` skill](skills/spec/SKILL.md). <a id="spec"></a>
 - **Ticket** — one vertical slice of a Spec, as a sub-issue of it, built on one branch and merged in one PR. The Build Lane holds the Tickets. Home: [the `tickets` skill](skills/tickets/SKILL.md). <a id="ticket"></a>
 - **ADR** — a decision that binds more than one Task, not one Spec's decision. Home: `docs/adr/`. <a id="adr"></a>
 

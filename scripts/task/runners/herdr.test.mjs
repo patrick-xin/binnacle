@@ -35,6 +35,21 @@ test('the herdr runner starts pi in a new tab, with the task and the role in its
   ])
 })
 
+test('a herdr agent started again continues the session in its folder, and a forked one starts from a copy of another', async () => {
+  const resumed = fake([tab, { result: { agent: {} } }])
+  await resumed.runner.start({ ...agent, resume: true })
+  assert.match(
+    resumed.calls[1],
+    / -- --model zai\/glm-5\.3 --thinking max --session-dir \/t\/140\/agents\/implementer\/sessions --continue$/,
+  )
+  const forked = fake([tab, { result: { agent: {} } }])
+  await forked.runner.start({ ...agent, fork: '/t/100/agents/reviewer/sessions/b.jsonl' })
+  assert.match(
+    forked.calls[1],
+    / --session-dir \/t\/140\/agents\/implementer\/sessions --fork \/t\/100\/agents\/reviewer\/sessions\/b\.jsonl$/,
+  )
+})
+
 test('a herdr start that fails removes its tab, and rejects', async () => {
   const { calls, runner } = fake([tab, { error: { code: 'agent_start_timeout', message: 'not ready' } }, { result: {} }])
   await assert.rejects(runner.start(agent), /agent_start_timeout/)

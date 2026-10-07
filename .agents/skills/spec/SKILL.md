@@ -5,7 +5,7 @@ description: Write the design of one feature of a Stage as a Spec, a GitHub issu
 
 # Spec
 
-A Spec is the design of one feature of a Stage. The Reviewer checks it once, in Round 0. Then the `tickets` skill slices it into Tickets, and each Ticket's builder and Reviewer read it as their contract. The template is [`.github/ISSUE_TEMPLATE/spec.md`](../../../.github/ISSUE_TEMPLATE/spec.md).
+A Spec is the design of one feature of a Stage, and its slices into Tickets. The Reviewer checks both in Round 0. Then the Tickets are published, and each Ticket's builder and Reviewer read the Spec as their contract. The template is [`.github/ISSUE_TEMPLATE/spec.md`](../../../.github/ISSUE_TEMPLATE/spec.md).
 
 ## Steps
 
@@ -14,8 +14,9 @@ A Spec is the design of one feature of a Stage. The Reviewer checks it once, in 
 3. Send each question about dsh, pi-tui or another Reference to the Researcher.
 4. Fill each field of the template.
 5. Mark each open choice under **Decisions**, with your recommendation.
-6. Publish the issue with `gh issue create --label spec`.
-7. Run `pnpm task start <spec>`. It sends the Spec to the Reviewer for Round 0.
+6. Slice it into Tickets under **Tickets**, with the `tickets` skill.
+7. Publish the issue with `gh issue create --label spec`.
+8. Run `pnpm task start <spec>`. It sends the Spec to the Reviewer for Round 0.
 
 ## The fields
 
@@ -27,6 +28,7 @@ A Spec is the design of one feature of a Stage. The Reviewer checks it once, in 
 | **Seams** | Where the tests observe the change, from outside. Use the fewest seams that hold every behaviour. |
 | **Decisions** | Each choice that the build needs, with its answer |
 | **Out of scope** | What the Spec does not do, and the Spec or the Stage that does it |
+| **Tickets** | Each Ticket: its title, the behaviours that it builds, and the Tickets that block it |
 | **Door** | One-way or two-way, and why |
 
 - A Stage has one Spec or more. Each Spec is one feature, and it belongs to one Stage.

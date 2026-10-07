@@ -6,7 +6,8 @@ import { built, git, logLines, makeWorld } from './world.mjs'
 import { run } from './task.mjs'
 
 async function merged(world, n) {
-  await built(world, n, '--by', 'lead')
+  // A Reviewer of the Ticket's own has a checkout of its own to remove.
+  await built(world, n, '--by', 'lead', '--reviewer', 'herdr:google/gemini-3-pro')
   const worktree = join(world.home, 'worktrees', String(n))
   appendFileSync(join(worktree, 'README.md'), 'more\n')
   git(worktree, ['add', 'README.md'])

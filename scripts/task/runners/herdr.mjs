@@ -36,7 +36,9 @@ export function makeHerdr({ exec }) {
       const made = await herdr(exec, ['tab', 'create', '--cwd', agent.cwd, '--label', name, '--no-focus', ...env])
       const handle = { name, pane: made.root_pane.pane_id, tab: made.tab.tab_id }
       try {
-        await herdr(exec, ['agent', 'start', name, '--kind', tool.kind, '--pane', handle.pane, '--', ...tool.args(agent)])
+        // pi finds the session to continue, or the one to fork, through the session folder that the arguments name.
+        const session = agent.resume === true ? ['--continue'] : agent.fork === undefined ? [] : ['--fork', agent.fork]
+        await herdr(exec, ['agent', 'start', name, '--kind', tool.kind, '--pane', handle.pane, '--', ...tool.args(agent), ...session])
       } catch (error) {
         await herdr(exec, ['tab', 'close', handle.tab]).catch(() => {})
         throw error

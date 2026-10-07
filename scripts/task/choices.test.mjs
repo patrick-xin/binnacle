@@ -38,7 +38,7 @@ test('`task start <spec> --reviewer headless:<model>` and `task build --by pi:<m
   await steps(world, ['build', '140', '--by', 'pi:zai/glm-5.3'])
   const { implementer, reviewer } = agentsOf(world, 140)
   assert.equal(`${implementer.runner} ${implementer.tool} ${implementer.model} ${implementer.family}`, 'fake pi zai/glm-5.3 zai')
-  assert.equal(`${reviewer.runner} ${reviewer.model}`, 'headless google/gemini-3-pro', "a Ticket's Reviewer is its Spec's")
+  assert.deepEqual(reviewer, { role: 'reviewer', of: SPEC }, "a Ticket's Reviewer is its Spec's")
 })
 
 test('`task build` refuses a builder and a Reviewer of one family, unless it gets `--same-family`', async (t) => {
@@ -98,13 +98,13 @@ test("`task build --by subagent:<model>` starts no agent: it records the subagen
   )
   const status = await run(['status', '140'], world.deps)
   assert.match(status.stdout, /^ {2}implementer subagent sonnet$/m)
-  assert.match(status.stdout, /^ {2}reviewer fake openai-codex\/gpt-6.1-sol, not started$/m)
+  assert.match(status.stdout, /^ {2}reviewer of the Spec 100$/m)
 })
 
-test("A Ticket's Reviewer starts at its first `ready`, and that prompt tells it its role", async (t) => {
+test('A Reviewer chosen for the Ticket starts at its first `ready`, in its own checkout, and that prompt tells it its role', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
-  await built(world, 140, '--by', 'lead')
+  await built(world, 140, '--by', 'lead', '--reviewer', 'herdr:google/gemini-3-pro')
   assert.deepEqual(
     world.runner.starts.map((agent) => `${agent.role} ${agent.cwd}`),
     [`reviewer ${join(world.home, 'worktrees', `${SPEC}-review`)}`],

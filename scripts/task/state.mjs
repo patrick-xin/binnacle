@@ -45,13 +45,15 @@ export function readTask(folder) {
   }
 }
 
-// A Spec has only Round 0, and its approval ends it. A Ticket begins at its Spec's approval, so it has no Round 0 of its own.
+// A Spec has only Round 0. Its approval goes back to `spec` for another pass, such as of its Tickets, until a Ticket is built from it.
+// A Ticket begins at its Spec's approval, so it has no Round 0 of its own.
 export function followers(kind, from, round) {
   if (kind === 'spec')
     switch (from) {
       case 'spec':
         return ['changes', 'approved']
       case 'changes':
+      case 'approved':
         return ['spec']
       default:
         return []
@@ -98,7 +100,15 @@ export function readTasks(home) {
       const record = readTask(join(folder, entry.name))
       const lines = readLog(join(folder, entry.name))
       const last = lines.at(-1)
-      tasks.set(n, { n, folder: join(folder, entry.name), kind: kindOf(record), state: last.to, round: last.round, lines })
+      tasks.set(n, {
+        n,
+        folder: join(folder, entry.name),
+        kind: kindOf(record),
+        spec: record.spec,
+        state: last.to,
+        round: last.round,
+        lines,
+      })
     } catch (error) {
       unreadable.push({ n, reason: error.message })
     }

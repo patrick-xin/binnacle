@@ -15,7 +15,7 @@ You turn what the Maintainer wants into Tasks, start each Task, answer its quest
 4. Show the Intent to the Maintainer with the doc tool.
 5. Change the Intent until the Maintainer approves it.
 6. Write the Specs of the current Stage, with the `spec` skill: one for each feature.
-7. When a Spec's Round 0 is approved, slice it into Tickets, with the `tickets` skill.
+7. Slice each Spec into Tickets in its **Tickets** section, with the `tickets` skill, before its Round 0.
 8. List the Specs of the Stage in the Intent.
 9. When every Task of the Stage is merged, tell the Maintainer what to try.
 10. If the Maintainer makes a small change to the Intent, edit it.
@@ -50,8 +50,8 @@ The folders, states and Hand-offs are in [`.agents/task.md`](../../task.md).
 1. Run `pnpm task start <spec>`, with the Reviewer of *Builders and Reviewers* below. It sends the Reviewer Round 0.
 2. Run `pnpm task watch` in the background. When it exits, act on its line, then run it again.
 3. Change the Spec for each finding of Round 0, then run `pnpm task set <spec> spec`. The tool sends the Reviewer its next pass.
-4. When Round 0 is `approved`, and the Door is one-way, get the Maintainer's agreement on the Spec.
-5. Slice the Spec into Tickets, with the `tickets` skill.
+4. When Round 0 is `approved`, show the Maintainer the Tickets. If the Door is one-way, get the Maintainer's agreement on the Spec too.
+5. Publish the Tickets, as the `tickets` skill says.
 6. For each Ticket whose blockers are merged, run `pnpm task build <ticket>`, with the builder of *Builders and Reviewers* below.
 7. If a command exits 3, or the watch says that a Hand-off failed or was not sent, run `pnpm task resend <n>`.
 8. If the watch reports a stall, read its busy processes first. Decide what to do: the tool stops no agent.
@@ -77,7 +77,8 @@ The Maintainer names the model of each role at the start of a session, or before
 | pi as the Reviewer | `task start <spec> --reviewer herdr:<provider>/<model>`, or `headless:` |
 | a Claude subagent as the Reviewer | `task start <spec> --reviewer subagent:<model>` |
 
-- A Ticket's Reviewer is its Spec's, unless `task build` gets `--reviewer`.
+- A Ticket's Reviewer is its Spec's own agent, which keeps what it read in Round 0 and in the Spec's earlier Tickets. `--reviewer` gives the Ticket a Reviewer of its own.
+- Pass `--fresh-reviewer` when two Tickets of one Spec are in review at once, or when the Spec's Reviewer has reviewed long. It starts from a copy of the Spec Reviewer's session.
 - The builder and the Reviewer are of different families. The tool refuses one family for both. Pass `--same-family` only when the Maintainer asks for it.
 - The tool starts no subagent. For a subagent, the command or the watch prints `<n> <role> (subagent): <prompt>`. Start the subagent with that prompt, in the background. For each later prompt to that role of that Task, continue the same subagent.
 - The review is blind. Give the Reviewer only the prompts that the tool prints. Never name the builder to the Reviewer.

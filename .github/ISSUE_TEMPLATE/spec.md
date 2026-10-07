@@ -28,6 +28,12 @@ labels: spec
 
 ## Out of scope
 
+## Tickets
+
+<!-- The slices, drafted with the tickets skill: for each Ticket, its title, the behaviours that it builds, and the Tickets that block it. Round 0 checks them with the Spec. -->
+
+1.
+
 ## Door
 
 <!-- One-way or two-way, and why. -->

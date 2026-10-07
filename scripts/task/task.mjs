@@ -101,6 +101,7 @@ function parseChoices(args, allowed, usage) {
     const option = args[i]
     if (!allowed.includes(option)) throw new Usage(usage)
     if (option === '--same-family') read.sameFamily = true
+    else if (option === '--fresh-reviewer') read.freshReviewer = true
     else {
       if (args[i + 1] === undefined) throw new Usage(usage)
       read[option.slice(2)] = args[i + 1]
@@ -126,8 +127,11 @@ async function command(argv, deps, say) {
     }
     case 'build': {
       const [nText, ...more] = args
-      const usage = 'usage: task build <ticket> [--by lead|subagent:<model>|pi:<model>] [--reviewer <runner>:<model>] [--same-family]'
-      return build(number(nText), parseChoices(more, ['--by', '--reviewer', '--same-family'], usage), deps, say)
+      const usage =
+        'usage: task build <ticket> [--by lead|subagent:<model>|pi:<model>] [--reviewer <runner>:<model> | --fresh-reviewer] [--same-family]'
+      const read = parseChoices(more, ['--by', '--reviewer', '--fresh-reviewer', '--same-family'], usage)
+      if (read.freshReviewer && read.reviewer !== undefined) throw new Usage(usage)
+      return build(number(nText), read, deps, say)
     }
     case 'land': {
       const [nText, ...more] = args
@@ -215,12 +219,15 @@ function readRoles(deps) {
 function context(n, folder, deps) {
   const lines = readLog(folder)
   const last = lines.at(-1)
+  // A Ticket that shares its Spec's Reviewer is reviewed in the Spec's checkout.
+  const reviewedIn = readAgents(folder).reviewer?.of ?? n
   return {
     n,
     repo: deps.repo,
     folder,
     worktree: join(deps.home, 'worktrees', String(n)),
-    review: join(deps.home, 'worktrees', `${n}-review`),
+    review: join(deps.home, 'worktrees', `${reviewedIn}-review`),
+    sharedReviewer: reviewedIn !== n,
     round: last.round,
     pass: lines.filter((line) => line.to === 'spec' && line.round === 0).length,
   }
@@ -242,7 +249,10 @@ async function tryHandoff(n, folder, id, handoff, deps, extra) {
   const event = (name, detail) =>
     appendEvent(folder, { at: deps.now().toISOString(), event: name, role: handoff.role, detail: { id, ...detail } })
   try {
-    const agents = readAgents(folder)
+    // A Ticket's Reviewer is its Spec's own agent, unless it was given its own: it is read, started and kept in the Spec's folder.
+    const of = readAgents(folder)[handoff.role]?.of
+    const owner = of === undefined ? { n, folder } : { n: of, folder: join(deps.home, 'tasks', String(of)) }
+    const agents = readAgents(owner.folder)
     let agent = agents[handoff.role]
     // The Lead takes this role, or passes the prompt to its subagent: the prompt wakes the Lead, and starts no agent.
     if (RELAYED.includes(agent?.runner)) {
@@ -257,20 +267,23 @@ async function tryHandoff(n, folder, id, handoff, deps, extra) {
       const setting = agent === undefined ? defaultOf(handoff.role, readRoles(deps)) : settingOf(agent)
       toolOf(handoff.role, setting)
       const runner = runnerOf(setting.runner, deps)
-      const sessionDir = join(folder, 'agents', handoff.role, 'sessions')
+      const sessionDir = join(owner.folder, 'agents', handoff.role, 'sessions')
+      // An agent that ran before continues its session; a new one may start from a copy of another's.
+      const resume = existsSync(sessionDir) && readdirSync(sessionDir).length > 0
       const handle = await runner.start({
-        n,
+        n: owner.n,
         role: handoff.role,
         tool: setting.tool,
         model: setting.model,
         ...(setting.thinking === undefined ? {} : { thinking: setting.thinking }),
-        cwd: join(deps.home, 'worktrees', handoff.role === 'reviewer' ? `${n}-review` : String(n)),
+        cwd: join(deps.home, 'worktrees', handoff.role === 'reviewer' ? `${owner.n}-review` : String(owner.n)),
         sessionDir,
-        env: { BINNACLE_TASK: String(n), BINNACLE_ROLE: handoff.role },
+        ...(resume ? { resume } : setting.fork === undefined ? {} : { fork: setting.fork }),
+        env: { BINNACLE_TASK: String(owner.n), BINNACLE_ROLE: handoff.role },
       })
       agent = { ...setting, role: handoff.role, handle, startedAt: deps.now().toISOString() }
-      writeJson(join(folder, 'agents.json'), { ...agents, [handoff.role]: agent })
-      event('started', { runner: setting.runner })
+      writeJson(join(owner.folder, 'agents.json'), { ...agents, [handoff.role]: agent })
+      event('started', { runner: setting.runner, ...(of === undefined ? {} : { of }) })
     }
     await runnerOf(agent.runner, deps).prompt(agent.handle, handoff.text, (tried, code) => event('resent', { try: tried, code }))
     event('prompted', extra)
@@ -279,6 +292,15 @@ async function tryHandoff(n, folder, id, handoff, deps, extra) {
     event('handoff-failed', { error: error.message })
     throw new HandoffFailed(`task ${n}: the hand-off ${id} to the ${handoff.role} failed: ${error.message}; run task resend ${n}`)
   }
+}
+
+// pi names each session file by the time it began, so the newest sorts last.
+function newestSession(dir) {
+  if (!existsSync(dir)) return undefined
+  const files = readdirSync(dir)
+    .filter((file) => file.endsWith('.jsonl'))
+    .toSorted()
+  return files.length === 0 ? undefined : join(dir, files.at(-1))
 }
 
 function runnerOf(name, deps) {
@@ -307,6 +329,19 @@ async function build(n, read, deps, say) {
         : ofSpec !== undefined
           ? settingOf(ofSpec)
           : defaultOf('reviewer', roles)
+    // What the Ticket's agents.json holds: the Spec's own Reviewer, a copy of its session, or a Reviewer chosen for the Ticket.
+    let kept = reviewer
+    if (read.reviewer === undefined && ofSpec !== undefined) {
+      if (!read.freshReviewer) kept = { role: 'reviewer', of: spec }
+      else {
+        if (ofSpec.runner === 'headless' || RELAYED.includes(ofSpec.runner))
+          throw new Refusal(`the Spec ${spec}'s Reviewer runs as ${ofSpec.runner}; --fresh-reviewer forks only a herdr Reviewer's session`)
+        const fork = newestSession(join(specFolder, 'agents', 'reviewer', 'sessions'))
+        if (fork === undefined) throw new Refusal(`the Spec ${spec}'s Reviewer has no session to fork`)
+        kept = { ...reviewer, fork }
+      }
+    } else if (read.freshReviewer) throw new Refusal(`the Spec ${spec} has no Reviewer to fork`)
+    const shared = kept.of !== undefined
     if (!read.sameFamily && builder.family === reviewer.family)
       throw new Refusal(`the builder and the reviewer are of the same family ${builder.family}; choose another, or pass --same-family`)
     checkTool(builder)
@@ -315,11 +350,7 @@ async function build(n, read, deps, say) {
     const folder = join(deps.home, 'tasks', String(n))
     const worktree = join(deps.home, 'worktrees', String(n))
     const review = `${worktree}-review`
-    for (const [what, path] of [
-      ['task folder', folder],
-      ['worktree', worktree],
-      ['worktree', review],
-    ])
+    for (const [what, path] of [['task folder', folder], ['worktree', worktree], ...(shared ? [] : [['worktree', review]])])
       if (existsSync(path)) throw new Refusal(`task ${n}: the ${what} ${path} exists already`)
     const branch = `task/${n}`
     const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', branch], { cwd: deps.repo })
@@ -329,19 +360,19 @@ async function build(n, read, deps, say) {
     try {
       git(deps.repo, ['fetch', 'origin', 'main'])
       git(deps.repo, ['worktree', 'add', '-b', branch, worktree, 'origin/main'])
-      git(deps.repo, ['worktree', 'add', '--detach', review, 'origin/main'])
+      if (!shared) git(deps.repo, ['worktree', 'add', '--detach', review, 'origin/main'])
       base = git(deps.repo, ['rev-parse', 'origin/main'])
       mkdirSync(folder, { recursive: true })
       writeJson(join(folder, 'task.json'), { n, kind: 'ticket', spec, branch, worktree, createdAt: deps.now().toISOString() })
       writeJson(join(folder, 'agents.json'), {
         implementer: { ...builder, ...(RELAYED.includes(builder.runner) ? { startedAt: deps.now().toISOString() } : {}) },
-        reviewer,
+        reviewer: kept,
       })
       // A Ticket begins where its Spec's Round 0 ended.
       appendLine(join(folder, 'log.ndjson'), { at: deps.now().toISOString(), role: 'lead', from: null, to: 'approved', round: 0 })
     } catch (error) {
       spawnSync('git', ['worktree', 'remove', '--force', worktree], { cwd: deps.repo })
-      spawnSync('git', ['worktree', 'remove', '--force', review], { cwd: deps.repo })
+      if (!shared) spawnSync('git', ['worktree', 'remove', '--force', review], { cwd: deps.repo })
       spawnSync('git', ['branch', '-D', branch], { cwd: deps.repo })
       rmSync(folder, { recursive: true, force: true })
       throw error
@@ -383,7 +414,8 @@ async function land(n, deps, say) {
     const roles = readRoles(deps)
     const full = withTrailers(message, {
       builder: agents.implementer?.runner === 'lead' ? { ...roles.lead, runner: 'lead' } : agents.implementer,
-      reviewer: agents.reviewer,
+      reviewer:
+        agents.reviewer?.of === undefined ? agents.reviewer : readAgents(join(deps.home, 'tasks', String(agents.reviewer.of))).reviewer,
     })
     const worktree = join(deps.home, 'worktrees', String(n))
     if (git(worktree, ['status', '--porcelain']) !== '') throw new Refusal(`${worktree} has changes that are not committed`)
@@ -488,6 +520,10 @@ async function setState(n, state, read, deps, say) {
     const last = readLog(folder).at(-1)
     if (OWNERS[state] !== read.as) throw new Refusal(`the ${read.as} cannot set ${state}; the ${OWNERS[state]} sets it`)
     if (!followers(kind, last.to, last.round).includes(state)) throw new Refusal(refusal(n, kind, state, last))
+    if (kind === 'spec' && last.to === 'approved') {
+      const ticket = [...readTasks(deps.home).tasks.values()].find((task) => task.spec === n)
+      if (ticket !== undefined) throw new Refusal(`task ${n}: the Ticket ${ticket.n} is built from it; the Spec stays approved`)
+    }
     const round = state === 'ready' ? last.round + 1 : last.round
     appendLine(join(folder, 'log.ndjson'), {
       at: deps.now().toISOString(),
@@ -606,6 +642,10 @@ async function status(deps, n, say) {
     }
     say(`${task.n} ${task.state} round ${task.round} (${since(new Date(task.lines.at(-1).at), deps.now())} ago)`)
     for (const agent of agents) {
+      if (agent.of !== undefined) {
+        say(`  ${agent.role} of the Spec ${agent.of}`)
+        continue
+      }
       if (agent.runner === 'lead') {
         say(`  ${agent.role} lead`)
         continue
@@ -658,8 +698,15 @@ async function stop(n, read, deps, say) {
       say(`task ${n}: stopped already`)
       return 0
     }
+    if (kindOf(readTask(folder)) === 'spec' && !read.force) {
+      const running = [...readTasks(deps.home).tasks.values()].find((task) => task.spec === n && task.state !== 'stopped')
+      // Its Tickets share its Reviewer, so it goes last.
+      if (running !== undefined)
+        throw new Refusal(`the Ticket ${running.n} of the Spec ${n} is not stopped; stop it first, or pass --force`)
+    }
     const branch = `task/${n}`
     for (const agent of Object.values(readAgents(folder))) {
+      // A Ticket that shares its Spec's Reviewer holds no handle to it: the Reviewer stops with the Spec.
       if (RELAYED.includes(agent.runner) || agent.handle === undefined) continue
       await runnerOf(agent.runner, deps).close(agent.handle)
       appendEvent(folder, { at: deps.now().toISOString(), event: 'closed', role: agent.role })
