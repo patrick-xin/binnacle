@@ -86,6 +86,8 @@ export interface ChatSession {
   readonly events: readonly SessionEvent[]
   /** Sends a prompt, or steers the turn that runs. */
   send(text: string): void
+  /** Interrupts the turn that runs; what was queued for it waits for the next turn. */
+  interrupt(): void
 }
 
 declare module '@deepseek-ai/cordis' {

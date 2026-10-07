@@ -3,13 +3,16 @@ import type { Keybinding, KeybindingDefinitions } from '../terminal/keybindings.
 
 declare module '../terminal/keybindings.ts' {
   interface Keybindings {
-    'binnacle.quit': true
+    'binnacle.clear': true
+    'binnacle.interrupt': true
     'binnacle.suspend': true
   }
 }
 
+// Escape is also the editor's select.cancel. The composer has no popup yet; once it has one, it keeps escape while the popup is open, as pi does.
 const CORE_KEYS = {
-  'binnacle.quit': { defaultKeys: 'ctrl+c', description: 'Quit binnacle' },
+  'binnacle.clear': { defaultKeys: 'ctrl+c', description: 'Clear the draft; pressed twice on an empty draft, quit binnacle' },
+  'binnacle.interrupt': { defaultKeys: 'escape', description: 'Interrupt the turn that runs' },
   'binnacle.suspend': { defaultKeys: 'ctrl+z', description: 'Suspend binnacle, back to the shell' },
 } as const satisfies KeybindingDefinitions
 

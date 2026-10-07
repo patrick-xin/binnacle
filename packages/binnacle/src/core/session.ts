@@ -20,7 +20,7 @@ export async function openStored(ctx: Context, id: string): Promise<ChatSession 
   const handle = await store.open(id as SessionId, 'read')
   try {
     const { events } = await handle.read()
-    return { id, agent: undefined, events, send: () => {} }
+    return { id, agent: undefined, events, send: () => {}, interrupt: () => {} }
   } finally {
     await handle.close()
   }
@@ -59,6 +59,10 @@ export async function openNew(ctx: Context): Promise<ChatSession | undefined> {
       const message = createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
       if (agent.status === 'running') agent.steer(message)
       else agent.followup(message)
+    },
+    interrupt: () => {
+      // As dsh's own stop does: what was queued for the turn waits for the next one.
+      agent.cancel({ kind: 'user' }, { keepInbox: true })
     },
   }
 }

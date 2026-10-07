@@ -23,7 +23,7 @@ export interface Size {
   readonly rows: number
 }
 
-/** The core's hold on the terminal: it takes it, gives it back, and suspends with it. */
+/** One owner of the terminal, so a crash, a suspend and an unload each give it back once. */
 export class Host {
   readonly #streams: readonly Stream[]
   readonly #process: Process

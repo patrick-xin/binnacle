@@ -37,10 +37,9 @@ test('enter clears the draft and keeps it in the history, and up brings it back'
   )
 })
 
-test('ctrl+c passes the composer by to the Key Table, and quits', async () => {
+test('ctrl+c clears the draft, and binnacle stays', async () => {
   const { typed, exits } = await chat()
-  await typed('h', '\x03')
-  assert.deepEqual(exits, [0])
+  assert.deepEqual([await typed('h', 'i', '\x03'), exits], [['', '', RULE, ' ', RULE], []])
 })
 
 test('a key that the kitty protocol reports released is not typed a second time', async () => {
@@ -120,4 +119,22 @@ test('enter keeps the draft while no agent takes it: a stored session that is re
       ['', '', RULE, 'hi ', RULE],
     ],
   )
+})
+
+test('ctrl+c on a draft clears it, and only two more on the empty draft quit', async () => {
+  const { typed, exits } = await chat()
+  await typed('h', '\x03', '\x03')
+  const afterOne = [...exits]
+  await typed('\x03')
+  assert.deepEqual([afterOne, exits], [[], [0]])
+})
+
+test("esc interrupts the turn that runs, keeping what was queued for it as dsh's own stop does, and leaves the draft", async () => {
+  const dsh = agents()
+  const { typed } = await chat(20, 5, dsh.provide)
+  await typed('h', 'i')
+  const rows = await typed('\x1b')
+  // A lone escape is told from the start of a sequence once nothing follows it.
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  assert.deepEqual([dsh.cancels, rows], [[{ cause: { kind: 'user' }, options: { keepInbox: true } }], ['', '', RULE, 'hi ', RULE]])
 })
