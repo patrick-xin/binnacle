@@ -9,19 +9,21 @@ You turn what the Maintainer wants into Tasks, start each Task, answer its quest
 
 ## From Intent to Tasks
 
-1. Brainstorm with the originator, with the `grill` skill.
-2. Continue until both of you agree on what is wanted.
-3. Write `intents/<slug>/intent.md`: title, metadata, problem, proposed outcome, affected users and systems, constraints, Stages and open questions.
-4. Show the Intent to the Maintainer with the doc tool.
-5. Change the Intent until the Maintainer approves it.
-6. Write the Specs of the current Stage, with the `spec` skill: one for each feature.
-7. Slice each Spec into Tickets in its **Tickets** section, with the `tickets` skill, before its Round 0.
-8. List the Specs of the Stage in the Intent.
-9. When every Task of the Stage is merged, tell the Maintainer what to try.
-10. If the Maintainer makes a small change to the Intent, edit it.
-11. If the change is large, use `grill` again.
+The product's Intent is `intents/binnacle/intent.md`. Each feature that is grilled gets an Intent of its own, `intents/<feature>/intent.md`, and the product's Stages name the features that serve each one.
 
-- An Intent says what is wanted and why. The design goes in the Specs, never in the Intent.
+1. Grill the Maintainer about the feature, with the `grill` skill, until both of you agree on what is wanted.
+2. Write `intents/<feature>/intent.md` in the Maintainer's own words: title, metadata, Problem, Proposed outcome, Affected users and systems, Constraints, Open questions.
+3. Show the Intent to the Maintainer with the doc tool.
+4. Change the Intent until the Maintainer approves it.
+5. Write the feature's Specs, with the `spec` skill.
+6. Slice each Spec into Tickets in its **Tickets** section, with the `tickets` skill, before its Round 0.
+7. List the Specs in the feature's Intent.
+8. When every Task of the Stage is merged, tell the Maintainer what to try.
+9. If the Maintainer makes a small change to an Intent, edit it.
+10. If the change is large, use `grill` again.
+
+- An Intent says what is wanted and why, in plain words: no code, no API, no design. A word that only an engineer would use belongs in the Spec.
+- The design goes in the Specs. What is built goes in the feature's doc in `docs/features/`, with the code.
 - An answer to an open question is an edit to the Intent.
 - A decision that binds more than one Task is an ADR, written in the Task that needs it.
 - A decision that you take for the Maintainer is an ADR too.
@@ -41,7 +43,7 @@ If a Fix needs a decision or a third source file, stop. Move it to Build.
 ## Before a Ticket starts
 
 1. Each Ticket that blocks it is merged.
-2. Two Tickets with no edge between them can be built at the same time. If both change one shared file, such as a table, a registry or a type, add an edge with `gh issue edit <n> --add-blocked-by <m>`, and wait. A row appended to the feature map, and a changeset, are no edge.
+2. Two Tickets with no edge between them can be built at the same time. If both change one shared file, such as a table, a registry or a type, add an edge with `gh issue edit <n> --add-blocked-by <m>`, and wait. A row appended to the feature index or a feature's doc, and a changeset, are no edge.
 
 ## A Spec and its Tickets
 

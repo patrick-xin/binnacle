@@ -9,7 +9,7 @@ A Spec is the design of one feature of a Stage, and its slices into Tickets. The
 
 ## Steps
 
-1. Read the Intent and the Stage that the Spec serves.
+1. Read the feature's Intent, its doc in `docs/features/`, and the product's Stage that the Spec serves.
 2. Read the code and the records that the Spec touches.
 3. Send each question about dsh, pi-tui or another Reference to the Researcher.
 4. Fill each field of the template.
@@ -23,7 +23,7 @@ A Spec is the design of one feature of a Stage, and its slices into Tickets. The
 
 | Field | Holds |
 |---|---|
-| **Intent** | A link to the Intent and the Stage |
+| **Intent** | A link to the feature's Intent, and the product's Stage |
 | **Problem** | What a person or an author cannot do today, as they would say it |
 | **Behaviour** | What a person or an author can do after the change. Write one sentence for each behaviour, as a person would say it. Each sentence becomes the name of one test, in the Ticket that builds it. |
 | **Seams** | Where the tests observe the change, from outside. Use the fewest seams that hold every behaviour. |
@@ -34,6 +34,7 @@ A Spec is the design of one feature of a Stage, and its slices into Tickets. The
 
 - A Stage has one Spec or more. Each Spec is one feature, and it belongs to one Stage.
 - The design goes in the Spec, not in the Intent. A decision that binds more than one Spec is an ADR.
+- Each Ticket names the feature doc that it changes, as one of its records.
 - Order the behaviours so that each builds on the one before. The first is the thinnest one that crosses every seam.
 - Cite code with its path and symbol, such as `` `binnacle:scripts/refs.mjs#plan` ``. A line number goes stale.
 - If the Door is one-way, the Maintainer agrees the Spec before its Tickets are built.

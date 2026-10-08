@@ -54,6 +54,7 @@ Agents write most of binnacle's code, reviews and records. Without a plan and cl
 6. A person merges only a change that cannot be reversed.
 7. The workflow does not depend on a dispatch tool that the repository does not own.
 8. No role depends on one agent tool or one model. For example, a GPT model can be the coordinator.
+9. A file that is longer than 800 lines gets a warning, not a failure.
 
 ## Stages
 
@@ -64,40 +65,6 @@ Each Stage ends in a behaviour that the Maintainer can try. The coordinator writ
 3. **Specs and Tickets.** A Spec holds the design of one feature, and its Tickets are sub-issues with blocking edges. The `tickets` skill begins as Matt Pocock's `to-tickets`. The Task tool takes the builder and the Reviewer that the Maintainer names. The Maintainer tries it on binnacle's Stage 3: one Spec, its Tickets, a Ticket built by a subagent, and a PR that reads alone.
 4. **Merging.** A change that can be reversed merges with no person. The Maintainer sees one merge with no person, and one change that waits.
 5. **Words.** The checks refuse a retired word and a sentence that breaks STE. The Maintainer sees both refusals.
-
-## Decisions
-
-These answer the open questions of the first draft.
-
-1. Two Tasks do not change the same files at the same time. Decision 11 replaces this.
-2. A decision that the coordinator takes for the Maintainer is written as an ADR. An ADR cannot be reversed, so the Maintainer merges it.
-3. A file that is longer than 800 lines causes a warning, not a failure.
-4. One file lists the kinds of change that cannot be reversed. A change to that file cannot be reversed either.
-
-These answer the design of Stage 3, from the grill of 2026-10-06.
-
-5. **Spec.** A Spec is one GitHub issue for one feature of a Stage. A Stage has one Spec or more. A Spec holds its Intent and Stage, the problem, the behaviours, the seams, the decisions, what is out of scope, and the Door.
-6. **Ticket.** A Ticket is one vertical slice of a Spec: a sub-issue of it, with `gh issue create --parent`. It holds its Spec, what the Maintainer can try when it merges, its behaviours as the names of its tests, its records, the Tickets that block it, its Door and its review level. A Ticket names no file path.
-7. **Task** is the word for each issue that is built: a Ticket, a Fix or a Chore. The Build Lane holds the Tickets.
-8. **The design** goes in the Spec. The Intent holds only what is wanted, why, and in which Stages. An ADR holds a decision that binds more than one Spec.
-9. **Round 0** checks the Spec, with its Tickets (decision 20). `task start <spec>` starts it. `task build <ticket>` refuses until the Ticket's Spec is approved. A Ticket's Rounds start at Round 1.
-10. **Code shape** goes away, with the check of overlapping files.
-11. **Blocking edges** order the Tickets, with `--blocked-by`. Two Tickets with no edge between them can be built at the same time. If both change one shared file, the Lead adds an edge.
-12. **The builder** of a Ticket is the Lead, a Claude Code subagent, or a pi agent on any model. The Maintainer names the model of each role at the start of a session, or before the builder writes code. With no name, `.agents/roles.json` holds the default.
-13. **The tool takes the choice** as flags, and records it for each Task: `task start <spec> --reviewer <runner>:<model>`, and `task build <ticket> --by lead|subagent:<model>|pi:<model>`.
-14. **One state machine** serves each builder. For the Lead and a subagent, the tool starts no agent, and the Lead sets the Implementer's states with `--as implementer`. The Reviewer's Hand-offs, the Rounds and `task land` do not change.
-15. **The Reviewer** runs through pi, in herdr or headless with `--session-id`, or as a Claude Code subagent that the Lead continues between Rounds.
-16. **Blind review.** No prompt to the Reviewer names the builder. A builder's commits have no model trailer, and `task land` adds it. The Reviewer does not read `agents.json`.
-17. **Families.** The tool finds a model's family from its provider. It refuses a builder and a Reviewer of one family, unless the Lead passes `--same-family`.
-18. **A PR reads alone.** Its title says what a person or an author can do now. Its Summary starts with where it fits: "Ticket 2 of 4 of #160, Stage 3". It quotes each decision that it follows, and does not name only its number. It ends with `Closes #<ticket>` and `Part of #<spec>`.
-19. **Order.** This is Stage 3 of this Intent. binnacle's Stage 3 waits for it, and is its first Spec.
-
-These come from binnacle's Stage 3, on 2026-10-06, before its first Ticket.
-
-20. **Round 0 checks the slicing.** A Spec holds its Tickets: each one's title, its behaviours and its blocking edges. Round 0 checks them with the Spec, and the Maintainer agrees to both at once. An approved Spec goes back to `spec` for another pass until a Ticket of it is built.
-21. **One Reviewer for each Spec.** The Reviewer of a Spec's Round 0 reviews each Round of its Tickets, in the Spec's checkout. Each Round still names one Ticket and its commits, so the Reviewer checks a small diff with the whole Spec in mind. It stops with the Spec, after the last Ticket.
-22. **A session continues.** An agent that the tool starts again continues its pi session, so a closed tab or a crash loses nothing.
-23. **A fresh Reviewer** starts from a copy of the Spec Reviewer's session: `task build --fresh-reviewer`. The Lead uses it for two Tickets of one Spec in review at once, or for a Reviewer that has reviewed long and may have grown lenient.
 
 ## Open questions
 
