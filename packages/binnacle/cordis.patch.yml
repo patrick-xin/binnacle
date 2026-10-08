@@ -30,3 +30,9 @@
     # The approvals: a tool that needs an approval asks, and a person answers.
     - id: binnacle-approvals
       name: 'binnacle/plugins/approvals'
+    # The questions: the agent asks a person, who answers or reviews its plan.
+    - id: binnacle-questions
+      name: 'binnacle/plugins/questions'
+    # The tool the agent asks through, in its blocking mode, as dsh's standard preset composes it.
+    - id: tool-ask-user
+      name: '@deepseek-ai/dsh-tool-ask-user'
