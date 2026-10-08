@@ -12,8 +12,8 @@ One canonical term for each concept of the workflow that builds binnacle. A term
 
 ## From what is wanted to what is built
 
-- **Intent** — what is wanted, why, and in which Stages. It holds no design, so it is not a Spec. Home: `intents/<slug>/intent.md`. <a id="intent"></a>
-- **Stage** — a part of an Intent that ends in a behaviour the Maintainer can try under dsh. Home: the Intent. <a id="stage"></a>
+- **Intent** — what is wanted and why, in the Maintainer's plain words. The product's Intent holds the Stages; a feature's Intent holds what is wanted of one feature. It holds no design, so it is not a Spec. Home: `intents/<slug>/intent.md`. <a id="intent"></a>
+- **Stage** — a part of the product's Intent that ends in a behaviour the Maintainer can try under dsh, and names the features that serve it. Home: `intents/binnacle/intent.md`. <a id="stage"></a>
 - **Task** — one GitHub issue that is built, in one Lane: a Ticket, a Fix or a Chore. Home: [`task.md`](task.md). <a id="task"></a>
 - **Lane** — how a Task is built and reviewed: Fix, Chore or Build. Not a Door. Home: [the `lead` skill](skills/lead/SKILL.md). <a id="lane"></a>
 - **Spec** — the issue that designs one feature of a Stage: its behaviours, its seams, its decisions and its Tickets. Round 0 checks it. It is not a Ticket. Home: [the `spec` skill](skills/spec/SKILL.md). <a id="spec"></a>

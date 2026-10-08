@@ -27,7 +27,7 @@ A Ticket is one vertical slice of a Spec: a sub-issue of it, built on one branch
 - **Prefactors first.** A prefactor is a Ticket of its own, and it blocks the Tickets that need it.
 - **No file paths.** A Ticket says what changes, not where. Paths go stale before the build. The exception is a snippet from a prototype that holds a decision better than prose does: a type, a state machine or a table.
 - **Each behaviour fails before the build.** For each behaviour, name what would show it false, and check that it is false at `origin/main`. A behaviour that holds already, or that only another Ticket can make true, grades nothing.
-- **A shared file is an edge.** When two Tickets with no edge between them change one shared file, such as a table, a registry or a type, add an edge. A row appended to the feature map, and a changeset, are no edge: the rebase before `task land` keeps both.
+- **A shared file is an edge.** When two Tickets with no edge between them change one shared file, such as a table, a registry or a type, add an edge. A row appended to the feature index or a feature's doc, and a changeset, are no edge: the rebase before `task land` keeps both.
 
 ## A wide refactor
 

@@ -1,6 +1,6 @@
 # Glossary
 
-One canonical term for each concept that is binnacle's own, for a person who uses binnacle and an author who changes it. A term is capitalized wherever it is used in that meaning, so it reads apart from the plain word. A word that dsh or Cordis owns keeps their meaning: see dsh's glossary. What the author API does is in `packages/binnacle/src/api.ts`, and what a person sees is in [the feature map](features.md). The words of the agents who build binnacle are in [`.agents/glossary.md`](../.agents/glossary.md).
+One canonical term for each concept that is binnacle's own, for a person who uses binnacle and an author who changes it. A term is capitalized wherever it is used in that meaning, so it reads apart from the plain word. A word that dsh or Cordis owns keeps their meaning: see dsh's glossary. What the author API does is in `packages/binnacle/src/api.ts`, and what each feature does so far is in [the feature docs](features.md). The words of the agents who build binnacle are in [`.agents/glossary.md`](../.agents/glossary.md).
 
 ## Screens
 

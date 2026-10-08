@@ -6,7 +6,7 @@ labels: spec
 
 ## Intent
 
-<!-- A link to the Intent, and the Stage that this Spec serves. -->
+<!-- A link to the feature's Intent, and the product's Stage that this Spec serves. -->
 
 ## Problem
 

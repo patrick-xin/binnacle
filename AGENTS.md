@@ -10,11 +10,12 @@ binnacle is a terminal app for [DeepSeek Harness](https://github.com/deepseek-ai
 ## Where things are
 
 ```text
-intents/<slug>/intent.md    what is wanted, why, and in which Stages
+intents/<slug>/intent.md    what is wanted and why, in the Maintainer's words: the product, or one feature
 packages/binnacle/          the app: a dsh bundle, its core and its plugins
 docs/adr/                   the decisions that bind more than one Task
 docs/glossary.md            binnacle's words, for a person and an author
-docs/features.md            each feature: what a person sees, its row and its code
+docs/features.md            the index of features, their docs and their rows
+docs/features/<feature>.md  how a feature is built so far: the second source, after the code
 .agents/glossary.md         the words of the agents' workflow
 .agents/skills/             one skill for each role, and shared skills
 .agents/roles.json          the tool and the model that take each role
@@ -25,9 +26,9 @@ references.json             the repositories that pnpm refs fetches into .refs/
 .refs/<name>/               each Reference at its pin, to read and never to write
 ```
 
-A Task is a GitHub issue that is built: a Ticket, a Fix or a Chore. A Spec designs one feature of a Stage, and its Tickets are its sub-issues. The Intent lists the Specs of its current Stage.
+A Task is a GitHub issue that is built: a Ticket, a Fix or a Chore. A Spec designs one feature of a Stage, and its Tickets are its sub-issues. The feature's Intent lists its Specs.
 
-A change that adds a feature or a row edits the feature map in the same commit. A concept that is ours, and that could be read two ways, goes in its glossary in the same commit, capitalized there and wherever it is used in that meaning.
+A change to a feature edits its doc in `docs/features/` in the same commit, and a new feature or row edits the index too. A PR that changes the published package adds a changeset with a short release note: before 1.0, a fix or a feature is a `patch`, and a break of what an author may import is a `minor`. The Maintainer merges the version PR to publish. A concept that is ours, and that could be read two ways, goes in its glossary in the same commit, capitalized there and wherever it is used in that meaning.
 
 ## Commands
 

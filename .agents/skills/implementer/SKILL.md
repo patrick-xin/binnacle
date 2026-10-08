@@ -41,6 +41,7 @@ A test is proven when a break of the code that it covers makes it fail.
 - The header is Conventional Commits: `feat: <what a person or an author can do now>`.
 - The body says what changed for a person or an author, and why.
 - It names the change to the author API, or says "Author API: none."
+- If the change leaves its feature's doc true, a line says why: `Feature doc unchanged: <Feature>, <why>`.
 - It lists the decisions that you took.
 - It ends with `Closes #<ticket>`.
 - It names no model. `task land` adds the trailers.
@@ -63,7 +64,7 @@ Then check each item:
 - `pnpm test` passes at that commit.
 - Each behaviour of the Ticket has a test with its name.
 - Each new test is proven, and `checked.md` records the break.
-- The records that the Ticket names are changed in the same commit as the code.
+- The records that the Ticket names are changed in the same commit as the code, and the feature's doc in `docs/features/` says what is built now.
 - Each changed file serves a behaviour or a record of the Ticket.
 - Each comment in your diff gives a reason that the code cannot show. A test's name says its behaviour, so a test has no comment.
 - No commit names a model.

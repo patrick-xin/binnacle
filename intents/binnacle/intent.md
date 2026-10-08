@@ -21,75 +21,41 @@ binnacle is a terminal app for dsh. A person starts it with `dsh --profile binna
 4. Resume a session that started in binnacle or in another dsh app.
 5. Ask an author agent to change anything that binnacle draws or answers, while the session runs. This outcome is between 0.X-1.0 release. Examples are colours, glyphs, the words on screen, the keys, how a tool call is drawn, and where a part of the screen goes.
 
-The author agent changes binnacle through the same registrations that binnacle's own features use. If binnacle can do something for itself, an author can do it too. If an author cannot change something, that is a gap in binnacle.
+binnacle's built-in features are defaults that authors replace, and they serve as living examples. If binnacle can do something for itself, an author can do it too. If an author cannot change something, that is a gap in binnacle.
 
-A change takes effect while the session runs, and a broken change does not stop the session. binnacle draws what went wrong and names the change that caused it.
+A change takes effect while the session runs, and a broken change does not stop the session. binnacle shows what went wrong and names the change that caused it.
+
+The first 0.x release is a fully working terminal app. Authoring is the 1.0 release.
 
 ## Affected users and systems
 
 - **A person** who uses dsh in a terminal.
-- **An author agent:** a dsh agent with binnacle's author skill. It changes binnacle for the person.
-- **dsh:** the launcher, profiles and bundles, sessions and their events, the approval and question requests, the plugin manager, and hot reload.
+- **An author agent:** a dsh agent that changes binnacle for the person.
+- **dsh:** it starts binnacle, and runs the agent and its sessions.
 - **Terminals:** macOS Terminal, iTerm2, Ghostty, kitty, WezTerm, terminals on Linux, and tmux.
-- **pi-tui:** binnacle copies parts of it, under its MIT licence.
+- **pi:** binnacle copies parts of pi's terminal library, with credit.
 - **npm:** binnacle is published as a package that a dsh profile installs.
 
 ## Constraints
 
-1. binnacle is an ordinary dsh bundle. It uses dsh only through named seams.
-2. binnacle owns its terminal layer: the Screens, drawing, scrolling, the Focus, layout and keys. It copies pi-tui's input decoding, text width, terminal I/O and editor, with credit, and changes them as it needs.
-3. binnacle uses the alternate screen, and its layout keeps the composer at the bottom. When it exits, it prints a plain summary of the session to the main screen. Drawing stays behind one seam, so a regular mode in the terminal's scrollback can come later. Stage 5 decides if the first release has it.
-4. One part of binnacle owns the terminal and the session view. It stays up when dsh reloads the profile. Views, themes and keys reload under it.
-5. The mouse is on by default, as in pi. binnacle selects and copies text itself, and a key turns the mouse off. Keys and the mouse share one gesture table.
-6. Text from a model or a tool is not trusted. binnacle removes terminal control sequences from it before it draws the text.
-7. binnacle restores the terminal when it exits, crashes or is suspended.
-8. While binnacle draws, it captures text that other code writes to the terminal and shows it as a notice.
-9. Breaking changes are accepted until the first stable release.
+1. binnacle is an ordinary dsh profile. It does not change dsh.
+2. binnacle gives the terminal back as it found it, when it exits, crashes or is suspended.
+3. Text from a model or a tool is not trusted: it cannot control the terminal.
+4. Windows is best effort.
+5. There is no screen-reader mode. dsh's web app serves screen readers.
+6. Authors get no promise of stability before the 0.x release, and breaking changes are accepted until the first stable release.
 
 ## Stages
 
-Each stage ends in a behaviour that the Maintainer can try under `dsh`. The Lead writes the specs for the current stage only.
+Each stage ends in something the Maintainer can try under dsh. The Lead writes the Specs for the current stage only. What each feature does so far is in [the feature docs](../../docs/features.md).
 
-1. **Core.** binnacle boots under `dsh --profile binnacle`, and owns the terminal. The Maintainer opens a recorded session in a temporary Read view, and scrolls it with the wheel.
-2. **Chat.** The Maintainer types in the composer, sends a prompt, watches the answer stream as raw events, and interrupts it. The Screen is a layout tree that an author can replace, and the keys reach the composer through one Key Table.
-3. **Waiting on a person.** The Maintainer answers each Request with the keyboard or the mouse. Keys and the mouse go through one gesture table. Focus and folds work.
-4. **Plugins.** Search, the model picker, settings and the trajectory are plugins. The trajectory is a Screen of its own, with charts, tabs and filters.
-5. **Finish.** The Maintainer resumes a session, selects and copies text, and sees the summary on exit. The theme and `NO_COLOR` work. The first 0.x release follows.
+1. **Core.** binnacle starts under dsh and takes the terminal. The Maintainer opens a recorded session and scrolls it.
+2. **Chat.** The Maintainer types a prompt, sends it, watches the answer stream, and interrupts it.
+3. **Waiting on a person.** The Maintainer answers the agent's questions and approvals with the keyboard or the mouse, and folds the transcript. Features: Gestures, Requests, Transcript.
+4. **Plugins.** Search, the model picker, settings, and the trajectory, a screen of its own with charts, tabs and filters.
+5. **Finish.** The Maintainer resumes a session, selects and copies text, and sees a summary on exit. Colours follow the terminal, and `NO_COLOR` works. The first 0.x release follows.
 
 Authoring gets its own stages, toward 1.0.
-
-The Specs of Stage 3:
-
-- [#156](https://github.com/patrick-xin/binnacle/issues/156) Gestures: a person clicks a Part, and moves the Focus by key or click, through one Gesture Table.
-- [#157](https://github.com/patrick-xin/binnacle/issues/157) Approvals: a person allows or rejects a tool that needs an approval.
-- [#158](https://github.com/patrick-xin/binnacle/issues/158) Questions: a person answers the agent's questions, and reviews its plan.
-- [#159](https://github.com/patrick-xin/binnacle/issues/159) Folds: a person folds the transcript's events, and moves through them by key.
-
-## Decisions
-
-These answer the open questions of the first draft, from the grill of 2026-10-04.
-
-1. **Releases.** A PR that changes the published package adds a changeset with a short release note. Before 1.0, a fix or a feature is a `patch`, and a break of what an author may import is a `minor`. One version PR stays open on `main`, and the Maintainer merges it to publish.
-2. **The first 0.x release** is a fully working terminal app. Authoring is the 1.0 release, and 1.0 is an estimate. While binnacle is built, the team tests what an author can do through the same registrations that the built-in plugins use.
-3. **Core and plugins.** The core owns the terminal, input decoding, the gesture table, layout, Screens, the Focus, drawing, the link to the dsh session, the fence around a broken plugin, and the plugin registry. Everything that a person sees is a plugin: the transcript, the composer, Requests, the status line, search, the model picker, settings and the trajectory.
-4. **Words.** A box that the agent waits on is a **Request**: an approval or a question, in dsh's words. A thing that a person picks in a Request is a **Choice**. A picker that a person opens is a **Menu**. These words replace "ask" and "offer", and they are always capitalized.
-5. **Windows** is best effort. The copied pi-tui code keeps its Windows handling, and CI tests macOS and Linux.
-6. **The copied editor** stays until a person or an author needs something that it cannot do.
-7. **Screen readers.** The first release has no plain mode. dsh's web app serves screen readers.
-8. **Authors** get no promise of stability before 0.X release.
-9. **Wide content** wraps, as in pi. A table wraps each cell. A table that is too narrow to draw falls back to its raw markdown, wrapped.
-
-These answer the design of stage 2, from the grill of 2026-10-05. They were written before a Spec held the design of a Stage. From Stage 3, the design goes in its Specs.
-
-10. **The agent** is composed as dsh's headless bundle composes it: on `dsh-base`, with no presets, on the default model.
-11. **`dsh --profile binnacle`** opens the Chat on a new session. `--session <id>` draws a stored session, and nothing can be sent to it.
-12. **Layout.** A Screen is a layout tree of named Places, and every node may have a box ([ADR 2](../../docs/adr/0002-a-screen-is-a-layout-tree-of-named-places.md)). Edges, glyphs and spacing are named tables behind one lookup. An author overrides an entry or registers a new name with the theme, in stage 5.
-13. **Keys.** The core owns one Key Table: each action has an id, its default keys and a description. The copied editor reads its keys from it. A key goes to the Part with the Focus first, then to the core. Stage 3 adds the mouse to the same table.
-14. **The keys of the Chat.** Enter sends a prompt, or steers the turn that runs. Shift+enter is a new line, with pi's fallbacks where a terminal cannot tell it from enter. pi's fallback for macOS's Terminal and for Windows reads the shift key through a native helper, and binnacle does not copy it: there, ctrl+j or a backslash before enter is a new line. Esc interrupts the turn. Ctrl+c clears the draft, and pressed twice on an empty draft it quits. Ctrl+z suspends.
-15. **The transcript** is a plugin. It draws each event of the session raw, as its seq, its type and its JSON, and the answer that streams as one live block that the committed event replaces. Grouping and styling come later, and an author can do them too. The status line is a plugin of its own.
-16. **Requests** fail closed until stage 3: a tool that needs an approval fails. (Ended by [#163](https://github.com/patrick-xin/binnacle/issues/163): a person allows or rejects it.)
-17. **Hot reload** is off until the core stays up while its plugins reload.
-18. **Styled lines.** A Part's lines may carry colour and style. The core takes out every other control sequence, such as a cursor move, a clear or an OSC. A plugin makes Untrusted Text plain with a helper the core exports, and a Part says where its cursor is.
 
 ## Open questions
 
