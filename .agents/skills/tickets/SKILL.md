@@ -17,7 +17,7 @@ A Ticket is one vertical slice of a Spec: a sub-issue of it, built on one branch
 6. When Round 0 is `approved`, show the Maintainer the draft. Ask: is each Ticket the right size? Is each edge real? Should a Ticket merge with another, or split?
 7. If the Maintainer changes the draft, edit the section, and send the Spec for another pass.
 8. Publish the Tickets, blockers first, so that each edge names a real number: `gh issue create --label build --parent <spec> --blocked-by <n>,<m>`.
-9. Leave the Spec open. Its Tickets close it, one by one.
+9. Leave the Spec open. `pnpm task stop <spec>` closes it after its last Ticket merges.
 
 ## Rules
 
@@ -27,7 +27,7 @@ A Ticket is one vertical slice of a Spec: a sub-issue of it, built on one branch
 - **Prefactors first.** A prefactor is a Ticket of its own, and it blocks the Tickets that need it.
 - **No file paths.** A Ticket says what changes, not where. Paths go stale before the build. The exception is a snippet from a prototype that holds a decision better than prose does: a type, a state machine or a table.
 - **Each behaviour fails before the build.** For each behaviour, name what would show it false, and check that it is false at `origin/main`. A behaviour that holds already, or that only another Ticket can make true, grades nothing.
-- **A shared file is an edge.** When two Tickets with no edge between them change one shared file, such as a table, a registry or a type, add an edge.
+- **A shared file is an edge.** When two Tickets with no edge between them change one shared file, such as a table, a registry or a type, add an edge. A row appended to the feature map, and a changeset, are no edge: the rebase before `task land` keeps both.
 
 ## A wide refactor
 

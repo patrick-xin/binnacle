@@ -734,6 +734,7 @@ async function stop(n, read, deps, say) {
       }
       git(deps.repo, ['branch', '-D', branch])
     }
+    if (kindOf(readTask(folder)) === 'spec' && !read.force) await closeSpec(n, deps, say)
     appendLine(join(folder, 'log.ndjson'), {
       at: deps.now().toISOString(),
       role: 'lead',
@@ -744,6 +745,21 @@ async function stop(n, read, deps, say) {
     say(`task ${n}: stopped round ${last.round}`)
     return 0
   })
+}
+
+// A Ticket's PR says `Part of #<spec>`, so no merge closes the Spec: its stop does, once each Ticket landed.
+async function closeSpec(n, deps, say) {
+  const tickets = [...readTasks(deps.home).tasks.values()].filter((task) => task.spec === n)
+  const prs = tickets.map(
+    (task) => readEvents(join(deps.home, 'tasks', String(task.n))).findLast((event) => event.event === 'pr')?.detail.url,
+  )
+  if (tickets.length === 0 || prs.includes(undefined)) {
+    say(`task ${n}: the Spec stays open, as a Ticket of it did not land`)
+    return
+  }
+  const closed = await deps.gh(['issue', 'close', String(n), '--comment', `Its Tickets landed: ${prs.join(', ')}.`])
+  if (closed.code !== 0) throw new Error(`cannot close the Spec ${n}: ${closed.stderr.trim()}`)
+  say(`task ${n}: closed the Spec`)
 }
 
 export async function run(argv, deps) {

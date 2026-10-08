@@ -13,10 +13,11 @@ A Spec is the design of one feature of a Stage, and its slices into Tickets. The
 2. Read the code and the records that the Spec touches.
 3. Send each question about dsh, pi-tui or another Reference to the Researcher.
 4. Fill each field of the template.
-5. Mark each open choice under **Decisions**, with your recommendation.
-6. Slice it into Tickets under **Tickets**, with the `tickets` skill.
-7. Publish the issue with `gh issue create --label spec`.
-8. Run `pnpm task start <spec>`. It sends the Spec to the Reviewer for Round 0.
+5. Walk each behaviour's edges, as *Edges* below says. Each edge gets a behaviour or a decision.
+6. Mark each open choice under **Decisions**, with your recommendation.
+7. Slice it into Tickets under **Tickets**, with the `tickets` skill.
+8. Publish the issue with `gh issue create --label spec`.
+9. Run `pnpm task start <spec>`. It sends the Spec to the Reviewer for Round 0.
 
 ## The fields
 
@@ -36,3 +37,13 @@ A Spec is the design of one feature of a Stage, and its slices into Tickets. The
 - Order the behaviours so that each builds on the one before. The first is the thinnest one that crosses every seam.
 - Cite code with its path and symbol, such as `` `binnacle:scripts/refs.mjs#plan` ``. A line number goes stale.
 - If the Door is one-way, the Maintainer agrees the Spec before its Tickets are built.
+
+## Edges
+
+Round 0's findings are most often an edge that no behaviour names. For each behaviour, say what happens:
+
+- **At the ends:** the first and the last item, and a move past them.
+- **With nothing:** no item, no option, an empty answer.
+- **With too much:** more than the screen holds, a long line, a narrow terminal.
+- **When it goes part-way:** the thing is withdrawn, replaced or unloaded while it is shown, or while it waits.
+- **When it is another's:** another agent's, another Place's, or a stored session's.

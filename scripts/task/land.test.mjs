@@ -212,3 +212,27 @@ test('A resumed `task land` makes no second commit when Git is set to keep a mes
   assert.equal((await run(['land', '140'], world.deps)).code, 0)
   assert.equal(git(worktree, ['rev-parse', 'HEAD']), squashed)
 })
+
+test('`task stop <spec>` closes the Spec once each of its Tickets landed, and names their PRs', async (t) => {
+  const world = makeWorld()
+  t.after(() => world.remove())
+  await approved(world)
+  await steps(world, ['land', '140'], ['stop', '140', '--force'])
+
+  const stopped = await run(['stop', String(SPEC)], world.deps)
+
+  assert.equal(stopped.stdout, 'task 100: closed the Spec\ntask 100: stopped round 0\n')
+  assert.deepEqual(world.gh.closed, [{ n: '100', comment: 'Its Tickets landed: https://github.com/o/r/pull/1.' }])
+})
+
+test('`task stop <spec>` leaves the Spec open when a Ticket of it did not land', async (t) => {
+  const world = makeWorld()
+  t.after(() => world.remove())
+  await built(world, 140, '--by', 'lead')
+  await steps(world, ['stop', '140', '--force'])
+
+  const stopped = await run(['stop', String(SPEC)], world.deps)
+
+  assert.equal(stopped.stdout, 'task 100: the Spec stays open, as a Ticket of it did not land\ntask 100: stopped round 0\n')
+  assert.deepEqual(world.gh.closed, [])
+})

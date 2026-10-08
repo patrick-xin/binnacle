@@ -132,6 +132,7 @@ export function makeFakeGh() {
     calls: [],
     prs: new Map(),
     comments: [],
+    closed: [],
     failures: [],
     async call(args, input) {
       gh.calls.push(args.join(' '))
@@ -170,6 +171,10 @@ export function makeFakeGh() {
       }
       if (verb === 'edit') {
         byUrl.labels.push(args[args.indexOf('--add-label') + 1])
+        return { code: 0, stdout: '', stderr: '' }
+      }
+      if (verb === 'close') {
+        gh.closed.push({ n: target, comment: args[args.indexOf('--comment') + 1] })
         return { code: 0, stdout: '', stderr: '' }
       }
       if (verb === 'comment') {

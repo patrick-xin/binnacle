@@ -65,4 +65,5 @@ Then check each item:
 - Each new test is proven, and `checked.md` records the break.
 - The records that the Ticket names are changed in the same commit as the code.
 - Each changed file serves a behaviour or a record of the Ticket.
+- Each comment in your diff gives a reason that the code cannot show. A test's name says its behaviour, so a test has no comment.
 - No commit names a model.

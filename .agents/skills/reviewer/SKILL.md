@@ -14,7 +14,7 @@ The review is blind. You do not know who built the Ticket, and you do not try to
 1. Read the Spec with `gh issue view <n>`.
 2. Check each claim about upstream, against its Reference in `.refs/`.
 3. Check each move between layers, against the layers file.
-4. List each decision that the build will meet and that the Spec does not answer.
+4. List each decision that the build will meet and that the Spec does not answer. Walk each behaviour's edges, as the `spec` skill's *Edges* lists them.
 5. Check the **Tickets** section against the rules of the `tickets` skill: each behaviour is in one Ticket only, each edge is real, and each Ticket can be tried or tested.
 6. Write `review-0.md`.
 
@@ -30,7 +30,7 @@ In Round 0, each unanswered decision is a finding, and so is a slice that breaks
 6. Compare the drawn lines with the Ticket and the Spec.
 7. From Round 2, check each earlier finding first.
 8. Read the diff against the Ticket and the Spec, and against the Tickets of the Spec that you reviewed before it.
-9. Read the diff against the rules.
+9. Read the diff against the rules. When it renames or removes a word of a glossary, search the tree for the old word: each use that is left is a finding.
 10. Write `review-<r>.md`.
 
 The report has two headings:
