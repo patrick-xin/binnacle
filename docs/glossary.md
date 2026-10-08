@@ -25,6 +25,10 @@ One canonical term for each concept that is binnacle's own, for a person who use
 - **Choice** — a thing that a person picks in a Request. <a id="choice"></a>
 - **Menu** — a picker that a person opens. The agent does not wait on it, so it is not a Request. <a id="menu"></a>
 
+## Authoring
+
+- **Author Gap** — what a built-in feature imports from inside binnacle, and an author cannot. Each one is an issue labelled `author-gap`, and the import names it on its line: `// Author Gap #<n>`. <a id="author-gap"></a>
+
 ## The terminal
 
 - **Untrusted Text** — text from a model, a tool or a stored session. A plugin makes it plain with `toPlainText` before it goes in a Part's lines, as the core keeps their colour and style. The core makes a title plain itself. <a id="untrusted-text"></a>

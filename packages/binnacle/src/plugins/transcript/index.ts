@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { Part } from '../../api.ts'
+import type { Part } from '../../index.ts'
 import { toPlainText } from '../../index.ts'
 
 export const name = 'binnacle-transcript'

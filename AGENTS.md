@@ -27,7 +27,7 @@ references.json             the repositories that pnpm refs fetches into .refs/
 
 A Task is a GitHub issue that is built: a Ticket, a Fix or a Chore. A Spec designs one feature of a Stage, and its Tickets are its sub-issues. The Intent lists the Specs of its current Stage.
 
-A change that adds a feature or a row edits the feature map in the same commit. A concept that is ours, and that could be read two ways, goes in its glossary in the same commit, capitalized there and wherever it is used in that meaning.
+A change that adds a feature or a row edits the feature map in the same commit. A built-in feature is an author's example, so it imports only binnacle's entry, its own folder and packages ([ADR 3](docs/adr/0003-a-built-in-feature-is-a-default-that-holds-only-what-an-author-holds.md)); `pnpm test` fails on any other import, unless its line names its issue labelled `author-gap`: `// Author Gap #<n>`. A concept that is ours, and that could be read two ways, goes in its glossary in the same commit, capitalized there and wherever it is used in that meaning.
 
 ## Commands
 

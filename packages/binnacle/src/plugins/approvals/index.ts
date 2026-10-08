@@ -2,11 +2,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { ApprovalOutcome, ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { Part } from '../../api.ts'
+import type { Part } from '../../index.ts'
 import { toPlainText } from '../../index.ts'
-import { queueOf } from '../requests/index.ts'
-import type { Standing } from '../requests/index.ts'
-import { visibleWidth } from '../../terminal/utils.ts'
+import { queueOf } from '../requests/index.ts' // Author Gap #177
+import type { Standing } from '../requests/index.ts' // Author Gap #177
+import { visibleWidth } from '../../terminal/utils.ts' // Author Gap #176
 
 export const name = 'binnacle-approvals'
 

@@ -20,7 +20,8 @@
     "typecheck": "pnpm --filter binnacle exec tsc -p tsconfig.json",
     "build": "pnpm --filter binnacle run build",
     "check:features": "node scripts/check-features.mjs",
-    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:skills && pnpm run check:features && pnpm run lint && pnpm run fmt:check && pnpm run typecheck",
+    "check:imports": "node scripts/check-imports.mjs",
+    "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:skills && pnpm run check:features && pnpm run check:imports && pnpm run lint && pnpm run fmt:check && pnpm run typecheck",
     "test": "pnpm run check && node --test --test-timeout=30000 \"scripts/**/*.test.mjs\" && pnpm --filter binnacle test"
   },
   "devDependencies": {

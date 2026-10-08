@@ -8,13 +8,13 @@ import type {
   AskUserQuestionItem,
   AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
-import type { Part, Point } from '../../api.ts'
+import type { Part, Point } from '../../index.ts'
 import { toPlainText } from '../../index.ts'
-import { Input } from '../../terminal/components/input.ts'
-import { CURSOR_MARKER } from '../../terminal/tui.ts'
-import { visibleWidth } from '../../terminal/utils.ts'
-import { queueOf } from '../requests/index.ts'
-import type { Standing } from '../requests/index.ts'
+import { Input } from '../../terminal/components/input.ts' // Author Gap #174
+import { CURSOR_MARKER } from '../../terminal/tui.ts' // Author Gap #175
+import { visibleWidth } from '../../terminal/utils.ts' // Author Gap #176
+import { queueOf } from '../requests/index.ts' // Author Gap #177
+import type { Standing } from '../requests/index.ts' // Author Gap #177
 
 export const name = 'binnacle-questions'
 

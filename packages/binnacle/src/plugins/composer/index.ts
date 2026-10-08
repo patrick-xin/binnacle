@@ -1,9 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { Handle, Point } from '../../api.ts'
-import { Editor } from '../../terminal/components/editor.ts'
-import type { EditorTheme } from '../../terminal/components/editor.ts'
-import { CURSOR_MARKER } from '../../terminal/tui.ts'
-import { visibleWidth } from '../../terminal/utils.ts'
+import type { Handle, Point } from '../../index.ts'
+import { Editor } from '../../terminal/components/editor.ts' // Author Gap #173
+import type { EditorTheme } from '../../terminal/components/editor.ts' // Author Gap #173
+import { CURSOR_MARKER } from '../../terminal/tui.ts' // Author Gap #175
+import { visibleWidth } from '../../terminal/utils.ts' // Author Gap #176
 
 export const name = 'binnacle-composer'
 

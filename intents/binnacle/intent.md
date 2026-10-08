@@ -83,13 +83,22 @@ These answer the design of stage 2, from the grill of 2026-10-05. They were writ
 
 10. **The agent** is composed as dsh's headless bundle composes it: on `dsh-base`, with no presets, on the default model.
 11. **`dsh --profile binnacle`** opens the Chat on a new session. `--session <id>` draws a stored session, and nothing can be sent to it.
-12. **Layout.** A Screen is a layout tree of named Places, and every node may have a box ([ADR 2](../../docs/adr/0002-a-screen-is-a-layout-tree-of-named-places.md)). Edges, glyphs and spacing are named tables behind one lookup. An author overrides an entry or registers a new name with the theme, in stage 5.
+12. **Layout.** A Screen is a layout tree of named Places, and every node may have a box ([ADR 2](../../docs/adr/0002-a-screen-is-a-layout-tree-of-named-places.md)). A box's edge is a named table; an author registers a new name with the theme, in stage 5. Glyphs, words and spacing inside a Part have no table: decision 21 says how an author changes them.
 13. **Keys.** The core owns one Key Table: each action has an id, its default keys and a description. The copied editor reads its keys from it. A key goes to the Part with the Focus first, then to the core. Stage 3 adds the mouse to the same table.
 14. **The keys of the Chat.** Enter sends a prompt, or steers the turn that runs. Shift+enter is a new line, with pi's fallbacks where a terminal cannot tell it from enter. pi's fallback for macOS's Terminal and for Windows reads the shift key through a native helper, and binnacle does not copy it: there, ctrl+j or a backslash before enter is a new line. Esc interrupts the turn. Ctrl+c clears the draft, and pressed twice on an empty draft it quits. Ctrl+z suspends.
 15. **The transcript** is a plugin. It draws each event of the session raw, as its seq, its type and its JSON, and the answer that streams as one live block that the committed event replaces. Grouping and styling come later, and an author can do them too. The status line is a plugin of its own.
 16. **Requests** fail closed until stage 3: a tool that needs an approval fails. (Ended by [#163](https://github.com/patrick-xin/binnacle/issues/163): a person allows or rejects it.)
 17. **Hot reload** is off until the core stays up while its plugins reload.
 18. **Styled lines.** A Part's lines may carry colour and style. The core takes out every other control sequence, such as a cursor move, a clear or an OSC. A plugin makes Untrusted Text plain with a helper the core exports, and a Part says where its cursor is.
+
+These answer the root design, from the talk of 2026-10-08, after Stage 3.
+
+19. **Built-ins are defaults, and living examples.** A built-in feature is a default that an author replaces, and the example that an author reads and copies. Its opinions are binnacle's, and replacing it is cheap. An idea that is one person's taste, such as tabs between a Request's questions, is an author's change, not a built-in's.
+20. **A built-in holds only what an author holds** ([ADR 3](../../docs/adr/0003-a-built-in-feature-is-a-default-that-holds-only-what-an-author-holds.md)). It imports binnacle's published entry, its own folder and other packages, and `pnpm test` fails on any other import. What a built-in needs and an author lacks is an Author Gap: an issue labelled `author-gap`, which the import names on its line. binnacle closes it by exporting what is needed.
+21. **What an author changes**, coarse to fine:
+    1. A feature, by its row: they turn it off, and install a bundle of their own.
+    2. A piece of a feature, by composing the building blocks that the built-ins are made of, which binnacle exports. Glyphs, words and spacing inside a Part change here.
+    3. A small change, by a registration and no replacement: where a Place goes, by a layout; a colour, by a theme name; a key, by an action that a plugin declares with its default keys and that a person rebinds; how one type of event is drawn, by a renderer for that type.
 
 ## Open questions
 

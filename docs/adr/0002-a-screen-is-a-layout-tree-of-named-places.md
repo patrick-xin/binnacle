@@ -1,6 +1,6 @@
 # A Screen is a layout tree of named Places
 
-**Status:** accepted, 2026-10-05
+**Status:** accepted, 2026-10-05 Narrowed by [ADR 3](0003-a-built-in-feature-is-a-default-that-holds-only-what-an-author-holds.md): the named tables keep the edges; glyphs and spacing inside a Part have none.
 
 A Screen is a layout tree. Its nodes are rows and columns, and its leaves are Places, each with a name. Each child is sized `fixed n`, `content` (the rows its lines need) or `fill` (a share of what is left). A plugin fills a Place by its name with a Part: what a Part draws is its lines at the width it is given. A plugin may replace a Screen's tree; the newest tree wins, and it goes when its plugin unloads.
 

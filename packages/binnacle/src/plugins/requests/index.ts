@@ -1,4 +1,4 @@
-import type { ChatSession, Handle, Part } from '../../api.ts'
+import type { ChatSession, Handle, Part } from '../../index.ts'
 
 /** One Request that stands in the queue. */
 export interface Standing {
