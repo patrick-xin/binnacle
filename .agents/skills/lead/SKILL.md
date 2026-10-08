@@ -41,7 +41,7 @@ If a Fix needs a decision or a third source file, stop. Move it to Build.
 ## Before a Ticket starts
 
 1. Each Ticket that blocks it is merged.
-2. Two Tickets with no edge between them can be built at the same time. If both change one shared file, such as a table, a registry or a type, add an edge with `gh issue edit <n> --add-blocked-by <m>`, and wait.
+2. Two Tickets with no edge between them can be built at the same time. If both change one shared file, such as a table, a registry or a type, add an edge with `gh issue edit <n> --add-blocked-by <m>`, and wait. A row appended to the feature map, and a changeset, are no edge.
 
 ## A Spec and its Tickets
 
@@ -59,11 +59,11 @@ The folders, states and Hand-offs are in [`.agents/task.md`](../../task.md).
 10. Link the edit in a comment on the Spec.
 11. Read each review report in full.
 12. After the third Round with findings, choose one narrow Round more, or ask the Maintainer.
-13. If the Ticket changes what binnacle draws or boots, try the branch under `dsh` in `~/.binnacle/try`.
+13. If the Ticket changes what binnacle draws or boots, try its branch with `pnpm try task/<ticket>`, as [`.agents/try.md`](../../try.md) says.
 14. Run `pnpm task land <ticket>` to open the PR, as `.agents/task.md` says.
 15. If `task land` says that the branch does not hold `origin/main`, send the Ticket back to its builder to rebase. The builder knows why its change was made. Rebase it yourself only when you built it.
 16. If you tried the branch, write in the PR what you drove and what it drew.
-17. After the PR merges or closes, run `pnpm task stop <ticket>`. After the last Ticket of a Spec merges, run `pnpm task stop <spec>`.
+17. After the PR merges or closes, run `pnpm task stop <ticket>`. After the last Ticket of a Spec merges, run `pnpm task stop <spec>`: it closes the Spec.
 
 ## Builders and Reviewers
 

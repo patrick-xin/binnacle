@@ -19,6 +19,7 @@ docs/features.md            each feature: what a person sees, its row and its co
 .agents/skills/             one skill for each role, and shared skills
 .agents/roles.json          the tool and the model that take each role
 .agents/task.md             a Task's folders, states and Hand-offs
+.agents/try.md              how the Lead tries a branch under dsh
 scripts/                    the checks and the Task tool, each with its test
 references.json             the repositories that pnpm refs fetches into .refs/
 .refs/<name>/               each Reference at its pin, to read and never to write
@@ -36,4 +37,5 @@ A change that adds a feature or a row edits the feature map in the same commit. 
 | `pnpm test` | Runs every check, then every test. CI runs it on each PR. |
 | `pnpm fmt` | Formats the tree |
 | `pnpm build` | Builds the bundle. A `binnacle` dsh profile that links `packages/binnacle` then runs it with `dsh --profile binnacle`. |
+| `pnpm try <ref>` | Builds a branch or a commit in `~/.binnacle/try`, for `dsh --profile binnacle-try`. [`.agents/try.md`](.agents/try.md) says how to drive it. |
 | `pnpm task` | Runs a Spec's Round 0 and its Tickets: `start`, `build`, `set`, `ask`, `answer`, `resend`, `status`, `watch`, `land`, `stop` |
