@@ -426,6 +426,49 @@ test('a node with `unless: name` draws nothing while the Layout or the Place by 
   ])
 })
 
+test('a node that takes what its lines need, with less room than that, shrinks the node in it that fills before the screen gives up its borders', async () => {
+  const { rows } = await drawn(10, 5, (binnacle) => {
+    binnacle.layout('chat', {
+      column: [
+        { place: 'transcript' },
+        {
+          column: [
+            { place: 'body', size: 'fill' },
+            { place: 'choices', size: 'content' },
+          ],
+          size: 'content',
+          border: ['bottom'],
+        },
+      ],
+    })
+    binnacle.place('transcript', part('t'))
+    binnacle.place('body', part('b1', 'b2', 'b3', 'b4', 'b5'))
+    binnacle.place('choices', part('c1', 'c2'))
+  })
+  assert.deepEqual(rows, ['b4', 'b5', 'c1', 'c2', '──────────'])
+})
+
+test('in a column, nodes that fill take no more than their lines need while another needs more, then share what is left evenly', async () => {
+  const seen: string[][] = []
+  for (const height of [6, 9]) {
+    const { rows } = await drawn(10, height, (binnacle) => {
+      binnacle.layout('chat', {
+        column: [
+          { place: 'short', size: 'fill' },
+          { place: 'tall', size: 'fill' },
+        ],
+      })
+      binnacle.place('short', part('s1', 's2'))
+      binnacle.place('tall', part('t1', 't2', 't3', 't4', 't5', 't6'))
+    })
+    seen.push(rows)
+  }
+  assert.deepEqual(seen, [
+    ['s1', 's2', 't3', 't4', 't5', 't6'],
+    ['s1', 's2', '', 't1', 't2', 't3', 't4', 't5', 't6'],
+  ])
+})
+
 test('a node with `mouse: false` ignores a click and the wheel inside it, and a click there moves no Focus', async () => {
   const heard: string[] = []
   const taking = (name: string) => ({

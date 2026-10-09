@@ -13,7 +13,6 @@ import type {
 import type { ApprovalChoice, ApprovalRequest, Choice, Question, QuestionRequest, Request, Requests } from '../../api.ts'
 import { createModel } from '../../core/model.ts'
 import { toPlainText } from '../../core/view.ts'
-import { changedAtOnce, failsClosed, standingOf } from './old-rows.ts'
 
 export const name = 'binnacle-requests'
 
@@ -73,12 +72,10 @@ interface Draft {
 
 export function apply(ctx: Context): void {
   const standing: Request[] = []
+  const failsClosed = new Map<Request, () => void>()
   const views = new Set<object>()
   const told = createModel({})
-  const changed = (): void => {
-    told.set(() => {})
-    changedAtOnce(requests)
-  }
+  const changed = (): void => told.set(() => {})
   let quiet = false
   // Every Request settles before a view is told, so a view that throws as it unloads cannot leave one pending.
   const failAll = (): void => {
@@ -108,7 +105,6 @@ export function apply(ctx: Context): void {
     },
   }
   ctx.provide('binnacleRequests', requests)
-  standingOf.set(requests, () => standing.slice())
   ctx.effect(() => failAll, 'binnacle-requests: what still stands, failed closed')
 
   const stand = (request: Request, failClosed: () => void): void => {
@@ -122,6 +118,7 @@ export function apply(ctx: Context): void {
     const at = standing.indexOf(request)
     if (at === -1) return
     standing.splice(at, 1)
+    failsClosed.delete(request)
     settle()
     if (!quiet) changed()
   }

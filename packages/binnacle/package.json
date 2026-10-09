@@ -28,13 +28,9 @@
       "types": "./dist/plugins/requests/index.d.ts",
       "default": "./dist/plugins/requests/index.js"
     },
-    "./plugins/approvals": {
-      "types": "./dist/plugins/approvals/index.d.ts",
-      "default": "./dist/plugins/approvals/index.js"
-    },
-    "./plugins/questions": {
-      "types": "./dist/plugins/questions/index.d.ts",
-      "default": "./dist/plugins/questions/index.js"
+    "./plugins/requests-view": {
+      "types": "./dist/plugins/requests-view/index.d.ts",
+      "default": "./dist/plugins/requests-view/index.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"

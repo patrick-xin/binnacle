@@ -30,12 +30,9 @@
     # The Requests: the approvals and the questions that stand, and the talk with dsh. It draws nothing.
     - id: binnacle-requests
       name: 'binnacle/plugins/requests'
-    # The approvals: a tool that needs an approval asks, and a person answers.
-    - id: binnacle-approvals
-      name: 'binnacle/plugins/approvals'
-    # The questions: the agent asks a person, who answers or reviews its plan.
-    - id: binnacle-questions
-      name: 'binnacle/plugins/questions'
+    # The Requests' default view: a tool asks for an approval, or the agent asks a question, and a person answers.
+    - id: binnacle-requests-view
+      name: 'binnacle/plugins/requests-view'
     # The tool the agent asks through, in its blocking mode, as dsh's standard preset composes it.
     - id: tool-ask-user
       name: '@deepseek-ai/dsh-tool-ask-user'

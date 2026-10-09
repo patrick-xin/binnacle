@@ -121,6 +121,16 @@ test('the transcript scrolls to keep the Marked event in view', async () => {
   assert.deepEqual(await shown(), ['▾ #1 test/two', '{}', ''])
 })
 
+test("as the Mark moves down within the rows shown, the transcript keeps the Marked event's header on the top row", async () => {
+  const { terminal } = await reading([three], ['--session', 'session-stored'], 4)
+  const shown = async () => (await terminal.read()).rows
+  terminal.type(UP)
+  terminal.type(UP)
+  assert.deepEqual(await shown(), ['▾ #0 test/one', '{}', '', '▾ #1 test/two'])
+  terminal.type(DOWN)
+  assert.deepEqual(await shown(), ['▾ #1 test/two', '{}', '', '▾ #2 test/three'])
+})
+
 test("a click on an event's header line folds or unfolds that event, and Marks it", async () => {
   const store = persistence([three])
   const mounted = await mount({
