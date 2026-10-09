@@ -60,7 +60,12 @@ Each stage ends in something the Maintainer can try under dsh.
 
 ## Specs
 
-None yet. The prototype and its trial are in [#180](https://github.com/patrick-xin/binnacle/issues/180).
+Stage 1:
+
+- [#183](https://github.com/patrick-xin/binnacle/issues/183) The kit: a theme, models, looks and components an author changes in one place.
+- [#184](https://github.com/patrick-xin/binnacle/issues/184) Requests made from the kit, so an author changes one piece of it.
+
+The prototype and its two trials are in [#180](https://github.com/patrick-xin/binnacle/issues/180).
 
 ## Open questions
 
