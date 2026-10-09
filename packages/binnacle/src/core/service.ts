@@ -1,6 +1,21 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Action, Binnacle, Gestures, Handle, Layout, Look, Model, Part, Point, Screen, ThemeLayer, Tokens, Tone } from '../api.ts'
+import type {
+  Action,
+  Binnacle,
+  Gestures,
+  Handle,
+  Layout,
+  Look,
+  Model,
+  Part,
+  PlacedHandle,
+  Point,
+  Screen,
+  ThemeLayer,
+  Tokens,
+  Tone,
+} from '../api.ts'
 import type { TerminalColorMode } from '../terminal/colors.ts'
 import { Actions } from './actions.ts'
 import type { SetAction, SetBinding } from './actions.ts'
@@ -18,11 +33,36 @@ export interface Drawn {
   /** Every Part is wrapped again at its next draw: the theme or a Look changed. */
   forgetAll(): void
   colorMode(): TerminalColorMode
+  /** Scrolls a Place drawn by pages of its box, toward its last line when `pages` is positive. */
+  scroll(place: string, pages: number): void
+}
+
+/** The Place the Focus was moved to, and whether it has had the Focus since. */
+export interface Moved {
+  readonly place: string
+  had: boolean
 }
 
 /** One registration. Each is held apart, so that one object registered twice goes only with the plugin whose registration unloads. */
-interface Held<T> {
+export interface Held<T> {
   readonly item: T
+  /** Registered by a row of the bundle: it ranks beneath every author's. */
+  readonly builtIn: boolean
+}
+
+/** The part of a Cordis fiber that the loader adds: the row whose plugin it is, or none on a child plugin. */
+interface Fiber {
+  readonly entry?: { readonly options: { readonly name: string } }
+  readonly parent: { readonly fiber: Fiber }
+}
+
+// A child plugin has no row of its own: the row is the first of its parents' that has one, as the loader's `locate` finds it.
+function builtIn(fiber: Fiber): boolean {
+  for (let at = fiber; ; at = at.parent.fiber) {
+    const name = at.entry?.options.name
+    if (name !== undefined) return name === 'binnacle' || name.startsWith('binnacle/')
+    if (at.parent.fiber === at) return false
+  }
 }
 
 interface Themed {
@@ -32,13 +72,13 @@ interface Themed {
 
 export class BinnacleService extends Service implements Binnacle {
   // TypeScript private, not #private: Cordis reaches the service through traced copies.
-  private readonly chat: Held<Screen> = { item: CHAT }
+  private readonly chat: Held<Screen> = { item: CHAT, builtIn: true }
   private readonly screens: Held<Screen>[] = [this.chat]
   private readonly layouts = new Map<string, Held<Layout>[]>()
   private readonly parts = new Map<string, Held<Part>[]>()
   private readonly models = new Map<string, Held<Model<object>>[]>()
-  // The Place a person moved the Focus to, for each Screen shown; null once the core forgot it.
-  private readonly moved = new Map<Held<Screen>, string | null>()
+  // The Place the Focus was moved to, for each Screen shown; null once the core forgot it.
+  private readonly moved = new Map<Held<Screen>, Moved | null>()
   private readonly layers: Held<ThemeLayer>[] = []
   private readonly looks = new Map<string, Held<Make>[]>()
   // One list for every id, oldest first, as the newest set wins among actions of different ids.
@@ -120,17 +160,25 @@ export class BinnacleService extends Service implements Binnacle {
     return this.shown().item
   }
 
-  focusMovedTo(): string | null | undefined {
+  focusMovedTo(): Moved | null | undefined {
     return this.moved.get(this.shown())
   }
 
-  /** A person moved the Focus on the Screen on view. */
+  /** A person or an author moved the Focus on the Screen on view. */
   moveFocus(place: string): void {
-    this.moved.set(this.shown(), place)
+    this.moved.set(this.shown(), { place, had: false })
     this.drawn.redraw()
   }
 
-  /** The Focus a person moved on the Screen on view is forgotten: its Place stopped taking keys. */
+  focus(place: string): void {
+    this.moveFocus(place)
+  }
+
+  scroll(place: string, pages: number): void {
+    this.drawn.scroll(place, pages)
+  }
+
+  /** The Focus moved on the Screen on view is forgotten: its Place had it and stopped taking keys. */
   forgetMovedFocus(): void {
     this.moved.set(this.shown(), null)
   }
@@ -147,7 +195,7 @@ export class BinnacleService extends Service implements Binnacle {
     return this.hold(listIn(this.layouts, screen), layout, 'binnacle: a layout')
   }
 
-  place(name: string, part: Part): Handle {
+  place(name: string, part: Part): PlacedHandle {
     let stops: (() => void)[] = []
     const handle = this.hold(
       listIn(this.parts, name),
@@ -161,7 +209,7 @@ export class BinnacleService extends Service implements Binnacle {
       },
     )
     stops = (part.models ?? []).map((model) => model.watch(() => handle.redraw()))
-    return handle
+    return { ...handle, focus: () => this.moveFocus(name) }
   }
 
   model<S extends object>(name: string, model: Model<S>): Handle {
@@ -185,8 +233,11 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   private hold<T>(list: Held<T>[], item: T, label: string, changed?: () => void, off?: (entry: Held<T>) => void): Handle {
-    const entry: Held<T> = { item }
-    list.push(entry)
+    // In a traced copy, `this.ctx` is the calling plugin's context, so its fiber is the plugin that registers.
+    const entry: Held<T> = { item, builtIn: builtIn(this.ctx.fiber as unknown as Fiber) }
+    const firstAuthor = list.findIndex((held) => !held.builtIn)
+    if (entry.builtIn && firstAuthor !== -1) list.splice(firstAuthor, 0, entry)
+    else list.push(entry)
     this.drawn.redraw()
     let held = true
     const release = (): void => {
@@ -196,7 +247,7 @@ export class BinnacleService extends Service implements Binnacle {
       off?.(entry)
       this.drawn.redraw()
     }
-    // In a traced copy, `this.ctx` is the calling plugin's context, so what it holds goes when that plugin unloads.
+    // What the calling plugin holds goes when it unloads.
     const dispose = this.ctx.effect(() => release, label)
     return {
       redraw: () => {

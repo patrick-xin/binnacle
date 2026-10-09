@@ -9,6 +9,8 @@ export interface Places {
   scrolledUp(place: string): number
   /** In the Place's rows; only the Place with the Focus has one. */
   cursor(place: string, width: number): Position | undefined
+  /** An author paged the Place, and its cursor has not moved since: the Place shows the paged rows, not the cursor's. */
+  paged(place: string, width: number): boolean
 }
 
 export interface Position {
@@ -228,10 +230,10 @@ class Arrangement {
     const cursor = this.#places.cursor(place, width)
     let end = all.length - Math.min(this.#places.scrolledUp(place), this.#maxScroll(place, width, height))
     // The Part with the Focus shows the row of its cursor, however it was scrolled.
-    if (cursor !== undefined) end = Math.min(Math.max(end, cursor.row + 1), cursor.row + height)
+    if (cursor !== undefined && !this.#places.paged(place, width)) end = Math.min(Math.max(end, cursor.row + 1), cursor.row + height)
     const start = Math.max(0, end - height)
     this.#shownFrom.set(place, start)
-    if (cursor !== undefined && height > 0 && cursor.column < width)
+    if (cursor !== undefined && cursor.row >= start && cursor.row < end && cursor.column < width)
       this.cursor = { row: top + cursor.row - start, column: left + cursor.column }
     const shown = all.slice(start, end).map((row) => fit(row.includes('\x1b') ? row + RESET_STYLE : row, width))
     return [...shown, ...Array.from({ length: height - shown.length }, () => blank(width))]

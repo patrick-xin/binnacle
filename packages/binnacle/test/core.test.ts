@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Handle } from '../src/api.ts'
+import { Loader } from '@deepseek-ai/cordis-plugin-loader'
 import { mount } from './support/mount.ts'
 
 const probe = (lines: readonly string[]) => ({
@@ -298,4 +299,62 @@ test('a Part, a Layout or a Screen registered twice by one name goes only with t
     await drawnAfter((binnacle, shared) => binnacle.show(shared ? sharedScreen : { name: 'theirs', layout: { place: 'transcript' } })),
   ]
   assert.deepEqual(drawn, ['middle', 'in b', 'middle'])
+})
+
+/** The rows of a profile, loaded as dsh loads them: each row's plugin is the module its name imports. */
+async function loaded(ctx: Context, rows: readonly { name: string; plugin: object }[]) {
+  const modules = new Map(rows.map(({ name, plugin }) => [name, plugin]))
+  class Profile extends Loader {
+    override import(name: string) {
+      return Promise.resolve(modules.get(name))
+    }
+  }
+  await ctx.plugin(Profile)
+  const loader = ctx.get('loader')!
+  const ids: string[] = []
+  for (const { name } of rows) ids.push(await loader.create({ name }))
+  return { remove: (nth: number) => loader.remove(ids[nth]!) }
+}
+
+test('what a built-in row registers ranks beneath anything an author registers, whichever loads first; among the built-ins, and among the authors, the newest wins', async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 30, rows: 1 })
+  ready()
+  const ran: string[] = []
+  const row = (name: string, said: string) => ({
+    name,
+    plugin: {
+      name: said,
+      inject: ['binnacle'],
+      apply: (plugin: Context) => {
+        plugin.binnacle.place('said', { lines: () => [said] })
+        plugin.binnacle.action('say', { run: () => ran.push(said) })
+      },
+    },
+  })
+  const profile = await loaded(ctx, [
+    row('./plugins/author', 'author'),
+    row('binnacle-foo', 'newer author'),
+    row('binnacle/plugins/said', 'built-in'),
+    row('binnacle/plugins/newer', 'newer built-in'),
+  ])
+  ctx.binnacle.layout('chat', { place: 'said' })
+  const seen = async () => {
+    const [first] = (await terminal.read()).rows
+    ctx.binnacle.run('say')
+    return first
+  }
+  const shown = [await seen()]
+  profile.remove(1)
+  shown.push(await seen())
+  profile.remove(0)
+  shown.push(await seen())
+  profile.remove(3)
+  shown.push(await seen())
+  assert.deepEqual(
+    [shown, ran],
+    [
+      ['newer author', 'author', 'newer built-in', 'built-in'],
+      ['newer author', 'author', 'newer built-in', 'built-in'],
+    ],
+  )
 })

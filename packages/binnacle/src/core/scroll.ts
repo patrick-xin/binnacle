@@ -1,3 +1,4 @@
+import type { Point } from '../api.ts'
 import type { Placed } from './layout.ts'
 
 const ROWS_PER_WHEEL_NOTCH = 3
@@ -7,13 +8,32 @@ export class Scroll {
   readonly #up = new Map<string, number>()
   readonly #counted = new Map<string, number>()
   readonly #anchored = new Set<string>()
+  // For each Place an author paged, where its Part's cursor was then.
+  readonly #pages = new Map<string, string>()
 
   up(place: string): number {
     return this.#up.get(place) ?? 0
   }
 
   wheel(place: string, notches: number): void {
+    this.#pages.delete(place)
     this.#up.set(place, Math.max(0, this.up(place) + notches * ROWS_PER_WHEEL_NOTCH))
+  }
+
+  /** Moves the Place by rows toward its end, from `shownUp`, the rows below the ones it showed; the next draw stops it at its start. The rows paged to are shown until its Part's cursor moves. */
+  page(place: string, shownUp: number, rows: number, cursor: Point | undefined): void {
+    if (cursor === undefined) this.#pages.delete(place)
+    else this.#pages.set(place, keyOf(cursor))
+    this.#up.set(place, Math.max(0, shownUp - rows))
+  }
+
+  /** True while the Place is paged and its Part's cursor is where it was when it was paged. */
+  paged(place: string, cursor: Point | undefined): boolean {
+    const then = this.#pages.get(place)
+    if (then === undefined) return false
+    if (cursor !== undefined && keyOf(cursor) === then) return true
+    this.#pages.delete(place)
+    return false
   }
 
   /** Each draw anchors each Place once. */
@@ -38,3 +58,5 @@ export class Scroll {
     for (const { place, maxScroll } of placed) this.#up.set(place, Math.min(this.up(place), maxScroll))
   }
 }
+
+const keyOf = ({ line, column }: Point): string => `${line} ${column}`

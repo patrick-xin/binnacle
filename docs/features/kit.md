@@ -13,11 +13,11 @@ The Kit is what an author builds a feature from, as binnacle's built-ins do. It 
 
 - Make a Model with `createModel(state)`: its `state`, `set(change)`, and `watch(changed)`.
 - List a Part's Models in `Part.models`, so that the core draws the Part again after each of them changes, with no code of the author's.
-- Name a Model with `binnacle.model(name, model)`, and find it with `binnacle.modelOf(name)`. The newest by a name wins, and it goes when the plugin that named it unloads.
-- Add a theme layer with `binnacle.theme(layer)`: its `colors`, `glyphs`, `edge`, `padding` and `gap`. Each token that it names changes for everything drawn with it, and the others stay as they were. The newest layer wins for each token, and a layer goes when the plugin that added it unloads.
+- Name a Model with `binnacle.model(name, model)`, and find it with `binnacle.modelOf(name)`. The newest by a name wins, an author's above a built-in's ([Core](core.md)), and it goes when the plugin that named it unloads.
+- Add a theme layer with `binnacle.theme(layer)`: its `colors`, `glyphs`, `edge`, `padding` and `gap`. Each token that it names changes for everything drawn with it, and the others stay as they were. The newest layer wins for each token, an author's above a built-in's, and a layer goes when the plugin that added it unloads.
 - Read the tokens with `binnacle.tokens`, and draw text in a Tone with `binnacle.paint(tone, text)`.
 - Set a Look with `binnacle.look(name, (beneath) => look)`: by a component's kind, such as `list.row`, for every instance of that kind, or by an instance's name, such as `request.choices.row`, for that instance alone. The Look is handed the Look beneath it, so it can draw that Look and add to it. A Look goes when the plugin that set it unloads, and everything is drawn again.
-- Draw a piece of a component with `binnacle.lookOf(names, fallback)`: the newest Look by the first name, with the chain beneath it, down to `fallback`, the component's default.
+- Draw a piece of a component with `binnacle.lookOf(names, fallback)`: the newest Look by the first name, with the chain beneath it, down to `fallback`, the component's default. An author's Looks are above a built-in's.
 - Give a component actions that an author binds by kind, such as `list.toggle`, and changes on the action beneath: `binnacle.action`, `binnacle.bind`, `binnacle.keysOf` and `binnacle.run`. The [Gestures](gestures.md) doc says how a gesture reaches them.
 
 The Tones, what draws with each, and their defaults, which are v0's:
@@ -49,10 +49,10 @@ The types are `binnacle:packages/binnacle/src/api.ts#Model`, `binnacle:packages/
 - **An exact colour is drawn as the nearest of 256** when the terminal does not say in `COLORTERM` that it has truecolor. The colour code is copied from pi-tui.
 - **Each attribute is closed by the code that ends it alone**, so a Tone painted inside another leaves the other standing.
 - **A Look is held as a Part is**, in a list by its name, so it goes with its plugin. When a Look comes or goes, every Part is wrapped again, as its lines can draw with it.
-- **The chain of a piece is read at each draw**: the Looks by the instance's name, newest first, then the Looks by the kind's name, newest first, then the component's default. A name given twice, as by an instance named like its kind, is read once. `lookOf` calls each `make` as it draws down the chain.
+- **The chain of a piece is read at each draw**: the Looks by the instance's name, newest first, then the Looks by the kind's name, newest first, then the component's default. By each name, an author's Looks are above a built-in's, whichever loaded first, as the [Core](core.md) ranks every registration. A name given twice, as by an instance named like its kind, is read once. `lookOf` calls each `make` as it draws down the chain.
 - **The Look beneath is found when it draws, never captured.** Each `beneath` finds its own Look in the chain as it stands, and draws the next one. A `beneath` kept from an earlier draw so follows a Look that unloads, or one that loads beneath later. A `beneath` whose own Look has gone draws the default.
 - **A Look set twice by one function has two places in its chain**, as each is held apart, and each goes with its own plugin.
 
 ## Built by
 
-Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme · Ticket [#188](https://github.com/patrick-xin/binnacle/issues/188): Looks, by instance and by kind · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bound by kind, run by id, and the action beneath.
+Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme · Ticket [#188](https://github.com/patrick-xin/binnacle/issues/188): Looks, by instance and by kind · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bound by kind, run by id, and the action beneath · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): an author's Models, layers and Looks rank above a built-in's.

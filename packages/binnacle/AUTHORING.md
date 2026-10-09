@@ -2,6 +2,8 @@
 
 binnacle is a terminal app for dsh. Everything it draws and answers is a plugin. This page says how an author changes it. It grows with each part of the Kit that is built.
 
+What a plugin registers, such as a Part, a Layout, a theme layer, a Look, an action or a binding, goes when the plugin unloads. Of two registrations by one name, the newest wins. What binnacle's own rows register ranks beneath what you register, whichever loads first: a row is binnacle's own when the specifier of its `name` is `binnacle` or begins with `binnacle/`. So your plugin wins over a built-in on every start, and its `beneath` is the built-in's.
+
 ## Models
 
 A Model is state, and the one way to change it.
@@ -149,3 +151,18 @@ ctx.binnacle.action('requests.send', {
 
 - An action with no `keys`, or no `kind`, keeps those of the action it hides.
 - `beneath()` is found each time it runs: the newest enabled action by that id beneath this one, wherever the Focus is, or nothing. When the plugin of an action between them unloads, the next `beneath()` uses the actions as they stand.
+
+## The Focus and the scroll
+
+```js
+const handle = ctx.binnacle.place('preview', preview)
+handle.focus()
+ctx.binnacle.focus('composer')
+ctx.binnacle.scroll('transcript', -1)
+```
+
+- `binnacle.focus(place)` moves the Focus to the Place by that name, as a click does. The Handle that `binnacle.place(name, part)` returns has `focus()`, which moves the Focus to its own Place.
+- A Place that is not drawn yet, or that takes no keys yet, takes the Focus once it draws and takes keys. The Focus moved is forgotten after its Place has had it and stopped taking keys. Then the Focus goes back to the Screen's own, else to the first Place that takes keys.
+- `binnacle.scroll(place, pages)` scrolls the Place by that name by pages, and stops at its first and its last line. A positive `pages` moves toward the last line, as page down does, and a negative one toward the first. A page is as many rows as the Place's box shows, from the rows it shows now.
+- A scroll of a Place that is not drawn, or that has no rows of room, does nothing. A scroll never moves the Focus.
+- A Place with the Focus shows its Part's cursor. After `binnacle.scroll`, it shows the rows paged to, until the Part's cursor moves to another line or column, as when a key moves it. Then it follows the cursor again. The wheel follows the cursor, as before.
