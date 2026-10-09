@@ -18,7 +18,7 @@ The wheel scrolls the Place under the pointer. The Part with the Focus takes the
 ## Consequences
 
 - A layout names Places, never plugins, so an author moves the composer without changing it.
-- Nothing overlaps. A Request drawn over the Screen needs an overlay layer, which is a decision of its own.
+- Nothing overlaps, except a float ([ADR 3](0003-only-a-float-draws-over-what-it-covers.md)).
 - A terminal has whole cells and no stroke width: a border is thicker only by another edge, such as `heavy`, `double` or a block.
 - When the terminal is too small, `fill` Places shrink first, then padding and gaps go, then borders, and then content is cut. binnacle always draws. What goes, goes from the whole Screen, so the Screen keeps one look.
 - Padding and gaps are cells. Spacing by name comes with the theme, as `number | name`, and breaks no author.

@@ -2,7 +2,7 @@ import type { Layout, Part, Point, Screen } from '../api.ts'
 import { Display } from './display.ts'
 import type { Size } from './host.ts'
 import { arrange } from './layout.ts'
-import type { Placed } from './layout.ts'
+import type { Hit, Placed } from './layout.ts'
 import type { Moved } from './service.ts'
 import type { Theme } from './theme.ts'
 import { Scroll } from './scroll.ts'
@@ -19,6 +19,8 @@ export interface OnView extends Theme {
   /** The core forgets the Focus moved on the Screen on view: its Place had it and stopped taking keys. */
   forgetMovedFocus(): void
   partIn(place: string): Part | undefined
+  /** The newest Layout set by that name. */
+  layoutNamed(name: string): Layout | undefined
   /** A Place takes keys while its Part does, or while an action acts in it. */
   takesKeys(place: string): boolean
   /** A click that the Part in the Place did not take goes to the Place's actions bound to it. True when one took it. */
@@ -33,6 +35,7 @@ export class Drawing {
   readonly #rows = new Rows()
   readonly #scroll = new Scroll()
   #placed: readonly Placed[] = []
+  #hits: readonly Hit[] = []
   // The Part last told it has the Focus.
   #focusTold: Part | undefined
 
@@ -61,6 +64,7 @@ export class Drawing {
           scrolledUp: (place) => this.#scroll.up(place),
           cursor: (place, width) => (place === focus ? this.#rows.cursorOf(view.partIn(place), width) : undefined),
           paged: (place, width) => this.#scroll.paged(place, view.partIn(place)?.cursor?.(width)),
+          layout: (name) => view.layoutNamed(name),
         },
         view,
       )
@@ -76,6 +80,7 @@ export class Drawing {
       arranged = measure(focus)
     }
     this.#placed = arranged.placed
+    this.#hits = arranged.hits
     this.#scroll.clamp(this.#placed)
     this.#display.draw(arranged.rows, arranged.cursor)
   }
@@ -106,7 +111,7 @@ export class Drawing {
 
   /** The wheel scrolls the Place under the pointer, at a cell counted from 0. */
   wheel(notches: number, x: number, y: number): void {
-    const under = this.#placed.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
+    const under = this.#under(x, y)
     if (under === undefined) return
     this.#scroll.wheel(under.place, notches)
     this.draw()
@@ -115,7 +120,7 @@ export class Drawing {
   /** A press of the left button at the cell under the pointer, by its gesture's name. The Focus moves first, then the click reaches the Part, then the Place's actions. */
   click(x: number, y: number, gesture: string): boolean {
     const view = this.#onView()
-    const under = this.#placed.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
+    const under = this.#under(x, y)
     if (under === undefined) return false
     const part = view.partIn(under.place)
     if (view.takesKeys(under.place)) view.moveFocus(under.place)
@@ -146,6 +151,11 @@ export class Drawing {
     const focus = this.#focus(this.#placed)
     const from = takers.findIndex(({ place }) => place === focus)
     this.#onView().moveFocus(takers[(from + 1) % takers.length]!.place)
+  }
+
+  /** The Place under the pointer, a float before what it covers, unless the mouse does nothing there. */
+  #under(x: number, y: number): Placed | undefined {
+    return this.#hits.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)?.placed
   }
 
   /** The Places on view that take keys, in the order of the layout. */
