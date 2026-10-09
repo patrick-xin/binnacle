@@ -144,14 +144,14 @@ test("the Choice 'Type an answer' opens a line in the box: enter sends what was 
   })
   await typed('\r')
   await typed('\x1b[B', '\x1b[B', '\r')
-  assert.deepEqual((await rows()).slice(-3), ['Which?', '> '.padEnd(40), RULE])
+  assert.deepEqual((await rows()).slice(-3), ['Which?', '>  ', RULE])
   await typed('b', 'o', 't', 'h')
   await typed('\x1b')
   // A lone escape is told from the start of a sequence once nothing follows it.
   await new Promise((resolve) => setTimeout(resolve, 80))
   assert.deepEqual((await rows()).slice(-5), ['  [x] Lint', '  [ ] Format', '› Type an answer', '  Done', RULE])
   await typed('\r')
-  assert.deepEqual((await rows()).slice(-3), ['Which?', '> both'.padEnd(40), RULE])
+  assert.deepEqual((await rows()).slice(-3), ['Which?', '> both ', RULE])
   await typed('\r')
   assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['Lint'], custom: 'both' }] })
   const single = ask(ctx, dsh, {
@@ -165,7 +165,7 @@ test('a question with no options opens the line at once, and esc there dismisses
   const { ctx, dsh, rows, typed } = await chat()
   const answer = ask(ctx, dsh, { questions: [{ id: 'q1', header: 'Name', question: 'What is it called?' }] })
   const settled = answer.catch((error: unknown) => error)
-  assert.deepEqual((await rows()).slice(-3), ['What is it called?', '> '.padEnd(40), RULE])
+  assert.deepEqual((await rows()).slice(-3), ['What is it called?', '>  ', RULE])
   await typed('x')
   await typed('\x1b')
   // A lone escape is told from the start of a sequence once nothing follows it.
@@ -179,10 +179,10 @@ test('a typed answer that is empty, or only blanks, is not sent, and the line st
   const { ctx, dsh, rows, typed } = await chat()
   const answer = ask(ctx, dsh, { questions: [{ id: 'q1', question: 'What is it called?' }] })
   await typed('\r')
-  assert.deepEqual((await rows()).slice(-3), ['What is it called?', '> '.padEnd(40), RULE])
+  assert.deepEqual((await rows()).slice(-3), ['What is it called?', '>  ', RULE])
   assert.equal(await Promise.race([answer, Promise.resolve('still pending')]), 'still pending')
   await typed(' ', ' ', '\r')
-  assert.deepEqual((await rows()).slice(-3), ['What is it called?', '>   '.padEnd(40), RULE])
+  assert.deepEqual((await rows()).slice(-3), ['What is it called?', '>    ', RULE])
   assert.equal(await Promise.race([answer, Promise.resolve('still pending')]), 'still pending')
   await typed(' ', 'x', ' ', '\r')
   assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: [], custom: 'x' }] })
@@ -245,7 +245,7 @@ test("when a Request holds several questions they come one after another, with '
   await typed('\r')
   assert.deepEqual((await rows()).slice(-5), [ruleWith('── 2 of 3 ──'), 'Two?', '› C', '  Type an answer', RULE])
   await typed('\x1b[B', '\r', 'c', '\r')
-  assert.deepEqual((await rows()).slice(-3), ['Three?', '> '.padEnd(40), RULE])
+  assert.deepEqual((await rows()).slice(-3), ['Three?', '>  ', RULE])
   await typed('d', '\r')
   assert.deepEqual(await answer, {
     answers: [
@@ -369,7 +369,7 @@ test('enter after paging returns to the marked Choice: a multi-select toggle and
     questions: [{ id: 'q2', header: 'Name', question: 'What?', detail: detail.join('\n'), options: [{ label: 'A' }, { label: 'B' }] }],
   })
   await typed('\x1b[B', '\x1b[B', '\x1b[5~', '\r')
-  assert.deepEqual((await rows()).at(-2), '> '.padEnd(40))
+  assert.deepEqual((await rows()).at(-2), '>  ')
   await typed('y', '\r')
   assert.deepEqual(await typedLine, { answers: [{ id: 'q2', selected: [], custom: 'y' }] })
 })

@@ -263,3 +263,39 @@ test('ctrl+c pressed twice within half a second quits; once, or twice further ap
   }
   assert.deepEqual([pressed(0), pressed(600), pressed(900)], [[], [], [0]])
 })
+
+const part = (lines: readonly string[]) => ({ lines: () => lines })
+
+test('a Part, a Layout or a Screen registered twice by one name goes only with the plugin whose registration unloads, and the one beneath it is drawn again', async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 12, rows: 1 })
+  ready()
+  const sharedPart = part(['shared'])
+  const sharedLayout = { place: 'a' }
+  const sharedScreen = { name: 'mine', layout: { place: 'a' } }
+  const registered = (name: string, register: (binnacle: Context['binnacle']) => void) =>
+    ctx.plugin({
+      name,
+      inject: ['binnacle'],
+      apply: (plugin: Context) => {
+        register(plugin.binnacle)
+      },
+    })
+  const drawnAfter = async (register: (binnacle: Context['binnacle'], shared: boolean) => void) => {
+    await registered('first', (binnacle) => register(binnacle, true))
+    await registered('second', (binnacle) => register(binnacle, false))
+    const third = registered('third', (binnacle) => register(binnacle, true))
+    await third
+    await third.dispose()
+    return (await terminal.read()).rows[0]
+  }
+  await registered('places', (binnacle) => {
+    binnacle.place('a', part(['in a']))
+    binnacle.place('b', part(['in b']))
+  })
+  const drawn = [
+    await drawnAfter((binnacle, shared) => binnacle.place('transcript', shared ? sharedPart : part(['middle']))),
+    await drawnAfter((binnacle, shared) => binnacle.layout('chat', shared ? sharedLayout : { place: 'b' })),
+    await drawnAfter((binnacle, shared) => binnacle.show(shared ? sharedScreen : { name: 'theirs', layout: { place: 'transcript' } })),
+  ]
+  assert.deepEqual(drawn, ['middle', 'in b', 'middle'])
+})

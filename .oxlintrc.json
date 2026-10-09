@@ -44,6 +44,12 @@
       }
     },
     {
+      "files": ["packages/binnacle/src/terminal/colors.ts", "packages/binnacle/src/terminal/oklab.ts"],
+      "rules": {
+        "unicorn/consistent-function-scoping": "off"
+      }
+    },
+    {
       "files": ["packages/binnacle/**"],
       "rules": {
         "no-control-regex": "off"

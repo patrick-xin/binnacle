@@ -10,6 +10,8 @@
     "**/dist/**",
     "intents/**",
     "packages/binnacle/src/terminal/utils.ts",
+    "packages/binnacle/src/terminal/colors.ts",
+    "packages/binnacle/src/terminal/oklab.ts",
     "packages/binnacle/src/terminal/stdin-buffer.ts",
     "packages/binnacle/src/terminal/keys.ts",
     "packages/binnacle/src/terminal/keybindings.ts",

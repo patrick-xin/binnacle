@@ -64,6 +64,36 @@ export class XtermTerminal implements Terminal {
     return cell === undefined || cell.isFgDefault() ? 'default' : cell.getFgColor()
   }
 
+  /** How the text in a cell is drawn: its colour, a palette index or `#rrggbb`, and its attributes. */
+  async styleAt(
+    x: number,
+    y: number,
+  ): Promise<{ colour: number | string; bold: boolean; dim: boolean; italic: boolean; underline: boolean }> {
+    await this.read()
+    const cell = this.#xterm.buffer.active.getLine(this.#xterm.buffer.active.viewportY + y)?.getCell(x)
+    if (cell === undefined) return { colour: 'default', bold: false, dim: false, italic: false, underline: false }
+    const colour = cell.isFgDefault()
+      ? 'default'
+      : cell.isFgRGB()
+        ? `#${cell.getFgColor().toString(16).padStart(6, '0')}`
+        : cell.getFgColor()
+    return {
+      colour,
+      bold: cell.isBold() !== 0,
+      dim: cell.isDim() !== 0,
+      italic: cell.isItalic() !== 0,
+      underline: cell.isUnderline() !== 0,
+    }
+  }
+
+  /** The colour behind the text in a cell: a palette index, `#rrggbb`, or `default`. */
+  async backgroundAt(x: number, y: number): Promise<number | string> {
+    await this.read()
+    const cell = this.#xterm.buffer.active.getLine(this.#xterm.buffer.active.viewportY + y)?.getCell(x)
+    if (cell === undefined || cell.isBgDefault()) return 'default'
+    return cell.isBgRGB() ? `#${cell.getBgColor().toString(16).padStart(6, '0')}` : cell.getBgColor()
+  }
+
   /** Whether the cell is drawn in inverse video. */
   async inverseAt(x: number, y: number): Promise<boolean> {
     await this.read()

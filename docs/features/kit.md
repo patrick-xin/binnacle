@@ -1,27 +1,51 @@
 # Kit
 
-Row `binnacle`, part of the core · Code `binnacle:packages/binnacle/src/core/model.ts#createModel` · Intent: [authoring](../../intents/authoring/intent.md)
+Row `binnacle`, part of the core · Code `binnacle:packages/binnacle/src/core/model.ts#createModel`, `binnacle:packages/binnacle/src/core/theme.ts#layered` · Intent: [authoring](../../intents/authoring/intent.md)
 
 The Kit is what an author builds a feature from, as binnacle's built-ins do. It is not a row that a person turns off. How to use it is in the package's [`AUTHORING.md`](../../packages/binnacle/AUTHORING.md).
 
 ## What a person can do
 
-Nothing that a person sees changes yet.
+- See the borders of each box drawn dim, in the theme's `border` Tone, so they stand back from what the box holds.
+- See binnacle in their own palette: each default Tone is one of the terminal's sixteen colours, or only an attribute.
 
 ## What an author can change
 
 - Make a Model with `createModel(state)`: its `state`, `set(change)`, and `watch(changed)`.
 - List a Part's Models in `Part.models`, so that the core draws the Part again after each of them changes, with no code of the author's.
 - Name a Model with `binnacle.model(name, model)`, and find it with `binnacle.modelOf(name)`. The newest by a name wins, and it goes when the plugin that named it unloads.
+- Add a theme layer with `binnacle.theme(layer)`: its `colors`, `glyphs`, `edge`, `padding` and `gap`. Each token that it names changes for everything drawn with it, and the others stay as they were. The newest layer wins for each token, and a layer goes when the plugin that added it unloads.
+- Read the tokens with `binnacle.tokens`, and draw text in a Tone with `binnacle.paint(tone, text)`.
 
-The types are `binnacle:packages/binnacle/src/api.ts#Model` and `binnacle:packages/binnacle/src/api.ts#Watchable`.
+The Tones, what draws with each, and their defaults, which are v0's:
+
+| Tone | Draws | Default |
+|---|---|---|
+| `text` | text with no other meaning | the terminal's own |
+| `accent` | a marked item, a Title | cyan |
+| `muted` | a description | bright black |
+| `dim` | what stands back | dim |
+| `success` | a chosen box | green |
+| `warning` | a warning | yellow |
+| `error` | an error | red |
+| `border` | the borders of a box | dim |
+| `borderAccent` | the frame of what waits on the person, such as a Request | cyan |
+| `borderMuted` | a border that stands further back | dim |
+
+The glyphs are `mark` `›`, `unmarked` a space, `checked` `[x]`, `unchecked` `[ ]`, `rule` `─`, `separator` ` | ` and `more` `…`. The edge is `rounded`, and the padding and the gap are 0. Only the borders draw with the theme now. The List, the Title and a Request's frame draw with their Tones and glyphs when they are built.
+
+The types are `binnacle:packages/binnacle/src/api.ts#Model`, `binnacle:packages/binnacle/src/api.ts#Watchable`, `binnacle:packages/binnacle/src/api.ts#ThemeLayer`, `binnacle:packages/binnacle/src/api.ts#Tokens`, `binnacle:packages/binnacle/src/api.ts#Tone`, `binnacle:packages/binnacle/src/api.ts#Style` and `binnacle:packages/binnacle/src/api.ts#Colour`.
 
 ## How it is built
 
 - **A Model tells its watchers in a microtask after a change**, once for the changes made together. A watcher that changes the Model in its own call is told again after that call, never inside it.
 - **A Part's Models are watched while the Part is placed.** Each change draws the Part again, as its Handle's `redraw()` does. The watch stops when the Part's Handle is disposed.
 - **A named Model is held as a Part is**, in a list by its name, so it goes with its plugin.
+- **A theme layer is held as a Part is.** The tokens are laid from the layers, oldest first, at the first read after a layer comes or goes. Then every Part is wrapped again, as its lines can paint with the tokens.
+- **A colour token is a Style**: a colour and the attributes `bold`, `dim`, `italic` and `underline`. A colour is one of the sixteen by name, a 256-colour index, or an exact colour, as `#rrggbb`, `okhsl(…)` or `oklch(…)`. A plain colour stands for `{ color }`. `binnacle.theme` refuses a layer with a colour that is not one, and names its Tone.
+- **An exact colour is drawn as the nearest of 256** when the terminal does not say in `COLORTERM` that it has truecolor. The colour code is copied from pi-tui.
+- **Each attribute is closed by the code that ends it alone**, so a Tone painted inside another leaves the other standing.
 
 ## Built by
 
-Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them.
+Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme.

@@ -12,6 +12,8 @@ binnacle copies these files from pi-tui (https://github.com/earendil-works/pi, p
 - src/terminal/components/select-list.ts, from packages/tui/src/components/select-list.ts
 - src/terminal/autocomplete.ts, the types of packages/tui/src/autocomplete.ts that the editor names
 - src/terminal/tui.ts, the types and the cursor marker of packages/tui/src/tui.ts that the editor names
+- src/terminal/colors.ts, what the theme takes of packages/tui/src/colors.ts to draw a colour
+- src/terminal/oklab.ts, what colors.ts takes of packages/tui/src/oklab.ts, which ports Björn Ottosson's Oklab and OKHSL under the MIT licence, as its header says
 
 pi-tui's licence:
 

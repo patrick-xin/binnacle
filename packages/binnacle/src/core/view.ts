@@ -46,6 +46,10 @@ export class Rows {
     this.wrapped.delete(part)
   }
 
+  forgetAll(): void {
+    this.wrapped = new WeakMap()
+  }
+
   of(part: Part | undefined, width: number): readonly string[] {
     return part === undefined ? [] : this.#wrapped(part, width).rows
   }
