@@ -2,7 +2,7 @@
 
 - **Author:** Patrick Xin
 - **Role:** Maintainer
-- **Status:** approved
+- **Status:** approved, while authoring is prototyped: every decision here may change
 - **Date:** 2026-10-08
 
 ## Problem
@@ -12,6 +12,8 @@ binnacle's [product Intent](../binnacle/intent.md) promises that a person can as
 The combinations people may want are endless. We cannot build or check each one. What we can do is make each kind of change possible on its own, so that changes combine.
 
 A prototype of Requests showed both halves: changes to where something goes and which keys do what were a few lines each, while changes to how a feature behaves copied most of the feature.
+
+Nothing yet is shared between features. Each one draws its own list of choices and its own line to type in, so the next feature would drift from the last, and a person who changes how a list looks would have to change it once for each feature.
 
 ## Proposed outcome
 
@@ -23,6 +25,13 @@ A prototype of Requests showed both halves: changes to where something goes and 
 6. A change is saved in the person's profile. It applies to every later session and survives a restart, until the person undoes it.
 7. Each built-in feature uses only what an author can use, so it is a default to replace and an example to copy.
 8. A person can still turn a whole feature off.
+9. binnacle is built in layers, as a web app is built from a framework, a design system and its pages:
+   - **the core** owns the terminal, where things go, the Focus and the gestures;
+   - **the theme** names the colours by what they mean, the glyphs, the edges and the spacing;
+   - **components**, such as a list, a line to type in, tabs and a title, each hold what they do and which keys do it, apart from how they look;
+   - **their default looks** draw each component with the theme;
+   - **features**, such as Requests, are made of components, and talk to dsh.
+10. A change to a component's look or keys reaches every place the component is used, unless the author names one place. A change to the theme reaches everything that draws with it.
 
 ## Affected users and systems
 
@@ -37,14 +46,15 @@ A prototype of Requests showed both halves: changes to where something goes and 
 2. A feature is done only when an author has tried it. That author knows only what any author gets from binnacle, and is from another family than the builder.
 3. Each feature's Intent holds a few changes that a person might ask for, written by the Maintainer. A trial makes at least one change of each kind, and the author also makes up some of its own.
 4. A change that an author cannot make in a small change is a gap, and it is fixed before the feature is done.
-5. There is no way to share a change before 1.0. A change is a dsh bundle, and it is shared the way bundles are.
-6. The product's constraints hold: there is no promise of stability before the first stable release.
+5. Every feature is made from the components and the theme. A feature that needs a piece they do not have adds that piece to them first, so the next feature can use it too.
+6. There is no way to share a change before 1.0. A change is a dsh bundle, and it is shared the way bundles are.
+7. The product's constraints hold: there is no promise of stability before the first stable release.
 
 ## Stages
 
 Each stage ends in something the Maintainer can try under dsh.
 
-1. **Requests.** An author makes each of these changes small: space selects a choice where more than one can be chosen; tabs, or a click on a header, move between questions; a preview of every answer shows before they are sent; clicks do nothing; a Request draws as a dialog; a Request draws on the side.
+1. **The first layers, and Requests made from them.** The theme, the components that Requests needs, and Requests built from those components. An author makes each of these changes small: space selects a choice where more than one can be chosen; tabs, or a click on a header, move between questions; a preview of every answer shows before they are sent; clicks do nothing; a Request draws as a dialog; a Request draws on the side.
 2. **The features built so far.** The core, gestures, the transcript, the composer and the status line are each tried by an author, and refined. The product's next stage is built the same way after this.
 3. **Asking inside binnacle.** A person picks an author agent, asks for a change while the session runs, sees it take effect, and undoes it. A broken change does not stop the session.
 
