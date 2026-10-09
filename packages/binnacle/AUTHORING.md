@@ -1,8 +1,149 @@
 # Changing binnacle
 
-binnacle is a terminal app for dsh. Everything it draws and answers is a plugin. This page says how an author changes it. It grows with each part of the Kit that is built.
+binnacle is a terminal app for dsh. Everything it draws and answers is a plugin. This page says how an author changes it.
+
+binnacle's own features are plugins too, and they use only what this page says. Each one is a default that you replace, and an example to copy. Their source is in `src/` of this package:
+
+| Row | Feature | Source |
+|---|---|---|
+| `binnacle` | the core: the terminal, Layouts, Places, the Focus, gestures, and the Kit | `src/index.ts`, `src/core/`, `src/kit/` |
+| `binnacle-transcript` | the session's events | `src/plugins/transcript/index.ts` |
+| `binnacle-composer` | what a person types, before it is sent | `src/plugins/composer/index.ts` |
+| `binnacle-status-line` | whether the agent runs, and on which model | `src/plugins/status-line/index.ts` |
+| `binnacle-approvals` | a tool asks for an approval, and a person answers | `src/plugins/approvals/index.ts` |
+| `binnacle-questions` | the agent asks a person a question | `src/plugins/questions/index.ts` |
+
+The components of the Kit, in `src/kit/`, are made from the author API, as your own can be.
+
+## The layers
+
+binnacle is built in layers, as a web app is built from a framework, a design system and its pages:
+
+| Layer | Holds | On the web |
+|---|---|---|
+| the core | the terminal, Layouts, Places, the Focus and gestures | React and the DOM's layout |
+| the theme | a colour for each Tone, the glyphs, a box's edge and spacing | Tailwind's tokens |
+| the components: List, Title, Line and Tabs | what each one does, and the keys that do it | Radix's primitives |
+| the Looks | how each piece of a component is drawn, with the theme | shadcn's styles |
+| the features: the transcript, the composer and the rest | components and Parts put together, and the talk with dsh | an app's pages |
+
+You change binnacle when you lay a piece over the defaults. The newest piece wins, and what you do not replace stays binnacle's.
+
+## A plugin
+
+A plugin is a Cordis plugin, in a package of its own: an ES module that exports `name`, `inject` and `apply`.
+
+```js
+// plugins/my-change/index.js
+export const name = 'my-change'
+export const inject = ['binnacle']
+export function apply(ctx) {
+  ctx.binnacle.theme({ colors: { accent: 'magenta' } })
+}
+```
+
+```json
+{ "name": "my-change", "version": "0.0.0", "type": "module", "main": "index.js" }
+```
+
+A plugin in TypeScript imports the types with `import type { Binnacle, Part } from 'binnacle'`. That import also gives `ctx.binnacle` its type. The types are in `dist/index.d.ts`.
+
+### Load it in a profile
+
+A dsh profile is a folder, `~/.dsh/profiles/<profile>/`. A profile runs binnacle when its `package.json` has `binnacle` in its dependencies, and `"dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "binnacle"] } }`.
+
+1. Put the plugin in the profile, such as in `plugins/my-change/`.
+2. Add it to the dependencies of the profile's `package.json`: `"my-change": "link:./plugins/my-change"`.
+3. Run `pnpm install` in the profile.
+4. Add a row for it to the profile's `cordis.patch.yml`:
+
+   ```yaml
+   - insert:
+       - id: my-change
+         name: 'my-change'
+   ```
+
+5. Start binnacle with `dsh --profile <profile>`.
+
+Hot reload is off. After you change the plugin, start binnacle again.
+
+### Turn a built-in off
+
+Each built-in feature is a row of this package's `cordis.patch.yml`. Turn it off by its row, in the profile's `cordis.patch.yml`:
+
+```yaml
+- id: binnacle-status-line
+  disabled: true
+```
+
+The core, row `binnacle`, cannot be turned off. Every feature needs it.
+
+## Each way to change something
 
 What a plugin registers, such as a Part, a Layout, a theme layer, a Look, an action or a binding, goes when the plugin unloads. Of two registrations by one name, the newest wins. What binnacle's own rows register ranks beneath what you register, whichever loads first: a row is binnacle's own when the specifier of its `name` is `binnacle` or begins with `binnacle/`. So your plugin wins over a built-in on every start, and its `beneath` is the built-in's.
+
+| To change | The shortest way |
+|---|---|
+| where a Place is drawn | a Layout built on `CHAT_LAYOUT`: `binnacle.layout('chat', …)` ([Layouts](#layouts)) |
+| a colour or a glyph, everywhere | a theme layer: `binnacle.theme(layer)` ([The theme](#the-theme)) |
+| how one piece of a component looks | a Look: `binnacle.look(name, make)` ([Looks](#looks)) |
+| what a Place draws | a Part: `binnacle.place(name, part)` ([Parts, Places and Screens](#parts-places-and-screens)) |
+| which keys run an action | a binding: `binnacle.bind(name, keys)` ([Bind an action](#bind-an-action)) |
+| what an action does | an action by its id, which runs `beneath()` ([Run an action, and change what it does](#run-an-action-and-change-what-it-does)) |
+| a new gesture that does what an action does | an enabled action that runs the other by its id: `binnacle.run(id)` ([Run an action, and change what it does](#run-an-action-and-change-what-it-does)) |
+| the state that a feature draws | its Model: `binnacle.modelOf(name)` ([Models](#models)) |
+| the whole Screen | a Screen: `binnacle.show(screen)` ([Parts, Places and Screens](#parts-places-and-screens)) |
+| a whole feature | its row, turned off, and your plugin in its place ([Turn a built-in off](#turn-a-built-in-off)) |
+
+## Parts, Places and Screens
+
+A Place is a leaf of a Layout, by its name. A Part fills a Place: it gives the lines that the Place draws.
+
+```js
+const placed = ctx.binnacle.place('status', {
+  lines: (width) => [`${width} cells wide`],
+})
+```
+
+- `binnacle.place(name, part)` fills the Place by that name, on every Screen. The newest Part in a Place wins. It returns a Handle.
+- `lines(width)` gives the lines to draw at that width. A line keeps its colour and style. binnacle takes out every other control sequence, then wraps the line at the width.
+- `models` are the Models that the Part is drawn from. binnacle draws the Part again after each of them changes.
+- `cursor(width)`, while the Place has the Focus, says where the cursor is: `{ line, column }`.
+- `key(data)` takes a key, as the terminal sent it, while the Place has the Focus. It returns `true` when it used the key.
+- `click(at)` takes a click on the Part's lines. `at` is `{ line, column }` in its own lines. It returns `true` when it used the click.
+- `focus(has)` says when the Place gets the Focus, or loses it.
+- The Handle has `redraw()`, `focus()`, which moves the Focus to the Part's Place, and `dispose()`, which takes the Part away.
+
+A Screen is a Layout that fills the terminal. The Chat is the first Screen, by the name `chat`, and its Layout is `CHAT_LAYOUT`.
+
+- `binnacle.show(screen)` shows a Screen: `{ name, layout, focus }`. Only the newest Screen shown is drawn. `focus` names the Place where the Focus starts. Dispose its Handle to show the Screen beneath it again.
+- `binnacle.layout(name, layout)` replaces a Screen's Layout by its name, as [Layouts](#layouts) says.
+
+### Text
+
+Text from a model, a tool or a stored session is Untrusted Text. Make it plain before it goes in a Part's lines, as binnacle keeps the colour and style of each line:
+
+```js
+import { toPlainText, truncateToWidth, visibleWidth } from 'binnacle'
+
+const lineOf = (untrusted, width) => truncateToWidth(toPlainText(untrusted), width, '…')
+```
+
+- `toPlainText(text)` takes every control sequence out of the text.
+- `visibleWidth(text)` is the cells that the text takes in the terminal, with its colour and style not counted.
+- `truncateToWidth(text, width, ellipsis)` cuts the text to that many cells, and ends it with `ellipsis` where it is cut, `...` if you give none.
+
+### The Chat's session
+
+The core opens the session that the Chat shows, and provides it as `ctx.binnacleSession`: its `id`, its `agent`, its `events`, `send(text)` and `interrupt()`. It opens after dsh's plugins start. So wait for it in `apply`, as the status line does:
+
+```js
+export function apply(ctx) {
+  ctx.inject(['binnacleSession'], (ctx) => {
+    ctx.binnacle.place('status', { lines: () => [ctx.binnacleSession.id] })
+  })
+}
+```
 
 ## Models
 
@@ -123,6 +264,8 @@ A key goes, in this order, to:
 
 A click goes to the Part under it, then to its Place's actions bound to `click`. In one step, the newest enabled action by an id takes the gesture, and of two ids, the action set last wins.
 
+`binnacle.gestures.actionsOf(gesture)` reads binnacle's own Gesture Table. It takes a key, as the terminal sent it. It gives the ids of the core's gestures and the editor's keys that the key is bound to. It does not give the actions that a plugin sets. Read it to keep a key of your own off a key that binnacle uses.
+
 ### Bind an action
 
 ```js
@@ -136,6 +279,17 @@ ctx.binnacle.bind('requests.send', [...ctx.binnacle.keysOf('requests.send'), 'ct
 ### Run an action, and change what it does
 
 `binnacle.run(id)` runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture. With none enabled, nothing runs.
+
+To give an action another gesture, set an action of your own that runs it by its id. Here ctrl+d pages down the List `fruit` of [List](#list). It does this only while the List has more than ten items:
+
+```js
+ctx.binnacle.action('fruit.downMore', {
+  keys: ['ctrl+d'],
+  place: 'fruit',
+  enabled: () => fruit.state.items.length > 10,
+  run: () => ctx.binnacle.run('fruit.pageDown'),
+})
+```
 
 An action set with the id of another hides it, and is handed it as `beneath`. Run `beneath()` to keep what the action did, and add to it. So two plugins that each change one action both act, the newest first:
 

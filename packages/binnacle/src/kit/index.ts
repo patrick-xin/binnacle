@@ -1,4 +1,5 @@
 export { createModel } from '../core/model.ts'
+export { truncateToWidth, visibleWidth } from '../terminal/utils.ts'
 export { list } from './list.ts'
 export type { ListComponent, ListItem, ListOptions, ListRow, ListRowAt, ListState } from './list.ts'
 export { title } from './title.ts'
