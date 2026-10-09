@@ -38,7 +38,9 @@
   "files": [
     "dist",
     "cordis.patch.yml",
-    "NOTICE"
+    "NOTICE",
+    "AUTHORING.md",
+    "src"
   ],
   "dsh": {
     "bundle": {
@@ -49,6 +51,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
     "test": "node --test --test-timeout=30000 \"test/**/*.test.ts\""
   },
   "engines": {
