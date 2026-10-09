@@ -2,7 +2,7 @@
 
 **Status:** accepted, 2026-10-09
 
-A Layout's nodes share the cells of their parent, and no two of them draw in one cell. A float is the one exception. A node `{ over, float, at }` draws `over` in all of its cells, then draws `float` on top of it, while `float` has a line to draw. `at` says where the float goes, and how wide it is. The float's height is what its lines need.
+A Layout's nodes share the cells of their parent, and no two of them draw in one cell. A float is the one exception. A float node holds two nodes: what it covers, and the float. It draws what it covers in all of its cells, then draws the float on top, while the float has a line to draw. The node says where the float goes and how wide it is. The float's height is what its lines need.
 
 A click and the wheel land on the float before what it covers. Where the float covers it, what is beneath gets no click and no wheel, and its cursor is not drawn.
 
