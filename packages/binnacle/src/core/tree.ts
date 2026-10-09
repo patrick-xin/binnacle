@@ -33,6 +33,9 @@ export function grow(node: Layout, named: boolean, names: readonly string[], lay
   return { node, size, kind: 'column', children: all(node.column ?? []) }
 }
 
+/** A node of a fixed size takes that many cells along its parent, whatever it holds. */
+export const fixedOf = (tree: Tree): number | undefined => (typeof tree.size === 'object' ? tree.size.fixed : undefined)
+
 const MOST_FLOAT_WIDTH = 80
 const FLOAT_MARGIN = 4
 

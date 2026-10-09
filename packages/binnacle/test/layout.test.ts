@@ -601,3 +601,32 @@ test('a float with no size in a named Layout takes the width its lines need, wit
   })
   assert.deepEqual(rows, ['  M  rest', ''])
 })
+
+test('a float is as high as a fixed node in it is fixed, not as what the node holds', async () => {
+  const { rows } = await drawn(10, 8, (binnacle) => {
+    binnacle.show({
+      name: 'menu',
+      focus: 'menu',
+      layout: {
+        over: { place: 'base' },
+        float: { column: [{ place: 'title' }, { place: 'items', size: { fixed: 2 } }], border: true },
+        at: { width: 6 },
+      },
+    })
+    binnacle.place('base', part(...Array.from({ length: 10 }, (_, line) => `${line}`.repeat(10))))
+    binnacle.place('title', part('T'))
+    binnacle.place('items', part(...Array.from({ length: 10 }, (_, line) => `i${line}`)))
+  })
+  assert.deepEqual(rows, ['2222222222', '33╭────╮33', '44│T   │44', '55│i8  │55', '66│i9  │66', '77╰────╯77', '8888888888', '9999999999'])
+})
+
+test('a named Layout in a row is as wide as a fixed node in it is fixed, not as what the node holds', async () => {
+  const { rows } = await drawn(10, 1, (binnacle) => {
+    binnacle.layout('chat', { row: [{ layout: 'side', size: 'content' }, { place: 'main' }] })
+    binnacle.layout('side', { row: [{ place: 'a', size: { fixed: 2 } }, { place: 'b' }] })
+    binnacle.place('a', part('AAAAAA'))
+    binnacle.place('b', part('B'))
+    binnacle.place('main', part('mmmmmmmmmm'))
+  })
+  assert.deepEqual(rows, ['AABmmm'])
+})
