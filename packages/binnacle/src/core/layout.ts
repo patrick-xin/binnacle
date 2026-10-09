@@ -3,7 +3,7 @@ import { sliceByColumn, sliceWithWidth, truncateToWidth, visibleWidth } from '..
 import { bordersOf, edgeRow, gapOf, insetsOf, paddingOf } from './box.ts'
 import type { Spare } from './box.ts'
 import { withoutBlankEnd } from './row-end.ts'
-import { coverWidthOf, floatAt, floatWidthOf, grow } from './tree.ts'
+import { coverWidthOf, fixedOf, floatAt, floatWidthOf, grow } from './tree.ts'
 import type { Tree } from './tree.ts'
 import { edgeNamed } from './theme.ts'
 import type { Theme } from './theme.ts'
@@ -201,7 +201,7 @@ class Arrangement {
       const widths = this.#widths(tree, width)
       return Math.max(0, ...shown.map((child, index) => this.height(child, widths[index] ?? 0)))
     }
-    return shown.reduce((sum, child) => sum + this.height(child, width), this.#gaps(tree, width))
+    return shown.reduce((sum, child) => sum + (fixedOf(child) ?? this.height(child, width)), this.#gaps(tree, width))
   }
 
   #innerWidth(tree: Tree, available: number): number {
@@ -212,7 +212,8 @@ class Arrangement {
         this.#hasLines(tree.float, available) ? coverWidthOf(tree.at, this.width(tree.float, available)) : 0,
       )
     const shown = this.#shown(tree, available)
-    if (tree.kind === 'row') return shown.reduce((sum, child) => sum + this.width(child, available), this.#gaps(tree, available))
+    if (tree.kind === 'row')
+      return shown.reduce((sum, child) => sum + (fixedOf(child) ?? this.width(child, available)), this.#gaps(tree, available))
     return Math.max(0, ...shown.map((child) => this.width(child, available)))
   }
 
