@@ -224,3 +224,47 @@ ctx.binnacle.scroll('transcript', -1)
 - `binnacle.scroll(place, pages)` scrolls the Place by that name by pages, and stops at its first and its last line. A positive `pages` moves toward the last line, as page down does, and a negative one toward the first. A page is as many rows as the Place's box shows, from the rows it shows now.
 - A scroll of a Place that is not drawn, or that has no rows of room, does nothing. A scroll never moves the Focus.
 - A Place with the Focus shows its Part's cursor. After `binnacle.scroll`, it shows the rows paged to, until the Part's cursor moves to another line or column, as when a key moves it. Then it follows the cursor again. The wheel follows the cursor, as before.
+
+## Components
+
+A component is a piece that binnacle's own features are built from, and yours can be. Each one fills the Place by its `name`, which you put in a Layout. Its Looks are `<name>.<piece>`, then `<component>.<piece>`, and its actions `<name>.<verb>`, of the kind `<component>.<verb>`. It gives back `{ handle }`, the Handle of its Part. `handle.dispose()` also takes away what else the component registered.
+
+### List
+
+Items that a person marks and picks.
+
+```js
+import { createModel, list } from 'binnacle'
+
+const fruit = createModel({ items: [{ label: 'fig' }, { label: 'pear', description: 'ripe' }] })
+const picker = list(ctx.binnacle, {
+  name: 'fruit',
+  items: () => fruit.state.items,
+  pick: (index) => eat(fruit.state.items[index]),
+  models: [fruit],
+})
+```
+
+- `items()` gives the items: a `label`, an optional `description`, and an optional `checked`. An item with `checked` draws a box, `[x]` or `[ ]`. The List makes each label and description plain.
+- `pick(index)` runs when the person picks an item: enter picks the marked item, and a click picks the item clicked.
+- Up and down move the mark, and wrap. Page up and page down move it by a page, and stop at the first and the last item. A page is as many items as the Place shows at once, an item that wraps counted once, and at least one.
+- `key()`, if you give it, says which items are shown. When what it returns changes, the mark goes back to the first item. When the items are fewer and `key()` is the same, the mark stays on the last item. With no items there is no mark, and enter and the page keys do nothing.
+- `toggle(index)`, if you give it, runs for the marked item on the action `<name>.toggle`. It has no keys until someone binds it: `ctx.binnacle.bind('list.toggle', ['space'])`.
+- `models` are what the items are drawn from, so that the List is drawn again when they change.
+- `picker.model` is the List's Model, also named `name`: `{ mark }`, the index of the marked item.
+- The actions are `<name>.up`, `<name>.down`, `<name>.pageUp`, `<name>.pageDown`, `<name>.pick`, `<name>.click` and `<name>.toggle`, of the kinds `list.up` and the rest.
+- The Look `list.row`, or `<name>.row`, draws one item: `(item, { marked, index, width }) => line`. Its default draws the `mark` glyph and the marked item in `accent`, a description in `muted`, a box's frame in `border`, and what a checked box holds in `success`. A box glyph that is not framed in brackets draws whole, in `success` when checked and in `border` when not.
+
+### Title
+
+A rule across the width, with its text in it: `── Fruit ─────`.
+
+```js
+import { title } from 'binnacle'
+
+title(ctx.binnacle, { name: 'fruit.title', text: () => 'Fruit' })
+```
+
+- `text()` gives the text, which the Title makes plain. While it gives `undefined`, the Title draws nothing. `''` draws the rule alone.
+- `models` are what the text is drawn from, so that the Title is drawn again when it changes.
+- The Look `title.row`, or `<name>.row`, draws it: `(text, { width }) => line`. Its default draws the `rule` glyph and the text in `accent`.

@@ -144,6 +144,20 @@ export class Drawing {
     this.draw()
   }
 
+  /** How many of the Part's lines the Place shows now, a wrapped line counted once; none while the Place is not drawn. */
+  linesShown(place: string): number | undefined {
+    const placed = this.#placed.find((drawn) => drawn.place === place)
+    const part = this.#onView().partIn(place)
+    if (placed === undefined || part === undefined) return undefined
+    const { width, height } = placed.content
+    const lines = new Set<number>()
+    for (let row = placed.shownFrom; row < placed.shownFrom + height; row++) {
+      const at = this.#rows.pointAt(part, width, row, 0)
+      if (at !== undefined) lines.add(at.line)
+    }
+    return lines.size
+  }
+
   /** Shift+tab: the Focus to the next Place on view that takes keys, in the order of the layout, from the last back to the first. */
   nextFocus(): void {
     const takers = this.#takers(this.#placed)
