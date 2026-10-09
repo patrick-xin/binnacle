@@ -120,7 +120,7 @@ A correct seam is one where the test exercises the **real bug pattern** as it oc
 
 If a correct seam exists:
 
-1. Turn the minimised repro into a failing test at that seam, following `tdd`.
+1. Turn the minimised repro into a failing test at that seam.
 2. Watch it fail.
 3. Apply the fix.
 4. Watch it pass.

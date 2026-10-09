@@ -4,7 +4,7 @@
 
 ## Evidence
 
-<!-- What a person sees before and after, or each test's break and its failure message. -->
+<!-- What a person sees before and after. -->
 
 ## Merge danger
 
@@ -15,7 +15,6 @@
 ## Checked
 
 - [ ] `pnpm test` passes on the branch.
-- [ ] Each new test is proven: its break and its failure message.
 - [ ] Each review Round: what it found, and the commit that answered it. The reports are below, each in a `<details>` block.
 - [ ] Tried under `dsh`, if the change draws or boots: what was driven, and what it drew.
 - [ ] The author API: unchanged, or the commit says what changed.

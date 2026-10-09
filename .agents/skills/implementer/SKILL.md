@@ -12,29 +12,18 @@ You build one Ticket, in your own worktree. The Ticket is the GitHub issue that 
 1. Set the state `building`, and continue.
 2. Read the Ticket with `gh issue view <n>`, and its Spec, the parent issue.
 3. Read a comment only when an issue body links to it.
-4. Load the `tdd` skill.
-5. List the behaviours from the Ticket. Each behaviour is the name of one test.
-6. Build one behaviour at a time, at the seams that the Spec names.
-7. Commit as often as you like. Only the final message is kept. A commit names no model: no `Co-Authored-By` or other trailer. `task land` adds who built and who reviewed.
-8. If the Ticket or the Spec does not answer a question, write `question.md`.
-9. Set the state `blocked`.
-10. When every behaviour is built, do the checks below.
-11. Set the state `ready`.
-12. If the state becomes `changes`, read the review report.
-13. Fix each finding.
-14. Do the checks below again.
-15. Set the state `ready`.
-16. If the state becomes `approved`, write `message.md`.
-
-## A test is proven
-
-A test is proven when a break of the code that it covers makes it fail.
-
-1. Break the code that the test covers.
-2. Run the test.
-3. Copy the failure message.
-4. Restore the code.
-5. Write the break and the failure message in `checked.md`.
+4. List the behaviours from the Ticket. Each behaviour is the name of one test, at a seam that the Spec names.
+5. Build them, and run their tests as you go.
+6. Commit as often as you like. Only the final message is kept. A commit names no model: no `Co-Authored-By` or other trailer. `task land` adds who built and who reviewed.
+7. If the Ticket or the Spec does not answer a question, write `question.md`.
+8. Set the state `blocked`.
+9. When every behaviour is built, do the checks below.
+10. Set the state `ready`.
+11. If the state becomes `changes`, read the review report.
+12. Fix each finding.
+13. Do the checks below again.
+14. Set the state `ready`.
+15. If the state becomes `approved`, write `message.md`.
 
 ## The final commit message
 
@@ -45,8 +34,6 @@ A test is proven when a break of the code that it covers makes it fail.
 - It lists the decisions that you took.
 - It ends with `Closes #<ticket>`.
 - It names no model. `task land` adds the trailers.
-
-The proof of each test goes in `checked.md`. The Lead puts it in the PR.
 
 ## Before you set the state `ready`
 
@@ -63,7 +50,7 @@ Then check each item:
 - Each change is committed, and `git status` shows a clean worktree.
 - `pnpm test` passes at that commit.
 - Each behaviour of the Ticket has a test with its name.
-- Each new test is proven, and `checked.md` records the break.
+- Each test can fail. A test that passed the first time may assert something that is always true.
 - The records that the Ticket names are changed in the same commit as the code, and the feature's doc in `docs/features/` says what is built now.
 - Each changed file serves a behaviour or a record of the Ticket.
 - Each comment in your diff gives a reason that the code cannot show. A test's name says its behaviour, so a test has no comment.

@@ -33,6 +33,19 @@ function originSubjects(world) {
   return git(world.repo, ['log', '--format=%s', 'origin/main..origin/task/140']).split('\n')
 }
 
+test('`task land` opens the PR with no `checked.md`, and leaves *Evidence* for the Lead to fill in', async (t) => {
+  const world = makeWorld()
+  t.after(() => world.remove())
+  const { folder } = await approved(world)
+  rmSync(join(folder, 'checked.md'))
+  const landed = await run(['land', '140'], world.deps)
+  assert.equal(landed.code, 0, landed.stderr)
+  assert.match(
+    world.gh.prs.get('task/140').body,
+    /## Evidence\n\n<!-- the Lead fills this in: what a person sees before and after -->\n\n## Merge danger/,
+  )
+})
+
 test('`task land <n>` squashes the branch into one commit on top of `origin/main`, with `message.md` as its message and who built and who reviewed as its trailers, and pushes it', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())
@@ -105,9 +118,6 @@ test('`task land` refuses before a round after round 0 is approved, and when an 
   writeFileSync(join(folder, 'message.md'), '\nno header\n')
   await refuses(/its first line, the header, is empty/)
   writeFileSync(join(folder, 'message.md'), MESSAGE)
-  rmSync(join(folder, 'checked.md'))
-  await refuses(/no checked\.md/)
-  writeFileSync(join(folder, 'checked.md'), 'proofs\n')
   rmSync(join(folder, 'review-1.md'))
   await refuses(/no review report of a round after round 0/)
   writeFileSync(join(folder, 'review-1.md'), 'Round 1.')

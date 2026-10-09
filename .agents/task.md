@@ -24,7 +24,7 @@ The files of Spec or Ticket `<n>`:
 | `question.md` | The open question | the role that asks |
 | `answer.md` | The answer | the Lead |
 | `review-<r>.md` | The report of Round `<r>`. A Spec's Round 0 has passes: its first pass is `review-0.md`, and pass `<p>` is `review-0-<p>.md`. The prompt names the file. | the Reviewer |
-| `checked.md` | Each test's break and its failure message | the builder |
+| `checked.md` | Optional: what the builder checked by hand, which `task land` puts under *Evidence* | the builder |
 | `message.md` | The final commit message, which names no model | the builder |
 
 The log governs the state: the last line is the current state and Round. If the log does not end with a newline, or a line is not JSON, each command for that Task refuses and names the file. The Lead repairs it by hand.
@@ -142,10 +142,10 @@ When the builder is the Lead, or a role runs as a subagent, the tool starts no a
 
 ## The PR
 
-Run `pnpm task land <ticket>` when the Reviewer approves a Round of the Ticket, and `message.md` and `checked.md` exist. It checks each input before it changes anything, then:
+Run `pnpm task land <ticket>` when the Reviewer approves a Round of the Ticket, and `message.md` exists. It checks each input before it changes anything, then:
 
 1. squashes the branch into one commit on `origin/main`, with `message.md` as its message and two trailers, `Built-by:` and `Reviewed-by:`, and pushes it;
-2. opens the PR, in the shape of the PR template: where the Ticket fits ("Ticket 2 of 4 of #160, <the Spec's title>"), the message's body, `checked.md` under *Evidence*, the Ticket's Door, and at the end `Closes #<ticket>` and `Part of #<spec>`;
+2. opens the PR, in the shape of the PR template: where the Ticket fits ("Ticket 2 of 4 of #160, <the Spec's title>"), the message's body, `checked.md` under *Evidence* if it exists, the Ticket's Door, and at the end `Closes #<ticket>` and `Part of #<spec>`;
 3. labels a one-way PR `one-way`;
 4. posts each review report as a comment of its own, oldest first;
 5. writes `landed` with the PR's address.
