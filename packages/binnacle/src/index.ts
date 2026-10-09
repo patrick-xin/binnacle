@@ -15,8 +15,8 @@ import { StdinBuffer } from './terminal/stdin-buffer.ts'
 export type * from './api.ts'
 export type { Process } from './core/host.ts'
 export { toPlainText } from './core/view.ts'
-export { createModel } from './core/model.ts'
 export { CHAT_LAYOUT } from './core/chat.ts'
+export * from './kit/index.ts'
 export { internals } from './core/internals.ts'
 
 export const name = 'binnacle'
@@ -49,7 +49,7 @@ export function apply(ctx: Context): void {
     forget: (part) => drawing.forget(part),
     forgetAll: () => drawing.forgetAll(),
     colorMode: () => internals.colorMode(),
-    scroll: (place, pages) => drawing.scroll(place, pages),
+    places: drawing,
   })
   const exit: AppExit = ctx.appExit!
   route(input, {

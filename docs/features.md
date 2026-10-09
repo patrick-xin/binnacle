@@ -10,7 +10,7 @@ Each feature is a plugin with a row of its own in the bundle's patch ([ADR 1](ad
 |---|---|---|---|
 | Core | [core](features/core.md) | `binnacle` | `packages/binnacle/src/` |
 | Gestures | [gestures](features/gestures.md) | `binnacle` | `packages/binnacle/src/core/gestures.ts`, `packages/binnacle/src/core/input.ts`, `packages/binnacle/src/core/keyboard.ts`, `packages/binnacle/src/core/actions.ts` |
-| Kit | [kit](features/kit.md) | `binnacle` | `packages/binnacle/src/core/model.ts`, `packages/binnacle/src/core/theme.ts`, `packages/binnacle/src/core/looks.ts` |
+| Kit | [kit](features/kit.md) | `binnacle` | `packages/binnacle/src/core/model.ts`, `packages/binnacle/src/core/theme.ts`, `packages/binnacle/src/core/looks.ts`, `packages/binnacle/src/kit/` |
 | Transcript | [transcript](features/transcript.md) | `binnacle-transcript` | `packages/binnacle/src/plugins/transcript/` |
 | Composer | [composer](features/composer.md) | `binnacle-composer` | `packages/binnacle/src/plugins/composer/` |
 | Status line | [status line](features/status-line.md) | `binnacle-status-line` | `packages/binnacle/src/plugins/status-line/` |

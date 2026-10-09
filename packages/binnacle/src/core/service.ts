@@ -33,8 +33,15 @@ export interface Drawn {
   /** Every Part is wrapped again at its next draw: the theme or a Look changed. */
   forgetAll(): void
   colorMode(): TerminalColorMode
+  readonly places: DrawnPlaces
+}
+
+/** What the service asks of the Places as they were last drawn. */
+export interface DrawnPlaces {
   /** Scrolls a Place drawn by pages of its box, toward its last line when `pages` is positive. */
   scroll(place: string, pages: number): void
+  /** How many of the Part's lines the Place shows, a wrapped line counted once; none while it is not drawn. */
+  linesShown(place: string): number | undefined
 }
 
 /** The Place the Focus was moved to, and whether it has had the Focus since. */
@@ -175,7 +182,12 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   scroll(place: string, pages: number): void {
-    this.drawn.scroll(place, pages)
+    this.drawn.places.scroll(place, pages)
+  }
+
+  /** How many of the Part's lines the Place shows now, a wrapped line counted once, for a List's page. Not in the author's `Binnacle`. */
+  linesShown(place: string): number | undefined {
+    return this.drawn.places.linesShown(place)
   }
 
   /** The Focus moved on the Screen on view is forgotten: its Place had it and stopped taking keys. */
