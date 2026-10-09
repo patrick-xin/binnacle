@@ -4,3 +4,7 @@ export type { ListComponent, ListItem, ListOptions, ListRow, ListRowAt, ListStat
 export { title } from './title.ts'
 export type { TitleOptions, TitleRow } from './title.ts'
 export type { Component } from './component.ts'
+export { line } from './line.ts'
+export type { LineComponent, LineOptions, LineRow, LineState, Typed } from './line.ts'
+export { tabs } from './tabs.ts'
+export type { TabAt, TabLook, TabsOptions } from './tabs.ts'
