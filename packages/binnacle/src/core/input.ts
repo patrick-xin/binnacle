@@ -45,12 +45,17 @@ export interface Routes {
   focused(): Part | undefined
   /** The Part took the key, so its lines changed. */
   taken(part: Part): void
-  /** A press of the left button, at the cell under the pointer counted from 0. True when the Part under it took the click. */
-  click(x: number, y: number): boolean
+  /** A press of the left button, at the cell under the pointer counted from 0, by its gesture's name. True when the Part under it, or an action of its Place, took the click. */
+  click(x: number, y: number, gesture: string): boolean
+  /** A key to the actions that authors set, at one step of the order: before the Part with the Focus, or after it. True when one took it. */
+  actions(data: string, first: boolean): boolean
   act(action: CoreAction, at?: Pointer): void
 }
 
-/** A key or a click goes to a Part first; what the Part does not take goes to the Gesture Table, and the core does the core's action bound to it. */
+/**
+ * A key goes to the actions marked `first`, then to the Part with the Focus, then to the other actions, then to the Gesture Table, and the core does the core's action bound to it.
+ * A click goes to the Part under the pointer, then to its Place's actions, then to the Gesture Table.
+ */
 export function route(input: StdinBuffer, routes: Routes): void {
   const toFocus = (data: string): boolean => {
     const part = routes.focused()
@@ -69,11 +74,11 @@ export function route(input: StdinBuffer, routes: Routes): void {
     if (mouse !== undefined) {
       const gesture = gestureOf(mouse)
       if (gesture === undefined) return
-      if (gesture.base === 'click' && routes.click(gesture.at.x, gesture.at.y)) return
+      if (gesture.base === 'click' && routes.click(gesture.at.x, gesture.at.y, gesture.name)) return
       toTable(gesture.name, gesture.at)
       return
     }
-    if (toFocus(sequence)) return
+    if (routes.actions(sequence, true) || toFocus(sequence) || routes.actions(sequence, false)) return
     // Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as keys.
     toTable(sequence)
   })

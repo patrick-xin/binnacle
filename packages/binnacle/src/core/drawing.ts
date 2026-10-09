@@ -18,6 +18,10 @@ export interface OnView extends Theme {
   /** The core forgets the Focus a person moved on the Screen on view: its Place stopped taking keys. */
   forgetMovedFocus(): void
   partIn(place: string): Part | undefined
+  /** A Place takes keys while its Part does, or while an action acts in it. */
+  takesKeys(place: string): boolean
+  /** A click that the Part in the Place did not take goes to the Place's actions bound to it. True when one took it. */
+  clickActions(gesture: string, place: string, at: Point | undefined): boolean
 }
 
 /** The Focus, the wheel and a click need where each Place was last drawn, so what draws keeps it. */
@@ -90,8 +94,12 @@ export class Drawing {
 
   /** The Part with the Focus, while its Place is drawn. */
   focused(): Part | undefined {
-    const focus = this.#focus(this.#placed)
+    const focus = this.focusedPlace()
     return focus === undefined ? undefined : this.#onView().partIn(focus)
+  }
+
+  focusedPlace(): string | undefined {
+    return this.#focus(this.#placed)
   }
 
   /** The wheel scrolls the Place under the pointer, at a cell counted from 0. */
@@ -102,21 +110,23 @@ export class Drawing {
     this.draw()
   }
 
-  /** A press of the left button at the cell under the pointer. The Focus moves first, then the click reaches the Part. */
-  click(x: number, y: number): boolean {
+  /** A press of the left button at the cell under the pointer, by its gesture's name. The Focus moves first, then the click reaches the Part, then the Place's actions. */
+  click(x: number, y: number, gesture: string): boolean {
     const view = this.#onView()
     const under = this.#placed.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
     if (under === undefined) return false
     const part = view.partIn(under.place)
-    if (part?.key !== undefined) view.moveFocus(under.place)
+    if (view.takesKeys(under.place)) view.moveFocus(under.place)
     const at = this.#pointIn(under, part, x, y)
-    if (at === undefined || part?.click?.(at) !== true) return false
-    this.forget(part)
-    this.draw()
-    return true
+    if (at !== undefined && part?.click?.(at) === true) {
+      this.forget(part)
+      this.draw()
+      return true
+    }
+    return view.clickActions(gesture, under.place, at)
   }
 
-  /** Shift+tab: the Focus to the next Place on view whose Part takes keys, in the order of the layout, from the last back to the first. */
+  /** Shift+tab: the Focus to the next Place on view that takes keys, in the order of the layout, from the last back to the first. */
   nextFocus(): void {
     const takers = this.#takers(this.#placed)
     if (takers.length === 0) return
@@ -128,7 +138,7 @@ export class Drawing {
   /** The Places on view that take keys, in the order of the layout. */
   #takers(placed: readonly Placed[]): readonly Placed[] {
     const view = this.#onView()
-    return placed.filter(({ place, width, height }) => width > 0 && height > 0 && view.partIn(place)?.key !== undefined)
+    return placed.filter(({ place, width, height }) => width > 0 && height > 0 && view.takesKeys(place))
   }
 
   #focus(placed: readonly Placed[]): string | undefined {
@@ -159,7 +169,7 @@ export class Drawing {
 
   /** The cell under the pointer as the Part's line and column, or none on the Place's box or below the Part's lines. */
   #pointIn(under: Placed, part: Part | undefined, x: number, y: number): Point | undefined {
-    if (part?.click === undefined) return undefined
+    if (part === undefined) return undefined
     const { top, left, width, height } = under.content
     if (y < top || y >= top + height || x < left || x >= left + width) return undefined
     return this.#rows.pointAt(part, width, under.shownFrom + y - top, x - left)

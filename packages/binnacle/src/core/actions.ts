@@ -1,3 +1,6 @@
+import type { Action, Point } from '../api.ts'
+import { matchesKey } from '../terminal/keys.ts'
+import type { KeyId } from '../terminal/keys.ts'
 import type { CoreAction } from './gestures.ts'
 
 // pi's window for the second ctrl+c that quits.
@@ -31,4 +34,113 @@ export function coreActions(acts: Acts): (action: CoreAction, at?: Pointer) => v
     if (now - clearedAt < QUIT_WITHIN_MS) acts.quit()
     clearedAt = now
   }
+}
+
+/** One action set, held apart, so that one action set twice keeps two places beneath its id. */
+export interface SetAction {
+  readonly item: { readonly id: string; readonly action: Action }
+}
+
+export interface SetBinding {
+  readonly item: { readonly name: string; readonly keys: readonly string[] }
+}
+
+/** The actions that authors set, read from their lists as they stand at each gesture and each call. */
+export class Actions {
+  readonly #set: readonly SetAction[]
+  readonly #bindings: readonly SetBinding[]
+
+  /** Both lists are oldest first, and the service changes them in place. */
+  constructor(set: readonly SetAction[], bindings: readonly SetBinding[]) {
+    this.#set = set
+    this.#bindings = bindings
+  }
+
+  keysOf(id: string): readonly string[] {
+    const action = this.#set.findLast(({ item }) => item.id === id)
+    return action === undefined ? (this.#bound(id) ?? []) : this.#keysOf(action)
+  }
+
+  run(id: string, at: Point | undefined): void {
+    const top = this.#enabledBelow(id, this.#set.length)
+    if (top !== undefined) this.#run(top, at)
+  }
+
+  /**
+   * A key before the Part with the Focus, to the actions marked `first` of its Place; or after it, to the Place's other actions, then to the actions with no Place, `first` or not.
+   * True when an action took it.
+   */
+  key(data: string, focus: string | undefined, first: boolean): boolean {
+    const takers = this.#tops().filter((entry) => this.#keysOf(entry).some((key) => matchesKey(data, key as KeyId)))
+    const inFocus = takers.filter(({ item }) => focus !== undefined && actsIn(item.action, focus))
+    const taker = first
+      ? inFocus.find(({ item }) => item.action.first === true)
+      : (inFocus.find(({ item }) => item.action.first !== true) ?? takers.find(({ item }) => item.action.place === undefined))
+    if (taker === undefined) return false
+    this.#run(taker, undefined)
+    return true
+  }
+
+  /** A click that the Part in the Place did not take, by its gesture's name, such as `click` or `shift+click`. True when an action took it. */
+  click(gesture: string, place: string, at: Point | undefined): boolean {
+    const taker = this.#tops().find((entry) => actsIn(entry.item.action, place) && this.#keysOf(entry).includes(gesture))
+    if (taker === undefined) return false
+    this.#run(taker, at)
+    return true
+  }
+
+  /** True while an action is set that acts in the Place, enabled or not, so that the Focus stays while one is disabled for a moment. */
+  actsIn(place: string): boolean {
+    return this.#set.some(({ item }) => actsIn(item.action, place))
+  }
+
+  #run(entry: SetAction, at: Point | undefined): void {
+    entry.item.action.run(at, () => {
+      // Found when it runs, never captured, so a plugin that unloads between them leaves the chain as it stands.
+      const index = this.#set.indexOf(entry)
+      const next = index === -1 ? undefined : this.#enabledBelow(entry.item.id, index)
+      if (next !== undefined) this.#run(next, at)
+    })
+  }
+
+  #enabledBelow(id: string, index: number): SetAction | undefined {
+    return this.#set.slice(0, index).findLast(({ item }) => item.id === id && item.action.enabled?.() !== false)
+  }
+
+  /** The newest enabled action of each id, newest first. */
+  #tops(): readonly SetAction[] {
+    const seen = new Set<string>()
+    return this.#set.toReversed().filter(({ item }) => {
+      if (seen.has(item.id) || item.action.enabled?.() === false) return false
+      seen.add(item.id)
+      return true
+    })
+  }
+
+  /** An action that names no keys, or no kind, keeps those of the action it hides, so that a plugin that changes what an action does need not repeat its keys. */
+  #keysOf(entry: SetAction): readonly string[] {
+    const { id } = entry.item
+    const hidden = this.#set
+      .slice(0, this.#set.indexOf(entry) + 1)
+      .filter(({ item }) => item.id === id)
+      .toReversed()
+      .map(({ item }) => item.action)
+    const kind = hidden.find((action) => action.kind !== undefined)?.kind
+    return (
+      this.#bound(id) ??
+      (kind === undefined ? undefined : this.#bound(kind)) ??
+      hidden.find((action) => action.keys !== undefined)?.keys ??
+      []
+    )
+  }
+
+  #bound(name: string): readonly string[] | undefined {
+    return this.#bindings.findLast(({ item }) => item.name === name)?.item.keys
+  }
+}
+
+function actsIn(action: Action, place: string): boolean {
+  const { place: own } = action
+  if (own === undefined) return false
+  return typeof own === 'string' ? own === place : own.includes(place)
 }

@@ -57,7 +57,8 @@ export function apply(ctx: Context): void {
       drawing.forget(part)
       drawing.draw()
     },
-    click: (x, y) => drawing.click(x, y),
+    click: (x, y, gesture) => drawing.click(x, y, gesture),
+    actions: (data, first) => service.actions.key(data, drawing.focusedPlace(), first),
     act: coreActions({
       now: () => internals.now(),
       quit: () => exit(0),

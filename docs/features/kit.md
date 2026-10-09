@@ -18,6 +18,7 @@ The Kit is what an author builds a feature from, as binnacle's built-ins do. It 
 - Read the tokens with `binnacle.tokens`, and draw text in a Tone with `binnacle.paint(tone, text)`.
 - Set a Look with `binnacle.look(name, (beneath) => look)`: by a component's kind, such as `list.row`, for every instance of that kind, or by an instance's name, such as `request.choices.row`, for that instance alone. The Look is handed the Look beneath it, so it can draw that Look and add to it. A Look goes when the plugin that set it unloads, and everything is drawn again.
 - Draw a piece of a component with `binnacle.lookOf(names, fallback)`: the newest Look by the first name, with the chain beneath it, down to `fallback`, the component's default.
+- Give a component actions that an author binds by kind, such as `list.toggle`, and changes on the action beneath: `binnacle.action`, `binnacle.bind`, `binnacle.keysOf` and `binnacle.run`. The [Gestures](gestures.md) doc says how a gesture reaches them.
 
 The Tones, what draws with each, and their defaults, which are v0's:
 
@@ -54,4 +55,4 @@ The types are `binnacle:packages/binnacle/src/api.ts#Model`, `binnacle:packages/
 
 ## Built by
 
-Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme · Ticket [#188](https://github.com/patrick-xin/binnacle/issues/188): Looks, by instance and by kind.
+Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme · Ticket [#188](https://github.com/patrick-xin/binnacle/issues/188): Looks, by instance and by kind · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bound by kind, run by id, and the action beneath.
