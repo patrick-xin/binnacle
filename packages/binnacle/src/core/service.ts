@@ -1,58 +1,99 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Gestures, Handle, Layout, Model, Part, Screen } from '../api.ts'
+import type { Binnacle, Gestures, Handle, Layout, Model, Part, Screen, ThemeLayer, Tokens, Tone } from '../api.ts'
+import type { TerminalColorMode } from '../terminal/colors.ts'
 import { CHAT } from './chat.ts'
 import { actionsOf } from './gestures.ts'
+import { checkLayer, layered, painter } from './theme.ts'
+
+/** What the service asks of what draws. */
+export interface Drawn {
+  redraw(): void
+  /** The Part is wrapped again at its next draw. */
+  forget(part: Part): void
+  /** Every Part is wrapped again at its next draw: the theme changed. */
+  forgetAll(): void
+  colorMode(): TerminalColorMode
+}
+
+/** One registration. Each is held apart, so that one object registered twice goes only with the plugin whose registration unloads. */
+interface Held<T> {
+  readonly item: T
+}
+
+interface Themed {
+  readonly tokens: Tokens
+  readonly paint: (tone: Tone, text: string) => string
+}
 
 export class BinnacleService extends Service implements Binnacle {
   // TypeScript private, not #private: Cordis reaches the service through traced copies.
-  private readonly screens: Screen[] = [CHAT]
-  private readonly layouts = new Map<string, Layout[]>()
-  private readonly parts = new Map<string, Part[]>()
-  // Each naming is held apart, as one Model can be named more than once.
-  private readonly models = new Map<string, { readonly model: Model<object> }[]>()
+  private readonly chat: Held<Screen> = { item: CHAT }
+  private readonly screens: Held<Screen>[] = [this.chat]
+  private readonly layouts = new Map<string, Held<Layout>[]>()
+  private readonly parts = new Map<string, Held<Part>[]>()
+  private readonly models = new Map<string, Held<Model<object>>[]>()
   // The Place a person moved the Focus to, for each Screen shown; null once the core forgot it.
-  private readonly moved = new Map<Screen, string | null>()
-  private readonly redraw: () => void
-  private readonly forget: (part: Part) => void
+  private readonly moved = new Map<Held<Screen>, string | null>()
+  private readonly layers: Held<ThemeLayer>[] = []
+  // Made again from the layers at the next read, after a layer comes or goes. A method runs on a traced copy, where a field set stays on the copy, so the field is an object that is changed.
+  private readonly themed: { now?: Themed } = {}
+  private readonly drawn: Drawn
   readonly gestures: Gestures = { actionsOf }
 
-  constructor(ctx: Context, redraw: () => void, forget: (part: Part) => void) {
+  constructor(ctx: Context, drawn: Drawn) {
     super(ctx, 'binnacle')
-    this.redraw = redraw
-    this.forget = forget
+    this.drawn = drawn
+  }
+
+  get tokens(): Tokens {
+    return this.themeNow().tokens
+  }
+
+  paint(tone: Tone, text: string): string {
+    return this.themeNow().paint(tone, text)
+  }
+
+  theme(layer: ThemeLayer): Handle {
+    checkLayer(layer)
+    const restyle = (): void => {
+      delete this.themed.now
+      this.drawn.forgetAll()
+    }
+    restyle()
+    return this.hold(this.layers, layer, 'binnacle: a theme layer', undefined, restyle)
   }
 
   get layoutOnView(): Layout {
     const screen = this.screenOnView
-    return this.layouts.get(screen.name)?.at(-1) ?? screen.layout
+    return this.layouts.get(screen.name)?.at(-1)?.item ?? screen.layout
   }
 
   get screenOnView(): Screen {
-    return this.screens.at(-1) ?? CHAT
+    return this.shown().item
   }
 
   focusMovedTo(): string | null | undefined {
-    return this.moved.get(this.screenOnView)
+    return this.moved.get(this.shown())
   }
 
   /** A person moved the Focus on the Screen on view. */
   moveFocus(place: string): void {
-    this.moved.set(this.screenOnView, place)
-    this.redraw()
+    this.moved.set(this.shown(), place)
+    this.drawn.redraw()
   }
 
   /** The Focus a person moved on the Screen on view is forgotten: its Place stopped taking keys. */
   forgetMovedFocus(): void {
-    this.moved.set(this.screenOnView, null)
+    this.moved.set(this.shown(), null)
   }
 
   partIn(place: string): Part | undefined {
-    return this.parts.get(place)?.at(-1)
+    return this.parts.get(place)?.at(-1)?.item
   }
 
   show(screen: Screen): Handle {
-    return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, () => this.moved.delete(screen))
+    return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, (entry) => this.moved.delete(entry))
   }
 
   layout(screen: string, layout: Layout): Handle {
@@ -66,7 +107,7 @@ export class BinnacleService extends Service implements Binnacle {
       part,
       'binnacle: a part placed',
       () => {
-        this.forget(part)
+        this.drawn.forget(part)
       },
       () => {
         for (const stop of stops) stop()
@@ -77,23 +118,36 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   model<S extends object>(name: string, model: Model<S>): Handle {
-    return this.hold(listIn(this.models, name), { model: model as Model<object> }, 'binnacle: a model named')
+    return this.hold(listIn(this.models, name), model as Model<object>, 'binnacle: a model named')
   }
 
   modelOf<S extends object>(name: string): Model<S> | undefined {
-    return this.models.get(name)?.at(-1)?.model as Model<S> | undefined
+    return this.models.get(name)?.at(-1)?.item as Model<S> | undefined
   }
 
-  private hold<T>(list: T[], item: T, label: string, changed?: () => void, off?: () => void): Handle {
-    list.push(item)
-    this.redraw()
+  private themeNow(): Themed {
+    if (this.themed.now === undefined) {
+      const tokens = layered(this.layers.map(({ item }) => item))
+      this.themed.now = { tokens, paint: painter(tokens, this.drawn.colorMode()) }
+    }
+    return this.themed.now
+  }
+
+  private shown(): Held<Screen> {
+    return this.screens.at(-1) ?? this.chat
+  }
+
+  private hold<T>(list: Held<T>[], item: T, label: string, changed?: () => void, off?: (entry: Held<T>) => void): Handle {
+    const entry: Held<T> = { item }
+    list.push(entry)
+    this.drawn.redraw()
     let held = true
     const release = (): void => {
       if (!held) return
       held = false
-      list.splice(list.indexOf(item), 1)
-      off?.()
-      this.redraw()
+      list.splice(list.indexOf(entry), 1)
+      off?.(entry)
+      this.drawn.redraw()
     }
     // In a traced copy, `this.ctx` is the calling plugin's context, so what it holds goes when that plugin unloads.
     const dispose = this.ctx.effect(() => release, label)
@@ -101,7 +155,7 @@ export class BinnacleService extends Service implements Binnacle {
       redraw: () => {
         if (!held) return
         changed?.()
-        this.redraw()
+        this.drawn.redraw()
       },
       dispose: () => {
         void dispose()

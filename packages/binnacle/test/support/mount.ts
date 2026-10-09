@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { internals as cmdline, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import * as core from '../../src/index.ts'
+import type { TerminalColorMode } from '../../src/terminal/colors.ts'
 import { XtermTerminal } from './terminal.ts'
 
 export class FakeProcess {
@@ -22,7 +23,9 @@ export class FakeProcess {
   }
 }
 
-export async function mount(options: { args?: string[]; columns?: number; rows?: number; provide?: (ctx: Context) => void } = {}) {
+export async function mount(
+  options: { args?: string[]; columns?: number; rows?: number; colorMode?: TerminalColorMode; provide?: (ctx: Context) => void } = {},
+) {
   const terminal = new XtermTerminal(options.columns ?? 40, options.rows ?? 8)
   const exits: number[] = []
   const out: string[] = []
@@ -36,6 +39,7 @@ export async function mount(options: { args?: string[]; columns?: number; rows?:
   core.internals.streams = { stdout, stderr }
   core.internals.terminal = () => terminal
   core.internals.process = process
+  core.internals.colorMode = () => options.colorMode ?? 'truecolor'
   const clock = { now: 0 }
   core.internals.now = () => clock.now
   const ctx = new Context()

@@ -17,6 +17,7 @@ One canonical term for each concept that is binnacle's own, for a person who use
 ## The Kit
 
 - **Model** — an author's state, made with `createModel`, which tells its watchers after each change. A Part that lists its Models is drawn again after each change. Not dsh's model, the LLM that runs the agent. <a id="model"></a>
+- **Tone** — a colour of the theme, named by what is drawn in it, as pi and v0 name it: `accent`, `muted`, `border` and the rest. A Tone is a colour and attributes, and a theme layer changes it for everything drawn in it. Not a colour itself, such as `cyan`. <a id="tone"></a>
 
 ## The transcript
 

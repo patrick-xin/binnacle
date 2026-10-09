@@ -3,11 +3,12 @@ import { Display } from './display.ts'
 import type { Size } from './host.ts'
 import { arrange } from './layout.ts'
 import type { Placed } from './layout.ts'
+import type { Theme } from './theme.ts'
 import { Scroll } from './scroll.ts'
 import { Rows } from './view.ts'
 
 /** The service, read through this: the service draws through Drawing, so neither is whole when the other is made. */
-export interface OnView {
+export interface OnView extends Theme {
   readonly screenOnView: Screen
   readonly layoutOnView: Layout
   /** The Place a person moved the Focus to on the Screen on view; `null` once the core forgot it; `undefined` if no one has. */
@@ -42,15 +43,21 @@ export class Drawing {
     const view = this.#onView()
     this.#scroll.startDraw()
     const measure = (focus: string | undefined) =>
-      arrange(view.layoutOnView, size.columns, size.rows, {
-        rows: (place, width) => {
-          const rows = this.#rows.of(view.partIn(place), width)
-          this.#scroll.anchor(place, width, rows.length)
-          return rows
+      arrange(
+        view.layoutOnView,
+        size.columns,
+        size.rows,
+        {
+          rows: (place, width) => {
+            const rows = this.#rows.of(view.partIn(place), width)
+            this.#scroll.anchor(place, width, rows.length)
+            return rows
+          },
+          scrolledUp: (place) => this.#scroll.up(place),
+          cursor: (place, width) => (place === focus ? this.#rows.cursorOf(view.partIn(place), width) : undefined),
         },
-        scrolledUp: (place) => this.#scroll.up(place),
-        cursor: (place, width) => (place === focus ? this.#rows.cursorOf(view.partIn(place), width) : undefined),
-      })
+        view,
+      )
     // Which Places take keys is known only once they are laid out, and telling a Part the Focus can move the layout
     // and so the Places that take keys: the Screen is measured and the Focus settled again until it stops moving.
     let focus: string | undefined
@@ -75,6 +82,10 @@ export class Drawing {
   /** A Part whose lines changed is wrapped again at its next draw. */
   forget(part: Part): void {
     this.#rows.forget(part)
+  }
+
+  forgetAll(): void {
+    this.#rows.forgetAll()
   }
 
   /** The Part with the Focus, while its Place is drawn. */

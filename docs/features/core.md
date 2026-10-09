@@ -25,14 +25,16 @@ The author API is `binnacle:packages/binnacle/src/api.ts#Binnacle`, exported fro
 
 - **A feature is a Cordis plugin on the `binnacle` service** ([ADR 1](../adr/0001-a-feature-is-a-cordis-plugin-on-the-binnacle-service.md)). The core is one row, and each feature is a row of its own, which a person turns off in their profile's patch.
 - **A Screen is a layout tree of named Places** ([ADR 2](../adr/0002-a-screen-is-a-layout-tree-of-named-places.md)). The Chat's tree is `binnacle:packages/binnacle/src/core/chat.ts#CHAT`: the transcript fills, then the status line and the composer take what their lines need. `binnacle:packages/binnacle/src/core/layout.ts#arrange` lays it out; a terminal too small gives up padding, gaps and borders before it cuts rows.
-- **Edges** are a named table: `binnacle:packages/binnacle/src/core/theme.ts#edges`. There is no theme of colours yet.
+- **Edges** are a named table: `binnacle:packages/binnacle/src/core/theme.ts#edges`. A box's borders are drawn in the theme's `border` Tone, and its default edge, padding and gap are the theme's ([Kit](kit.md)).
+- **A row ends where its style does.** The display clears each row to its end, so the blanks at a row's end are not written while no style is open. The layout follows each style to where it is closed, as a border closes only what it opened.
+- **Each registration is held apart**: a Part placed, a Layout, a Screen shown, a named Model and a theme layer. When a plugin unloads, only its own registrations go, even when another plugin registered the same object, and the newest one left wins again.
 - **The alternate screen.** binnacle draws on it, and the layout keeps the composer at the bottom.
 - **Styled lines.** A Part's lines may carry colour and style. The core takes out every other control sequence. A plugin makes Untrusted Text plain with `binnacle:packages/binnacle/src/core/view.ts#toPlainText`, and a Part says where its cursor is.
 - **Wide content wraps**, as in pi.
 - **One owner of the terminal**, `binnacle:packages/binnacle/src/core/host.ts#Host`, so a crash, a suspend and an unload each give it back once. `binnacle:packages/binnacle/src/core/capture.ts#capture` holds back what other code writes while binnacle draws.
 - **The session.** `binnacle:packages/binnacle/src/core/session.ts#openChat` opens the Chat's session as dsh's headless bundle does: on `dsh-base`, with no preset, on the default model. A stored session is read once.
 - **Hot reload is off** in the bundle's patch, until the core stays up while its plugins reload.
-- **pi-tui** is copied, with credit, under `packages/binnacle/src/terminal/`: its input decoding, text width, terminal I/O, editor and input.
+- **pi-tui** is copied, with credit, under `packages/binnacle/src/terminal/`: its input decoding, text width, terminal I/O, editor and input, and how it draws an exact colour.
 
 ## Built by
 

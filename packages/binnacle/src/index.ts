@@ -12,7 +12,7 @@ import { openChat } from './core/session.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 
-export type { Binnacle, Box, ChatSession, Gestures, Handle, Layout, Model, Part, Point, Screen, Side, Size, Watchable } from './api.ts'
+export type * from './api.ts'
 export type { Process } from './core/host.ts'
 export { toPlainText } from './core/view.ts'
 export { createModel } from './core/model.ts'
@@ -43,7 +43,12 @@ export function apply(ctx: Context): void {
     (data) => host.write(data),
     () => service,
   )
-  const service = new BinnacleService(ctx, drawing.draw, (part) => drawing.forget(part))
+  const service = new BinnacleService(ctx, {
+    redraw: drawing.draw,
+    forget: (part) => drawing.forget(part),
+    forgetAll: () => drawing.forgetAll(),
+    colorMode: () => internals.colorMode(),
+  })
   const exit: AppExit = ctx.appExit!
   route(input, {
     answered: (sequence) => host.answered(sequence),

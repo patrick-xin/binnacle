@@ -32,6 +32,63 @@ export interface Model<S extends object> extends Watchable {
   set(change: (state: S) => void): void
 }
 
+/** A colour of the theme's, named by what is drawn in it, as pi's themes name it. */
+export type Tone = 'text' | 'accent' | 'muted' | 'dim' | 'success' | 'warning' | 'error' | 'border' | 'borderAccent' | 'borderMuted'
+
+export type Glyph = 'mark' | 'unmarked' | 'checked' | 'unchecked' | 'rule' | 'separator' | 'more'
+
+/** One of the terminal's sixteen colours, so the person's palette decides how it looks. */
+export type Sixteen =
+  | 'black'
+  | 'red'
+  | 'green'
+  | 'yellow'
+  | 'blue'
+  | 'magenta'
+  | 'cyan'
+  | 'white'
+  | 'bright-black'
+  | 'bright-red'
+  | 'bright-green'
+  | 'bright-yellow'
+  | 'bright-blue'
+  | 'bright-magenta'
+  | 'bright-cyan'
+  | 'bright-white'
+
+/** One of the sixteen by name; a 256-colour index; or an exact colour, as `#rrggbb`, `#rgb`, `okhsl(h s% l%)` or `oklch(l c h)`, drawn as the nearest of 256 where the terminal has no truecolor. */
+export type Colour = Sixteen | number | (string & {})
+
+/** How a Tone is drawn: a colour, the terminal's own when it has none, and attributes. */
+export interface Style {
+  readonly color?: Colour
+  readonly bold?: boolean
+  readonly dim?: boolean
+  readonly italic?: boolean
+  readonly underline?: boolean
+}
+
+/** What everything binnacle draws is drawn with, as the theme's layers make it. */
+export interface Tokens {
+  readonly colors: { readonly [tone in Tone]: Style }
+  readonly glyphs: { readonly [glyph in Glyph]: string }
+  /** The edge of a box that names none. */
+  readonly edge: string
+  /** The padding of a box that names none, in cells. */
+  readonly padding: number
+  /** The gap between the children of a node that names none, in cells. */
+  readonly gap: number
+}
+
+/** A layer of the theme: only the tokens it names change. A plain colour stands for `{ color }`. */
+export interface ThemeLayer {
+  readonly colors?: { readonly [tone in Tone]?: Colour | Style }
+  readonly glyphs?: { readonly [glyph in Glyph]?: string }
+  readonly edge?: string
+  readonly padding?: number
+  readonly gap?: number
+}
+
 /** A line of a Part's lines, and a column in cells. */
 export interface Point {
   readonly line: number
@@ -90,6 +147,12 @@ export interface Binnacle {
   layout(screen: string, layout: Layout): Handle
   /** Fills the Place by that name on every Screen; the newest Part wins. */
   place(name: string, part: Part): Handle
+  /** Adds a layer to the theme, and draws everything again. The newest layer wins for each token it names. It refuses a colour that is not one. */
+  theme(layer: ThemeLayer): Handle
+  /** The theme's tokens, as its layers make them now. */
+  readonly tokens: Tokens
+  /** The text in the Tone's style. A Part paints at each draw, so that its lines follow the theme. */
+  paint(tone: Tone, text: string): string
   /** Names a model, such as a component's, so that anyone can read and change it; the newest by a name wins. */
   model<S extends object>(name: string, model: Model<S>): Handle
   modelOf<S extends object>(name: string): Model<S> | undefined
