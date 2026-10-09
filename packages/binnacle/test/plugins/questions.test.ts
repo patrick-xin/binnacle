@@ -7,6 +7,7 @@ import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
 import * as approvals from '../../src/plugins/approvals/index.ts'
 import * as composer from '../../src/plugins/composer/index.ts'
+import * as requests from '../../src/plugins/requests/index.ts'
 import * as questions from '../../src/plugins/questions/index.ts'
 import { agents } from '../support/agents.ts'
 import { mount } from '../support/mount.ts'
@@ -24,6 +25,7 @@ async function chat(
   })
   mounted.ready()
   await mounted.ctx.plugin(composer)
+  const model = await mounted.ctx.plugin(requests)
   const plugin = await mounted.ctx.plugin(questions)
   const approvalPlugin = options.withApprovals === true ? await mounted.ctx.plugin(approvals) : undefined
   // The session opens after the core loads; let it settle.
@@ -36,7 +38,7 @@ async function chat(
     for (const key of keys) mounted.terminal.type(key)
     return rows()
   }
-  return { ...mounted, dsh, plugin, approvalPlugin, rows, typed }
+  return { ...mounted, dsh, model, plugin, approvalPlugin, rows, typed }
 }
 
 interface Ask {
@@ -523,6 +525,85 @@ test("when one plugin of the shared queue unloads, its Requests go and the other
   )
   await typed('n', 'o', '\r')
   assert.deepEqual(await question, { answers: [{ id: 'q1', selected: [], custom: 'no' }] })
+})
+
+const approve = (ctx: Context, dsh: ReturnType<typeof agents>, toolName: string): Promise<ApprovalOutcome> =>
+  ctx.waterfall(scopeTarget(dsh.agent, dsh.agent) as never, 'approval/request', { agent: dsh.agent, toolName } as never, () =>
+    Promise.resolve('allowed-once' as ApprovalOutcome),
+  ) as Promise<ApprovalOutcome>
+
+test('when the questions row unloads, each question that waits behind an approval is dismissed at once, and the approvals keep their order', async () => {
+  const { ctx, dsh, plugin, rows, typed } = await chat({ withApprovals: true })
+  const first = approve(ctx, dsh, 'bash')
+  const waiting = ask(ctx, dsh, { questions: [{ id: 'a', header: 'First', question: 'One?' }] }).catch((error: unknown) => error)
+  const second = approve(ctx, dsh, 'cargo')
+  const last = ask(ctx, dsh, { questions: [{ id: 'b', header: 'Second', question: 'Two?' }] }).catch((error: unknown) => error)
+  await plugin.dispose()
+  for (const settled of [await waiting, await last]) {
+    assert.ok(settled instanceof UserQuestionError && settled.code === 'ASK_CANCELLED')
+  }
+  assert.equal(ctx.binnacleRequests.standing, 2)
+  assert.equal(
+    (await rows()).some((row) => row.includes('bash needs approval')),
+    true,
+  )
+  await typed('\r')
+  assert.equal(await first, 'allowed-once')
+  assert.equal(
+    (await rows()).some((row) => row.includes('cargo needs approval')),
+    true,
+  )
+  assert.equal(await Promise.race([second, Promise.resolve('still pending')]), 'still pending')
+})
+
+test('when the approvals row unloads, each approval that waits behind a question fails closed at once, and the questions keep their order', async () => {
+  const { ctx, dsh, approvalPlugin, rows, typed } = await chat({ withApprovals: true })
+  const first = ask(ctx, dsh, { questions: [{ id: 'a', header: 'First', question: 'One?' }] })
+  const waiting = approve(ctx, dsh, 'bash')
+  const second = ask(ctx, dsh, { questions: [{ id: 'b', header: 'Second', question: 'Two?' }] })
+  await approvalPlugin!.dispose()
+  assert.equal(await waiting, 'unavailable')
+  assert.equal(ctx.binnacleRequests.standing, 2)
+  assert.equal(
+    (await rows()).some((row) => row.includes('── First ──')),
+    true,
+  )
+  await typed('1', '\r')
+  assert.deepEqual(await first, { answers: [{ id: 'a', selected: [], custom: '1' }] })
+  assert.equal(
+    (await rows()).some((row) => row.includes('── Second ──')),
+    true,
+  )
+  assert.equal(await Promise.race([second, Promise.resolve('still pending')]), 'still pending')
+})
+
+test('when the model row unloads under both old rows, the approval on view fails closed and the question behind it is dismissed', async () => {
+  const { ctx, dsh, model, rows } = await chat({ withApprovals: true })
+  const shown = approve(ctx, dsh, 'bash')
+  const waiting = ask(ctx, dsh, { questions: [{ id: 'a', header: 'First', question: 'One?' }] }).catch((error: unknown) => error)
+  const last = approve(ctx, dsh, 'cargo')
+  await model.dispose()
+  const dismissed = await waiting
+  assert.ok(dismissed instanceof UserQuestionError && dismissed.code === 'ASK_CANCELLED')
+  assert.deepEqual(await Promise.all([shown, last]), ['unavailable', 'unavailable'])
+  assert.deepEqual(await rows(), ['', '', '', '', '', '', '', RULE, ' ', RULE])
+})
+
+test('while the approvals row is off, an approval fails closed when it comes on view, and the question behind it is shown', async () => {
+  const { ctx, dsh, rows } = await chat()
+  const approval = ctx.waterfall(
+    scopeTarget(dsh.agent, dsh.agent) as never,
+    'approval/request',
+    { agent: dsh.agent, toolName: 'bash' } as never,
+    () => Promise.resolve('allowed-once' as ApprovalOutcome),
+  ) as Promise<ApprovalOutcome>
+  const question = ask(ctx, dsh, { questions: [{ id: 'q1', header: 'Second', question: 'Two?' }] })
+  assert.equal(await approval, 'unavailable')
+  assert.equal(
+    (await rows()).some((row) => row.includes('── Second ──')),
+    true,
+  )
+  assert.equal(await Promise.race([question, Promise.resolve('still pending')]), 'still pending')
 })
 
 test('when the plugin unloads, each Request that still stands is dismissed with ASK_CANCELLED', async () => {

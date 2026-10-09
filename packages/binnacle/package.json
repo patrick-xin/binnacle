@@ -24,6 +24,10 @@
       "types": "./dist/plugins/status-line/index.d.ts",
       "default": "./dist/plugins/status-line/index.js"
     },
+    "./plugins/requests": {
+      "types": "./dist/plugins/requests/index.d.ts",
+      "default": "./dist/plugins/requests/index.js"
+    },
     "./plugins/approvals": {
       "types": "./dist/plugins/approvals/index.d.ts",
       "default": "./dist/plugins/approvals/index.js"
