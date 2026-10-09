@@ -21,6 +21,8 @@ One canonical term for each concept that is binnacle's own, for a person who use
 - **Look** — how one piece of a component is drawn, such as a List's row, set by the component's kind, such as `list.row`, or by an instance's name, such as `request.choices.row`. A Look is handed the Look beneath it, and can draw that Look and add to it. An instance's Looks lie on its kind's, and those on the component's default. Not how the whole Screen looks, which is the theme. <a id="look"></a>
 - **List** — a component of the Kit: items that a person marks with up and down and picks with enter or a click. Made with `list`. <a id="list"></a>
 - **Title** — a component of the Kit: a rule across the width with its text in it. Made with `title`. Not a box's title, which a node of a Layout sets in its top edge. <a id="title"></a>
+- **Line** — a component of the Kit: one line that a person types in, which takes every key while it is shown. Enter submits its text and escape escapes. Made with `line`. Not a line of a Part's lines. <a id="line"></a>
+- **Tabs** — a component of the Kit: a row of labels, one current, that tab and shift+tab or a click move between. Made with `tabs`. Not the tab key itself. <a id="tabs"></a>
 
 ## The transcript
 

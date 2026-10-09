@@ -268,3 +268,56 @@ title(ctx.binnacle, { name: 'fruit.title', text: () => 'Fruit' })
 - `text()` gives the text, which the Title makes plain. While it gives `undefined`, the Title draws nothing. `''` draws the rule alone.
 - `models` are what the text is drawn from, so that the Title is drawn again when it changes.
 - The Look `title.row`, or `<name>.row`, draws it: `(text, { width }) => line`. Its default draws the `rule` glyph and the text in `accent`.
+
+### Line
+
+One line that a person types in: `› what they typed`.
+
+```js
+import { createModel, line } from 'binnacle'
+
+const asking = createModel({ shown: true, question: 0 })
+const answer = line(ctx.binnacle, {
+  name: 'answer',
+  shown: () => asking.state.shown,
+  key: () => asking.state.question,
+  submit: (text) => send(text),
+  escape: () => asking.set((state) => (state.shown = false)),
+  models: [asking],
+})
+```
+
+- `shown()` says whether the Line is drawn. While it is, the Line takes every key while its Place has the Focus. Move the Focus to it with `answer.handle.focus()`.
+- `submit(text)` runs on enter, and `escape()` on escape. Neither clears the text.
+- `key()`, if you give it, says which text the Line holds: each value keeps its own, as each question of a form keeps its answer.
+- `models` are what `shown()` and `key()` read, so that the Line is drawn again when they change.
+- `answer.model` is the Line's Model, also named `name`: `{ texts }`, a `Map` from each value of `key()` to its text. It is what the Line holds. Set the shown key's text to change the Line, with the cursor at its end, and delete it to clear the Line: `answer.model.set((state) => state.texts.delete(key))`. The text stays after a submit, an escape, or while the Line is hidden, until you clear it.
+- The Look `line.row`, or `<name>.row`, draws it: `(typed, { width }) => line`, where `typed(width)` is the text with its cursor, drawn in that many cells and scrolled to show the cursor. Its default draws the `mark` glyph in `accent`, then the text. A Look that adds to the line gives `typed` the cells that are left, and the cursor follows where the text is drawn.
+
+### Tabs
+
+Labels in a row, one of them current, that a person moves between: `› Fruit |   Trees`.
+
+```js
+import { createModel, tabs } from 'binnacle'
+
+const pages = createModel({ current: 0 })
+tabs(ctx.binnacle, {
+  name: 'pages',
+  labels: () => ['Fruit', 'Trees'],
+  current: () => pages.state.current,
+  go: (index) => pages.set((state) => (state.current = index)),
+  keysIn: ['answer'],
+  models: [pages],
+})
+```
+
+- `labels()` gives the labels, which the Tabs make plain. The Tabs draw while there is more than one.
+- `current()` gives the index of the current tab. An index past the last draws the last as current.
+- `go(index)` runs when the person goes to a tab: a click on it, or tab and shift+tab. `index` is always within the labels.
+- Tab goes to the next tab, and shift+tab to the one before. Tab on the last goes to the first, and shift+tab on the first to the last. They move from the tab drawn as current.
+- `keysIn` names the Places where tab and shift+tab move between the tabs, even while a Line there takes every key. With none, the Tabs' own Place. A click on the Tabs moves no Focus.
+- When the tabs are wider than the row, the current one is drawn, then its neighbours while they fit, and the `more` glyph marks each end where the row is cut. A current tab wider than the row is cut with `more`. A click on a `more` or a separator does nothing.
+- `models` are what the labels and the current tab are drawn from, so that the Tabs are drawn again when they change.
+- The actions are `<name>.next` and `<name>.previous`, of the kinds `tabs.next` and `tabs.previous`, marked `first`.
+- The Look `tabs.tab`, or `<name>.tab`, draws one tab: `(label, { current, index }) => text`. Its default draws the `mark` glyph and the label in `accent` for the current tab, and the `unmarked` glyph and the label for the others. The `separator` glyph goes between the tabs.
