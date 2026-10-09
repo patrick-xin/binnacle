@@ -1,6 +1,6 @@
 # Kit
 
-Row `binnacle`, part of the core · Code `binnacle:packages/binnacle/src/core/model.ts#createModel`, `binnacle:packages/binnacle/src/core/theme.ts#layered` · Intent: [authoring](../../intents/authoring/intent.md)
+Row `binnacle`, part of the core · Code `binnacle:packages/binnacle/src/core/model.ts#createModel`, `binnacle:packages/binnacle/src/core/theme.ts#layered`, `binnacle:packages/binnacle/src/core/looks.ts#drawer` · Intent: [authoring](../../intents/authoring/intent.md)
 
 The Kit is what an author builds a feature from, as binnacle's built-ins do. It is not a row that a person turns off. How to use it is in the package's [`AUTHORING.md`](../../packages/binnacle/AUTHORING.md).
 
@@ -16,6 +16,8 @@ The Kit is what an author builds a feature from, as binnacle's built-ins do. It 
 - Name a Model with `binnacle.model(name, model)`, and find it with `binnacle.modelOf(name)`. The newest by a name wins, and it goes when the plugin that named it unloads.
 - Add a theme layer with `binnacle.theme(layer)`: its `colors`, `glyphs`, `edge`, `padding` and `gap`. Each token that it names changes for everything drawn with it, and the others stay as they were. The newest layer wins for each token, and a layer goes when the plugin that added it unloads.
 - Read the tokens with `binnacle.tokens`, and draw text in a Tone with `binnacle.paint(tone, text)`.
+- Set a Look with `binnacle.look(name, (beneath) => look)`: by a component's kind, such as `list.row`, for every instance of that kind, or by an instance's name, such as `request.choices.row`, for that instance alone. The Look is handed the Look beneath it, so it can draw that Look and add to it. A Look goes when the plugin that set it unloads, and everything is drawn again.
+- Draw a piece of a component with `binnacle.lookOf(names, fallback)`: the newest Look by the first name, with the chain beneath it, down to `fallback`, the component's default.
 
 The Tones, what draws with each, and their defaults, which are v0's:
 
@@ -32,9 +34,9 @@ The Tones, what draws with each, and their defaults, which are v0's:
 | `borderAccent` | the frame of what waits on the person, such as a Request | cyan |
 | `borderMuted` | a border that stands further back | dim |
 
-The glyphs are `mark` `›`, `unmarked` a space, `checked` `[x]`, `unchecked` `[ ]`, `rule` `─`, `separator` ` | ` and `more` `…`. The edge is `rounded`, and the padding and the gap are 0. Only the borders draw with the theme now. The List, the Title and a Request's frame draw with their Tones and glyphs when they are built.
+The glyphs are `mark` `›`, `unmarked` a space, `checked` `[x]`, `unchecked` `[ ]`, `rule` `─`, `separator` ` | ` and `more` `…`. The edge is `rounded`, and the padding and the gap are 0. Only the borders draw with the theme now. The List, the Title and a Request's frame draw with their Tones and glyphs, and with their Looks, when they are built.
 
-The types are `binnacle:packages/binnacle/src/api.ts#Model`, `binnacle:packages/binnacle/src/api.ts#Watchable`, `binnacle:packages/binnacle/src/api.ts#ThemeLayer`, `binnacle:packages/binnacle/src/api.ts#Tokens`, `binnacle:packages/binnacle/src/api.ts#Tone`, `binnacle:packages/binnacle/src/api.ts#Style` and `binnacle:packages/binnacle/src/api.ts#Colour`.
+The types are `binnacle:packages/binnacle/src/api.ts#Model`, `binnacle:packages/binnacle/src/api.ts#Watchable`, `binnacle:packages/binnacle/src/api.ts#ThemeLayer`, `binnacle:packages/binnacle/src/api.ts#Tokens`, `binnacle:packages/binnacle/src/api.ts#Tone`, `binnacle:packages/binnacle/src/api.ts#Style`, `binnacle:packages/binnacle/src/api.ts#Colour` and `binnacle:packages/binnacle/src/api.ts#Look`.
 
 ## How it is built
 
@@ -45,7 +47,11 @@ The types are `binnacle:packages/binnacle/src/api.ts#Model`, `binnacle:packages/
 - **A colour token is a Style**: a colour and the attributes `bold`, `dim`, `italic` and `underline`. A colour is one of the sixteen by name, a 256-colour index, or an exact colour, as `#rrggbb`, `okhsl(…)` or `oklch(…)`. A plain colour stands for `{ color }`. `binnacle.theme` refuses a layer with a colour that is not one, and names its Tone.
 - **An exact colour is drawn as the nearest of 256** when the terminal does not say in `COLORTERM` that it has truecolor. The colour code is copied from pi-tui.
 - **Each attribute is closed by the code that ends it alone**, so a Tone painted inside another leaves the other standing.
+- **A Look is held as a Part is**, in a list by its name, so it goes with its plugin. When a Look comes or goes, every Part is wrapped again, as its lines can draw with it.
+- **The chain of a piece is read at each draw**: the Looks by the instance's name, newest first, then the Looks by the kind's name, newest first, then the component's default. A name given twice, as by an instance named like its kind, is read once. `lookOf` calls each `make` as it draws down the chain.
+- **The Look beneath is found when it draws, never captured.** Each `beneath` finds its own Look in the chain as it stands, and draws the next one. A `beneath` kept from an earlier draw so follows a Look that unloads, or one that loads beneath later. A `beneath` whose own Look has gone draws the default.
+- **A Look set twice by one function has two places in its chain**, as each is held apart, and each goes with its own plugin.
 
 ## Built by
 
-Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme.
+Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme · Ticket [#188](https://github.com/patrick-xin/binnacle/issues/188): Looks, by instance and by kind.
