@@ -19,6 +19,7 @@ The Kit is what an author builds a feature from, as binnacle's built-ins do. It 
 - Set a Look with `binnacle.look(name, (beneath) => look)`: by a component's kind, such as `list.row`, for every instance of that kind, or by an instance's name, such as `request.choices.row`, for that instance alone. The Look is handed the Look beneath it, so it can draw that Look and add to it. A Look goes when the plugin that set it unloads, and everything is drawn again.
 - Draw a piece of a component with `binnacle.lookOf(names, fallback)`: the newest Look by the first name, with the chain beneath it, down to `fallback`, the component's default. An author's Looks are above a built-in's.
 - Give a component actions that an author binds by kind, such as `list.toggle`, and changes on the action beneath: `binnacle.action`, `binnacle.bind`, `binnacle.keysOf` and `binnacle.run`. The [Gestures](gestures.md) doc says how a gesture reaches them.
+- Lay out a feature's Places in a Layout of its own name, and build on the Chat's Layout, `CHAT_LAYOUT`, with the nodes that the [Core](core.md) draws: `{ layout: name }`, `first`, a float, `unless` and `mouse: false`.
 
 The Tones, what draws with each, and their defaults, which are v0's:
 
@@ -55,4 +56,4 @@ The types are `binnacle:packages/binnacle/src/api.ts#Model`, `binnacle:packages/
 
 ## Built by
 
-Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme · Ticket [#188](https://github.com/patrick-xin/binnacle/issues/188): Looks, by instance and by kind · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bound by kind, run by id, and the action beneath · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): an author's Models, layers and Looks rank above a built-in's.
+Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#186](https://github.com/patrick-xin/binnacle/issues/186): Models, and Parts that redraw with them · Ticket [#187](https://github.com/patrick-xin/binnacle/issues/187): the theme · Ticket [#188](https://github.com/patrick-xin/binnacle/issues/188): Looks, by instance and by kind · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bound by kind, run by id, and the action beneath · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): an author's Models, layers and Looks rank above a built-in's. · Ticket [#191](https://github.com/patrick-xin/binnacle/issues/191): Layout nodes, and `CHAT_LAYOUT`.

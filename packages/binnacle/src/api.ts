@@ -114,13 +114,42 @@ export interface Box {
 }
 
 interface Node extends Box {
+  /** In a Screen's own Layout, a node with no size fills; in a Layout set by name, it takes what its lines need. */
   readonly size?: Size
+  /** It draws nothing, and takes no cells, while the Layout or the Place by this name has a line to draw. */
+  readonly unless?: string
+  /** `false`: a click or the wheel inside it does nothing, and a click there moves no Focus. */
+  readonly mouse?: boolean
+}
+
+interface Kinds {
+  readonly place?: never
+  readonly row?: never
+  readonly column?: never
+  readonly layout?: never
+  readonly first?: never
+  readonly over?: never
+  readonly float?: never
+  readonly at?: never
 }
 
 export type Layout =
-  | (Node & { readonly place: string; readonly row?: never; readonly column?: never })
-  | (Node & { readonly row: readonly Layout[]; readonly place?: never; readonly column?: never })
-  | (Node & { readonly column: readonly Layout[]; readonly place?: never; readonly row?: never })
+  | (Node & Omit<Kinds, 'place'> & { readonly place: string })
+  | (Node & Omit<Kinds, 'row'> & { readonly row: readonly Layout[] })
+  | (Node & Omit<Kinds, 'column'> & { readonly column: readonly Layout[] })
+  /** The Layout set by that name with `binnacle.layout(name, …)`. While it has no line to draw, it takes no cells, its box included. */
+  | (Node & Omit<Kinds, 'layout'> & { readonly layout: string })
+  /** Only its first child that has a line to draw. While none has, it takes no cells, its box included. */
+  | (Node & Omit<Kinds, 'first'> & { readonly first: readonly Layout[] })
+  /** `over` fills the node, and `float` is drawn on top of it while `float` has a line to draw. A click lands on the float before what it covers. */
+  | (Node & Omit<Kinds, 'over' | 'float' | 'at'> & { readonly over: Layout; readonly float: Layout; readonly at?: Anchor })
+
+/** Where a float is drawn over what it covers: at its top, its bottom or its centre, and centred across. Its height is what its lines need. */
+export interface Anchor {
+  readonly side?: 'top' | 'center' | 'bottom'
+  /** In cells, its box included. With none, the float is 4 cells narrower than what it covers, and at most 80. */
+  readonly width?: number
+}
 
 export interface Screen {
   /** The name a plugin replaces the Screen's layout by. */
@@ -184,8 +213,8 @@ export interface Binnacle {
   run(id: string, at?: Point): void
   /** Only the newest Screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle
-  /** Replaces the layout of the Screen by that name; the newest layout wins. */
-  layout(screen: string, layout: Layout): Handle
+  /** Sets the Layout by that name: a Screen's, which replaces the Screen's own, or one that a `{ layout: name }` node draws. The newest wins. */
+  layout(name: string, layout: Layout): Handle
   /** Fills the Place by that name on every Screen; the newest Part wins. */
   place(name: string, part: Part): PlacedHandle
   /**

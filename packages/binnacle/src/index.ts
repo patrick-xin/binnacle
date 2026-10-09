@@ -16,6 +16,7 @@ export type * from './api.ts'
 export type { Process } from './core/host.ts'
 export { toPlainText } from './core/view.ts'
 export { createModel } from './core/model.ts'
+export { CHAT_LAYOUT } from './core/chat.ts'
 export { internals } from './core/internals.ts'
 
 export const name = 'binnacle'

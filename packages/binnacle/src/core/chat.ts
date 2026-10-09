@@ -1,13 +1,17 @@
-import type { Screen } from '../api.ts'
+import type { Layout, Screen } from '../api.ts'
 
-export const CHAT: Screen = {
-  name: 'chat',
-  focus: 'composer',
-  layout: {
-    column: [
-      { place: 'transcript', size: 'fill' },
-      { place: 'status', size: 'content' },
-      { place: 'composer', size: 'content' },
-    ],
-  },
+const deepFrozen = <T extends object>(value: T): T => {
+  for (const inner of Object.values(value)) if (typeof inner === 'object' && inner !== null) deepFrozen(inner)
+  return Object.freeze(value)
 }
+
+/** Frozen, as an author builds on it: a change to it in place would change the Chat under every plugin. */
+export const CHAT_LAYOUT: Layout & { readonly column: readonly Layout[] } = deepFrozen({
+  column: [
+    { place: 'transcript', size: 'fill' },
+    { place: 'status', size: 'content' },
+    { place: 'composer', size: 'content' },
+  ],
+})
+
+export const CHAT: Screen = { name: 'chat', focus: 'composer', layout: CHAT_LAYOUT }

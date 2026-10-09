@@ -191,8 +191,12 @@ export class BinnacleService extends Service implements Binnacle {
     return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, (entry) => this.moved.delete(entry))
   }
 
-  layout(screen: string, layout: Layout): Handle {
-    return this.hold(listIn(this.layouts, screen), layout, 'binnacle: a layout')
+  layout(name: string, layout: Layout): Handle {
+    return this.hold(listIn(this.layouts, name), layout, 'binnacle: a layout')
+  }
+
+  layoutNamed(name: string): Layout | undefined {
+    return this.layouts.get(name)?.at(-1)?.item
   }
 
   place(name: string, part: Part): PlacedHandle {

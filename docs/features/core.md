@@ -14,18 +14,25 @@ The core is not a feature that a person turns off: it owns the terminal, and eve
 
 ## What an author can change
 
-- The Chat's layout: `binnacle.layout('chat', …)` replaces its tree of Places, so the composer can go on top or a Place can be added.
+- The Chat's layout: `binnacle.layout('chat', …)` replaces its tree of Places, so the composer can go on top or a Place can be added. The Chat's own Layout is exported as `CHAT_LAYOUT`, to build on.
+- A Layout set by a name of their own, with `binnacle.layout(name, …)`, which a `{ layout: name }` node draws.
+- The other nodes: `{ first: [...] }` draws its first child that has a line to draw, and `{ over, float, at }` draws a float on top of what it covers.
+- On any node: `unless: name` hides it while the Layout or the Place by that name has a line to draw, and `mouse: false` makes a click and the wheel inside it do nothing.
 - A Screen of their own: `binnacle.show(…)`.
 - What a Place draws: `binnacle.place(name, part)`; the newest Part wins.
 - Anything a built-in row registers: what an author registers ranks above it, whichever loads first.
 - A Place's box: padding, gap, borders, a title, and an edge style by name.
 
-The author API is `binnacle:packages/binnacle/src/api.ts#Binnacle`, exported from binnacle's entry with `toPlainText`.
+The author API is `binnacle:packages/binnacle/src/api.ts#Binnacle`, exported from binnacle's entry with `toPlainText` and `CHAT_LAYOUT`.
 
 ## How it is built
 
 - **A feature is a Cordis plugin on the `binnacle` service** ([ADR 1](../adr/0001-a-feature-is-a-cordis-plugin-on-the-binnacle-service.md)). The core is one row, and each feature is a row of its own, which a person turns off in their profile's patch.
-- **A Screen is a layout tree of named Places** ([ADR 2](../adr/0002-a-screen-is-a-layout-tree-of-named-places.md)). The Chat's tree is `binnacle:packages/binnacle/src/core/chat.ts#CHAT`: the transcript fills, then the status line and the composer take what their lines need. `binnacle:packages/binnacle/src/core/layout.ts#arrange` lays it out; a terminal too small gives up padding, gaps and borders before it cuts rows.
+- **A Screen is a layout tree of named Places** ([ADR 2](../adr/0002-a-screen-is-a-layout-tree-of-named-places.md)). The Chat's tree is `binnacle:packages/binnacle/src/core/chat.ts#CHAT_LAYOUT`, frozen, as an author builds on it: the transcript fills, then the status line and the composer take what their lines need. `binnacle:packages/binnacle/src/core/layout.ts#arrange` lays it out; a terminal too small gives up padding, gaps and borders before it cuts rows.
+- **A Layout's tree is grown before each draw** (`binnacle:packages/binnacle/src/core/tree.ts#grow`). Each `{ layout: name }` node holds the newest Layout set by that name, and each node knows its size. A node with no size fills in a Screen's own Layout, and takes what its lines need in a Layout set by name. A Layout that draws itself, at any depth, draws nothing the second time.
+- **A node can take no cells, its box included**: a named Layout or a `first` with no line to draw, and a node hidden by `unless`. Its parent lays out its other children as if it were not there, so no gap is kept for it. A node has a line to draw while a Place in it does. An `unless` that names a Layout it is in finds no lines there, so it always ends.
+- **Only a float draws over what it covers** ([ADR 3](../adr/0003-only-a-float-draws-over-what-it-covers.md)). The float is centred across, at the top, the bottom or the centre, and 4 cells narrower than what it covers, at most 80, unless `at.width` says. The layout keeps the cells that a click and the wheel land on, the topmost first: a float's Places, then its whole box, which hits nothing, then what it covers. So a click on a float's border reaches nothing beneath it, and a float inside a float stays on top. A cursor that it covers is not drawn. A float with a line to draw gives its node a line to draw, and its height and width when the node takes what its lines need: the float's width, with its margin, or `at.width`.
+- **`mouse: false` holds for each Place inside the node.** A click or the wheel on such a Place does nothing, and moves no Focus. It does not go to what is beneath.
 - **Edges** are a named table: `binnacle:packages/binnacle/src/core/theme.ts#edges`. A box's borders are drawn in the theme's `border` Tone, and its default edge, padding and gap are the theme's ([Kit](kit.md)).
 - **A row ends where its style does.** The display clears each row to its end, so the blanks at a row's end are not written while no style is open. The layout follows each style to where it is closed, as a border closes only what it opened.
 - **Each registration is held apart**: a Part placed, a Layout, a Screen shown, a named Model and a theme layer. When a plugin unloads, only its own registrations go, even when another plugin registered the same object, and the newest one left wins again.
@@ -41,4 +48,4 @@ The author API is `binnacle:packages/binnacle/src/api.ts#Binnacle`, exported fro
 
 ## Built by
 
-Stage 1, Stage 2 (before Specs). Spec [#156](https://github.com/patrick-xin/binnacle/issues/156) · PR [#167](https://github.com/patrick-xin/binnacle/pull/167): clicks reach the Part under the pointer. Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): a built-in's registration ranks beneath an author's.
+Stage 1, Stage 2 (before Specs). Spec [#156](https://github.com/patrick-xin/binnacle/issues/156) · PR [#167](https://github.com/patrick-xin/binnacle/pull/167): clicks reach the Part under the pointer. Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): a built-in's registration ranks beneath an author's. Ticket [#191](https://github.com/patrick-xin/binnacle/issues/191): named Layouts, `first`, floats, `unless`, `mouse: false` and sizes in named Layouts, and `CHAT_LAYOUT`.

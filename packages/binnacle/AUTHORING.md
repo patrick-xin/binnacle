@@ -152,6 +152,64 @@ ctx.binnacle.action('requests.send', {
 - An action with no `keys`, or no `kind`, keeps those of the action it hides.
 - `beneath()` is found each time it runs: the newest enabled action by that id beneath this one, wherever the Focus is, or nothing. When the plugin of an action between them unloads, the next `beneath()` uses the actions as they stand.
 
+## Layouts
+
+A Layout is a tree. Its leaves are Places, which Parts fill, by name.
+
+| Node | Draws |
+|---|---|
+| `{ place: 'status' }` | the Part placed in that Place |
+| `{ row: [...] }`, `{ column: [...] }` | its children side by side, or one above the other |
+| `{ layout: 'request' }` | the Layout set by that name |
+| `{ first: [...] }` | only its first child that has a line to draw |
+| `{ over, float, at }` | `over`, with `float` on top of it while `float` has a line to draw |
+
+Every node can also take:
+
+- `size`: `'fill'`, a share of what is left; `'content'`, the cells its lines need; or `{ fixed: n }`, in cells, its box included. A node with no size fills in a Screen's own Layout, and takes what its lines need in a Layout set by name.
+- `unless: name`: it draws nothing, and takes no cells, while the Layout or the Place by that name has a line to draw.
+- `mouse: false`: a click or the wheel inside it does nothing, and a click there moves no Focus.
+- A box: `padding` and `gap` in cells, a `border` on every side (`true`) or on the sides it names, the `edge` its border is drawn with, and a `title` set in its top edge.
+
+A `{ layout: name }` node or a `first` that has no line to draw takes no cells, its box included. A node has a line to draw while a Place in it does.
+
+A float is the only node that draws over what it covers. A click and the wheel land on it first. `at.side` is `'top'`, `'center'` or `'bottom'`, and `at.width` is its width in cells. With no `at`, it is centred, and 4 cells narrower than what it covers, at most 80. Its height is what its lines need.
+
+`binnacle.layout(name, layout)` sets the Layout by that name, and the newest wins. A Screen's Layout has the Screen's name, so `binnacle.layout('chat', …)` replaces the Chat's. The Chat's own Layout is exported as `CHAT_LAYOUT`:
+
+```js
+{
+  column: [
+    { place: 'transcript', size: 'fill' },
+    { place: 'status', size: 'content' },
+    { place: 'composer', size: 'content' },
+  ],
+}
+```
+
+Build on it to move one node, such as the composer to the top:
+
+```js
+import { CHAT_LAYOUT } from 'binnacle'
+
+const composer = CHAT_LAYOUT.column.filter((node) => node.place === 'composer')
+const others = CHAT_LAYOUT.column.filter((node) => node.place !== 'composer')
+ctx.binnacle.layout('chat', { ...CHAT_LAYOUT, column: [...composer, ...others] })
+```
+
+Or float a Layout of your own over the Chat, and hide the status line while it shows:
+
+```js
+ctx.binnacle.layout('chat', {
+  over: { column: CHAT_LAYOUT.column.map((node) => (node.place === 'status' ? { ...node, unless: 'menu' } : node)) },
+  float: { layout: 'menu', border: true },
+  at: { side: 'bottom', width: 40 },
+})
+ctx.binnacle.layout('menu', { column: [{ place: 'menu.title' }, { place: 'menu.items' }] })
+```
+
+`CHAT_LAYOUT` is frozen: make a new node, as above, rather than change one in place.
+
 ## The Focus and the scroll
 
 ```js

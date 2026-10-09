@@ -1,8 +1,12 @@
-import type { Layout, Side, Size } from '../api.ts'
-import { sliceByColumn, truncateToWidth, visibleWidth } from '../terminal/utils.ts'
+import type { Layout } from '../api.ts'
+import { sliceByColumn, sliceWithWidth, truncateToWidth, visibleWidth } from '../terminal/utils.ts'
+import { bordersOf, edgeRow, gapOf, insetsOf, paddingOf } from './box.ts'
+import type { Spare } from './box.ts'
+import { withoutBlankEnd } from './row-end.ts'
+import { coverWidthOf, floatAt, floatWidthOf, grow } from './tree.ts'
+import type { Tree } from './tree.ts'
 import { edgeNamed } from './theme.ts'
-import type { Edge, Theme } from './theme.ts'
-import { toPlainText } from './view.ts'
+import type { Theme } from './theme.ts'
 
 export interface Places {
   rows(place: string, width: number): readonly string[]
@@ -11,6 +15,8 @@ export interface Places {
   cursor(place: string, width: number): Position | undefined
   /** An author paged the Place, and its cursor has not moved since: the Place shows the paged rows, not the cursor's. */
   paged(place: string, width: number): boolean
+  /** The newest Layout set by that name. */
+  layout(name: string): Layout | undefined
 }
 
 export interface Position {
@@ -31,97 +37,44 @@ export interface Placed {
   readonly shownFrom: number
 }
 
+/** Cells that a click or the wheel lands on: a Place drawn, or none, where the mouse does nothing or a float's box covers. */
+export interface Hit {
+  readonly top: number
+  readonly left: number
+  readonly width: number
+  readonly height: number
+  readonly placed: Placed | undefined
+}
+
 export interface Arranged {
   readonly rows: string[]
+  /** In the order of the layout. */
   readonly placed: Placed[]
+  /** The topmost first: what floats comes before what it covers. */
+  readonly hits: Hit[]
   /** On the terminal, where the cursor of the Part with the Focus is drawn. */
   readonly cursor: Position | undefined
 }
 
-type Insets = { readonly [side in Side]: number }
-
-/** What a terminal too small for the layout gives up, in order, before it cuts rows. */
-type Spare = 'nothing' | 'spacing' | 'borders'
 const SPARES: readonly Spare[] = ['nothing', 'spacing', 'borders']
-const NONE: Insets = { top: 0, right: 0, bottom: 0, left: 0 }
-const SIDES: readonly Side[] = ['top', 'right', 'bottom', 'left']
 
 const RESET_STYLE = '\x1b[0m'
 const blank = (width: number): string => ' '.repeat(Math.max(0, width))
 const fit = (row: string, width: number): string => truncateToWidth(row, width, '', true)
-// An author's numbers are not checked by a type: a size, a padding or a gap is whole cells, and never fewer than none.
-const cells = (n: number): number => (Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0)
-
-function sizeOf(node: Layout): Size {
-  const size = node.size ?? 'fill'
-  return typeof size === 'object' ? { fixed: cells(size.fixed) } : size
-}
-
-function childrenOf(node: Layout): readonly Layout[] {
-  if ('row' in node) return node.row
-  if ('column' in node) return node.column
-  return []
-}
-
-function bordersOf(node: Layout, spare: Spare): Insets {
-  if (spare === 'borders') return NONE
-  const sides = node.border === true ? SIDES : node.border === false || node.border === undefined ? [] : node.border
-  return { top: +sides.includes('top'), right: +sides.includes('right'), bottom: +sides.includes('bottom'), left: +sides.includes('left') }
-}
-
-function paddingOf(node: Layout, spare: Spare, theme: Theme): Insets {
-  if (spare !== 'nothing') return NONE
-  const padding = node.padding ?? theme.tokens.padding
-  if (typeof padding === 'number') {
-    const all = cells(padding)
-    return { top: all, right: all, bottom: all, left: all }
-  }
-  return {
-    top: cells(padding.top ?? 0),
-    right: cells(padding.right ?? 0),
-    bottom: cells(padding.bottom ?? 0),
-    left: cells(padding.left ?? 0),
-  }
-}
-
-function insetsOf(node: Layout, spare: Spare, theme: Theme): Insets {
-  const borders = bordersOf(node, spare)
-  const padding = paddingOf(node, spare, theme)
-  return {
-    top: borders.top + padding.top,
-    right: borders.right + padding.right,
-    bottom: borders.bottom + padding.bottom,
-    left: borders.left + padding.left,
-  }
-}
-
-function edgeRow(edge: Edge, borders: Insets, width: number, at: 'top' | 'bottom', paint: (glyphs: string) => string, title = ''): string {
-  const [start, line, end] = at === 'top' ? [edge.topLeft, edge.top, edge.topRight] : [edge.bottomLeft, edge.bottom, edge.bottomRight]
-  const left = borders.left === 1 ? start : ''
-  const right = borders.right === 1 ? end : ''
-  const between = width - visibleWidth(left) - visibleWidth(right)
-  const shownTitle = sliceByColumn(toPlainText(title), 0, Math.max(0, between - 3), true).trimEnd()
-  const middle = shownTitle === '' ? '' : `${line} ${shownTitle} `
-  const rest = line.repeat(Math.max(0, between - visibleWidth(middle)))
-  return shownTitle === '' ? paint(left + rest + right) : `${paint(left + line)} ${shownTitle} ${paint(rest + right)}`
-}
-
-function gapOf(node: Layout, spare: Spare, theme: Theme): number {
-  return spare === 'nothing' ? cells(node.gap ?? theme.tokens.gap) : 0
-}
-
-function gapsOf(node: Layout, spare: Spare, theme: Theme): number {
-  return Math.max(0, childrenOf(node).length - 1) * gapOf(node, spare, theme)
-}
 
 class Arrangement {
   readonly placed: Placed[] = []
+  hits: Hit[] = []
   overflowed = false
   cursor: Position | undefined
   readonly #shownFrom = new Map<string, number>()
   readonly #places: Places
   readonly #spare: Spare
   readonly #theme: Theme
+  readonly #named = new Map<string, Tree | undefined>()
+  // The names whose lines are being asked for: an `unless` that names a Layout it is in has no lines there.
+  readonly #asking = new Set<string>()
+  #mouse = true
 
   constructor(places: Places, spare: Spare, theme: Theme) {
     this.#places = places
@@ -129,35 +82,52 @@ class Arrangement {
     this.#theme = theme
   }
 
-  height(node: Layout, width: number): number {
-    const insets = insetsOf(node, this.#spare, this.#theme)
-    return insets.top + insets.bottom + this.#innerHeight(node, width - insets.left - insets.right)
+  height(tree: Tree, width: number): number {
+    if (this.#vanishes(tree, width)) return 0
+    const insets = insetsOf(tree.node, this.#spare, this.#theme)
+    return insets.top + insets.bottom + this.#innerHeight(tree, width - insets.left - insets.right)
   }
 
-  width(node: Layout, available: number): number {
-    const insets = insetsOf(node, this.#spare, this.#theme)
-    return insets.left + insets.right + this.#innerWidth(node, available - insets.left - insets.right)
+  width(tree: Tree, available: number): number {
+    if (this.#vanishes(tree, available)) return 0
+    const insets = insetsOf(tree.node, this.#spare, this.#theme)
+    return insets.left + insets.right + this.#innerWidth(tree, available - insets.left - insets.right)
   }
 
-  draw(node: Layout, top: number, left: number, width: number, height: number): string[] {
+  draw(tree: Tree, top: number, left: number, width: number, height: number): string[] {
+    if (this.#vanishes(tree, width)) return Array.from({ length: height }, () => blank(width))
+    const mouse = this.#mouse
+    if (tree.node.mouse === false) this.#mouse = false
+    try {
+      return this.#drawBox(tree, top, left, width, height)
+    } finally {
+      this.#mouse = mouse
+    }
+  }
+
+  #drawBox(tree: Tree, top: number, left: number, width: number, height: number): string[] {
+    const { node } = tree
     const insets = insetsOf(node, this.#spare, this.#theme)
     const borders = bordersOf(node, this.#spare)
     const padding = paddingOf(node, this.#spare, this.#theme)
     if (insets.top + insets.bottom > height || insets.left + insets.right > width) this.overflowed = true
     const innerWidth = Math.max(0, width - insets.left - insets.right)
     const innerHeight = Math.max(0, height - insets.top - insets.bottom)
-    const inner = this.#drawInner(node, innerWidth, innerHeight, top + insets.top, left + insets.left)
-    if ('place' in node)
-      this.placed.push({
-        place: node.place,
+    const inner = this.#drawInner(tree, innerWidth, innerHeight, top + insets.top, left + insets.left)
+    if (tree.kind === 'place') {
+      const placed: Placed = {
+        place: tree.place,
         top,
         left,
         width,
         height,
-        maxScroll: this.#maxScroll(node.place, innerWidth, innerHeight),
+        maxScroll: this.#maxScroll(tree.place, innerWidth, innerHeight),
         content: { top: top + insets.top, left: left + insets.left, width: innerWidth, height: innerHeight },
-        shownFrom: this.#shownFrom.get(node.place) ?? 0,
-      })
+        shownFrom: this.#shownFrom.get(tree.place) ?? 0,
+      }
+      this.placed.push(placed)
+      this.hits.push({ top, left, width, height, placed: this.#mouse ? placed : undefined })
+    }
     const paddedWidth = Math.max(0, width - borders.left - borders.right)
     const padded = [
       ...Array.from({ length: padding.top }, () => blank(paddedWidth)),
@@ -175,30 +145,123 @@ class Arrangement {
     return framed.slice(0, height)
   }
 
-  #innerHeight(node: Layout, width: number): number {
-    if ('place' in node) return this.#places.rows(node.place, width).length
-    if ('column' in node) return node.column.reduce((sum, child) => sum + this.height(child, width), gapsOf(node, this.#spare, this.#theme))
-    const widths = this.#widths(node, width)
-    return Math.max(0, ...node.row.map((child, index) => this.height(child, widths[index] ?? 0)))
+  /** Whether a Place in it has a line to draw. */
+  #hasLines(tree: Tree, width: number): boolean {
+    if (this.#hidden(tree, width)) return false
+    if (tree.kind === 'place') return this.#places.rows(tree.place, width).length > 0
+    if (tree.kind === 'over') return this.#hasLines(tree.over, width) || this.#hasLines(tree.float, width)
+    return tree.children.some((child) => this.#hasLines(child, width))
   }
 
-  #innerWidth(node: Layout, available: number): number {
-    if ('place' in node) return Math.max(0, ...this.#places.rows(node.place, available).map(visibleWidth))
-    if ('row' in node) return node.row.reduce((sum, child) => sum + this.width(child, available), gapsOf(node, this.#spare, this.#theme))
-    return Math.max(0, ...childrenOf(node).map((child) => this.width(child, available)))
+  #hidden(tree: Tree, width: number): boolean {
+    const name = tree.node.unless
+    if (name === undefined || this.#asking.has(name)) return false
+    this.#asking.add(name)
+    try {
+      if (!this.#named.has(name)) {
+        const layout = this.#places.layout(name)
+        this.#named.set(name, layout === undefined ? undefined : grow(layout, true, [name], (named) => this.#places.layout(named)))
+      }
+      const named = this.#named.get(name)
+      return named === undefined ? this.#places.rows(name, width).length > 0 : this.#hasLines(named, width)
+    } finally {
+      this.#asking.delete(name)
+    }
   }
 
-  #drawInner(node: Layout, width: number, height: number, top: number, left: number): string[] {
-    if ('place' in node) return this.#place(node.place, top, left, width, height)
-    if ('row' in node) return this.#row(node, top, left, width, height)
-    return this.#column(node, top, left, width, height)
+  /** A node hidden by `unless`, or a named Layout or a `first` with no line to draw, takes no cells, its box included. */
+  #vanishes(tree: Tree, width: number): boolean {
+    if (this.#hidden(tree, width)) return true
+    return (tree.kind === 'layout' || tree.kind === 'first') && !this.#hasLines(tree, width)
   }
 
-  #column(node: Layout, top: number, left: number, width: number, height: number): string[] {
-    const gap = gapOf(node, this.#spare, this.#theme)
-    const heights = this.#share(childrenOf(node), height - gapsOf(node, this.#spare, this.#theme), (child) => this.height(child, width))
+  /** The children that take cells. */
+  #shown(tree: Tree, width: number): readonly Tree[] {
+    if (tree.kind === 'place' || tree.kind === 'over') return []
+    if (tree.kind === 'first') {
+      const first = tree.children.find((child) => this.#hasLines(child, width))
+      return first === undefined ? [] : [first]
+    }
+    return tree.children.filter((child) => !this.#vanishes(child, width))
+  }
+
+  #gaps(tree: Tree, width: number): number {
+    return Math.max(0, this.#shown(tree, width).length - 1) * gapOf(tree.node, this.#spare, this.#theme)
+  }
+
+  #innerHeight(tree: Tree, width: number): number {
+    if (tree.kind === 'place') return this.#places.rows(tree.place, width).length
+    if (tree.kind === 'over')
+      return Math.max(
+        this.height(tree.over, width),
+        this.#hasLines(tree.float, width) ? this.height(tree.float, floatWidthOf(tree.at, width)) : 0,
+      )
+    const shown = this.#shown(tree, width)
+    if (tree.kind === 'row') {
+      const widths = this.#widths(tree, width)
+      return Math.max(0, ...shown.map((child, index) => this.height(child, widths[index] ?? 0)))
+    }
+    return shown.reduce((sum, child) => sum + this.height(child, width), this.#gaps(tree, width))
+  }
+
+  #innerWidth(tree: Tree, available: number): number {
+    if (tree.kind === 'place') return Math.max(0, ...this.#places.rows(tree.place, available).map(visibleWidth))
+    if (tree.kind === 'over')
+      return Math.max(
+        this.width(tree.over, available),
+        this.#hasLines(tree.float, available) ? coverWidthOf(tree.at, this.width(tree.float, available)) : 0,
+      )
+    const shown = this.#shown(tree, available)
+    if (tree.kind === 'row') return shown.reduce((sum, child) => sum + this.width(child, available), this.#gaps(tree, available))
+    return Math.max(0, ...shown.map((child) => this.width(child, available)))
+  }
+
+  #drawInner(tree: Tree, width: number, height: number, top: number, left: number): string[] {
+    if (tree.kind === 'place') return this.#place(tree.place, top, left, width, height)
+    if (tree.kind === 'over') return this.#over(tree, top, left, width, height)
+    if (tree.kind === 'row') return this.#row(tree, top, left, width, height)
+    return this.#column(tree, top, left, width, height)
+  }
+
+  #over(tree: Tree & { readonly kind: 'over' }, top: number, left: number, width: number, height: number): string[] {
+    const hitsFrom = this.hits.length
+    const rows = this.draw(tree.over, top, left, width, height)
+    if (!this.#hasLines(tree.float, width)) return rows
+    const floatWidth = floatWidthOf(tree.at, width)
+    const floatHeight = Math.min(height, this.height(tree.float, floatWidth))
+    const { x, y } = floatAt(tree.at, width, height, floatWidth, floatHeight)
+    const cursor = this.cursor
+    this.cursor = undefined
+    const beneath = this.hits.splice(hitsFrom)
+    const outside = this.hits
+    this.hits = []
+    const floated = this.draw(tree.float, top + y, left + x, floatWidth, floatHeight)
+    // The float's box covers what is beneath it, its border, padding and gaps included.
+    this.hits = [
+      ...outside,
+      ...this.hits,
+      { top: top + y, left: left + x, width: floatWidth, height: floatHeight, placed: undefined },
+      ...beneath,
+    ]
+    const covered = (at: Position) =>
+      at.row >= top + y && at.row < top + y + floatHeight && at.column >= left + x && at.column < left + x + floatWidth
+    // A cursor that the float covers is not drawn on top of it.
+    this.cursor ??= cursor !== undefined && covered(cursor) ? undefined : cursor
+    for (const [index, row] of floated.entries()) {
+      const under = rows[y + index] ?? ''
+      const head = sliceWithWidth(under, 0, x, true)
+      const tail = sliceByColumn(under, x + floatWidth, Math.max(0, width - x - floatWidth), true)
+      rows[y + index] = head.text + blank(x - head.width) + RESET_STYLE + fit(row, floatWidth) + RESET_STYLE + tail
+    }
+    return rows
+  }
+
+  #column(tree: Tree, top: number, left: number, width: number, height: number): string[] {
+    const gap = gapOf(tree.node, this.#spare, this.#theme)
+    const children = this.#shown(tree, width)
+    const heights = this.#share(children, height - this.#gaps(tree, width), (child) => this.height(child, width))
     let y = top
-    const rows = childrenOf(node).flatMap((child, index) => {
+    const rows = children.flatMap((child, index) => {
       const drawn = [
         ...(index === 0 ? [] : Array.from({ length: gap }, () => blank(width))),
         ...this.draw(child, y + (index === 0 ? 0 : gap), left, width, heights[index] ?? 0),
@@ -209,11 +272,11 @@ class Arrangement {
     return [...rows, ...Array.from({ length: height - rows.length }, () => blank(width))]
   }
 
-  #row(node: Layout, top: number, left: number, width: number, height: number): string[] {
-    const gap = blank(gapOf(node, this.#spare, this.#theme))
-    const widths = this.#widths(node, width)
+  #row(tree: Tree, top: number, left: number, width: number, height: number): string[] {
+    const gap = blank(gapOf(tree.node, this.#spare, this.#theme))
+    const widths = this.#widths(tree, width)
     let x = left
-    const blocks = childrenOf(node).map((child, index) => {
+    const blocks = this.#shown(tree, width).map((child, index) => {
       const block = this.draw(child, top, x, widths[index] ?? 0, height)
       x += (widths[index] ?? 0) + gap.length
       return block
@@ -239,26 +302,25 @@ class Arrangement {
     return [...shown, ...Array.from({ length: height - shown.length }, () => blank(width))]
   }
 
-  #widths(node: Layout, width: number): number[] {
-    return this.#share(childrenOf(node), width - gapsOf(node, this.#spare, this.#theme), (child) => this.width(child, width))
+  #widths(tree: Tree, width: number): number[] {
+    return this.#share(this.#shown(tree, width), width - this.#gaps(tree, width), (child) => this.width(child, width))
   }
 
-  #share(children: readonly Layout[], available: number, natural: (child: Layout) => number): number[] {
+  #share(children: readonly Tree[], available: number, natural: (child: Tree) => number): number[] {
     if (available < 0) this.overflowed = true
     let left = Math.max(0, available)
-    const sizes = children.map((child) => {
-      const size = sizeOf(child)
+    const sizes = children.map(({ size }, index) => {
       if (size === 'fill') return 0
-      const wanted = size === 'content' ? natural(child) : size.fixed
+      const wanted = size === 'content' ? natural(children[index]!) : size.fixed
       const given = Math.min(wanted, left)
       if (given < wanted) this.overflowed = true
       left -= given
       return given
     })
-    const fills = children.filter((child) => sizeOf(child) === 'fill').length
+    const fills = children.filter(({ size }) => size === 'fill').length
     let nth = 0
-    return children.map((child, index) => {
-      if (sizeOf(child) !== 'fill') return sizes[index] ?? 0
+    return children.map(({ size }, index) => {
+      if (size !== 'fill') return sizes[index] ?? 0
       const share = Math.floor(left / fills) + (nth < left % fills ? 1 : 0)
       nth++
       return share
@@ -266,81 +328,18 @@ class Arrangement {
   }
 }
 
-const TRAILING_BLANKS = / +$/
-const TRAILING_RESET = /\x1b\[0?m$/
-const STYLES = /\x1b\[([\d;:]*)m/g
-
-// What each SGR code turns on, by the code that turns it off; bold and dim are both turned off by 22.
-const TURNED_OFF_BY: { readonly [code: number]: number } = {
-  1: 22,
-  2: 22,
-  3: 23,
-  4: 24,
-  5: 25,
-  7: 27,
-  8: 28,
-  9: 29,
-  38: 39,
-  48: 49,
-  58: 59,
-}
-const offCodeOf = (code: number): number =>
-  (code >= 30 && code <= 37) || (code >= 90 && code <= 97)
-    ? 39
-    : (code >= 40 && code <= 47) || (code >= 100 && code <= 107)
-      ? 49
-      : (TURNED_OFF_BY[code] ?? -code)
-
-// A border closes only what it opened, so a row can end in a style that is closed: the styles are followed to their end.
-function styledAtEnd(text: string): boolean {
-  const on = new Set<number>()
-  for (const [, parameters = ''] of text.matchAll(STYLES)) {
-    const fields = parameters.split(';')
-    for (let at = 0; at < fields.length; at++) {
-      // In the colon form, a colour's numbers are subparameters of its own code.
-      const [head = '', ...subparameters] = (fields[at] ?? '').split(':')
-      const code = Number(head)
-      if (code === 0) on.clear()
-      else if (Object.values(TURNED_OFF_BY).includes(code) || code === 39 || code === 49) on.delete(code)
-      else on.add(offCodeOf(code))
-      // In the semicolon form, a colour by index or by RGB carries its numbers as the parameters after it.
-      if ((code === 38 || code === 48 || code === 58) && subparameters.length === 0) {
-        const space = fields[at + 1]
-        at += space === '5' ? 2 : space === '2' ? 4 : 0
-      }
-    }
-  }
-  return on.size > 0
-}
-
-// The display resets the style and clears each row to its end, so the blanks at a row's end in the default style are not
-// written. A blank after a colour or a style is kept: it is drawn.
-function withoutBlankEnd(row: string): string {
-  let end = row.length
-  for (;;) {
-    const head = row.slice(0, end)
-    const reset = TRAILING_RESET.exec(head)
-    if (reset !== null) {
-      end = reset.index
-      continue
-    }
-    const blanks = TRAILING_BLANKS.exec(head)
-    if (blanks === null || styledAtEnd(head.slice(0, blanks.index))) return head
-    end = blanks.index
-  }
-}
-
-function attempt(layout: Layout, width: number, height: number, places: Places, spare: Spare, theme: Theme) {
+function attempt(tree: Tree, width: number, height: number, places: Places, spare: Spare, theme: Theme) {
   const arrangement = new Arrangement(places, spare, theme)
-  const rows = arrangement.draw(layout, 0, 0, width, height)
-  return { rows, placed: arrangement.placed, cursor: arrangement.cursor, overflowed: arrangement.overflowed }
+  const rows = arrangement.draw(tree, 0, 0, width, height)
+  return { rows, placed: arrangement.placed, hits: arrangement.hits, cursor: arrangement.cursor, overflowed: arrangement.overflowed }
 }
 
 export function arrange(layout: Layout, width: number, height: number, places: Places, theme: Theme): Arranged {
-  let arranged = attempt(layout, width, height, places, 'nothing', theme)
+  const tree = grow(layout, false, [], (name) => places.layout(name))
+  let arranged = attempt(tree, width, height, places, 'nothing', theme)
   for (const spare of SPARES.slice(1)) {
     if (!arranged.overflowed) break
-    arranged = attempt(layout, width, height, places, spare, theme)
+    arranged = attempt(tree, width, height, places, spare, theme)
   }
-  return { rows: arranged.rows.map(withoutBlankEnd), placed: arranged.placed, cursor: arranged.cursor }
+  return { rows: arranged.rows.map(withoutBlankEnd), placed: arranged.placed, hits: arranged.hits, cursor: arranged.cursor }
 }
