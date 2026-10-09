@@ -55,7 +55,7 @@ Each stage ends in something the Maintainer can try under dsh. The Lead writes t
 4. **Plugins.** Search, the model picker, settings, and the trajectory, a screen of its own with charts, tabs and filters.
 5. **Finish.** The Maintainer resumes a session, selects and copies text, and sees a summary on exit. Colours follow the terminal, and `NO_COLOR` works. The first 0.x release follows.
 
-Authoring gets its own stages, toward 1.0.
+Authoring gets its own stages, toward 1.0, in [its Intent](../authoring/intent.md).
 
 ## Open questions
 
