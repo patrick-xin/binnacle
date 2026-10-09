@@ -97,15 +97,12 @@ A PR reads alone: a person or an agent knows what it does and why, with no other
 ## A Fix or a Chore Task
 
 1. Make a worktree in `~/.binnacle/worktrees/<n>`, on the branch `task/<n>`.
-2. For a Fix, load the `tdd` skill.
-3. For a Fix, prove each new test as the `implementer` skill says.
-4. For a Fix, if you or the Maintainer want a review, have your subagent review the diff once.
-5. Open the PR.
+2. For a Fix, if you or the Maintainer want a review, have your subagent review the diff once.
+3. Open the PR.
 
 Before you open the PR:
 
 - `pnpm test` passes.
-- Each new test is proven, and the PR records its break.
 - The records that the change affects are changed in the same commit.
 
 ## Doors

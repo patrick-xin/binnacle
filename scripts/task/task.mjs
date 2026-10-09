@@ -400,7 +400,6 @@ async function land(n, deps, say) {
     const message = readFileSync(messagePath, 'utf8')
     const { header } = partsOf(message)
     if (header === '') throw new Refusal(`${messagePath}: its first line, the header, is empty`)
-    if (!existsSync(join(folder, 'checked.md'))) throw new Refusal(`no checked.md in ${folder}`)
     const reports = reportsOf(readdirSync(folder))
     if (!reports.some((file) => !file.startsWith('review-0'))) throw new Refusal(`no review report of a round after round 0 in ${folder}`)
     const ticket = await deps.readIssue(n)
@@ -455,7 +454,8 @@ async function land(n, deps, say) {
         const pr = JSON.parse(open.stdout)
         if (pr.state === 'OPEN') return pr.url
       }
-      const checked = readFileSync(join(folder, 'checked.md'), 'utf8')
+      const checkedPath = join(folder, 'checked.md')
+      const checked = existsSync(checkedPath) ? readFileSync(checkedPath, 'utf8') : undefined
       const made = await deps.gh(
         ['pr', 'create', '--base', 'main', '--head', `task/${n}`, '--title', header, '--body-file', '-'],
         prBody({ n, message, ticket, checked, reports, place }),

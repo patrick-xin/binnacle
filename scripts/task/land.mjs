@@ -63,11 +63,9 @@ export function prBody({ n, message, ticket, checked, reports, place }) {
     '',
     '## Evidence',
     '',
-    "<details><summary>Each test's break and its failure (checked.md)</summary>",
-    '',
-    checked.trim(),
-    '',
-    '</details>',
+    ...(checked === undefined
+      ? ['<!-- the Lead fills this in: what a person sees before and after -->']
+      : ['<details><summary>What the builder checked (checked.md)</summary>', '', checked.trim(), '', '</details>']),
     '',
     '## Merge danger',
     '',
@@ -78,7 +76,6 @@ export function prBody({ n, message, ticket, checked, reports, place }) {
     '## Checked',
     '',
     '- [x] `pnpm test` passes on the branch: the Reviewer ran it in each round.',
-    '- [x] Each new test is proven: its break and its failure message are under *Evidence*.',
     `- [x] Each review round: ${reports.length} report${reports.length === 1 ? '' : 's'}, each in a comment below, oldest first.`,
     '- [ ] Tried under `dsh`, if the change draws or boots: what was driven, and what it drew.',
     '- [ ] The author API: unchanged, or the commit says what changed.',

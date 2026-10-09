@@ -48,7 +48,7 @@ export function handoffFor(change, c, asker) {
             : {
                 role: 'implementer',
                 start: false,
-                text: `Round ${c.round} of #${c.n} has findings: read ${report} in full, fix each finding, prove each new test, and set \`ready\` again with \`${tool} set ${c.n} ready --as implementer\`.`,
+                text: `Round ${c.round} of #${c.n} has findings: read ${report} in full, fix each finding, and set \`ready\` again with \`${tool} set ${c.n} ready --as implementer\`.`,
               }
         case 'approved':
           return c.round === 0
