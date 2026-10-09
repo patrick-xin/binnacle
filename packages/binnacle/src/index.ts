@@ -48,6 +48,7 @@ export function apply(ctx: Context): void {
     forget: (part) => drawing.forget(part),
     forgetAll: () => drawing.forgetAll(),
     colorMode: () => internals.colorMode(),
+    scroll: (place, pages) => drawing.scroll(place, pages),
   })
   const exit: AppExit = ctx.appExit!
   route(input, {

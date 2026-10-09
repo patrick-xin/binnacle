@@ -2,6 +2,7 @@ import type { Action, Point } from '../api.ts'
 import { matchesKey } from '../terminal/keys.ts'
 import type { KeyId } from '../terminal/keys.ts'
 import type { CoreAction } from './gestures.ts'
+import type { Held } from './service.ts'
 
 // pi's window for the second ctrl+c that quits.
 const QUIT_WITHIN_MS = 500
@@ -37,20 +38,16 @@ export function coreActions(acts: Acts): (action: CoreAction, at?: Pointer) => v
 }
 
 /** One action set, held apart, so that one action set twice keeps two places beneath its id. */
-export interface SetAction {
-  readonly item: { readonly id: string; readonly action: Action }
-}
+export type SetAction = Held<{ readonly id: string; readonly action: Action }>
 
-export interface SetBinding {
-  readonly item: { readonly name: string; readonly keys: readonly string[] }
-}
+export type SetBinding = Held<{ readonly name: string; readonly keys: readonly string[] }>
 
 /** The actions that authors set, read from their lists as they stand at each gesture and each call. */
 export class Actions {
   readonly #set: readonly SetAction[]
   readonly #bindings: readonly SetBinding[]
 
-  /** Both lists are oldest first, and the service changes them in place. */
+  /** Both lists are oldest first, a built-in's beneath an author's, and the service changes them in place. */
   constructor(set: readonly SetAction[], bindings: readonly SetBinding[]) {
     this.#set = set
     this.#bindings = bindings

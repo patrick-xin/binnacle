@@ -3,6 +3,7 @@ import { Display } from './display.ts'
 import type { Size } from './host.ts'
 import { arrange } from './layout.ts'
 import type { Placed } from './layout.ts'
+import type { Moved } from './service.ts'
 import type { Theme } from './theme.ts'
 import { Scroll } from './scroll.ts'
 import { Rows } from './view.ts'
@@ -11,11 +12,11 @@ import { Rows } from './view.ts'
 export interface OnView extends Theme {
   readonly screenOnView: Screen
   readonly layoutOnView: Layout
-  /** The Place a person moved the Focus to on the Screen on view; `null` once the core forgot it; `undefined` if no one has. */
-  focusMovedTo(): string | null | undefined
-  /** A person moved the Focus on the Screen on view to that Place. */
+  /** The Place the Focus was moved to on the Screen on view; `null` once the core forgot it; `undefined` if no one has moved it. */
+  focusMovedTo(): Moved | null | undefined
+  /** A person or an author moved the Focus on the Screen on view to that Place. */
   moveFocus(place: string): void
-  /** The core forgets the Focus a person moved on the Screen on view: its Place stopped taking keys. */
+  /** The core forgets the Focus moved on the Screen on view: its Place had it and stopped taking keys. */
   forgetMovedFocus(): void
   partIn(place: string): Part | undefined
   /** A Place takes keys while its Part does, or while an action acts in it. */
@@ -59,6 +60,7 @@ export class Drawing {
           },
           scrolledUp: (place) => this.#scroll.up(place),
           cursor: (place, width) => (place === focus ? this.#rows.cursorOf(view.partIn(place), width) : undefined),
+          paged: (place, width) => this.#scroll.paged(place, view.partIn(place)?.cursor?.(width)),
         },
         view,
       )
@@ -126,6 +128,17 @@ export class Drawing {
     return view.clickActions(gesture, under.place, at)
   }
 
+  /** A page is as many rows as the Place's box shows. */
+  scroll(place: string, pages: number): void {
+    const placed = this.#placed.find((drawn) => drawn.place === place)
+    if (placed === undefined || placed.content.height < 1) return
+    const { width, height } = placed.content
+    // The cursor of the Part with the Focus can show other rows than the Place's scroll, so a page starts from the rows shown.
+    const shownUp = Math.max(0, placed.maxScroll - placed.shownFrom)
+    this.#scroll.page(place, shownUp, pages * height, this.#onView().partIn(place)?.cursor?.(width))
+    this.draw()
+  }
+
   /** Shift+tab: the Focus to the next Place on view that takes keys, in the order of the layout, from the last back to the first. */
   nextFocus(): void {
     const takers = this.#takers(this.#placed)
@@ -145,9 +158,13 @@ export class Drawing {
     const view = this.#onView()
     const takers = this.#takers(placed)
     const moved = view.focusMovedTo()
-    if (typeof moved === 'string') {
-      if (takers.some(({ place }) => place === moved)) return moved
-      view.forgetMovedFocus()
+    if (typeof moved === 'object' && moved !== null) {
+      if (takers.some(({ place }) => place === moved.place)) {
+        moved.had = true
+        return moved.place
+      }
+      // A Focus moved before its Place draws waits for it, so an author can move it to a Place that is still to come.
+      if (moved.had) view.forgetMovedFocus()
     }
     const own = view.screenOnView.focus
     if (own !== undefined && takers.some(({ place }) => place === own)) return own

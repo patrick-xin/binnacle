@@ -20,6 +20,8 @@ Row `binnacle`, part of the core · Code `binnacle:packages/binnacle/src/core/ge
 - Add a key to an action without repeating its others: `binnacle.bind(id, [...binnacle.keysOf(id), 'ctrl+n'])`. `keysOf(id)` reads the newest action by the id, enabled or not: an author reads it once at load, while `enabled()` changes as the session runs, and an action that names its own keys owns its id's keys.
 - Run an action by its id with `binnacle.run(id)`, wherever the Focus is.
 - Change what an action does: set an action by its id, and run the one it hides with `beneath()`. Two plugins that each change one action both act, the newest first.
+- Move the Focus to a Place by its name with `binnacle.focus(place)`, or to a Part's own Place with the `focus()` of the Handle that `binnacle.place` returns.
+- Scroll a Place by pages with `binnacle.scroll(place, pages)`: toward its last line when `pages` is positive, as page down does, and toward its first when it is negative.
 
 A person cannot rebind a key yet.
 
@@ -40,7 +42,9 @@ A person cannot rebind a key yet.
 - **A Place takes the Focus** while its Part takes keys, or while an action is set that acts in it, enabled or not, so that the Focus stays while an action is disabled for a moment.
 - **The mouse is on by default**, as in pi.
 - **The Focus belongs to a Place**, so it stays when the Place's Part is replaced. A Screen names where it starts.
+- **A Focus moved waits for its Place.** A click, shift+tab, `binnacle.focus(place)` and a Handle's `focus()` each move it, and the core keeps whether its Place has had it yet. A Place that does not draw yet, or does not take keys yet, takes the Focus once it does. The core forgets the Focus moved only after its Place has had it and stopped taking keys.
+- **A scroll by pages** (`binnacle:packages/binnacle/src/core/drawing.ts#Drawing`) reads where the Place was last drawn: a page is the rows of the Place's box, inside its borders and padding, and it starts from the rows the Place showed, which the cursor of the Part with the Focus can move. The next draw stops it at the first line, as it stops the wheel. A Place that was not drawn, or that has no rows of room, does not scroll, and the Focus does not move. A page of the Place with the Focus wins over its Part's cursor until the cursor moves ([Core](core.md)).
 
 ## Built by
 
-Stage 2 (before Specs) · Spec [#156](https://github.com/patrick-xin/binnacle/issues/156) · PR [#167](https://github.com/patrick-xin/binnacle/pull/167) · Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bindings, run by id, and the action beneath.
+Stage 2 (before Specs) · Spec [#156](https://github.com/patrick-xin/binnacle/issues/156) · PR [#167](https://github.com/patrick-xin/binnacle/pull/167) · Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bindings, run by id, and the action beneath · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): the Focus and the scroll by a Place's name.

@@ -136,6 +136,12 @@ export interface Handle {
   dispose(): void
 }
 
+/** The Handle of a Part placed. */
+export interface PlacedHandle extends Handle {
+  /** Moves the Focus to the Place this Part fills, as `binnacle.focus(place)` does. */
+  focus(): void
+}
+
 export interface Gestures {
   /** The ids of the actions a gesture is bound to: a key, as the terminal sent it, or a mouse gesture by name. */
   actionsOf(gesture: string): readonly string[]
@@ -181,7 +187,17 @@ export interface Binnacle {
   /** Replaces the layout of the Screen by that name; the newest layout wins. */
   layout(screen: string, layout: Layout): Handle
   /** Fills the Place by that name on every Screen; the newest Part wins. */
-  place(name: string, part: Part): Handle
+  place(name: string, part: Part): PlacedHandle
+  /**
+   * Moves the Focus to the Place by that name, as a click does. A Place that is not drawn yet takes the Focus once it draws and takes keys.
+   * The Focus moved is forgotten once its Place has had it and stopped taking keys.
+   */
+  focus(place: string): void
+  /**
+   * Scrolls the Place by that name by pages, and stops at its first and last line. A positive `pages` moves toward the last line, as page down does; a negative one toward the first.
+   * A page is as many rows as the Place's box shows. A Place that is not drawn, or that has no rows of room, does not scroll. It never moves the Focus.
+   */
+  scroll(place: string, pages: number): void
   /** Adds a layer to the theme, and draws everything again. The newest layer wins for each token it names. It refuses a colour that is not one. */
   theme(layer: ThemeLayer): Handle
   /** The theme's tokens, as its layers make them now. */
