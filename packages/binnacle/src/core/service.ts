@@ -251,11 +251,7 @@ export class BinnacleService extends Service implements Binnacle {
   private hold<T>(list: Held<T>[], item: T, label: string, changed?: () => void, off?: (entry: Held<T>) => void): Handle {
     // In a traced copy, `this.ctx` is the calling plugin's context, so its fiber is the plugin that registers.
     const entry: Held<T> = { item, builtIn: builtIn(this.ctx.fiber as unknown as Fiber) }
-    const firstAuthor = list.findIndex((held) => !held.builtIn)
-    if (entry.builtIn && firstAuthor !== -1) list.splice(firstAuthor, 0, entry)
-    else list.push(entry)
-    this.drawn.redraw()
-    let held = true
+    let held = false
     const release = (): void => {
       if (!held) return
       held = false
@@ -263,8 +259,15 @@ export class BinnacleService extends Service implements Binnacle {
       off?.(entry)
       this.drawn.redraw()
     }
-    // What the calling plugin holds goes when it unloads.
-    const dispose = this.ctx.effect(() => release, label)
+    // What the calling plugin holds goes when it unloads. A plugin that is unloading gets no effect, so it holds nothing.
+    const dispose = this.ctx.effect(() => {
+      const firstAuthor = list.findIndex((other) => !other.builtIn)
+      if (entry.builtIn && firstAuthor !== -1) list.splice(firstAuthor, 0, entry)
+      else list.push(entry)
+      held = true
+      this.drawn.redraw()
+      return release
+    }, label)
     return {
       redraw: () => {
         if (!held) return
