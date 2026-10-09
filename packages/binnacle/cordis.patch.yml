@@ -27,6 +27,9 @@
     # The status line: whether the agent runs, and on which model.
     - id: binnacle-status-line
       name: 'binnacle/plugins/status-line'
+    # The Requests: the approvals and the questions that stand, and the talk with dsh. It draws nothing.
+    - id: binnacle-requests
+      name: 'binnacle/plugins/requests'
     # The approvals: a tool that needs an approval asks, and a person answers.
     - id: binnacle-approvals
       name: 'binnacle/plugins/approvals'

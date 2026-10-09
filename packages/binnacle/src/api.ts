@@ -266,9 +266,107 @@ export interface ChatSession {
   interrupt(): void
 }
 
+/**
+ * The Requests that stand in the Chat, as the row `binnacle-requests` provides them: a question or an approval waits until the one before it is settled.
+ * It answers dsh only while a view is attached to it. Its watchers learn after a Request comes or goes, or a draft changes, as a Model's do.
+ */
+export interface Requests extends Watchable {
+  /** The Request on view: the first that stands. */
+  readonly shown: Request | undefined
+  /** How many stand, the one on view included. */
+  readonly standing: number
+  /**
+   * A view says that it draws the Requests, and the model answers dsh while one is attached. It returns what detaches the view.
+   * With no view attached, a Request that comes goes on to dsh's own fallback, and a Request that stands when the last view detaches fails closed.
+   */
+  attach(): () => void
+}
+
+/** A Request that has gone, withdrawn, answered, dismissed or failed, ignores every call made on it after. */
+export type Request = QuestionRequest | ApprovalRequest
+
+/** A tool asks before it runs. Each text is plain. */
+export interface ApprovalRequest {
+  readonly kind: 'approval'
+  readonly tool: string
+  /** The id of the agent that asks, when it is not the Chat's own agent, such as a subagent. */
+  readonly agent: string | undefined
+  readonly why: string | undefined
+  /** The call's arguments, as JSON indented by two, one line each, at most 12 then a line that says how many more. */
+  readonly arguments: readonly string[]
+  /** dsh's outcomes that a person can answer: dsh has no "always". */
+  readonly choices: readonly ApprovalChoice[]
+  /** The outcome chosen so far, which `submit()` sends. */
+  readonly chosen: ApprovalChoice | undefined
+  /** Changes the draft, and sends nothing. */
+  choose(outcome: ApprovalChoice): void
+  /** Sends the outcome chosen; with none chosen, nothing is sent. */
+  submit(): void
+  /** The person rejected it without choosing, and the agent learns it. */
+  dismiss(): void
+}
+
+export type ApprovalChoice = 'allowed-once' | 'rejected'
+
+/** The agent asks one question or several; their answers go back together. */
+export interface QuestionRequest {
+  readonly kind: 'question'
+  /** The id of the agent that asks, when it is not the Chat's own agent, such as a subagent. */
+  readonly agent: string | undefined
+  readonly questions: readonly Question[]
+  /** The index of the question on view. */
+  readonly index: number
+  /** Puts the question at that index on view. A question with no options is typed at once. */
+  go(index: number): void
+  /** Whether the person types an answer to the question on view. */
+  readonly typing: boolean
+  type(on: boolean): void
+  /** Each question's answer so far, by the index of its question. */
+  readonly drafts: readonly Draft[]
+  /** In the question on view, selects the option by its label, or unselects it; in a question that allows one, it is the only one. */
+  toggle(label: string): void
+  /** The typed answer to the question on view, trimmed; an empty one, or `undefined`, takes it back. In a question that allows one, it is the only answer. */
+  write(text: string | undefined): void
+  /** Sends every question's draft, answered or not. */
+  submit(): void
+  /** The person dismissed the whole Request, and the agent learns it. */
+  dismiss(): void
+}
+
+export interface Question {
+  readonly id: string
+  readonly header: string | undefined
+  readonly question: string
+  readonly detail: readonly string[]
+  readonly multiSelect: boolean
+  /** A plan review: the detail is the plan, and the option that approves it is first. */
+  readonly planReview: boolean
+  /** Its options, then a typed answer, then, where more than one can be chosen, done. A question with no options has none. */
+  readonly choices: readonly Choice[]
+}
+
+export type Choice =
+  | {
+      readonly kind: 'option'
+      /** As the agent offered it: its identity, which `toggle`, the drafts and what is sent carry. It is not plain, so draw `text`. */
+      readonly label: string
+      /** The label made plain, to draw. */
+      readonly text: string
+      readonly description: string | undefined
+    }
+  | { readonly kind: 'other' }
+  | { readonly kind: 'done' }
+
+export interface Draft {
+  /** The labels selected, as the agent offered them. */
+  readonly selected: readonly string[]
+  readonly custom: string | undefined
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     binnacle: Binnacle
     binnacleSession: ChatSession
+    binnacleRequests: Requests
   }
 }

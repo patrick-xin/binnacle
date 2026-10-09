@@ -10,6 +10,7 @@ binnacle's own features are plugins too, and they use only what this page says. 
 | `binnacle-transcript` | the session's events | `src/plugins/transcript/index.ts` |
 | `binnacle-composer` | what a person types, before it is sent | `src/plugins/composer/index.ts` |
 | `binnacle-status-line` | whether the agent runs, and on which model | `src/plugins/status-line/index.ts` |
+| `binnacle-requests` | the approvals and the questions that stand, and the talk with dsh: a model that draws nothing | `src/plugins/requests/index.ts` |
 | `binnacle-approvals` | a tool asks for an approval, and a person answers | `src/plugins/approvals/index.ts` |
 | `binnacle-questions` | the agent asks a person a question | `src/plugins/questions/index.ts` |
 
@@ -475,3 +476,45 @@ tabs(ctx.binnacle, {
 - `models` are what the labels and the current tab are drawn from, so that the Tabs are drawn again when they change.
 - The actions are `<name>.next` and `<name>.previous`, of the kinds `tabs.next` and `tabs.previous`, marked `first`.
 - The Look `tabs.tab`, or `<name>.tab`, draws one tab: `(label, { current, index }) => text`. Its default draws the `mark` glyph and the label in `accent` for the current tab, and the `unmarked` glyph and the label for the others. The `separator` glyph goes between the tabs.
+
+## Requests
+
+When the agent asks a question, or a tool asks for an approval, a Request stands until a person answers it. The row `binnacle-requests` is its model: it talks to dsh, keeps the queue, and keeps each Request's draft answer. It draws nothing. It provides `ctx.binnacleRequests`, and its types are `Requests` and `Request` from `binnacle`. The rows `binnacle-approvals` and `binnacle-questions` draw from it.
+
+```js
+export const inject = ['binnacle', 'binnacleRequests']
+export function apply(ctx) {
+  const requests = ctx.binnacleRequests
+  ctx.effect(() => requests.attach())
+  ctx.binnacle.place('status', {
+    models: [requests],
+    lines: () => (requests.shown === undefined ? [] : [`${requests.standing} waiting for you`]),
+  })
+}
+```
+
+- `shown` is the Request on view, the first that stands, or `undefined`. `standing` is how many stand.
+- `watch(changed)` is as a Model's: `changed` runs in a microtask after a Request comes or goes, or a draft changes.
+- `attach()` says that your view draws the Requests, and returns what detaches it. The model answers dsh only while a view is attached. With none, a Request that comes goes on to dsh, which fails it closed. A Request that stands when the last view detaches fails closed, as when the model unloads: an approval is `unavailable`, and a question is dismissed.
+- Each text in a Request is plain already. A Request that has gone, withdrawn, answered, dismissed or failed, ignores every call made on it after.
+
+Both kinds have `agent`, the id of the agent that asks when it is not the Chat's own, such as a subagent. Only `submit()` and `dismiss()` answer dsh; every other call changes the draft and sends nothing.
+
+An approval, `{ kind: 'approval' }`, has:
+
+- `tool`, `why`, and `arguments`: the call's arguments as lines of JSON, at most 12, then a line that says how many more.
+- `choices`, dsh's outcomes: `'allowed-once'` and `'rejected'`.
+- `chosen` and `choose(outcome)`: the draft. `submit()` sends the outcome chosen, and with none chosen, sends nothing. `dismiss()` rejects it.
+
+A question, `{ kind: 'question' }`, has:
+
+- `questions`: each has `id`, `header`, `question`, `detail` (lines), `multiSelect`, `planReview`, and `choices`. The choices are its options, `{ kind: 'option', label, text, description }`, then `{ kind: 'other' }` for a typed answer, then `{ kind: 'done' }` where more than one can be chosen. A question with no options has none. In a plan review, the option that approves the plan is first.
+- `label` is an option's identity, as the agent offered it, and `text` is the label made plain. Draw `text`, and give `label` to `toggle`.
+- `index` and `go(index)`: the question on view.
+- `typing` and `type(on)`: whether the person types an answer to the question on view. A question with no options is typed at once.
+- `drafts`: each question's answer so far, `{ selected, custom }`, by its index.
+- `toggle(label)`: in the question on view, selects the option, or unselects it. Where only one can be chosen, it is the only answer.
+- `write(text)`: the typed answer to the question on view, trimmed. An empty one takes it back. Where only one can be chosen, it is the only answer.
+- `submit()` sends every question's draft, answered or not. `dismiss()` dismisses the whole Request, and the agent learns it.
+
+The model does not decide when a Request is sent: the view does. While `binnacle-approvals` or `binnacle-questions` is on, it fails closed a Request of a kind that no row of theirs draws. To draw the Requests your own way, turn off both rows.

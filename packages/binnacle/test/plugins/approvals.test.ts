@@ -5,6 +5,7 @@ import { bindScopeParent, scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
 import * as approvals from '../../src/plugins/approvals/index.ts'
 import * as composer from '../../src/plugins/composer/index.ts'
+import * as requests from '../../src/plugins/requests/index.ts'
 import { agents } from '../support/agents.ts'
 import { mount } from '../support/mount.ts'
 import { persistence } from '../support/sessions.ts'
@@ -19,6 +20,7 @@ async function chat(options: { columns?: number; rows?: number; provide?: (ctx: 
   })
   mounted.ready()
   await mounted.ctx.plugin(composer)
+  await mounted.ctx.plugin(requests)
   const plugin = await mounted.ctx.plugin(approvals)
   // The session opens after the core loads; let it settle.
   await new Promise((resolve) => setImmediate(resolve))
