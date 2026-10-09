@@ -1,7 +1,9 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Gestures, Handle, Layout, Look, Model, Part, Screen, ThemeLayer, Tokens, Tone } from '../api.ts'
+import type { Action, Binnacle, Gestures, Handle, Layout, Look, Model, Part, Point, Screen, ThemeLayer, Tokens, Tone } from '../api.ts'
 import type { TerminalColorMode } from '../terminal/colors.ts'
+import { Actions } from './actions.ts'
+import type { SetAction, SetBinding } from './actions.ts'
 import { CHAT } from './chat.ts'
 import { actionsOf } from './gestures.ts'
 import { drawer } from './looks.ts'
@@ -39,6 +41,10 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly moved = new Map<Held<Screen>, string | null>()
   private readonly layers: Held<ThemeLayer>[] = []
   private readonly looks = new Map<string, Held<Make>[]>()
+  // One list for every id, oldest first, as the newest set wins among actions of different ids.
+  private readonly set: SetAction[] = []
+  private readonly bindings: SetBinding[] = []
+  readonly actions = new Actions(this.set, this.bindings)
   // Made again from the layers at the next read, after a layer comes or goes. A method runs on a traced copy, where a field set stays on the copy, so the field is an object that is changed.
   private readonly themed: { now?: Themed } = {}
   private readonly drawn: Drawn
@@ -77,6 +83,32 @@ export class BinnacleService extends Service implements Binnacle {
     // An instance can be named like its kind, and a name read twice would put each of its Looks twice in the chain.
     const once = [...new Set(names)]
     return drawer(() => once.flatMap((name) => (this.looks.get(name) ?? []).toReversed()), fallback)
+  }
+
+  action(id: string, action: Action): Handle {
+    return this.hold(this.set, { id, action }, 'binnacle: an action')
+  }
+
+  bind(name: string, keys: readonly string[]): Handle {
+    return this.hold(this.bindings, { name, keys }, 'binnacle: a binding')
+  }
+
+  keysOf(id: string): readonly string[] {
+    return this.actions.keysOf(id)
+  }
+
+  run(id: string, at?: Point): void {
+    this.actions.run(id, at)
+  }
+
+  /** A Place takes keys while its Part does, or while an action acts in it. */
+  takesKeys(place: string): boolean {
+    const part = this.partIn(place)
+    return part !== undefined && (part.key !== undefined || this.actions.actsIn(place))
+  }
+
+  clickActions(gesture: string, place: string, at: Point | undefined): boolean {
+    return this.actions.click(gesture, place, at)
   }
 
   get layoutOnView(): Layout {

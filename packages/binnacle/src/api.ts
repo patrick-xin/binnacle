@@ -141,9 +141,41 @@ export interface Gestures {
   actionsOf(gesture: string): readonly string[]
 }
 
+/** Something a person does with a key, or with a click in its Place. */
+export interface Action {
+  /**
+   * At a click, `at` is the cell clicked in the lines of the Part in the Place; at a key, or below the Part's lines, it is `undefined`.
+   * `beneath` runs the action that this one hides, the newest enabled action by its id beneath it, with the same `at`; with none, it does nothing.
+   */
+  run(at: Point | undefined, beneath: () => void): void
+  /** The gestures it is bound to until someone binds it or its kind: keys by name, such as `enter`, `space`, `tab` or `ctrl+n`, and `click`. */
+  readonly keys?: readonly string[]
+  /** It takes a gesture only while this Place, or one of these, has the Focus, or for a click, while the click is in it. With none, it takes a key wherever the Focus is. A Place that an action acts in takes the Focus. */
+  readonly place?: string | readonly string[]
+  /** An action of a Place takes its key before the Part with the Focus, such as tab while a line is being typed. An action with no Place is never before the Part. */
+  readonly first?: boolean
+  /** The name that every action of its kind shares, such as `list.toggle`: binding the kind binds each of them. */
+  readonly kind?: string
+  /** While it returns false, the action is as if it were not set: a gesture goes on to the action beneath it by its id, then to the next taker. */
+  enabled?(): boolean
+  readonly description?: string
+}
+
 export interface Binnacle {
   /** The Gesture Table: what each key and each mouse gesture is bound to. */
   readonly gestures: Gestures
+  /**
+   * Sets the action by that id; the newest enabled one by an id takes its gestures.
+   * A key goes to the actions marked `first` of the Place with the Focus, then to the Part with the Focus, then to the Place's other actions, then to the actions with no Place, `first` or not, then to the Gesture Table.
+   * When two actions of different ids take a gesture at one step, the newest set wins.
+   */
+  action(id: string, action: Action): Handle
+  /** Binds the action by that id, or every action of that kind, to these gestures instead of its own. A binding by id wins over its kind's; the newest binding by a name wins, and `[]` unbinds. */
+  bind(name: string, keys: readonly string[]): Handle
+  /** The gestures that the newest action by that id, enabled or not, is bound to now, so that a binding can add a key to them. With no action by that id, its binding by id, or none. */
+  keysOf(id: string): readonly string[]
+  /** Runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture. With none enabled, nothing runs. */
+  run(id: string, at?: Point): void
   /** Only the newest Screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle
   /** Replaces the layout of the Screen by that name; the newest layout wins. */

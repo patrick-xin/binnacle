@@ -90,3 +90,62 @@ ctx.binnacle.place('fruit', {
   lines: () => ['fig', 'oak'].map((label) => ctx.binnacle.lookOf(['fruit.row', 'tags.row'], row)(label)),
 })
 ```
+
+## Actions
+
+An action is something a person does with a key, or with a click in its Place. It has an id. A component's actions are named `<instance>.<verb>`, and their kind `<component>.<verb>`.
+
+```js
+ctx.binnacle.action('fruit.toggle', {
+  kind: 'list.toggle',
+  place: 'fruit',
+  description: 'Check the marked fruit',
+  run: () => fruit.set((state) => (state.checked = !state.checked)),
+})
+```
+
+- `binnacle.action(id, action)` sets an action. `run(at, beneath)` does it. At a click, `at` is the cell clicked, as a line of the Part's lines and a column. At a key, it is `undefined`. The action goes when the plugin that set it unloads.
+- `keys` are the gestures it is bound to until someone binds it: keys by name, such as `enter`, `space`, `tab` or `ctrl+n`, and `click`.
+- `place` is the Place, or the Places, where it takes a gesture: while the Place has the Focus, or for a click, while the click is in it. With no `place`, it takes a key wherever the Focus is. A Place that an action acts in takes the Focus, as a Part that takes keys does.
+- `first: true` makes an action of a Place take its key before the Part with the Focus, such as tab while a line is being typed. An action with no `place` is never before the Part.
+- While `enabled()` returns false, the action is as if it were not set. The gesture goes on to the action beneath it by its id, then to the next taker.
+- `kind` is a name that every action of its kind shares, so that one binding binds them all.
+
+A key goes, in this order, to:
+
+1. The actions marked `first` of the Place with the Focus.
+2. The Part with the Focus.
+3. The other actions of the Place with the Focus.
+4. The actions with no Place.
+5. binnacle's own Gesture Table, such as ctrl+c and escape.
+
+A click goes to the Part under it, then to its Place's actions bound to `click`. In one step, the newest enabled action by an id takes the gesture, and of two ids, the action set last wins.
+
+### Bind an action
+
+```js
+ctx.binnacle.bind('list.toggle', ['space'])
+ctx.binnacle.bind('requests.send', [...ctx.binnacle.keysOf('requests.send'), 'ctrl+n'])
+```
+
+- `binnacle.bind(name, keys)` binds the action by that id, or every action of that kind, to these keys instead of its own. A binding by id wins over its kind's. The newest binding by a name wins, and `[]` unbinds. A binding goes when the plugin that set it unloads.
+- `binnacle.keysOf(id)` is the keys that the newest action by that id is bound to now, enabled or not. Use it to add a key without repeating the others. Call it after the action is set. It is read once, at load, while `enabled()` changes as the session runs, so it does not follow `enabled()`: an action that names its own keys owns its id's keys, even while it is disabled.
+
+### Run an action, and change what it does
+
+`binnacle.run(id)` runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture. With none enabled, nothing runs.
+
+An action set with the id of another hides it, and is handed it as `beneath`. Run `beneath()` to keep what the action did, and add to it. So two plugins that each change one action both act, the newest first:
+
+```js
+ctx.binnacle.action('requests.send', {
+  enabled: () => preview.state.on,
+  run: (at, beneath) => {
+    preview.set((state) => (state.shown = true))
+    beneath()
+  },
+})
+```
+
+- An action with no `keys`, or no `kind`, keeps those of the action it hides.
+- `beneath()` is found each time it runs: the newest enabled action by that id beneath this one, wherever the Focus is, or nothing. When the plugin of an action between them unloads, the next `beneath()` uses the actions as they stand.
