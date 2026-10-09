@@ -1,6 +1,6 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Gestures, Handle, Layout, Part, Screen } from '../api.ts'
+import type { Binnacle, Gestures, Handle, Layout, Model, Part, Screen } from '../api.ts'
 import { CHAT } from './chat.ts'
 import { actionsOf } from './gestures.ts'
 
@@ -9,6 +9,8 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly screens: Screen[] = [CHAT]
   private readonly layouts = new Map<string, Layout[]>()
   private readonly parts = new Map<string, Part[]>()
+  // Each naming is held apart, as one Model can be named more than once.
+  private readonly models = new Map<string, { readonly model: Model<object> }[]>()
   // The Place a person moved the Focus to, for each Screen shown; null once the core forgot it.
   private readonly moved = new Map<Screen, string | null>()
   private readonly redraw: () => void
@@ -58,9 +60,28 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   place(name: string, part: Part): Handle {
-    return this.hold(listIn(this.parts, name), part, 'binnacle: a part placed', () => {
-      this.forget(part)
-    })
+    let stops: (() => void)[] = []
+    const handle = this.hold(
+      listIn(this.parts, name),
+      part,
+      'binnacle: a part placed',
+      () => {
+        this.forget(part)
+      },
+      () => {
+        for (const stop of stops) stop()
+      },
+    )
+    stops = (part.models ?? []).map((model) => model.watch(() => handle.redraw()))
+    return handle
+  }
+
+  model<S extends object>(name: string, model: Model<S>): Handle {
+    return this.hold(listIn(this.models, name), { model: model as Model<object> }, 'binnacle: a model named')
+  }
+
+  modelOf<S extends object>(name: string): Model<S> | undefined {
+    return this.models.get(name)?.at(-1)?.model as Model<S> | undefined
   }
 
   private hold<T>(list: T[], item: T, label: string, changed?: () => void, off?: () => void): Handle {

@@ -15,6 +15,21 @@ export interface Part {
   click?(at: Point): boolean
   /** The Place gained or lost the Focus, and the core draws the Part again, as its lines may show the Focus. */
   focus?(has: boolean): void
+  /** What the Part is drawn from: the core draws it again after each of them changes. */
+  readonly models?: readonly Watchable[]
+}
+
+/** Anything a Part can be drawn from: it says when it changed. */
+export interface Watchable {
+  /** `changed` runs after each change, once for the changes made together. It returns what stops it. */
+  watch(changed: () => void): () => void
+}
+
+/** State, and the one way to change it. */
+export interface Model<S extends object> extends Watchable {
+  readonly state: S
+  /** Changes the state. The watchers learn of it in a microtask after the change, never while it is made. */
+  set(change: (state: S) => void): void
 }
 
 /** A line of a Part's lines, and a column in cells. */
@@ -75,6 +90,9 @@ export interface Binnacle {
   layout(screen: string, layout: Layout): Handle
   /** Fills the Place by that name on every Screen; the newest Part wins. */
   place(name: string, part: Part): Handle
+  /** Names a model, such as a component's, so that anyone can read and change it; the newest by a name wins. */
+  model<S extends object>(name: string, model: Model<S>): Handle
+  modelOf<S extends object>(name: string): Model<S> | undefined
 }
 
 /**

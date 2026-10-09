@@ -12,9 +12,10 @@ import { openChat } from './core/session.ts'
 import { setKeybindings } from './terminal/keybindings.ts'
 import { StdinBuffer } from './terminal/stdin-buffer.ts'
 
-export type { Binnacle, Box, ChatSession, Gestures, Handle, Layout, Part, Point, Screen, Side, Size } from './api.ts'
+export type { Binnacle, Box, ChatSession, Gestures, Handle, Layout, Model, Part, Point, Screen, Side, Size, Watchable } from './api.ts'
 export type { Process } from './core/host.ts'
 export { toPlainText } from './core/view.ts'
+export { createModel } from './core/model.ts'
 export { internals } from './core/internals.ts'
 
 export const name = 'binnacle'
