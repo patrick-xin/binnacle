@@ -89,6 +89,9 @@ export interface ThemeLayer {
   readonly gap?: number
 }
 
+/** How a piece of a component is drawn, such as a List's row: what it takes is the component's to say. */
+export type Look = (...args: never[]) => unknown
+
 /** A line of a Part's lines, and a column in cells. */
 export interface Point {
   readonly line: number
@@ -153,6 +156,16 @@ export interface Binnacle {
   readonly tokens: Tokens
   /** The text in the Tone's style. A Part paints at each draw, so that its lines follow the theme. */
   paint(tone: Tone, text: string): string
+  /**
+   * Sets how a piece of a component is drawn, by an instance's name, such as `request.choices.row`, or by its kind's, such as `list.row`.
+   * `make` is handed the Look beneath it, and returns the Look. The Look beneath is found each time it draws.
+   */
+  look<F extends Look>(name: string, make: (beneath: F) => F): Handle
+  /**
+   * The Look that draws a piece: the newest set by the first of these names, an instance's then its kind's.
+   * Each Look's beneath is the one set before it by its name, then the newest by the next name, and at the end `fallback`.
+   */
+  lookOf<F extends Look>(names: readonly string[], fallback: F): F
   /** Names a model, such as a component's, so that anyone can read and change it; the newest by a name wins. */
   model<S extends object>(name: string, model: Model<S>): Handle
   modelOf<S extends object>(name: string): Model<S> | undefined

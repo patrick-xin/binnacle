@@ -1,9 +1,11 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Gestures, Handle, Layout, Model, Part, Screen, ThemeLayer, Tokens, Tone } from '../api.ts'
+import type { Binnacle, Gestures, Handle, Layout, Look, Model, Part, Screen, ThemeLayer, Tokens, Tone } from '../api.ts'
 import type { TerminalColorMode } from '../terminal/colors.ts'
 import { CHAT } from './chat.ts'
 import { actionsOf } from './gestures.ts'
+import { drawer } from './looks.ts'
+import type { Make } from './looks.ts'
 import { checkLayer, layered, painter } from './theme.ts'
 
 /** What the service asks of what draws. */
@@ -11,7 +13,7 @@ export interface Drawn {
   redraw(): void
   /** The Part is wrapped again at its next draw. */
   forget(part: Part): void
-  /** Every Part is wrapped again at its next draw: the theme changed. */
+  /** Every Part is wrapped again at its next draw: the theme or a Look changed. */
   forgetAll(): void
   colorMode(): TerminalColorMode
 }
@@ -36,6 +38,7 @@ export class BinnacleService extends Service implements Binnacle {
   // The Place a person moved the Focus to, for each Screen shown; null once the core forgot it.
   private readonly moved = new Map<Held<Screen>, string | null>()
   private readonly layers: Held<ThemeLayer>[] = []
+  private readonly looks = new Map<string, Held<Make>[]>()
   // Made again from the layers at the next read, after a layer comes or goes. A method runs on a traced copy, where a field set stays on the copy, so the field is an object that is changed.
   private readonly themed: { now?: Themed } = {}
   private readonly drawn: Drawn
@@ -62,6 +65,18 @@ export class BinnacleService extends Service implements Binnacle {
     }
     restyle()
     return this.hold(this.layers, layer, 'binnacle: a theme layer', undefined, restyle)
+  }
+
+  look<F extends Look>(name: string, make: (beneath: F) => F): Handle {
+    const restyle = (): void => this.drawn.forgetAll()
+    restyle()
+    return this.hold(listIn(this.looks, name), make as unknown as Make, 'binnacle: a look', undefined, restyle)
+  }
+
+  lookOf<F extends Look>(names: readonly string[], fallback: F): F {
+    // An instance can be named like its kind, and a name read twice would put each of its Looks twice in the chain.
+    const once = [...new Set(names)]
+    return drawer(() => once.flatMap((name) => (this.looks.get(name) ?? []).toReversed()), fallback)
   }
 
   get layoutOnView(): Layout {

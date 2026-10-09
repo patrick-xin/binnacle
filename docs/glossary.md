@@ -18,6 +18,7 @@ One canonical term for each concept that is binnacle's own, for a person who use
 
 - **Model** — an author's state, made with `createModel`, which tells its watchers after each change. A Part that lists its Models is drawn again after each change. Not dsh's model, the LLM that runs the agent. <a id="model"></a>
 - **Tone** — a colour of the theme, named by what is drawn in it, as pi and v0 name it: `accent`, `muted`, `border` and the rest. A Tone is a colour and attributes, and a theme layer changes it for everything drawn in it. Not a colour itself, such as `cyan`. <a id="tone"></a>
+- **Look** — how one piece of a component is drawn, such as a List's row, set by the component's kind, such as `list.row`, or by an instance's name, such as `request.choices.row`. A Look is handed the Look beneath it, and can draw that Look and add to it. An instance's Looks lie on its kind's, and those on the component's default. Not how the whole Screen looks, which is the theme. <a id="look"></a>
 
 ## The transcript
 
