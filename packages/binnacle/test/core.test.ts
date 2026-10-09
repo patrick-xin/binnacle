@@ -358,3 +358,28 @@ test('what a built-in row registers ranks beneath anything an author registers, 
     ],
   )
 })
+
+test('a Part placed while its plugin unloads is not held: the call throws, and the Place draws as before', async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 20, rows: 2 })
+  ready()
+  const thrown: unknown[] = []
+  const late = ctx.plugin({
+    name: 'late',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.effect(
+        () => () => {
+          try {
+            plugin.binnacle.place('transcript', { lines: () => ['late'] })
+          } catch (error) {
+            thrown.push(error)
+          }
+        },
+        'late: places as it unloads',
+      )
+    },
+  })
+  await late
+  await late.dispose()
+  assert.deepEqual([(await terminal.read()).rows, thrown.length], [['', ''], 1])
+})
