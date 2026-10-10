@@ -40,7 +40,7 @@ export interface Model<S extends object> extends Watchable {
 /** A colour of the theme's, named by what is drawn in it, as pi's themes name it. */
 export type Tone = 'text' | 'accent' | 'muted' | 'dim' | 'success' | 'warning' | 'error' | 'border' | 'borderAccent' | 'borderMuted'
 
-export type Glyph = 'mark' | 'unmarked' | 'checked' | 'unchecked' | 'rule' | 'separator' | 'more'
+export type Glyph = 'mark' | 'unmarked' | 'checked' | 'unchecked' | 'rule' | 'separator' | 'divider' | 'more'
 
 /** One of the terminal's sixteen colours, so the person's palette decides how it looks. */
 export type Sixteen =
@@ -130,6 +130,7 @@ interface Node extends Box {
 interface Kinds {
   readonly place?: never
   readonly row?: never
+  readonly separator?: never
   readonly column?: never
   readonly layout?: never
   readonly first?: never
@@ -140,7 +141,15 @@ interface Kinds {
 
 export type Layout =
   | (Node & Omit<Kinds, 'place'> & { readonly place: string })
-  | (Node & Omit<Kinds, 'row'> & { readonly row: readonly Layout[] })
+  | (Node &
+      Omit<Kinds, 'row' | 'separator'> & {
+        readonly row: readonly Layout[]
+        /**
+         * `true`: the row draws one line, the first line of each child that draws one, joined by the theme's `divider` glyph, and cut at its end with `more`.
+         * Each child is drawn at the row's whole width, with no size and no box, and `gap` does nothing.
+         */
+        readonly separator?: boolean
+      })
   | (Node & Omit<Kinds, 'column'> & { readonly column: readonly Layout[] })
   /** The Layout set by that name with `binnacle.layout(name, …)`. While it has no line to draw, it takes no cells, its box included. */
   | (Node & Omit<Kinds, 'layout'> & { readonly layout: string })

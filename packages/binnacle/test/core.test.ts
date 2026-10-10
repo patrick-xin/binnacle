@@ -202,7 +202,7 @@ test("a Part is asked for its lines once at a width, until it redraws: another P
   const { ctx, ready } = await mount({ columns: 20, rows: 4 })
   ready()
   let asked = 0
-  let status: Handle | undefined
+  let composer: Handle | undefined
   let transcript: Handle | undefined
   await ctx.plugin({
     name: 'author',
@@ -214,12 +214,12 @@ test("a Part is asked for its lines once at a width, until it redraws: another P
           return ['a line']
         },
       })
-      status = plugin.binnacle.place('status', { lines: () => ['status'] })
+      composer = plugin.binnacle.place('composer', { lines: () => ['draft'] })
     },
   })
   const placed = asked
-  status?.redraw()
-  status?.redraw()
+  composer?.redraw()
+  composer?.redraw()
   const afterOthers = asked
   transcript?.redraw()
   assert.deepEqual([placed > 0, afterOthers - placed, asked - afterOthers > 0], [true, 0, true])

@@ -2,7 +2,7 @@ import type { Layout, Part, Point, Screen } from '../api.ts'
 import { Display } from './display.ts'
 import type { Size } from './host.ts'
 import { arrange } from './layout.ts'
-import type { Hit, Placed } from './layout.ts'
+import type { Hit, Placed } from './arranged.ts'
 import type { Moved } from './service.ts'
 import type { Theme } from './theme.ts'
 import { Scroll } from './scroll.ts'
@@ -61,6 +61,7 @@ export class Drawing {
             this.#scroll.anchor(place, width, rows.length)
             return rows
           },
+          firstLine: (place, width) => this.#rows.firstLineOf(view.partIn(place), width),
           scrolledUp: (place) => this.#scroll.up(place),
           cursor: (place, width) => (place === focus ? this.#rows.cursorOf(view.partIn(place), width) : undefined),
           paged: (place, width) => this.#scroll.paged(place, view.partIn(place)?.cursor?.(width)),

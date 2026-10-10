@@ -53,7 +53,7 @@ export const DEFAULT_TOKENS: Tokens = {
     borderAccent: { color: 'cyan' },
     borderMuted: { dim: true },
   },
-  glyphs: { mark: '›', unmarked: ' ', checked: '[x]', unchecked: '[ ]', rule: '─', separator: ' | ', more: '…' },
+  glyphs: { mark: '›', unmarked: ' ', checked: '[x]', unchecked: '[ ]', rule: '─', separator: ' | ', divider: ' · ', more: '…' },
   edge: 'rounded',
   padding: 0,
   gap: 0,

@@ -67,6 +67,15 @@ test("the packed Requests' view gives what an author builds on, and AUTHORING.md
   )
 })
 
+test('the packed status line gives `STATUS_LAYOUT` to build on, and AUTHORING.md names it', async () => {
+  const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
+  const statusLine = await import(pathToFileURL(join(unpacked, exports['./plugins/status-line']!.default)).href)
+  assert.deepEqual(
+    [statusLine.STATUS_LAYOUT, read('AUTHORING.md').includes('STATUS_LAYOUT')],
+    [{ row: [{ place: 'status.state' }, { place: 'status.model' }], separator: true }, true],
+  )
+})
+
 test('the packed AUTHORING.md names every member of the author API, every export, every Tone, and how to load a plugin in a profile', () => {
   const guide = read('AUTHORING.md')
   const api = read('dist/api.d.ts')

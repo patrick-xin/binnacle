@@ -76,6 +76,12 @@ export class Rows {
     return wrapped
   }
 
+  firstLineOf(part: Part | undefined, width: number): string | undefined {
+    if (part === undefined || width < 1) return undefined
+    const [first] = this.#wrapped(part, width).lines
+    return first === undefined ? undefined : toStyledText(first)
+  }
+
   cursorOf(part: Part | undefined, width: number): { row: number; column: number } | undefined {
     const cursor = part?.cursor?.(width)
     if (part === undefined || cursor === undefined || width < 1) return undefined

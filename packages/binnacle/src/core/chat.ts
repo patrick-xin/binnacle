@@ -9,7 +9,7 @@ const deepFrozen = <T extends object>(value: T): T => {
 export const CHAT_LAYOUT: Layout & { readonly column: readonly Layout[] } = deepFrozen({
   column: [
     { place: 'transcript', size: 'fill' },
-    { place: 'status', size: 'content' },
+    { layout: 'status', size: 'content' },
     // A Request that stands is drawn in the composer's stead, by the Layout that the Requests' view sets.
     { layout: 'request', size: 'content' },
     { place: 'composer', size: 'content', unless: 'request' },
