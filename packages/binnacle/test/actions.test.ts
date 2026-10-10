@@ -276,3 +276,103 @@ test('a click that the Part does not take goes to the actions of its Place bound
   terminal.type(clickAt(0, 2))
   assert.deepEqual(at, [{ line: 1, column: 2 }])
 })
+
+test('an action that names no `place` keeps the Place of the action it hides, so an action set by the id of a Place’s action takes a key or a click only in that Place', async () => {
+  const ran: string[] = []
+  const { author, terminal, ctx } = await booted(10, 3)
+  await author('built-in', (plugin) => {
+    plugin.binnacle.layout('chat', {
+      column: [
+        { place: 'choices', size: { fixed: 1 } },
+        { place: 'line', size: { fixed: 1 } },
+      ],
+    })
+    plugin.binnacle.place('choices', { lines: () => ['choices'] })
+    plugin.binnacle.place('line', { lines: () => ['line'], key: () => false })
+    plugin.binnacle.action('choices.toggle', logging(ran, 'toggle', { keys: ['space', 'click'], place: 'choices' }))
+    plugin.binnacle.action('line.send', logging(ran, 'send', { keys: ['enter'], place: 'line' }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('choices.toggle', logging(ran, 'selects', { run: (_at, beneath) => beneath() }))
+  })
+  await terminal.read()
+  const steps: [string, () => void][] = [
+    ['space in line', () => (ctx.binnacle.focus('line'), terminal.type(' '))],
+    ['click in line', () => terminal.type(clickAt(0, 1))],
+    ['space in choices', () => (ctx.binnacle.focus('choices'), terminal.type(' '))],
+    ['click in choices', () => terminal.type(clickAt(0, 0))],
+  ]
+  const took = steps.map(([step, act]) => {
+    ran.length = 0
+    act()
+    return [step, [...ran]]
+  })
+  assert.deepEqual(took, [
+    ['space in line', []],
+    ['click in line', []],
+    ['space in choices', ['selects', 'toggle']],
+    ['click in choices', ['selects', 'toggle']],
+  ])
+})
+
+test('an action that names no `place` keeps the `first` of the action it hides, so it still takes its key before the Part with the Focus', async () => {
+  const ran: string[] = []
+  const typed: string[] = []
+  const { author, terminal } = await booted()
+  await author('built-in', (plugin) => {
+    plugin.binnacle.show({ name: 'ask', focus: 'line', layout: { place: 'line' } })
+    plugin.binnacle.place('line', line(typed))
+    plugin.binnacle.action('ask.next', logging(ran, 'next', { keys: ['tab'], place: 'line', first: true }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('ask.next', logging(ran, 'mine'))
+  })
+  await terminal.read()
+  terminal.type(TAB)
+  assert.deepEqual([ran, typed], [['mine'], []])
+})
+
+test("an action that names no `place` keeps the `first` that an action between it and the Place's action names", async () => {
+  const ran: string[] = []
+  const typed: string[] = []
+  const { author, terminal } = await booted()
+  await author('built-in', (plugin) => {
+    plugin.binnacle.show({ name: 'ask', focus: 'line', layout: { place: 'line' } })
+    plugin.binnacle.place('line', line(typed))
+    plugin.binnacle.action('ask.next', logging(ran, 'next', { keys: ['tab'], place: 'line', first: true }))
+  })
+  await author('after', (plugin) => {
+    plugin.binnacle.action('ask.next', logging(ran, 'after', { first: false }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('ask.next', logging(ran, 'mine'))
+  })
+  await terminal.read()
+  terminal.type(TAB)
+  assert.deepEqual([ran, typed], [[], [TAB]])
+})
+
+test('an action that names its own `place` acts there, not in the Place of the action it hides', async () => {
+  const ran: string[] = []
+  const { author, terminal, ctx } = await booted(10, 3)
+  await author('built-in', (plugin) => {
+    plugin.binnacle.layout('chat', {
+      column: [
+        { place: 'choices', size: { fixed: 1 } },
+        { place: 'line', size: { fixed: 1 } },
+      ],
+    })
+    plugin.binnacle.place('choices', { lines: () => ['choices'] })
+    plugin.binnacle.place('line', { lines: () => ['line'], key: () => false })
+    plugin.binnacle.action('choices.toggle', logging(ran, 'toggle', { keys: ['space'], place: 'choices' }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('choices.toggle', logging(ran, 'mine', { place: 'line' }))
+  })
+  await terminal.read()
+  ctx.binnacle.focus('choices')
+  terminal.type(' ')
+  ctx.binnacle.focus('line')
+  terminal.type(' ')
+  assert.deepEqual(ran, ['mine'])
+})

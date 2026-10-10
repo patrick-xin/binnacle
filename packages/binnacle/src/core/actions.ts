@@ -69,18 +69,19 @@ export class Actions {
    */
   key(data: string, focus: string | undefined, first: boolean): boolean {
     const takers = this.#tops().filter((entry) => this.#keysOf(entry).some((key) => matchesKey(data, key as KeyId)))
-    const inFocus = takers.filter(({ item }) => focus !== undefined && actsIn(item.action, focus))
+    const placed = takers.map((entry) => ({ entry, ...this.#placeOf(entry) }))
+    const inFocus = placed.filter(({ place }) => focus !== undefined && actsIn(place, focus))
     const taker = first
-      ? inFocus.find(({ item }) => item.action.first === true)
-      : (inFocus.find(({ item }) => item.action.first !== true) ?? takers.find(({ item }) => item.action.place === undefined))
+      ? inFocus.find((action) => action.first === true)
+      : (inFocus.find((action) => action.first !== true) ?? placed.find(({ place }) => place === undefined))
     if (taker === undefined) return false
-    this.#run(taker, undefined)
+    this.#run(taker.entry, undefined)
     return true
   }
 
   /** A click that the Part in the Place did not take, by its gesture's name, such as `click` or `shift+click`. True when an action took it. */
   click(gesture: string, place: string, at: Point | undefined): boolean {
-    const taker = this.#tops().find((entry) => actsIn(entry.item.action, place) && this.#keysOf(entry).includes(gesture))
+    const taker = this.#tops().find((entry) => actsIn(this.#placeOf(entry).place, place) && this.#keysOf(entry).includes(gesture))
     if (taker === undefined) return false
     this.#run(taker, at)
     return true
@@ -88,7 +89,7 @@ export class Actions {
 
   /** True while an action is set that acts in the Place, enabled or not, so that the Focus stays while one is disabled for a moment. */
   actsIn(place: string): boolean {
-    return this.#set.some(({ item }) => actsIn(item.action, place))
+    return this.#set.some(({ item }) => actsIn(item.action.place, place))
   }
 
   #run(entry: SetAction, at: Point | undefined): void {
@@ -117,11 +118,7 @@ export class Actions {
   /** An action that names no keys, or no kind, keeps those of the action it hides, so that a plugin that changes what an action does need not repeat its keys. */
   #keysOf(entry: SetAction): readonly string[] {
     const { id } = entry.item
-    const hidden = this.#set
-      .slice(0, this.#set.indexOf(entry) + 1)
-      .filter(({ item }) => item.id === id)
-      .toReversed()
-      .map(({ item }) => item.action)
+    const hidden = this.#hidden(entry)
     const kind = hidden.find((action) => action.kind !== undefined)?.kind
     return (
       this.#bound(id) ??
@@ -131,13 +128,30 @@ export class Actions {
     )
   }
 
+  /** An action that names no Place keeps the Place and the `first` of the action it hides, so that an action set by the id of a Place's action acts only in that Place. */
+  #placeOf(entry: SetAction): { readonly place: Action['place'] | undefined; readonly first: boolean | undefined } {
+    const hidden = this.#hidden(entry)
+    const placed = hidden.findIndex((action) => action.place !== undefined)
+    const kept = placed === -1 ? hidden : hidden.slice(0, placed + 1)
+    return { place: placed === -1 ? undefined : hidden[placed]!.place, first: kept.find((action) => action.first !== undefined)?.first }
+  }
+
+  /** The action and each action that it hides, by its id, newest first. */
+  #hidden(entry: SetAction): readonly Action[] {
+    const { id } = entry.item
+    return this.#set
+      .slice(0, this.#set.indexOf(entry) + 1)
+      .filter(({ item }) => item.id === id)
+      .toReversed()
+      .map(({ item }) => item.action)
+  }
+
   #bound(name: string): readonly string[] | undefined {
     return this.#bindings.findLast(({ item }) => item.name === name)?.item.keys
   }
 }
 
-function actsIn(action: Action, place: string): boolean {
-  const { place: own } = action
+function actsIn(own: Action['place'], place: string): boolean {
   if (own === undefined) return false
   return typeof own === 'string' ? own === place : own.includes(place)
 }

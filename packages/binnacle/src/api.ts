@@ -190,9 +190,9 @@ export interface Action {
   run(at: Point | undefined, beneath: () => void): void
   /** The gestures it is bound to until someone binds it or its kind: keys by name, such as `enter`, `space`, `tab` or `ctrl+n`, and `click`. */
   readonly keys?: readonly string[]
-  /** It takes a gesture only while this Place, or one of these, has the Focus, or for a click, while the click is in it. With none, it takes a key wherever the Focus is. A Place that an action acts in takes the Focus. */
+  /** It takes a gesture only while this Place, or one of these, has the Focus, or for a click, while the click is in it. With none, it keeps the Place of the action it hides, and with none there either, it takes a key wherever the Focus is. A Place that an action acts in takes the Focus. */
   readonly place?: string | readonly string[]
-  /** An action of a Place takes its key before the Part with the Focus, such as tab while a line is being typed. An action with no Place is never before the Part. */
+  /** An action of a Place takes its key before the Part with the Focus, such as tab while a line is being typed. An action with no Place is never before the Part. An action that names no Place keeps the newest `first` named among the actions it hides, down to the action whose Place it keeps. */
   readonly first?: boolean
   /** The name that every action of its kind shares, such as `list.toggle`: binding the kind binds each of them. */
   readonly kind?: string
