@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Binnacle } from '../src/api.ts'
+import { createModel } from '../src/core/model.ts'
 import { mount } from './support/mount.ts'
 
 type Row = (label: string) => string
@@ -28,12 +29,12 @@ async function drawn() {
       tags(ctx.binnacle, 'trees', ['oak'])
     },
   })
-  const looker = (name: string, make: (beneath: Row) => Row) =>
+  const looker = (name: string, make: (beneath: Row) => Row, options?: Parameters<Binnacle['look']>[2]) =>
     mounted.ctx.plugin({
       name: `look of ${name}`,
       inject: ['binnacle'],
       apply: (ctx: Context) => {
-        ctx.binnacle.look(name, make)
+        ctx.binnacle.look(name, make, options)
       },
     })
   const rows = async () => (await mounted.terminal.read()).rows.map((row) => row.trimEnd())
@@ -123,4 +124,22 @@ test("an instance named like its kind draws each of the kind's Looks once, down 
   })
   await looker('tags.row', (beneath) => (label) => `[${beneath(label)}]`)
   assert.deepEqual(await rows(), ['[- elm]', '[- oak]'])
+})
+
+test('a look that names the models it reads draws again when one of them changes, though the Part it draws in names none', async () => {
+  const { looker, rows } = await drawn()
+  const marks = createModel({ mark: '*' })
+  const unread = createModel({})
+  await looker('tags.row', () => (label) => `${marks.state.mark} ${label}`, { models: [unread, marks] })
+  const before = await rows()
+  marks.set((state) => {
+    state.mark = '+'
+  })
+  assert.deepEqual(
+    [before, await rows()],
+    [
+      ['* fig', '* oak'],
+      ['+ fig', '+ oak'],
+    ],
+  )
 })
