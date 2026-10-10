@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import * as transcript from '../../src/plugins/transcript/index.ts'
-import type { TranscriptState } from '../../src/plugins/transcript/index.ts'
+import type { EventLook, LiveBlock, LiveLook, TranscriptState } from '../../src/plugins/transcript/index.ts'
 import { gestureTable } from '../../src/core/gestures.ts'
 import { mount } from '../support/mount.ts'
 import { persistence } from '../support/sessions.ts'
@@ -523,4 +523,159 @@ test("a click on an event's header runs transcript.click, which an author sets b
   const rows = (await terminal.read()).rows
   terminal.type(clickAt(0, 3))
   assert.deepEqual([clicked, (await terminal.read()).rows], [[3], rows])
+})
+
+const calls: Stored = {
+  id: 'session-stored',
+  createdAt: 1,
+  events: [
+    { seq: 0, type: 'user/message', time: 2, data: { text: 'hello' } },
+    { seq: 1, type: 'tool/call', time: 3, data: { name: 'read', arguments: '{"path":"a/very/long/path/to/a/file.ts"}' } },
+    { seq: 2, type: 'tool/call', time: 4, data: { name: 'ls', arguments: '{}' } },
+  ],
+}
+
+const oneLine = (ctx: Context) =>
+  ctx.binnacle.look<EventLook>('transcript.event.tool/call', () => (event, { width }) => {
+    const { name, arguments: args } = event.data as { name: string; arguments: string }
+    return [`* ${name}(${args})`.slice(0, width)]
+  })
+
+test('an event draws through the Look transcript.event.<type>, given the event and the width, and returns its lines', async () => {
+  const { ctx, terminal } = await reading([calls])
+  oneLine(ctx)
+  assert.deepEqual((await terminal.read()).rows, [
+    '▾ #0 user/message',
+    '{',
+    '  "text": "hello"',
+    '}',
+    '',
+    '* read({"path":"a/very/long/path/to/a/fi',
+    '* ls({})',
+    '',
+  ])
+  assert.deepEqual([await terminal.inverseAt(0, 5), await terminal.inverseAt(0, 6)], [false, true])
+})
+
+test('the Look transcript.event lies beneath each transcript.event.<type>, and is given whether the event is folded', async () => {
+  const { ctx, terminal } = await reading([stored])
+  ctx.binnacle.look<EventLook>('transcript.event', (beneath) => (event, at) => [
+    `${at.folded ? '+' : '-'} ${event.type}`,
+    ...beneath(event, at).slice(1),
+  ])
+  ctx.binnacle.look<EventLook>(
+    'transcript.event.user/message',
+    (beneath) => (event, at) => beneath(event, at).map((line) => line.toUpperCase()),
+  )
+  assert.deepEqual((await terminal.read()).rows.slice(0, 7), ['- USER/MESSAGE', '{', '  "TEXT": "HELLO"', '}', '', '- test/marker', '{}'])
+  terminal.type(ENTER)
+  assert.deepEqual((await terminal.read()).rows.slice(5, 7), ['+ test/marker', ''])
+})
+
+test("the view Marks an event's first line that its Look draws, along the whole line however the Look styles it", async () => {
+  const { ctx, terminal } = await reading([stored], undefined, 3)
+  ctx.binnacle.look<EventLook>('transcript.event', () => (event) => [`\x1b[1m>\x1b[0m ${ctx.binnacle.paint('muted', event.type)}`])
+  assert.deepEqual((await terminal.read()).rows, ['> user/message', '> test/marker', ''])
+  assert.deepEqual([await terminal.inverseAt(0, 1), await terminal.inverseAt(2, 1), await terminal.inverseAt(0, 0)], [true, true, false])
+})
+
+test('the Mark holds past a reset that a Look joins with another style in one sequence', async () => {
+  const { ctx, terminal } = await reading([stored], undefined, 3)
+  ctx.binnacle.look<EventLook>('transcript.event', () => () => ['prefix\x1b[0;31m suffix'])
+  assert.deepEqual([await terminal.inverseAt(0, 1), await terminal.inverseAt(8, 1)], [true, true])
+})
+
+test('a click on the first line of an event that a Look draws lands on that event', async () => {
+  const store = persistence([calls])
+  const mounted = await mount({
+    args: ['--session', 'session-stored'],
+    columns: 40,
+    rows: 10,
+    provide: (each) => each.provide('sessionPersistence', store),
+  })
+  mounted.ready()
+  await mounted.ctx.plugin(transcript)
+  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
+  await settled()
+  const { ctx, terminal } = mounted
+  oneLine(ctx)
+  await terminal.read()
+  terminal.type(clickAt(0, 6))
+  await terminal.read()
+  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [2, [2]])
+})
+
+test('an event whose Look draws no line takes no row, and up and down pass over it', async () => {
+  const { ctx, terminal } = await reading([three], ['--session', 'session-stored'], 9)
+  ctx.binnacle.look<EventLook>('transcript.event.test/two', () => () => [])
+  assert.deepEqual((await terminal.read()).rows, ['▾ #0 test/one', '{}', '', '▾ #2 test/three', '{}', '', '', '', ''])
+  terminal.type(UP)
+  assert.deepEqual([await terminal.inverseAt(0, 0), stateOf(ctx).state?.marked], [true, 0])
+  terminal.type(DOWN)
+  assert.deepEqual([await terminal.inverseAt(0, 3), stateOf(ctx).state?.marked], [true, 2])
+})
+
+test('a Marked event that draws no line has the Mark drawn on the next event that draws, else the one before, else nowhere, and marked stays', async () => {
+  const { ctx, terminal } = await reading([three], ['--session', 'session-stored'], 9)
+  const hidden = new Set(['test/two'])
+  const handle = ctx.binnacle.look<EventLook>(
+    'transcript.event',
+    (beneath) => (event, at) => (hidden.has(event.type) ? [] : beneath(event, at)),
+  )
+  stateOf(ctx).set((state) => (state.marked = 1))
+  assert.deepEqual([await terminal.inverseAt(0, 0), await terminal.inverseAt(0, 3)], [false, true])
+  hidden.add('test/three')
+  handle.dispose()
+  ctx.binnacle.look<EventLook>('transcript.event', (beneath) => (event, at) => (hidden.has(event.type) ? [] : beneath(event, at)))
+  assert.deepEqual([(await terminal.read()).rows[0], await terminal.inverseAt(0, 0)], ['▾ #0 test/one', true])
+  hidden.add('test/one')
+  ctx.binnacle.look<EventLook>('transcript.event', (beneath) => (event, at) => (hidden.has(event.type) ? [] : beneath(event, at)))
+  assert.deepEqual((await terminal.read()).rows, ['', '', '', '', '', '', '', '', ''])
+  hidden.clear()
+  ctx.binnacle.look<EventLook>('transcript.event', (beneath) => (event, at) => beneath(event, at))
+  assert.deepEqual([stateOf(ctx).state?.marked, await terminal.inverseAt(0, 3)], [1, true])
+})
+
+test('a marked that is not an event is drawn on the next event that draws, else the one before', async () => {
+  const { ctx, terminal } = await reading([calls], undefined, 8)
+  oneLine(ctx)
+  stateOf(ctx).set((state) => (state.marked = 1.5))
+  assert.deepEqual([await terminal.inverseAt(0, 6), stateOf(ctx).state?.marked], [true, 1.5])
+  stateOf(ctx).set((state) => (state.marked = 9))
+  assert.deepEqual([await terminal.inverseAt(0, 6), await terminal.inverseAt(0, 5)], [true, false])
+})
+
+test('up, down and enter act from where the Mark is drawn, and set marked to the event they reach', async () => {
+  const { ctx, terminal } = await reading([three], ['--session', 'session-stored'], 9)
+  ctx.binnacle.look<EventLook>('transcript.event.test/two', () => () => [])
+  stateOf(ctx).set((state) => (state.marked = 1))
+  terminal.type(ENTER)
+  await terminal.read()
+  assert.deepEqual([stateOf(ctx).state?.folded, stateOf(ctx).state?.marked], [[2], 1])
+  terminal.type(UP)
+  await terminal.read()
+  assert.equal(stateOf(ctx).state?.marked, 0)
+})
+
+test('the live block draws through the Look transcript.live, given its blocks and the width', async () => {
+  const { ctx, dsh, drawn } = await talking(3)
+  const given: [readonly LiveBlock[], number][] = []
+  ctx.binnacle.look<LiveLook>('transcript.live', (beneath) => (blocks, width) => {
+    given.push([blocks, width])
+    return beneath(
+      blocks.filter((block) => block.kind !== 'reasoning'),
+      width,
+    )
+  })
+  dsh.stream(ctx, { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 })
+  dsh.stream(ctx, chunk(0, { type: 'reasoning-delta', index: 0, text: 'think' }))
+  dsh.stream(ctx, chunk(1, { type: 'text-delta', index: 1, text: 'Hello' }))
+  assert.deepEqual(await drawn(), ['~ streaming', 'text', 'Hello'])
+  assert.deepEqual(given.at(-1), [
+    [
+      { kind: 'reasoning', text: 'think' },
+      { kind: 'text', text: 'Hello' },
+    ],
+    40,
+  ])
 })
