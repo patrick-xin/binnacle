@@ -17,13 +17,17 @@ interface Slot {
   /** Drawn only where the node's parent is a row, a column or a `first`: beside the root, `over` or `float`, an insert draws nothing. */
   readonly before: Slot[]
   readonly after: Slot[]
+  /** Whether what is put beside it is drawn. */
+  readonly listed: boolean
   /** What stands in its place after a replace, or `null` after a remove. */
   stands?: Layout | null
+  /** The Slot that a move drew it in, elsewhere. What was inserted beside it stays in its old place. */
+  moved?: Slot
 }
 
 const NOTHING: Layout = { column: [] }
 
-const kindOf = (edit: Edit): number => (edit.insert !== undefined ? 0 : edit.replace !== undefined ? 1 : 2)
+const kindOf = (edit: Edit): number => (edit.insert !== undefined ? 0 : edit.move !== undefined ? 1 : edit.replace !== undefined ? 2 : 3)
 
 // Plain comparison of code units, not of the locale's, so the order is the same on every machine.
 const compare = (a: string | undefined, b: string | undefined): number => {
@@ -39,14 +43,20 @@ const ranked = (a: Held<Made>, b: Held<Made>): number =>
   compare(a.item.plugin, b.item.plugin) ||
   compare(JSON.stringify(a.item.edit), JSON.stringify(b.item.edit))
 
-function slotOf(node: Layout, rank = -1): Slot {
-  const children = node.row ?? node.column ?? node.first ?? (node.over === undefined ? [] : [node.over, node.float])
-  return { node, rank, children: children.map((child) => slotOf(child)), before: [], after: [] }
+function slotOf(node: Layout, rank = -1, listed = false): Slot {
+  const list = node.row ?? node.column ?? node.first
+  const children = list ?? (node.over === undefined ? [] : [node.over, node.float])
+  return { node, rank, children: children.map((child) => slotOf(child, -1, list !== undefined)), before: [], after: [], listed }
 }
 
-/** Depth first, children in order and `over` before `float`. A named Layout that the node draws is not looked in. */
+const where = (slot: Slot): Slot => (slot.moved === undefined ? slot : where(slot.moved))
+
+/**
+ * Depth first, children in order and `over` before `float`. A named Layout that the node draws is not looked in.
+ * A moved node is found in its old place, so that of two nodes by one name, the first stays the one found, and is given where it went.
+ */
 function find(slot: Slot, anchor: string): Slot | undefined {
-  if (slot.node.place === anchor || slot.node.layout === anchor) return slot
+  if (slot.node.place === anchor || slot.node.layout === anchor) return where(slot)
   for (const child of slot.children) {
     const found = find(child, anchor)
     if (found !== undefined) return found
@@ -54,7 +64,17 @@ function find(slot: Slot, anchor: string): Slot | undefined {
   return undefined
 }
 
+const findIn = (slots: readonly Slot[], anchor: string): Slot | undefined =>
+  slots.reduce<Slot | undefined>((first, slot) => first ?? find(slot, anchor), undefined)
+
+/** Puts the slot beside the anchor's, where the rank of its edit puts it among the others there. */
+function put(found: Slot, slot: Slot, after: boolean): void {
+  const side = after ? found.after : found.before
+  side.splice(side.findLastIndex((other) => other.rank < slot.rank) + 1, 0, slot)
+}
+
 function built(slot: Slot): Layout | undefined {
+  if (slot.moved !== undefined) return undefined
   if (slot.stands !== undefined) return slot.stands ?? undefined
   const { node, children } = slot
   const listed = (): Layout[] => children.flatMap(beside).flatMap((each) => built(each) ?? [])
@@ -65,7 +85,11 @@ function built(slot: Slot): Layout | undefined {
   return node
 }
 
-const beside = (slot: Slot): Slot[] => [...slot.before.flatMap(beside), slot, ...slot.after.flatMap(beside)]
+const beside = (slot: Slot): Slot[] => [
+  ...slot.before.flatMap(beside),
+  ...(slot.moved === undefined ? [slot] : []),
+  ...slot.after.flatMap(beside),
+]
 
 /** The Layout with each edit applied, in the order that ranks them, whichever was made first. */
 export function edited(layout: Layout, edits: readonly Held<Made>[]): Layout {
@@ -78,16 +102,25 @@ export function edited(layout: Layout, edits: readonly Held<Made>[]): Layout {
   for (let left = waiting.length; left > 0; left = waiting.length) {
     waiting = waiting.filter(({ edit, rank }) => {
       const anchor = (edit.after ?? edit.before)!
-      const found = find(root, anchor) ?? added.reduce<Slot | undefined>((first, slot) => first ?? find(slot, anchor), undefined)
+      const found = find(root, anchor) ?? findIn(added, anchor)
       if (found === undefined) return true
-      const slot = slotOf(edit.insert!, rank)
-      const side = edit.after === undefined ? found.before : found.after
+      const slot = slotOf(edit.insert!, rank, found.listed)
       // An insert that waited a round for its anchor still goes where its rank puts it, not after those that did not wait.
-      side.splice(side.findLastIndex((other) => other.rank < rank) + 1, 0, slot)
+      put(found, slot, edit.after !== undefined)
       added.push(slot)
       return false
     })
     if (waiting.length === left) break
+  }
+  for (const [rank, edit] of sorted.entries()) {
+    if (edit.move === undefined) continue
+    const node = find(root, edit.move) ?? findIn(added, edit.move)
+    const anchor = (edit.after ?? edit.before)!
+    const found = find(root, anchor) ?? findIn(added, anchor)
+    if (node === undefined || found === undefined || found === node || !found.listed) continue
+    const slot = slotOf(node.node, rank, true)
+    node.moved = slot
+    put(found, slot, edit.after !== undefined)
   }
   for (const edit of sorted) {
     const anchor = edit.replace ?? edit.remove

@@ -803,6 +803,108 @@ test('inserts beside a node that another insert added keep their order, after it
   ])
 })
 
+test("`binnacle.edit` moves the composer above the transcript with one edit, and its size and `unless: 'request'` come with it", async () => {
+  const { ctx, terminal, rows } = await drawn(10, 4, (binnacle) => {
+    binnacle.edit('chat', { move: 'composer', before: 'transcript' })
+    binnacle.place('transcript', part('t1', 't2', 't3'))
+    statusLine(binnacle, 'working')
+    composerLine(binnacle, 'draft')
+  })
+  await ctx.plugin(
+    plugin('requests', (binnacle) => {
+      binnacle.layout('request', { place: 'request' })
+      binnacle.place('request', part('asking'))
+    }),
+  )
+  assert.deepEqual(
+    [rows, (await terminal.read()).rows],
+    [
+      ['draft', 't2', 't3', 'working'],
+      ['t2', 't3', 'working', 'asking'],
+    ],
+  )
+})
+
+test('a move takes its node, with its box, out of its place and puts it after or before the other anchor, among the nodes as set or that inserts added', async () => {
+  const layout: Layout = { column: [{ place: 'a', size: 'content', border: ['top'] }, one('b'), one('c')] }
+  const seen: string[][] = []
+  for (const edits of [
+    [{ move: 'a', after: 'c' }],
+    [{ move: 'c', before: 'a' }],
+    [
+      { move: 'b', after: 'x' },
+      { insert: one('x'), after: 'c' },
+    ],
+  ] satisfies Edit[][])
+    seen.push(await edited(10, 5, layout, [editor('author', edits)]))
+  assert.deepEqual(seen, [
+    ['b', 'c', '──────────', 'a', ''],
+    ['c', '──────────', 'a', 'b', ''],
+    ['──────────', 'a', 'c', 'x', 'b'],
+  ])
+})
+
+test('a move whose node or place is not there, or whose place is beside itself, the root, an `over` or a `float`, does nothing', async () => {
+  const seen: string[][] = []
+  for (const [layout, edits] of [
+    [{ column: [one('a'), one('b')] }, [{ move: 'z', before: 'a' }]],
+    [{ column: [one('a'), one('b')] }, [{ move: 'a', after: 'z' }]],
+    [{ column: [one('a'), one('b')] }, [{ move: 'a', after: 'a' }]],
+    [{ over: { column: [one('a'), one('b')] }, float: one('c'), at: { side: 'bottom', width: 4 } }, [{ move: 'a', after: 'c' }]],
+  ] satisfies [Layout, Edit[]][])
+    seen.push(await edited(10, 3, layout, [editor('author', edits)]))
+  assert.deepEqual(seen, [
+    ['a', 'b', ''],
+    ['a', 'b', ''],
+    ['a', 'b', ''],
+    ['a', 'b', '   c'],
+  ])
+})
+
+test('moves apply after inserts and before replaces and removes: an insert beside the moved node stays in its old place, and a replace or a remove acts on the node where it was moved', async () => {
+  const layout: Layout = { column: [one('a'), one('b'), one('c')] }
+  const seen: string[][] = []
+  for (const edits of [
+    [
+      { move: 'a', after: 'c' },
+      { insert: one('x'), after: 'a' },
+    ],
+    [
+      { replace: 'a', with: one('y') },
+      { move: 'a', after: 'c' },
+    ],
+    [{ remove: 'a' }, { move: 'a', after: 'c' }, { insert: one('x'), before: 'b' }],
+  ] satisfies Edit[][])
+    seen.push(await edited(10, 4, layout, [editor('author', edits)]))
+  assert.deepEqual(seen, [
+    ['x', 'b', 'c', 'a'],
+    ['b', 'c', 'y', ''],
+    ['x', 'b', 'c', ''],
+  ])
+})
+
+test('of two nodes by one name, a move, a replace and a remove each act on the first of the Layout as set, where a move put it', async () => {
+  const layout: Layout = { column: [{ place: 'a', size: 'content', border: ['top'] }, one('b'), one('a')] }
+  const seen: string[][] = []
+  for (const edits of [
+    [{ move: 'a', after: 'b' }, { remove: 'a' }],
+    [
+      { move: 'a', after: 'b' },
+      { replace: 'a', with: one('y') },
+    ],
+    [
+      { move: 'a', after: 'b' },
+      { move: 'a', before: 'b' },
+    ],
+  ] satisfies Edit[][])
+    seen.push(await edited(10, 4, layout, [editor('author', edits)]))
+  assert.deepEqual(seen, [
+    ['b', 'a', '', ''],
+    ['b', 'y', 'a', ''],
+    ['──────────', 'a', 'b', 'a'],
+  ])
+})
+
 test('an edit looks through rows, columns, `first`, `over` and `float`, the first node found by the name first, and never inside a named Layout that the Layout draws', async () => {
   const { rows } = await drawn(10, 5, (binnacle) => {
     binnacle.layout('chat', {

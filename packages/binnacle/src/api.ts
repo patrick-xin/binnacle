@@ -167,6 +167,7 @@ interface Edits {
   readonly insert?: never
   readonly after?: never
   readonly before?: never
+  readonly move?: never
   readonly remove?: never
   readonly replace?: never
   readonly with?: never
@@ -174,11 +175,14 @@ interface Edits {
 
 /**
  * A change to one node of a Layout, which it names by an anchor: the name in a node's `place` or `layout`.
- * `insert` adds a node beside the anchor's, `remove` takes the anchor's node out, and `replace` puts `with` in its place.
+ * `insert` adds a node beside the anchor's, `move` takes the anchor's node out of its place and puts it beside the other anchor,
+ * `remove` takes the anchor's node out, and `replace` puts `with` in its place.
  */
 export type Edit =
   | (Omit<Edits, 'insert' | 'after'> & { readonly insert: Layout; readonly after: string })
   | (Omit<Edits, 'insert' | 'before'> & { readonly insert: Layout; readonly before: string })
+  | (Omit<Edits, 'move' | 'after'> & { readonly move: string; readonly after: string })
+  | (Omit<Edits, 'move' | 'before'> & { readonly move: string; readonly before: string })
   | (Omit<Edits, 'remove'> & { readonly remove: string })
   | (Omit<Edits, 'replace' | 'with'> & { readonly replace: string; readonly with: Layout })
 
@@ -264,9 +268,10 @@ export interface Binnacle {
   layout(name: string, layout: Layout): Handle
   /**
    * Changes one node of the Layout or Screen by that name, and keeps the rest. It applies at each draw, to the newest Layout by that name; while its anchor is not there, it does nothing.
-   * Inserts apply first, then replaces, then removes. A replace or a remove acts on the node its anchor names in the Layout as set, never on a node that an insert added.
+   * Inserts apply first, then moves, then replaces, then removes. A move finds its two anchors as an insert does, and does nothing while either is not there.
+   * A replace or a remove acts on the node its anchor names in the Layout as set, where a move put it, never on a node that an insert added.
    * Within each kind, a built-in's apply before an author's, then they go by the name of the plugin that made each, so the order never depends on which loads first.
-   * An insert needs a row, a column or a `first` around its anchor. Of several inserts after one anchor, the first in that order is next to it; before it, the last is.
+   * An insert, or a move, needs a row, a column or a `first` around its anchor. Of several inserts after one anchor, the first in that order is next to it; before it, the last is.
    */
   edit(name: string, edit: Edit): Handle
   /** Fills the Place by that name on every Screen; the newest Part wins. */
