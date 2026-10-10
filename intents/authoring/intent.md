@@ -67,6 +67,10 @@ Stage 1:
 
 The prototype and its two trials are in [#180](https://github.com/patrick-xin/binnacle/issues/180).
 
+Stage 2:
+
+- [#224](https://github.com/patrick-xin/binnacle/issues/224) The status line, made of segments an author edits one at a time.
+
 ## Open questions
 
 None.
