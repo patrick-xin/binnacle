@@ -192,6 +192,34 @@ test('an empty typed answer is not written, and the Line stays', async () => {
   )
 })
 
+test('the Line takes the Focus when the person opens it from the Choices, and the Choices take it back when esc closes it, while a Place above the Request takes keys', async () => {
+  const above: string[] = []
+  const { ctx, dsh, rows, typed } = await chat({
+    before: (context) =>
+      context.plugin({
+        name: 'above',
+        inject: ['binnacle'],
+        apply: (author: Context) => {
+          author.binnacle.place('transcript', {
+            lines: () => [''],
+            key: (data) => {
+              above.push(data)
+              return true
+            },
+          })
+        },
+      }),
+  })
+  const answer = ask(ctx, dsh, [{ id: 'q1', question: 'Colour?', options: [{ label: 'Red' }, { label: 'Blue' }] }])
+  await rows()
+  assert.deepEqual((await typed(DOWN, DOWN, ENTER, 'G')).slice(-3), ['Colour?', '› G ', RULE])
+  await typed(ESC)
+  await escaped()
+  await typed(UP, ENTER)
+  assert.deepEqual(above, [])
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['Blue'] }] })
+})
+
 test("esc on the Line goes back to the Choices, with the Line's text and the selected options kept", async () => {
   const { ctx, dsh, rows, typed } = await chat()
   const answer = ask(ctx, dsh, [

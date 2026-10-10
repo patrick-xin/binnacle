@@ -42,8 +42,6 @@ export interface DrawnPlaces {
   scroll(place: string, pages: number): void
   /** How many of the Part's lines the Place shows, a wrapped line counted once; none while it is not drawn. */
   linesShown(place: string): number | undefined
-  /** The Place with the Focus, as it was last drawn. */
-  focusedPlace(): string | undefined
 }
 
 /** The Place the Focus was moved to, and whether it has had the Focus since. */
@@ -88,6 +86,7 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly models = new Map<string, Held<Model<object>>[]>()
   // The Place the Focus was moved to, for each Screen shown; null once the core forgot it.
   private readonly moved = new Map<Held<Screen>, Moved | null>()
+  private readonly movedLast = new Map<Held<Screen>, string>()
   private readonly layers: Held<ThemeLayer>[] = []
   private readonly looks = new Map<string, Held<Make>[]>()
   // One list for every id, oldest first, as the newest set wins among actions of different ids.
@@ -176,6 +175,7 @@ export class BinnacleService extends Service implements Binnacle {
   /** A person or an author moved the Focus on the Screen on view. */
   moveFocus(place: string): void {
     this.moved.set(this.shown(), { place, had: false })
+    this.movedLast.set(this.shown(), place)
     this.drawn.redraw()
   }
 
@@ -192,11 +192,12 @@ export class BinnacleService extends Service implements Binnacle {
     return this.drawn.places.linesShown(place)
   }
 
-  /** The Place with the Focus, or the Place it was moved to that is still to draw. Not in the author's `Binnacle`. */
-  focusedPlace(): string | undefined {
-    const moved = this.focusMovedTo()
-    if (typeof moved === 'object' && moved !== null && !moved.had) return moved.place
-    return this.drawn.places.focusedPlace()
+  /**
+   * The Place that a person or an author last moved the Focus to on the Screen on view, kept after the core forgets it; none if no one moved it. Not in the author's `Binnacle`.
+   * A Place that stops taking keys loses the Focus at the draw that finds it so, which can come before a watcher of the change that hid it.
+   */
+  focusMovedLast(): string | undefined {
+    return this.movedLast.get(this.shown())
   }
 
   /** The Focus moved on the Screen on view is forgotten: its Place had it and stopped taking keys. */
@@ -209,7 +210,10 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   show(screen: Screen): Handle {
-    return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, (entry) => this.moved.delete(entry))
+    return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, (entry) => {
+      this.moved.delete(entry)
+      this.movedLast.delete(entry)
+    })
   }
 
   layout(name: string, layout: Layout): Handle {

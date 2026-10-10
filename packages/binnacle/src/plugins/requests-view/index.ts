@@ -93,7 +93,7 @@ export function keyOf(request: Request | undefined): string {
 
 /** The core's own, which an author's `Binnacle` need not have. */
 interface Focused {
-  focusedPlace?(): string | undefined
+  focusMovedLast?(): string | undefined
 }
 
 export function apply(ctx: Context): void {
@@ -102,7 +102,7 @@ export function apply(ctx: Context): void {
   const models = [requests]
   const shown = (): Request | undefined => requests.shown
   const ownsFocus = (): boolean => {
-    const place = (binnacle as Binnacle & Focused).focusedPlace?.()
+    const place = (binnacle as Binnacle & Focused).focusMovedLast?.()
     return place === undefined || place === 'request.choices' || place === 'request.line'
   }
   const typing = (): QuestionRequest | undefined => {
