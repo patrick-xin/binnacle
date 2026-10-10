@@ -70,6 +70,8 @@ The prototype and its two trials are in [#180](https://github.com/patrick-xin/bi
 Stage 2:
 
 - [#224](https://github.com/patrick-xin/binnacle/issues/224) The status line, made of segments an author edits one at a time.
+- [#236](https://github.com/patrick-xin/binnacle/issues/236) The composer, made of a draft, its actions and a Layout an author changes one at a time.
+- [#248](https://github.com/patrick-xin/binnacle/issues/248) The transcript, drawn by a Look for each type of event, with a model and actions an author changes one at a time.
 
 ## Open questions
 
