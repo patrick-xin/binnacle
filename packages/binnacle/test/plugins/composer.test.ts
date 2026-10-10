@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import * as composer from '../../src/plugins/composer/index.ts'
+import type { ComposerState } from '../../src/plugins/composer/index.ts'
 import { mount } from '../support/mount.ts'
 import { agents } from '../support/agents.ts'
 import { persistence } from '../support/sessions.ts'
@@ -67,7 +68,7 @@ async function authored(ctx: Context, author: (plugin: Context) => void) {
 test('a Screen shown over the Chat that gives no Place the Focus gives the composer no key, though it draws it', async () => {
   const { ctx, typed } = await chat()
   const shown = await authored(ctx, (plugin) => {
-    plugin.binnacle.show({ name: 'detail', layout: { column: [{ place: 'detail' }, { place: 'composer', size: 'content' }] } })
+    plugin.binnacle.show({ name: 'detail', layout: { column: [{ place: 'detail' }, { layout: 'composer', size: 'content' }] } })
   })
   const whileShown = await typed('x')
   await shown.dispose()
@@ -157,4 +158,138 @@ test('ctrl+x interrupts the turn from the composer once an author binds it to bi
   })
   const rows = await typed('h', 'i', '\x18')
   assert.deepEqual([dsh.cancels, rows], [[{ cause: { kind: 'user' }, options: { keepInbox: true } }], ['', '', RULE, 'hi ', RULE]])
+})
+
+const draftOf = (ctx: Context) => ctx.binnacle.modelOf<ComposerState>('composer')!
+const settled = () => new Promise((resolve) => setImmediate(resolve))
+const LARGE = Array.from({ length: 12 }, (_, n) => `l${n}`).join('\n')
+
+test("the draft is the model `composer`: typing and pasting change its text, a large paste's content in full and not its marker", async () => {
+  const { ctx, typed } = await chat(30, 5)
+  const rows = await typed('a', `\x1b[200~${LARGE}\x1b[201~`)
+  assert.deepEqual([draftOf(ctx).state.text, rows[3]], [`a${LARGE}`, 'a[paste #1 +12 lines] '])
+})
+
+test('an author who sets the draft to another replaces the one shown, drawn in full with the cursor at its end', async () => {
+  const { ctx, typed, terminal } = await chat(20, 6)
+  await typed('h', 'i', `\x1b[200~${LARGE}\x1b[201~`)
+  draftOf(ctx).set((state) => {
+    state.text = 'one\ntwo'
+  })
+  await settled()
+  const { rows, cursor } = await terminal.read()
+  assert.deepEqual([rows, cursor], [['', '', RULE, 'one', 'two ', RULE], { x: 3, y: 4 }])
+})
+
+test("setting the draft to the draft it holds changes nothing, the cursor and a paste's marker included", async () => {
+  const { ctx, typed, terminal } = await chat(30, 5)
+  await typed('a', `\x1b[200~${LARGE}\x1b[201~`, 'b', '\x1b[D', '\x1b[D')
+  const before = await terminal.read()
+  draftOf(ctx).set((state) => {
+    state.text = `a${LARGE}b`
+  })
+  await settled()
+  const after = await terminal.read()
+  assert.deepEqual([after.rows, after.cursor], [before.rows, before.cursor])
+})
+
+test('ctrl+s sends the draft and enter makes a new line, once an author binds composer.send and composer.newline to them', async () => {
+  const dsh = agents()
+  const { ctx, typed } = await chat(20, 6, dsh.provide)
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.bind('composer.send', ['ctrl+s'])
+    plugin.binnacle.bind('composer.newline', ['enter'])
+  })
+  const rows = await typed('a', '\r', 'b')
+  await typed('\x13')
+  assert.deepEqual([rows, dsh.sent], [['', '', RULE, 'a', 'b ', RULE], [{ how: 'followup', text: 'a\nb' }]])
+})
+
+test('a newline sequence with no key name runs composer.newline, whatever its keys, and the editor makes no new line by itself', async () => {
+  const { ctx, typed } = await chat(20, 6)
+  const ran: string[] = []
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.bind('composer.newline', ['ctrl+n'])
+    plugin.binnacle.action('composer.newline', { run: () => ran.push('newline') })
+  })
+  assert.deepEqual([await typed('a', '\x1b[13;2~', 'b'), ran], [['', '', '', RULE, 'ab ', RULE], ['newline']])
+})
+
+test("ctrl+j makes a new line though enter's sequence is the same, after an author sets composer.send", async () => {
+  const dsh = agents()
+  const { ctx, typed } = await chat(20, 6, dsh.provide)
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.action('composer.send', { run: (_at, beneath) => beneath() })
+  })
+  assert.deepEqual([await typed('a', '\n', 'b'), dsh.sent], [['', '', RULE, 'a', 'b ', RULE], []])
+})
+
+test('the default composer.send takes a backslash before the cursor as a new line, wherever it is bound', async () => {
+  const dsh = agents()
+  const { ctx, typed } = await chat(20, 6, dsh.provide)
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.bind('composer.send', ['ctrl+s'])
+  })
+  const rows = await typed('a', '\\', '\x13', 'b')
+  assert.deepEqual([rows, dsh.sent], [['', '', RULE, 'a', 'b ', RULE], []])
+})
+
+test('the default composer.send sends nothing for a draft of whitespace, and keeps it', async () => {
+  const dsh = agents()
+  const { typed } = await chat(20, 5, dsh.provide)
+  const rows = await typed(' ', ' ', '\r')
+  assert.deepEqual([rows, dsh.sent], [['', '', RULE, '   ', RULE], []])
+})
+
+test('an author who sets composer.send and runs beneath() keeps what it did: the draft is sent, and goes into the history', async () => {
+  const dsh = agents()
+  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  const seen: string[] = []
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.action('composer.send', {
+      run: (_at, beneath) => {
+        seen.push(draftOf(plugin).state.text)
+        beneath()
+      },
+    })
+  })
+  await typed('h', 'i', '\r')
+  assert.deepEqual([seen, dsh.sent, await typed('\x1b[A')], [['hi'], [{ how: 'followup', text: 'hi' }], ['', '', RULE, 'hi', RULE]])
+})
+
+test('an author who sets composer.send without beneath() sends nothing, and clears the draft by setting its text', async () => {
+  const dsh = agents()
+  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  const queued: string[] = []
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.action('composer.send', {
+      run: () => {
+        const draft = draftOf(plugin)
+        queued.push(draft.state.text)
+        draft.set((state) => {
+          state.text = ''
+        })
+      },
+    })
+  })
+  await typed('h', 'i', '\r')
+  await settled()
+  assert.deepEqual([queued, dsh.sent, await typed()], [['hi'], [], ['', '', RULE, ' ', RULE]])
+})
+
+test("ctrl+c is the core's binnacle.clear: an author who binds it to ctrl+q clears the draft with ctrl+q, and binnacle stays", async () => {
+  const { ctx, typed, exits } = await chat()
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.bind('binnacle.clear', ['ctrl+q'])
+  })
+  assert.deepEqual([await typed('h', 'i', '\x11'), exits], [['', '', RULE, ' ', RULE], []])
+})
+
+test('the composer is the Layout `composer`, a row with the Place `composer.input`, where an author inserts a Place before the draft', async () => {
+  const { ctx, typed } = await chat()
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.edit('composer', { insert: { place: 'prompt', size: { fixed: 2 } }, before: 'composer.input' })
+    plugin.binnacle.place('prompt', { lines: () => ['', '>'] })
+  })
+  assert.deepEqual(await typed('h', 'i'), ['', '', `  ${'─'.repeat(18)}`, '> hi ', `  ${'─'.repeat(18)}`])
 })

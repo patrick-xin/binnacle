@@ -28,11 +28,16 @@ const statusLine = (binnacle: Binnacle, text: string) => {
   binnacle.place('status.state', part(text))
 }
 
+const composerLine = (binnacle: Binnacle, ...lines: string[]) => {
+  binnacle.layout('composer', { row: [{ place: 'composer.input' }] })
+  binnacle.place('composer.input', part(...lines))
+}
+
 test('the Chat stacks the transcript, the status and the composer: the status and the composer take the rows their lines need, and the transcript the rest', async () => {
   const { rows } = await drawn(20, 6, (binnacle) => {
     binnacle.place('transcript', part('t1', 't2', 't3', 't4', 't5'))
     statusLine(binnacle, 'working')
-    binnacle.place('composer', part('c1', 'c2'))
+    composerLine(binnacle, 'c1', 'c2')
   })
   assert.deepEqual(rows, ['t3', 't4', 't5', 'working', 'c1', 'c2'])
 })
@@ -82,7 +87,7 @@ test('a layout goes when the plugin that set it unloads, and the Screen is drawn
     name: 'again',
     inject: ['binnacle'],
     apply: (again: Context) => {
-      again.binnacle.place('composer', part('draft'))
+      composerLine(again.binnacle, 'draft')
     },
   })
   assert.deepEqual(
@@ -534,11 +539,11 @@ test("in a Layout set by name, a node with no size takes what its lines need; in
 
 test("the Chat's own Layout is exported as `CHAT_LAYOUT`, and an author builds on it to move one node", async () => {
   const { rows } = await drawn(10, 4, (binnacle) => {
-    const composer = CHAT_LAYOUT.column.filter((node) => node.place === 'composer')
-    binnacle.layout('chat', { ...CHAT_LAYOUT, column: [...composer, ...CHAT_LAYOUT.column.filter((node) => node.place !== 'composer')] })
+    const composer = CHAT_LAYOUT.column.filter((node) => node.layout === 'composer')
+    binnacle.layout('chat', { ...CHAT_LAYOUT, column: [...composer, ...CHAT_LAYOUT.column.filter((node) => node.layout !== 'composer')] })
     binnacle.place('transcript', part('t1', 't2', 't3'))
     statusLine(binnacle, 'working')
-    binnacle.place('composer', part('draft'))
+    composerLine(binnacle, 'draft')
   })
   assert.deepEqual(rows, ['draft', 't2', 't3', 'working'])
 })
@@ -685,7 +690,7 @@ test("`binnacle.edit` moves the status line above the transcript with two edits,
     binnacle.edit('chat', { insert: { layout: 'status', size: 'content' }, before: 'transcript' })
     binnacle.place('transcript', part('t1', 't2', 't3'))
     statusLine(binnacle, 'working')
-    binnacle.place('composer', part('draft'))
+    composerLine(binnacle, 'draft')
   })
   assert.deepEqual(rows, ['working', 't2', 't3', 'draft'])
 })
@@ -876,7 +881,7 @@ test('an edit goes when the plugin that made it unloads, and the Layout draws ag
   const { ctx, terminal } = await drawn(10, 3, (binnacle) => {
     binnacle.place('transcript', part('t1'))
     statusLine(binnacle, 'working')
-    binnacle.place('composer', part('draft'))
+    composerLine(binnacle, 'draft')
   })
   const author = ctx.plugin(plugin('author', (binnacle) => binnacle.edit('chat', { remove: 'status' })))
   await author

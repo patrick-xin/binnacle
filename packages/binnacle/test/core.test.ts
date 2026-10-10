@@ -214,7 +214,8 @@ test("a Part is asked for its lines once at a width, until it redraws: another P
           return ['a line']
         },
       })
-      composer = plugin.binnacle.place('composer', { lines: () => ['draft'] })
+      plugin.binnacle.layout('composer', { place: 'composer.input' })
+      composer = plugin.binnacle.place('composer.input', { lines: () => ['draft'] })
     },
   })
   const placed = asked

@@ -4,7 +4,7 @@ Row `binnacle`, part of the core · Code `binnacle:packages/binnacle/src/core/ge
 
 ## What a person can do
 
-- Use the keyboard and the mouse through actions: each action has an id, its default keys and a description. The editor's keys are in the Gesture Table, and the core's own gestures are actions, as an author's are.
+- Use the keyboard and the mouse through actions: each action has an id, its default keys and a description. The editor's keys are in the Gesture Table, and the core's own gestures are actions, as an author's are, and as the composer's submit and new line are.
 - Move the Focus to the next Place that takes keys with shift+tab, or with a click on a Place that takes keys: one whose Part takes keys, or that an action acts in. A Screen shown over another has its own Focus, and the one under it gets its Focus back.
 - Click a Part: the click reaches the Part under the pointer, with or without the Focus. Only the left button clicks.
 - Scroll with the wheel.
@@ -29,7 +29,7 @@ A person cannot rebind a key yet.
 
 ## How it is built
 
-- **The Gesture Table** holds pi-tui's editor actions, the `tui.` ids. The copied editor reads its keys from it.
+- **The Gesture Table** holds pi-tui's editor actions, the `tui.` ids. The copied editor reads its keys from it, but for submit and new line: `tui.input.submit` and `tui.input.newLine` give their keys to the composer's actions `composer.send` and `composer.newline`, and the composer gives the editor no key that they match ([Composer](composer.md)).
 - **The core's gestures are actions** that the core sets at its start, with no Place, ranked as a built-in's beneath an author's (`binnacle:packages/binnacle/src/core/actions.ts#coreActions`): `binnacle.clear` (ctrl+c), `binnacle.interrupt` (escape), `binnacle.suspend` (ctrl+z), `binnacle.focus.next` (shift+tab), `binnacle.scroll.up` and `binnacle.scroll.down` (the wheel). So `bind`, `keysOf`, `run` and `beneath()` reach them as they reach an author's. The wheel's scroll reads the cell under the pointer from the core, as an action's `at` is a cell in a Part's lines.
 - **`actionsOf`** gives the Gesture Table's actions that match the gesture, then the newest enabled action of each id whose keys match, if it has no Place or acts in the Place with the Focus. An action of another Place is left out, so a list's space does not keep the composer from typing a space.
 - **The order a key goes in** (`binnacle:packages/binnacle/src/core/input.ts#route`):
@@ -50,4 +50,4 @@ A person cannot rebind a key yet.
 
 ## Built by
 
-Stage 2 (before Specs) · Spec [#156](https://github.com/patrick-xin/binnacle/issues/156) · PR [#167](https://github.com/patrick-xin/binnacle/pull/167) · Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bindings, run by id, and the action beneath · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): the Focus and the scroll by a Place's name · Spec [#184](https://github.com/patrick-xin/binnacle/issues/184) · Ticket [#222](https://github.com/patrick-xin/binnacle/issues/222): a binding that is a function of the keys beneath it · Spec [#224](https://github.com/patrick-xin/binnacle/issues/224) · Ticket [#230](https://github.com/patrick-xin/binnacle/issues/230): one table for keys, the core's gestures as actions.
+Stage 2 (before Specs) · Spec [#156](https://github.com/patrick-xin/binnacle/issues/156) · PR [#167](https://github.com/patrick-xin/binnacle/pull/167) · Spec [#183](https://github.com/patrick-xin/binnacle/issues/183) · Ticket [#189](https://github.com/patrick-xin/binnacle/issues/189): actions, bindings, run by id, and the action beneath · Ticket [#190](https://github.com/patrick-xin/binnacle/issues/190): the Focus and the scroll by a Place's name · Spec [#184](https://github.com/patrick-xin/binnacle/issues/184) · Ticket [#222](https://github.com/patrick-xin/binnacle/issues/222): a binding that is a function of the keys beneath it · Spec [#224](https://github.com/patrick-xin/binnacle/issues/224) · Ticket [#230](https://github.com/patrick-xin/binnacle/issues/230): one table for keys, the core's gestures as actions · Spec [#236](https://github.com/patrick-xin/binnacle/issues/236) · Ticket [#237](https://github.com/patrick-xin/binnacle/issues/237): submit and new line leave the editor, as the composer's actions.

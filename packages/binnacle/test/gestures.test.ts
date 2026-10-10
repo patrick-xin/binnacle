@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Point } from '../src/api.ts'
+import type { Part, Point } from '../src/api.ts'
 import { mount } from './support/mount.ts'
 
 /** A left-button press at the cell under the pointer, both counted from 0, as a terminal sends it. */
@@ -17,6 +17,11 @@ async function gestures(columns: number, rows: number, author: (plugin: Context)
   const plugin = mounted.ctx.plugin(probe('author', author))
   await plugin
   return { ...mounted, plugin }
+}
+
+const inComposer = (plugin: Context, part: Part) => {
+  plugin.binnacle.layout('composer', { place: 'composer.input' })
+  plugin.binnacle.place('composer.input', part)
 }
 
 const takingKeys = (lines: readonly string[], cursor?: () => { line: number; column: number }) => {
@@ -64,7 +69,7 @@ test('a Screen that is shown has its own Focus. When it goes, the Screen under i
   const chat = takingKeys(['chat'])
   const over = takingKeys(['over'])
   const { ctx, terminal } = await gestures(10, 3, (plugin) => {
-    plugin.binnacle.place('composer', chat.part)
+    inComposer(plugin, chat.part)
   })
   const shown = await ctx.plugin(
     probe('shown', (plugin) => {
@@ -201,7 +206,7 @@ test('a Place with the Focus that is not on view gives the Focus to the first Pl
 
 test('with no Place on view that takes keys, no Part takes a key, and shift+tab does nothing', async () => {
   const { terminal } = await gestures(10, 2, (plugin) => {
-    plugin.binnacle.place('composer', { lines: () => ['plain'] })
+    inComposer(plugin, { lines: () => ['plain'] })
   })
   const rows = (await terminal.read()).rows
   terminal.type('k')
@@ -250,7 +255,7 @@ test('a Part placed over the Part with the Focus takes the keys while it is the 
 test('a key that the Part does not take goes to the core action that it is bound to, and a click goes to none', async () => {
   const draft = takingKeys(['draft'])
   const { ctx, terminal, exits } = await gestures(10, 2, (plugin) => {
-    plugin.binnacle.place('composer', draft.part)
+    inComposer(plugin, draft.part)
   })
   await terminal.read()
   terminal.type('k')
