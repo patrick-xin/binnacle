@@ -235,7 +235,6 @@ interface LayoutLine {
 }
 
 export interface EditorTheme {
-	borderColor: (str: string) => string;
 	selectList: SelectListTheme;
 }
 
@@ -275,24 +274,6 @@ function buildDebouncePattern(triggerCharacters: string[]): RegExp {
 	);
 }
 
-function createScrollBorder(direction: "↑" | "↓", hiddenLineCount: number, width: number): string {
-	const availableWidth = Math.max(0, width);
-	const label = ` ${direction} ${hiddenLineCount} more `;
-	const labelWidth = visibleWidth(label);
-	if (labelWidth + 2 <= availableWidth) {
-		const leftWidth = Math.floor((availableWidth - labelWidth) / 2);
-		return "─".repeat(leftWidth) + label + "─".repeat(availableWidth - leftWidth - labelWidth);
-	}
-
-	const indicator = `─── ${direction} ${hiddenLineCount} more `;
-	const remaining = availableWidth - visibleWidth(indicator);
-	if (remaining >= 0) return indicator + "─".repeat(remaining);
-
-	const ellipsis = "...".slice(0, availableWidth);
-	const indicatorWidth = availableWidth - visibleWidth(ellipsis);
-	return sliceByColumn(indicator, 0, indicatorWidth, true) + ellipsis;
-}
-
 export class Editor implements Component, Focusable {
 	private state: EditorState = {
 		lines: [""],
@@ -310,13 +291,13 @@ export class Editor implements Component, Focusable {
 	// Store last render geometry for cursor navigation and mouse hit-testing.
 	private lastWidth: number = 80;
 	private renderedVisibleLineCount = 1;
+	/** The rows of the draft hidden above and below at the last render, each told by a row of its own. */
+	public hiddenAbove = 0;
+	public hiddenBelow = 0;
 	private renderedAutocompleteHeight = 0;
 
 	// Vertical scrolling support
 	private scrollOffset: number = 0;
-
-	// Border color (can be changed dynamically)
-	public borderColor: (str: string) => string;
 
 	// Autocomplete support
 	private autocompleteProvider?: AutocompleteProvider;
@@ -373,7 +354,6 @@ export class Editor implements Component, Focusable {
 	constructor(tui: TUI, theme: EditorTheme, options: EditorOptions = {}) {
 		this.tui = tui;
 		this.theme = theme;
-		this.borderColor = theme.borderColor;
 		const paddingX = options.paddingX ?? 0;
 		this.paddingX = Number.isFinite(paddingX) ? Math.max(0, Math.floor(paddingX)) : 0;
 		const maxVisible = options.autocompleteMaxVisible ?? 5;
@@ -507,16 +487,6 @@ export class Editor implements Component, Focusable {
 		// No cached state to invalidate currently
 	}
 
-	protected renderTopBorder(width: number, hiddenLineCount: number): string {
-		const border = hiddenLineCount > 0 ? createScrollBorder("↑", hiddenLineCount, width) : "─".repeat(width);
-		return this.borderColor(border);
-	}
-
-	protected renderBottomBorder(width: number, hiddenLineCount: number): string {
-		const border = hiddenLineCount > 0 ? createScrollBorder("↓", hiddenLineCount, width) : "─".repeat(width);
-		return this.borderColor(border);
-	}
-
 	render(width: number): string[] {
 		const maxPadding = Math.max(0, Math.floor((width - 1) / 2));
 		const paddingX = Math.min(this.paddingX, maxPadding);
@@ -540,27 +510,37 @@ export class Editor implements Component, Focusable {
 		let cursorLineIndex = layoutLines.findIndex((line) => line.hasCursor);
 		if (cursorLineIndex === -1) cursorLineIndex = 0;
 
-		// Adjust scroll offset to keep cursor visible
-		if (cursorLineIndex < this.scrollOffset) {
-			this.scrollOffset = cursorLineIndex;
-		} else if (cursorLineIndex >= this.scrollOffset + maxVisibleLines) {
-			this.scrollOffset = cursorLineIndex - maxVisibleLines + 1;
+		// The rows that tell what is hidden count among the rows shown, and the rows of the draft that fit depend on them.
+		let shownLines = maxVisibleLines;
+		for (let pass = 0; pass < 4; pass++) {
+			if (cursorLineIndex < this.scrollOffset) {
+				this.scrollOffset = cursorLineIndex;
+			} else if (cursorLineIndex >= this.scrollOffset + shownLines) {
+				this.scrollOffset = cursorLineIndex - shownLines + 1;
+			}
+			const maxScrollOffset = Math.max(0, layoutLines.length - shownLines);
+			this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, maxScrollOffset));
+			const above = this.scrollOffset > 0 ? 1 : 0;
+			const below = this.scrollOffset + shownLines < layoutLines.length ? 1 : 0;
+			const next = Math.max(1, maxVisibleLines - above - below);
+			if (next === shownLines) break;
+			shownLines = next;
 		}
 
-		// Clamp scroll offset to valid range
-		const maxScrollOffset = Math.max(0, layoutLines.length - maxVisibleLines);
-		this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, maxScrollOffset));
-
 		// Get visible lines slice
-		const visibleLines = layoutLines.slice(this.scrollOffset, this.scrollOffset + maxVisibleLines);
+		const visibleLines = layoutLines.slice(this.scrollOffset, this.scrollOffset + shownLines);
 		this.renderedVisibleLineCount = visibleLines.length;
+		this.hiddenAbove = this.scrollOffset;
+		this.hiddenBelow = layoutLines.length - (this.scrollOffset + visibleLines.length);
 
 		const result: string[] = [];
 		const leftPadding = " ".repeat(paddingX);
 		const rightPadding = leftPadding;
+		const hidden = (direction: "↑" | "↓", count: number): string => {
+			return `${leftPadding}${sliceByColumn(`${direction} ${count} more`, 0, contentWidth, true)}`;
+		};
 
-		// Render top border (with scroll indicator if scrolled down)
-		result.push(this.renderTopBorder(width, this.scrollOffset));
+		if (this.hiddenAbove > 0) result.push(hidden("↑", this.hiddenAbove));
 
 		// Render each visible layout line
 		// Emit hardware cursor marker when focused so TUI can position the
@@ -606,13 +586,10 @@ export class Editor implements Component, Focusable {
 			const padding = " ".repeat(Math.max(0, contentWidth - lineVisibleWidth));
 			const lineRightPadding = cursorInPadding ? rightPadding.slice(1) : rightPadding;
 
-			// Render the line (no side borders, just horizontal lines above and below)
 			result.push(`${leftPadding}${displayText}${padding}${lineRightPadding}`);
 		}
 
-		// Render bottom border (with scroll indicator if more content below)
-		const linesBelow = layoutLines.length - (this.scrollOffset + visibleLines.length);
-		result.push(this.renderBottomBorder(width, linesBelow));
+		if (this.hiddenBelow > 0) result.push(hidden("↓", this.hiddenBelow));
 
 		// Add autocomplete list if active
 		this.renderedAutocompleteHeight = 0;
@@ -629,8 +606,12 @@ export class Editor implements Component, Focusable {
 		return result;
 	}
 
+	private renderedRowsAbove(): number {
+		return this.hiddenAbove > 0 ? 1 : 0;
+	}
+
 	handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-		const autocompleteStartRow = this.renderedVisibleLineCount + 2;
+		const autocompleteStartRow = this.renderedRowsAbove() + this.renderedVisibleLineCount + (this.hiddenBelow > 0 ? 1 : 0);
 		if (
 			this.autocompleteState &&
 			this.autocompleteList &&
@@ -655,10 +636,11 @@ export class Editor implements Component, Focusable {
 		// The renderer synthesizes a click when press and release land on the same
 		// cell without movement, which is the gesture that positions the cursor.
 		if (event.type !== "click" || event.button !== "left") return undefined;
-		if (event.y <= 0 || event.y > this.renderedVisibleLineCount) return { handled: true, focus: true };
+		const row = event.y - this.renderedRowsAbove();
+		if (row < 0 || row >= this.renderedVisibleLineCount) return { handled: true, focus: true };
 
 		const visualLines = this.buildVisualLineMap(this.lastWidth);
-		const visualLineIndex = this.scrollOffset + event.y - 1;
+		const visualLineIndex = this.scrollOffset + row;
 		const visualLine = visualLines[visualLineIndex];
 		if (!visualLine) return { handled: true, focus: true };
 		const logicalLine = this.state.lines[visualLine.logicalLine] ?? "";

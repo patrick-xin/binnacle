@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { Handle, Point } from '../../api.ts'
+import type { Handle, Layout, Point } from '../../api.ts'
 import { gestureTable } from '../../core/gestures.ts'
 import { createModel } from '../../core/model.ts'
 import { Editor } from '../../terminal/components/editor.ts'
@@ -16,6 +16,20 @@ export interface ComposerState {
   text: string
 }
 
+/** The Look `composer.empty`: the line of an empty draft, after its cursor, drawn in that many cells. */
+export type EmptyLook = (width: number) => string
+
+const deepFrozen = <T extends object>(value: T): T => {
+  for (const inner of Object.values(value)) if (typeof inner === 'object' && inner !== null) deepFrozen(inner)
+  return Object.freeze(value)
+}
+
+/** The Layout `composer`: the draft, between rules in the `border` Tone. Frozen, as an author builds on it. */
+export const COMPOSER_LAYOUT: Layout & { readonly row: readonly Layout[] } = deepFrozen({
+  row: [{ place: 'composer.input', size: 'fill' }],
+  border: ['top', 'bottom'],
+})
+
 const INPUT = 'composer.input'
 const SUBMIT = 'tui.input.submit'
 const NEW_LINE = 'tui.input.newLine'
@@ -24,9 +38,11 @@ const PASTE_START = '\x1b[200~'
 const plain = (text: string): string => text
 
 const THEME: EditorTheme = {
-  borderColor: plain,
   selectList: { selectedPrefix: plain, selectedText: plain, description: plain, scrollInfo: plain, noMatch: plain },
 }
+
+// The editor's cursor on an empty draft, at the start of its line.
+const EMPTY_CURSOR = '\x1b[7m \x1b[0m'
 
 // pi-tui's editor shows at most 30% of the terminal's rows, and at least 5. A plugin does not hold the terminal.
 const ROWS = 24
@@ -45,7 +61,7 @@ export function apply(ctx: Context): void {
   const { binnacle } = ctx
   let placed: Handle | undefined
   // The core asks for the lines and the cursor more than once in a draw; the editor renders once until it changes.
-  let rendered: { width: number; lines: string[]; cursor: Point | undefined } | undefined
+  let rendered: { width: number; lines: string[]; cursor: Point | undefined; above: boolean; below: boolean } | undefined
   const changed = (): void => {
     rendered = undefined
   }
@@ -118,7 +134,7 @@ export function apply(ctx: Context): void {
       edited()
     },
   })
-  binnacle.layout('composer', { row: [{ place: INPUT, size: 'fill' }] })
+  binnacle.layout('composer', COMPOSER_LAYOUT)
 
   // The editor marks its cursor in its lines, as pi-tui's own drawing reads it.
   const drawn = (width: number) => {
@@ -127,11 +143,21 @@ export function apply(ctx: Context): void {
     const line = lines.findIndex((text) => text.includes(CURSOR_MARKER))
     const marked = lines[line] ?? ''
     const cursor = line === -1 ? undefined : { line, column: visibleWidth(marked.slice(0, marked.indexOf(CURSOR_MARKER))) }
-    rendered = { width, lines: lines.map((text) => text.replace(CURSOR_MARKER, '')), cursor }
+    const [above, below] = [editor.hiddenAbove > 0, editor.hiddenBelow > 0]
+    rendered = { width, lines: lines.map((text) => text.replace(CURSOR_MARKER, '')), cursor, above, below }
     return rendered
   }
   placed = binnacle.place(INPUT, {
-    lines: (width) => drawn(width).lines,
+    // The Look and the paint are outside the editor's cache, so that the lines follow the Looks and the theme when they change.
+    lines: (width) => {
+      if (editor.getText() !== '') {
+        const { lines, above, below } = drawn(width)
+        const last = lines.length - 1
+        return lines.map((text, index) => ((above && index === 0) || (below && index === last) ? binnacle.paint('muted', text) : text))
+      }
+      const empty = binnacle.lookOf<EmptyLook>(['composer.empty'], () => '')
+      return [EMPTY_CURSOR + empty(Math.max(0, width - 1))]
+    },
     cursor: (width) => drawn(width).cursor,
     key: (data) => {
       if (!data.startsWith(PASTE_START)) {

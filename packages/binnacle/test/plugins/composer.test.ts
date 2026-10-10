@@ -289,7 +289,64 @@ test('the composer is the Layout `composer`, a row with the Place `composer.inpu
   const { ctx, typed } = await chat()
   await authored(ctx, (plugin) => {
     plugin.binnacle.edit('composer', { insert: { place: 'prompt', size: { fixed: 2 } }, before: 'composer.input' })
-    plugin.binnacle.place('prompt', { lines: () => ['', '>'] })
+    plugin.binnacle.place('prompt', { lines: () => ['>'] })
   })
-  assert.deepEqual(await typed('h', 'i'), ['', '', `  ${'─'.repeat(18)}`, '> hi ', `  ${'─'.repeat(18)}`])
+  assert.deepEqual(await typed('h', 'i'), ['', '', RULE, '> hi ', RULE])
+})
+
+test('COMPOSER_LAYOUT is a row with the Place composer.input, bordered at its top and bottom in the border Tone, and the editor draws no rules of its own', async () => {
+  const { ctx, typed, terminal } = await chat()
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.layout('composer', { ...composer.COMPOSER_LAYOUT, border: false })
+  })
+  const bare = await typed('h', 'i')
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.layout('composer', composer.COMPOSER_LAYOUT)
+  })
+  const ruled = await typed()
+  assert.deepEqual(
+    [composer.COMPOSER_LAYOUT, bare, ruled, (await terminal.styleAt(0, 2)).dim],
+    [
+      { row: [{ place: 'composer.input', size: 'fill' }], border: ['top', 'bottom'] },
+      ['', '', '', '', 'hi '],
+      ['', '', RULE, 'hi ', RULE],
+      true,
+    ],
+  )
+})
+
+test('an empty draft draws its line through the Look composer.empty, given the width, and the default draws nothing', async () => {
+  const { ctx, typed, terminal } = await chat()
+  const plain = await typed()
+  const widths: number[] = []
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.look('composer.empty', () => (width: number) => {
+      widths.push(width)
+      return plugin.binnacle.paint('dim', 'Ask anything')
+    })
+  })
+  const empty = await typed()
+  const hint = (await terminal.styleAt(1, 3)).dim
+  assert.deepEqual(
+    [plain, empty, hint, widths.at(-1), await typed('h')],
+    [['', '', RULE, ' ', RULE], ['', '', RULE, ' Ask anything', RULE], true, 19, ['', '', RULE, 'h ', RULE]],
+  )
+})
+
+test('a draft taller than the 7 rows shown tells the rows hidden above and below in rows of the muted Tone, which count among the 7', async () => {
+  const { typed, terminal } = await chat(20, 12)
+  const lines = Array.from({ length: 10 }, (_, n) => `l${n}`)
+  const atEnd = await typed(...lines.flatMap((line) => [...line, '\x1b[13;2u']).slice(0, -1))
+  const marker = await terminal.styleAt(0, 4)
+  const inMiddle = await typed(...Array<string>(5).fill('\x1b[A'))
+  const atTop = await typed(...Array<string>(5).fill('\x1b[A'))
+  assert.deepEqual(
+    [atEnd.slice(3), marker.colour, inMiddle.slice(3), atTop.slice(3)],
+    [
+      [RULE, '↑ 4 more', 'l4', 'l5', 'l6', 'l7', 'l8', 'l9 ', RULE],
+      8,
+      [RULE, '↑ 3 more', 'l3', 'l4 ', 'l5', 'l6', 'l7', '↓ 2 more', RULE],
+      [RULE, 'l0', 'l1', 'l2', 'l3', 'l4', 'l5', '↓ 4 more', RULE],
+    ],
+  )
 })
