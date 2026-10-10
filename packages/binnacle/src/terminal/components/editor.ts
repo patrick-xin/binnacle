@@ -1360,7 +1360,7 @@ export class Editor implements Component, Focusable {
 		return this.state.cursorCol > 0 && currentLine[this.state.cursorCol - 1] === "\\";
 	}
 
-	private submitValue(): void {
+	submitValue(): void {
 		this.cancelAutocomplete();
 		const result = this.expandPasteMarkers(this.state.lines.join("\n")).trim();
 
@@ -1376,7 +1376,7 @@ export class Editor implements Component, Focusable {
 		if (this.onSubmit) this.onSubmit(result);
 	}
 
-	private handleBackspace(): void {
+	handleBackspace(): void {
 		this.exitHistoryBrowsing();
 		this.lastAction = null;
 

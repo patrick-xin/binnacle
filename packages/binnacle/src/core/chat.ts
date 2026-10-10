@@ -12,8 +12,8 @@ export const CHAT_LAYOUT: Layout & { readonly column: readonly Layout[] } = deep
     { layout: 'status', size: 'content' },
     // A Request that stands is drawn in the composer's stead, by the Layout that the Requests' view sets.
     { layout: 'request', size: 'content' },
-    { place: 'composer', size: 'content', unless: 'request' },
+    { layout: 'composer', size: 'content', unless: 'request' },
   ],
 })
 
-export const CHAT: Screen = { name: 'chat', focus: 'composer', layout: CHAT_LAYOUT }
+export const CHAT: Screen = { name: 'chat', focus: 'composer.input', layout: CHAT_LAYOUT }

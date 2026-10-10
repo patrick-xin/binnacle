@@ -18,7 +18,8 @@ const clickAt = (x: number, y: number) => `\x1b[<0;${x + 1};${y + 1}M`
 /** A Place that takes keys, so the Focus can move to it and away from the transcript. */
 const probe = (name: string, place: (ctx: Context) => void) => ({ name, inject: ['binnacle'] as const, apply: place })
 const composerTakingKeys = (ctx: Context) => {
-  ctx.binnacle.place('composer', { lines: () => [''], key: () => false })
+  ctx.binnacle.layout('composer', { place: 'composer.input' })
+  ctx.binnacle.place('composer.input', { lines: () => [''], key: () => false })
 }
 
 const stored: Stored = {

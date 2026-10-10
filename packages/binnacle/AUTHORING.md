@@ -316,7 +316,7 @@ A Layout is a tree. Its leaves are Places, which Parts fill, by name.
 
 | Node | Draws |
 |---|---|
-| `{ place: 'composer' }` | the Part placed in that Place |
+| `{ place: 'composer.input' }` | the Part placed in that Place |
 | `{ row: [...] }`, `{ column: [...] }` | its children side by side, or one above the other |
 | `{ row: [...], separator: true }` | one line: the first line of each child, joined by the `divider` glyph |
 | `{ layout: 'request' }` | the Layout set by that name |
@@ -344,20 +344,20 @@ A float is the only node that draws over what it covers. A click and the wheel l
     { place: 'transcript', size: 'fill' },
     { layout: 'status', size: 'content' },
     { layout: 'request', size: 'content' },
-    { place: 'composer', size: 'content', unless: 'request' },
+    { layout: 'composer', size: 'content', unless: 'request' },
   ],
 }
 ```
 
-The Layout `status` is the status line, as [The status line](#the-status-line) says. A Request that stands is drawn by the Layout `request` in the composer's stead, as [Requests](#requests) says.
+The Layout `status` is the status line, as [The status line](#the-status-line) says, and the Layout `composer` is the composer, as [The composer](#the-composer) says. A Request that stands is drawn by the Layout `request` in the composer's stead, as [Requests](#requests) says.
 
 Build on it to move one node, such as the composer to the top:
 
 ```js
 import { CHAT_LAYOUT } from 'binnacle'
 
-const composer = CHAT_LAYOUT.column.filter((node) => node.place === 'composer')
-const others = CHAT_LAYOUT.column.filter((node) => node.place !== 'composer')
+const composer = CHAT_LAYOUT.column.filter((node) => node.layout === 'composer')
+const others = CHAT_LAYOUT.column.filter((node) => node.layout !== 'composer')
 ctx.binnacle.layout('chat', { ...CHAT_LAYOUT, column: [...composer, ...others] })
 ```
 
@@ -403,7 +403,7 @@ ctx.binnacle.edit('chat', { insert: { layout: 'status', size: 'content' }, befor
 ```js
 const handle = ctx.binnacle.place('preview', preview)
 handle.focus()
-ctx.binnacle.focus('composer')
+ctx.binnacle.focus('composer.input')
 ctx.binnacle.scroll('transcript', -1)
 ```
 
@@ -509,6 +509,49 @@ tabs(ctx.binnacle, {
 - `models` are what the labels and the current tab are drawn from, so that the Tabs are drawn again when they change.
 - The actions are `<name>.next` and `<name>.previous`, of the kinds `tabs.next` and `tabs.previous`, marked `first`.
 - The Look `tabs.tab`, or `<name>.tab`, draws one tab: `(label, { current, index }) => text`. Its default draws the `mark` glyph and the label in `accent` for the current tab, and the `unmarked` glyph and the label for the others. The `separator` glyph goes between the tabs.
+
+## The composer
+
+The row `binnacle-composer` sets the Layout `composer`, which the Chat draws while no Request stands. It is a row with the Place `composer.input`, where the editor draws the draft, and where the Chat's Focus starts:
+
+```js
+{ row: [{ place: 'composer.input', size: 'fill' }] }
+```
+
+- The draft is the model `composer`, of the type `ComposerState` from `binnacle/plugins/composer`. Its state's `text` is the draft as it would be sent: a large paste's content in full, not its marker. Typing and pasting change it. Set `text` to another draft, and it replaces the one shown, drawn in full with the cursor at its end. Set it to the draft it holds, and nothing changes.
+
+  ```js
+  const draft = ctx.binnacle.modelOf('composer')
+  draft.set((state) => (state.text = ''))
+  ```
+
+- Enter runs the action `composer.send`, and shift+enter runs `composer.newline`. Both act in `composer.input`. Bind them as any action, so ctrl+s sends and enter makes a new line:
+
+  ```js
+  ctx.binnacle.bind('composer.send', ['ctrl+s'])
+  ctx.binnacle.bind('composer.newline', ['enter'])
+  ```
+
+  A sequence that a terminal sends for shift+enter, and that names no key, runs `composer.newline` whatever its keys. Where one key is bound to both, such as ctrl+j, whose sequence is also enter's, it runs `composer.newline`.
+- The default `composer.send` sends the draft as a prompt, or steers the turn that runs, adds it to the history, and clears it. With a backslash before the cursor, it takes the backslash out and runs `composer.newline` in its place. A draft of whitespace sends nothing, and on a stored session, or before the session opens, the draft stays. Set `composer.send` to change what it does: run `beneath()` to keep the default, or leave it out to send nothing, as this one queues each draft while the agent runs:
+
+  ```js
+  const queue = []
+  ctx.binnacle.action('composer.send', {
+    run: (at, beneath) => {
+      if (ctx.get('binnacleSession')?.agent?.status !== 'running') return beneath()
+      queue.push(draft.state.text)
+      draft.set((state) => (state.text = ''))
+    },
+  })
+  ```
+
+- Ctrl+c is `binnacle.clear`. The composer sets an action by that id in `composer.input`, enabled while the draft has text, so ctrl+c clears a draft, and goes on to binnacle's own on an empty one, which quits when it is pressed twice.
+- Add a Place beside the draft with an edit of the Layout `composer`:
+
+  ```js
+  ctx.binnacle.edit('composer', { insert: { place: 'prompt', size: { fixed: 2 } }, before: 'composer.input' })
+  ```
 
 ## The status line
 
