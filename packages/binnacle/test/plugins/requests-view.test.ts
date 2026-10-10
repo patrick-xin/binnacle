@@ -13,10 +13,18 @@ import type { Request } from '../../src/index.ts'
 import { agents } from '../support/agents.ts'
 import { mount } from '../support/mount.ts'
 
-async function chat(options: { columns?: number; rows?: number; before?: (ctx: Context) => PromiseLike<unknown> } = {}) {
+async function chat(
+  options: {
+    columns?: number
+    rows?: number
+    first?: (ctx: Context) => PromiseLike<unknown>
+    before?: (ctx: Context) => PromiseLike<unknown>
+  } = {},
+) {
   const dsh = agents()
   const mounted = await mount({ columns: options.columns ?? 40, rows: options.rows ?? 10, provide: dsh.provide })
   mounted.ready()
+  await options.first?.(mounted.ctx)
   await mounted.ctx.plugin(composer)
   await mounted.ctx.plugin(requests)
   const plugin = await mounted.ctx.plugin(view)
@@ -400,6 +408,23 @@ test("the List's own page keys are not bound in `request.choices`, and an approv
   assert.deepEqual(await rows(), [ruleWith('bash needs approval'), '  "c": 3', '}', '› Allow once', '  Reject', RULE])
   assert.deepEqual(await typed(PAGE_UP), [ruleWith('bash needs approval'), '  "a": 1,', '  "b": 2,', '› Allow once', '  Reject', RULE])
   assert.deepEqual([ctx.binnacle.keysOf('request.choices.pageUp'), ctx.binnacle.keysOf('request.choices.pageDown')], [[], []])
+})
+
+test("a plugin that binds `request.choices.down` to `(keys) => [...keys, 'j']`, loaded before the view, moves the mark with both down and `j`", async () => {
+  const { ctx, dsh, typed } = await chat({
+    first: (root) =>
+      root.plugin({
+        name: 'adds-j',
+        inject: ['binnacle'],
+        apply: (plugin: Context) => {
+          plugin.binnacle.bind('request.choices.down', (keys) => [...keys, 'j'])
+        },
+      }),
+  })
+  approve(ctx, dsh)
+  assert.deepEqual((await typed('j')).slice(-3), ['  Allow once', '› Reject', RULE])
+  assert.deepEqual((await typed(UP, DOWN)).slice(-3), ['  Allow once', '› Reject', RULE])
+  assert.deepEqual(ctx.binnacle.keysOf('request.choices.down'), ['down', 'j'])
 })
 
 test('every way the default view sends runs the action `requests.send`, so a plugin that sets it changes what sending does, such as a preview first', async () => {

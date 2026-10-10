@@ -181,6 +181,9 @@ export interface Gestures {
   actionsOf(gesture: string): readonly string[]
 }
 
+/** Gestures by name, or a function of the gestures beneath the binding, read each time a gesture is resolved, so that it adds to the keys of an action set later. */
+export type Binding = readonly string[] | ((beneath: readonly string[]) => readonly string[])
+
 /** Something a person does with a key, or with a click in its Place. */
 export interface Action {
   /**
@@ -210,9 +213,12 @@ export interface Binnacle {
    * When two actions of different ids take a gesture at one step, the newest set wins.
    */
   action(id: string, action: Action): Handle
-  /** Binds the action by that id, or every action of that kind, to these gestures instead of its own. A binding by id wins over its kind's; the newest binding by a name wins, and `[]` unbinds. */
-  bind(name: string, keys: readonly string[]): Handle
-  /** The gestures that the newest action by that id, enabled or not, is bound to now, so that a binding can add a key to them. With no action by that id, its binding by id, or none. */
+  /**
+   * Binds the action by that id, or every action of that kind, to these gestures instead of its own, or to what a function gives from the gestures it would have without this binding.
+   * A binding by id is given, or replaces, what its kind's gives. Bindings by one name apply oldest first: a list replaces, and `[]` unbinds.
+   */
+  bind(name: string, keys: Binding): Handle
+  /** The gestures that the newest action by that id, enabled or not, is bound to now. With no action by that id, what its bindings by id give, or none. */
   keysOf(id: string): readonly string[]
   /** Runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture. With none enabled, nothing runs. */
   run(id: string, at?: Point): void
