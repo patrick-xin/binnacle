@@ -48,7 +48,7 @@ Rebase onto `origin/main` first: `git fetch origin main && git rebase origin/mai
 Then check each item:
 
 - Each change is committed, and `git status` shows a clean worktree.
-- `pnpm test` passes at that commit.
+- `pnpm test` passes at that commit. Run it after you commit: `check-features` reads the branch's commits, so work that is not committed passes it.
 - Each behaviour of the Ticket has a test with its name.
 - Each test can fail. A test that passed the first time may assert something that is always true.
 - The records that the Ticket names are changed in the same commit as the code, and the feature's doc in `docs/features/` says what is built now.
