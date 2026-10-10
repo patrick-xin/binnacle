@@ -304,7 +304,7 @@ ctx.binnacle.action('requests.send', {
 })
 ```
 
-- An action with no `keys`, or no `kind`, keeps those of the action it hides.
+- An action with no `keys`, or no `kind`, keeps those of the action it hides. An action with no `place` keeps the `place` and the `first` of the action it hides. So it takes a gesture only where that action did. An action that names its own `place` acts there. To act from every Place, set an action of a new id.
 - `beneath()` is found each time it runs: the newest enabled action by that id beneath this one, wherever the Focus is, or nothing. When the plugin of an action between them unloads, the next `beneath()` uses the actions as they stand.
 
 ## Layouts

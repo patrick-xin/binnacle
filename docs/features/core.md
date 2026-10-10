@@ -22,6 +22,7 @@ The core is not a feature that a person turns off: it owns the terminal, and eve
 - A Screen of their own: `binnacle.show(…)`.
 - What a Place draws: `binnacle.place(name, part)`; the newest Part wins.
 - Anything a built-in row registers: what an author registers ranks above it, whichever loads first.
+- What a built-in's action does: set an action of its id. An action with no `keys`, `kind`, `place` or `first` keeps those of the action it hides. So it takes a gesture only where that action did ([Gestures](gestures.md)).
 - A Place's box: padding, gap, borders, a title, and an edge style by name.
 - How a Place follows its Part's cursor: `follow` on the Part, `'end'` or `'least'`.
 
