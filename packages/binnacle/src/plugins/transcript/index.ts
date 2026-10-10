@@ -29,17 +29,23 @@ export interface TranscriptState {
   marked: number | undefined
 }
 
+/** The Look `transcript.event.<type>`, beneath it `transcript.event`: an event's lines, given whether it is folded and the transcript's width. No line, and the event takes no row. */
+export type EventLook = (event: SessionEvent, at: { folded: boolean; width: number }) => string[]
+
+/** The Look `transcript.live`: the lines of the answer that streams, given its blocks and the transcript's width. */
+export type LiveLook = (blocks: readonly LiveBlock[], width: number) => string[]
+
 type Glued = { -readonly [key in keyof LiveBlock]: LiveBlock[key] }
 
 const PLACE = 'transcript'
 
-// The Mark is the header line drawn in inverse video, which needs no theme.
+// The Mark is the first line drawn in inverse video, which needs no theme.
 const INVERSE = '\x1b[7m'
 const RESET = '\x1b[0m'
 const UNFOLDED = '▾'
 const FOLDED = '▸'
 
-function liveLinesOf(blocks: readonly LiveBlock[]): string[] {
+const liveLinesOf: LiveLook = (blocks) => {
   const lines = ['~ streaming']
   for (const { kind, text, name: tool } of blocks) {
     lines.push(tool === undefined ? kind : `${kind} ${toPlainText(tool)}`, ...text.split('\n').map(toPlainText))
@@ -47,12 +53,23 @@ function liveLinesOf(blocks: readonly LiveBlock[]): string[] {
   return lines
 }
 
+// A Look's own style sequence can end the inverse video part of the way along the line, as a reset does in any of its forms, so it is set again after each.
+const inverse = (line: string): string => INVERSE + line.replace(/\x1b\[[0-9;:]*m/g, (style) => style + INVERSE) + RESET
+
+/** Where the Mark is drawn: on the Marked event if it draws, else the next that draws, else the one before. */
+function markedIn(drawing: readonly number[], marked: number | undefined): number | undefined {
+  if (marked === undefined) return undefined
+  return drawing.find((seq) => seq >= marked) ?? drawing.findLast((seq) => seq < marked)
+}
+
 interface Drawn {
-  readonly key: string
-  readonly events: readonly SessionEvent[]
+  readonly width: number
   readonly lines: readonly string[]
-  readonly headerOf: ReadonlyMap<number, number>
+  /** The seqs of the events that draw, in order. */
+  readonly drawing: readonly number[]
+  readonly firstOf: ReadonlyMap<number, number>
   readonly seqAt: ReadonlyMap<number, number>
+  readonly mark: number | undefined
 }
 
 export function apply(plugin: Context): void {
@@ -64,7 +81,7 @@ export function apply(plugin: Context): void {
     // The transcript's own, so that an author who sets `events` or `live` has them replaced at the next event or frame.
     const events: SessionEvent[] = []
     let live: Map<number, Glued> | undefined
-    const jsonOf = new Map<number, readonly string[]>()
+    const jsonOf = new WeakMap<SessionEvent, string[]>()
     let hasFocus = false
     let hasHadFocus = false
 
@@ -72,7 +89,7 @@ export function apply(plugin: Context): void {
       live && [...live].toSorted(([a], [b]) => a - b).map(([, block]): LiveBlock => ({ ...block }))
     const add = (event: SessionEvent): void => {
       events.push(event)
-      jsonOf.set(event.seq, JSON.stringify(event.data, null, 2).split('\n'))
+      jsonOf.set(event, JSON.stringify(event.data, null, 2).split('\n'))
       const blocks = ownLive()
       model.set((state) => {
         state.events = events
@@ -83,29 +100,38 @@ export function apply(plugin: Context): void {
     }
     for (const event of chat.events) add(event)
 
-    // The committed events' lines are built again only when what they show changes, not at each frame of the live block.
+    const eventLines: EventLook = (event, { folded }) => {
+      const json = jsonOf.get(event) ?? JSON.stringify(event.data, null, 2).split('\n')
+      // A folded event's header line ends with how many of its lines it hides, counted before the core wraps them.
+      const header = `${folded ? FOLDED : UNFOLDED} #${event.seq} ${toPlainText(event.type)}${folded ? ` (${json.length} lines)` : ''}`
+      return folded ? [header, ''] : [header, ...json, '']
+    }
+
+    // Each Look is called at each draw, so that the lines follow the theme, the Looks and their models. The last drawn is kept for a click, which lands on what was drawn.
     let drawn: Drawn | undefined
-    const committed = (): Drawn => {
-      const { events: shown, folded, marked } = model.state
-      const key = `${shown.length}|${folded.join(',')}|${marked}|${hasFocus}`
-      if (drawn?.events === shown && drawn.key === key) return drawn
+    const draw = (width: number): Drawn => {
+      const { events: shown, live: blocks, folded, marked } = model.state
       const lines: string[] = []
-      const headerOf = new Map<number, number>()
+      const drawing: number[] = []
+      const firstOf = new Map<number, number>()
       const seqAt = new Map<number, number>()
       for (const event of shown) {
-        const json = jsonOf.get(event.seq) ?? JSON.stringify(event.data, null, 2).split('\n')
-        const isFolded = folded.includes(event.seq)
-        // A folded event's header line ends with how many of its lines it hides, counted before the core wraps them.
-        const header = `${isFolded ? FOLDED : UNFOLDED} #${event.seq} ${toPlainText(event.type)}${isFolded ? ` (${json.length} lines)` : ''}`
-        headerOf.set(event.seq, lines.length)
+        const look = binnacle.lookOf<EventLook>([`transcript.event.${event.type}`, 'transcript.event'], eventLines)
+        const own = look(event, { folded: folded.includes(event.seq), width })
+        if (own.length === 0) continue
+        drawing.push(event.seq)
+        firstOf.set(event.seq, lines.length)
         seqAt.set(lines.length, event.seq)
-        lines.push(marked === event.seq && hasFocus ? INVERSE + header + RESET : header)
-        if (!isFolded) lines.push(...json)
-        lines.push('')
+        lines.push(...own)
       }
-      drawn = { key, events: shown, lines, headerOf, seqAt }
+      const mark = markedIn(drawing, marked)
+      const at = mark === undefined ? undefined : firstOf.get(mark)
+      if (hasFocus && at !== undefined) lines[at] = inverse(lines[at] ?? '')
+      if (blocks !== undefined) lines.push(...binnacle.lookOf<LiveLook>(['transcript.live'], liveLinesOf)(blocks, width))
+      drawn = { width, lines, drawing, firstOf, seqAt, mark }
       return drawn
     }
+    const again = (): Drawn => draw(drawn?.width ?? 0)
 
     const mark = (seq: number): void => model.set((state) => (state.marked = seq))
     const fold = (seq: number): void =>
@@ -114,11 +140,11 @@ export function apply(plugin: Context): void {
         if (at === -1) state.folded.push(seq)
         else state.folded.splice(at, 1)
       })
+    // Up and down move from where the Mark is drawn, among the events that draw.
     const step = (by: -1 | 1): void => {
-      const { events: shown, marked } = model.state
-      const index = shown.findIndex((event) => event.seq === marked)
-      const to = shown[index + by]
-      if (index !== -1 && to !== undefined) mark(to.seq)
+      const { drawing, mark: at } = again()
+      const to = at === undefined ? undefined : drawing[drawing.indexOf(at) + by]
+      if (to !== undefined) mark(to)
     }
 
     binnacle.model(PLACE, model)
@@ -139,8 +165,9 @@ export function apply(plugin: Context): void {
       place: PLACE,
       description: 'Fold or unfold the Marked event',
       run: () => {
-        const { events: shown, marked } = model.state
-        if (marked !== undefined && shown.some((event) => event.seq === marked)) fold(marked)
+        // The event where the Mark is drawn, which a person sees Marked.
+        const { mark: at } = again()
+        if (at !== undefined) fold(at)
       },
     })
     binnacle.action('transcript.click', {
@@ -148,7 +175,7 @@ export function apply(plugin: Context): void {
       place: PLACE,
       description: 'Fold or unfold the event whose header is clicked, and Mark it',
       run: (at) => {
-        const seq = at === undefined ? undefined : committed().seqAt.get(at.line)
+        const seq = at === undefined ? undefined : (drawn ?? again()).seqAt.get(at.line)
         if (seq === undefined) return
         mark(seq)
         fold(seq)
@@ -157,15 +184,11 @@ export function apply(plugin: Context): void {
 
     binnacle.place(PLACE, {
       models: [model],
-      lines: () => {
-        const { lines } = committed()
-        const blocks = model.state.live
-        return blocks === undefined ? lines : [...lines, ...liveLinesOf(blocks)]
-      },
-      cursor: () => {
-        const { marked } = model.state
-        const at = marked === undefined ? undefined : committed().headerOf.get(marked)
-        return at === undefined ? undefined : { line: at, column: 0 }
+      lines: (width) => draw(width).lines,
+      cursor: (width) => {
+        const { mark: at, firstOf } = draw(width)
+        const line = at === undefined ? undefined : firstOf.get(at)
+        return line === undefined ? undefined : { line, column: 0 }
       },
       focus: (has) => {
         hasFocus = has

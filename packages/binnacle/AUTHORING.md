@@ -539,7 +539,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   )
   ```
 
-- Up, down and enter run the actions `transcript.up`, `transcript.down` and `transcript.fold`. They act in the Place `transcript`, with the keys of the Gesture Table's `tui.select.up`, `tui.select.down` and `tui.select.confirm`. A click on an event's header runs `transcript.click`. Bind them as any action, so `j` and `k` move the Mark:
+- Up, down and enter run the actions `transcript.up`, `transcript.down` and `transcript.fold`. They act in the Place `transcript`, with the keys of the Gesture Table's `tui.select.up`, `tui.select.down` and `tui.select.confirm`. A click on an event's first line runs `transcript.click`. Bind them as any action, so `j` and `k` move the Mark:
 
   ```js
   ctx.binnacle.bind('transcript.down', ['j'])
@@ -547,6 +547,30 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ```
 
 - Set one of them by its id to change what it does, and run `beneath()` to keep the default.
+- Each event draws through the Look `transcript.event.<type>`, such as `transcript.event.tool/call`, and beneath it `transcript.event`, which draws every type. Its type is `EventLook` from `binnacle/plugins/transcript`: `(event, { folded, width }) => string[]`. It is given the event, whether the event is folded, and the transcript's width, and returns the event's lines. The default draws the header, the JSON and a blank line, or the header with its count while folded. Make an event's text plain with `toPlainText` before you draw it, and cut a line at `width` to keep it to one row: the core wraps a wider one. This draws each tool call as one line:
+
+  ```js
+  import { toPlainText, truncateToWidth } from 'binnacle'
+  ctx.binnacle.look('transcript.event.tool/call', () => (event, { width }) => {
+    const { name, arguments: args } = event.data
+    return [truncateToWidth(toPlainText(`⏺ ${name}(${args})`), width)]
+  })
+  ```
+
+- The transcript Marks an event's first line in inverse video, and a click on that line lands on the event. Its Look draws what a folded event shows.
+- An event whose Look returns no line takes no row, and the Mark passes over it: up and down move between the events that draw. A `marked` whose event draws no line, or that is no event, is drawn on the next event that draws, else the one before it, else nowhere. Drawing never changes `marked`, so the Mark comes back to its event when it draws again. This draws no system message:
+
+  ```js
+  ctx.binnacle.look('transcript.event.system/message', () => () => [])
+  ```
+
+- The answer that streams draws through the Look `transcript.live`, of the type `LiveLook`: `(blocks, width) => string[]`, given the blocks, each a `LiveBlock`, and the width. This leaves out the reasoning:
+
+  ```js
+  ctx.binnacle.look('transcript.live', (beneath) => (blocks, width) => beneath(blocks.filter((block) => block.kind !== 'reasoning'), width))
+  ```
+
+- The transcript calls each Look at each draw, so a Look follows the theme, and the models it names in `binnacle.look`'s `{ models }`.
 
 ## The composer
 
