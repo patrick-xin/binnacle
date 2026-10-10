@@ -247,7 +247,7 @@ test('a Part placed over the Part with the Focus takes the keys while it is the 
   assert.deepEqual([under.keys, over.keys], [['1', '3'], ['2']])
 })
 
-test('a key or a click that the Part does not take goes to the Gesture Table, and the core does the core action that it is bound to', async () => {
+test('a key that the Part does not take goes to the core action that it is bound to, and a click goes to none', async () => {
   const draft = takingKeys(['draft'])
   const { ctx, terminal, exits } = await gestures(10, 2, (plugin) => {
     plugin.binnacle.place('composer', draft.part)
@@ -525,4 +525,37 @@ test('the wheel on a paged Place with the Focus shows its Part’s cursor again,
   await terminal.read()
   terminal.type(wheelUpAt(0, 0))
   assert.deepEqual((await terminal.read()).rows, ['7', '8', '9'])
+})
+
+test('the core sets its gestures as actions, and keysOf reads their keys', async () => {
+  const { ctx } = await gestures(10, 2, () => {})
+  const ids = [
+    'binnacle.clear',
+    'binnacle.interrupt',
+    'binnacle.suspend',
+    'binnacle.focus.next',
+    'binnacle.scroll.up',
+    'binnacle.scroll.down',
+  ]
+  assert.deepEqual(
+    ids.map((id) => ctx.binnacle.keysOf(id)),
+    [['ctrl+c'], ['escape'], ['ctrl+z'], ['shift+tab'], ['wheelup'], ['wheeldown']],
+  )
+})
+
+test("actionsOf names the editor's actions, the core's, and each enabled action an author set that acts where the Focus is, but not one of another Place", async () => {
+  const { ctx, terminal } = await gestures(10, 2, (plugin) => {
+    plugin.binnacle.layout('chat', { column: [{ place: 'draft', size: 'content' }, { place: 'list' }] })
+    plugin.binnacle.place('draft', takingKeys(['draft']).part)
+    plugin.binnacle.place('list', { lines: () => ['list'] })
+    plugin.binnacle.action('author.hide', { keys: ['escape'], run: () => {} })
+    plugin.binnacle.action('author.draft', { keys: ['escape'], place: 'draft', run: () => {} })
+    plugin.binnacle.action('author.list', { keys: ['escape'], place: 'list', run: () => {} })
+    plugin.binnacle.action('author.off', { keys: ['escape'], enabled: () => false, run: () => {} })
+  })
+  await terminal.read()
+  assert.deepEqual(
+    new Set(ctx.binnacle.gestures.actionsOf('\x1b')),
+    new Set(['tui.select.cancel', 'binnacle.interrupt', 'author.hide', 'author.draft']),
+  )
 })

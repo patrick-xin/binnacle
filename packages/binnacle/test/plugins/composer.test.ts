@@ -138,3 +138,23 @@ test("esc interrupts the turn that runs, keeping what was queued for it as dsh's
   await new Promise((resolve) => setTimeout(resolve, 80))
   assert.deepEqual([dsh.cancels, rows], [[{ cause: { kind: 'user' }, options: { keepInbox: true } }], ['', '', RULE, 'hi ', RULE]])
 })
+
+test('an action with no Place bound to ctrl+t runs while the composer has the Focus, and the draft keeps its text', async () => {
+  const { ctx, typed } = await chat()
+  const ran: string[] = []
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.action('author.toggle', { keys: ['ctrl+t'], run: () => ran.push('toggle') })
+  })
+  const rows = await typed('h', 'i', '\x14')
+  assert.deepEqual([ran, rows], [['toggle'], ['', '', RULE, 'hi ', RULE]])
+})
+
+test('ctrl+x interrupts the turn from the composer once an author binds it to binnacle.interrupt beside its keys', async () => {
+  const dsh = agents()
+  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.bind('binnacle.interrupt', (keys) => [...keys, 'ctrl+x'])
+  })
+  const rows = await typed('h', 'i', '\x18')
+  assert.deepEqual([dsh.cancels, rows], [[{ cause: { kind: 'user' }, options: { keepInbox: true } }], ['', '', RULE, 'hi ', RULE]])
+})

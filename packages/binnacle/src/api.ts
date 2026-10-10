@@ -9,9 +9,9 @@ export interface Part {
   lines(width: number): readonly string[]
   /** Where the cursor is in the lines at that width, while the Part has the Focus. */
   cursor?(width: number): Point | undefined
-  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key, and the core draws the Part again; the Gesture Table takes the rest. */
+  /** A key, as the terminal sent it, while the Part has the Focus. It returns true when it used the key, and the core draws the Part again; the actions take the rest. */
   key?(data: string): boolean
-  /** A click at the cell under the pointer: a line of the Part's lines and a column in cells, however the line wraps and the Place scrolls; past the end of a line, on its row, the column is past the line's end. It returns true when the Part used the click, and the core draws the Part again; the Gesture Table takes the rest. A click on the Place's box or below the Part's lines does not reach the Part. */
+  /** A click at the cell under the pointer: a line of the Part's lines and a column in cells, however the line wraps and the Place scrolls; past the end of a line, on its row, the column is past the line's end. It returns true when the Part used the click, and the core draws the Part again; its Place's actions take the rest. A click on the Place's box or below the Part's lines does not reach the Part. */
   click?(at: Point): boolean
   /** The Place gained or lost the Focus, and the core draws the Part again, as its lines may show the Focus. */
   focus?(has: boolean): void
@@ -205,7 +205,10 @@ export interface PlacedHandle extends Handle {
 }
 
 export interface Gestures {
-  /** The ids of the actions a gesture is bound to: a key, as the terminal sent it, or a mouse gesture by name. */
+  /**
+   * The ids of the actions a gesture is bound to now: a key, as the terminal sent it, or a mouse gesture by name.
+   * The editor's keys of the Gesture Table, and each enabled action, the core's own or an author's, that acts wherever the Focus is or in the Place with the Focus.
+   */
   actionsOf(gesture: string): readonly string[]
 }
 
@@ -221,7 +224,7 @@ export interface Action {
   run(at: Point | undefined, beneath: () => void): void
   /** The gestures it is bound to until someone binds it or its kind: keys by name, such as `enter`, `space`, `tab` or `ctrl+n`, and `click`. */
   readonly keys?: readonly string[]
-  /** It takes a gesture only while this Place, or one of these, has the Focus, or for a click, while the click is in it. With none, it keeps the Place of the action it hides, and with none there either, it takes a key wherever the Focus is. A Place that an action acts in takes the Focus. */
+  /** It takes a gesture only while this Place, or one of these, has the Focus, or for a click, while the click is in it. With none, it keeps the Place of the action it hides, and with none there either, it takes a key wherever the Focus is, and the wheel. A Place that an action acts in takes the Focus. */
   readonly place?: string | readonly string[]
   /** An action of a Place takes its key before the Part with the Focus, such as tab while a line is being typed. An action with no Place is never before the Part. An action that names no Place keeps the newest `first` named among the actions it hides, down to the action whose Place it keeps. */
   readonly first?: boolean
@@ -233,16 +236,16 @@ export interface Action {
 }
 
 export interface Binnacle {
-  /** The Gesture Table: what each key and each mouse gesture is bound to. */
+  /** What each key and each mouse gesture is bound to. */
   readonly gestures: Gestures
   /**
    * Sets the action by that id; the newest enabled one by an id takes its gestures.
-   * A key goes to the actions marked `first` of the Place with the Focus, then to the Part with the Focus, then to the Place's other actions, then to the actions with no Place, `first` or not, then to the Gesture Table.
+   * A key goes to the actions marked `first` of the Place with the Focus, then to the Part with the Focus, then to the Place's other actions, then to the actions with no Place, `first` or not, where the core's own are, beneath an author's.
    * When two actions of different ids take a gesture at one step, the newest set wins.
    */
   action(id: string, action: Action): Handle
   /**
-   * Binds the action by that id, or every action of that kind, to these gestures instead of its own, or to what a function gives from the gestures it would have without this binding.
+   * Binds the action by that id, or every action of that kind, the core's own too, such as `binnacle.interrupt`, to these gestures instead of its own, or to what a function gives from the gestures it would have without this binding.
    * A binding by id is given, or replaces, what its kind's gives. Bindings by one name apply oldest first: a list replaces, and `[]` unbinds.
    */
   bind(name: string, keys: Binding): Handle

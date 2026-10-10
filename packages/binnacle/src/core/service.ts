@@ -24,7 +24,7 @@ import type { SetAction, SetBinding } from './actions.ts'
 import { CHAT } from './chat.ts'
 import { edited } from './edit.ts'
 import type { Made } from './edit.ts'
-import { actionsOf } from './gestures.ts'
+import { editorActionsOf } from './gestures.ts'
 import { drawer } from './looks.ts'
 import type { Make } from './looks.ts'
 import { checkLayer, layered, painter } from './theme.ts'
@@ -46,6 +46,8 @@ export interface DrawnPlaces {
   scroll(place: string, pages: number): void
   /** How many of the Part's lines the Place shows, a wrapped line counted once; none while it is not drawn. */
   linesShown(place: string): number | undefined
+  /** The Place with the Focus, as it was last drawn. */
+  focusedPlace(): string | undefined
 }
 
 /** The Place the Focus was moved to, and whether it has had the Focus since. */
@@ -103,7 +105,9 @@ export class BinnacleService extends Service implements Binnacle {
   // Made again from the layers at the next read, after a layer comes or goes. A method runs on a traced copy, where a field set stays on the copy, so the field is an object that is changed.
   private readonly themed: { now?: Themed } = {}
   private readonly drawn: Drawn
-  readonly gestures: Gestures = { actionsOf }
+  readonly gestures: Gestures = {
+    actionsOf: (gesture) => [...editorActionsOf(gesture), ...this.actions.actionsOf(gesture, this.drawn.places.focusedPlace())],
+  }
 
   constructor(ctx: Context, drawn: Drawn) {
     super(ctx, 'binnacle')

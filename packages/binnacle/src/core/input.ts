@@ -2,8 +2,6 @@ import type { Part } from '../api.ts'
 import { isKeyRelease } from '../terminal/keys.ts'
 import type { StdinBuffer } from '../terminal/stdin-buffer.ts'
 import type { Pointer } from './actions.ts'
-import { coreActionOf } from './gestures.ts'
-import type { CoreAction } from './gestures.ts'
 
 const PASTE_START = '\x1b[200~'
 const PASTE_END = '\x1b[201~'
@@ -49,12 +47,13 @@ export interface Routes {
   click(x: number, y: number, gesture: string): boolean
   /** A key to the actions that authors set, at one step of the order: before the Part with the Focus, or after it. True when one took it. */
   actions(data: string, first: boolean): boolean
-  act(action: CoreAction, at?: Pointer): void
+  /** A notch of the wheel, by its gesture's name, to the actions with no Place, where the core's scroll is. */
+  wheel(name: string, at: Pointer): void
 }
 
 /**
- * A key goes to the actions marked `first`, then to the Part with the Focus, then to the other actions, then to the Gesture Table, and the core does the core's action bound to it.
- * A click goes to the Part under the pointer, then to its Place's actions, then to the Gesture Table.
+ * A key goes to the actions marked `first`, then to the Part with the Focus, then to the other actions, the core's own among those with no Place.
+ * A click goes to the Part under the pointer, then to its Place's actions. A notch of the wheel goes to the actions with no Place.
  */
 export function route(input: StdinBuffer, routes: Routes): void {
   const toFocus = (data: string): boolean => {
@@ -63,10 +62,6 @@ export function route(input: StdinBuffer, routes: Routes): void {
     routes.taken(part)
     return true
   }
-  const toTable = (gesture: string, at?: Pointer): void => {
-    const action = coreActionOf(gesture)
-    if (action !== undefined) routes.act(action, at)
-  }
   input.on('data', (sequence: string) => {
     // No Part asks for a key's release yet, and the editor would type it a second time.
     if (routes.answered(sequence) || isKeyRelease(sequence)) return
@@ -74,13 +69,13 @@ export function route(input: StdinBuffer, routes: Routes): void {
     if (mouse !== undefined) {
       const gesture = gestureOf(mouse)
       if (gesture === undefined) return
-      if (gesture.base === 'click' && routes.click(gesture.at.x, gesture.at.y, gesture.name)) return
-      toTable(gesture.name, gesture.at)
+      if (gesture.base === 'click') routes.click(gesture.at.x, gesture.at.y, gesture.name)
+      else routes.wheel(gesture.name, gesture.at)
       return
     }
-    if (routes.actions(sequence, true) || toFocus(sequence) || routes.actions(sequence, false)) return
-    // Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as keys.
-    toTable(sequence)
+    // Raw mode turns off the terminal's own signals, so ctrl+c and ctrl+z arrive as keys, for the core's actions.
+    if (routes.actions(sequence, true) || toFocus(sequence)) return
+    routes.actions(sequence, false)
   })
   // The buffer takes a bracketed paste out of its markers; the editor reads a paste by them.
   input.on('paste', (content: string) => {

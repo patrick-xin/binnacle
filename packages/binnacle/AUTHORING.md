@@ -260,12 +260,11 @@ A key goes, in this order, to:
 1. The actions marked `first` of the Place with the Focus.
 2. The Part with the Focus.
 3. The other actions of the Place with the Focus.
-4. The actions with no Place.
-5. binnacle's own Gesture Table, such as ctrl+c and escape.
+4. The actions with no Place. binnacle's own gestures are here, such as ctrl+c and escape, beneath each action that an author sets.
 
-A click goes to the Part under it, then to its Place's actions bound to `click`. In one step, the newest enabled action by an id takes the gesture, and of two ids, the action set last wins.
+A click goes to the Part under it, then to its Place's actions bound to `click`. The wheel goes to the actions with no Place. In one step, the newest enabled action by an id takes the gesture, and of two ids, the action set last wins.
 
-`binnacle.gestures.actionsOf(gesture)` reads binnacle's own Gesture Table. It takes a key, as the terminal sent it. It gives the ids of the core's gestures and the editor's keys that the key is bound to. It does not give the actions that a plugin sets. Read it to keep a key of your own off a key that binnacle uses.
+`binnacle.gestures.actionsOf(gesture)` gives the ids of the actions that a gesture is bound to now. It takes a key, as the terminal sent it. It gives the editor's keys of the Gesture Table, and each enabled action, binnacle's own or a plugin's, that acts wherever the Focus is or in the Place with the Focus. A Part that takes keys can pass on each key that another action is bound to, as the composer does. Read it also to keep a key of your own off a key that binnacle uses.
 
 ### Bind an action
 
@@ -275,6 +274,7 @@ ctx.binnacle.bind('request.choices.down', (keys) => [...keys, 'j'])
 ```
 
 - `binnacle.bind(name, keys)` binds the action by that id, or every action of that kind. A binding by id is given, or replaces, what its kind's gives. A binding goes when the plugin that set it unloads.
+- binnacle's own gestures are actions that you bind by id: `binnacle.clear` (ctrl+c), `binnacle.interrupt` (escape), `binnacle.suspend` (ctrl+z), `binnacle.focus.next` (shift+tab), `binnacle.scroll.up` and `binnacle.scroll.down` (the wheel). So `binnacle.bind('binnacle.interrupt', (keys) => [...keys, 'ctrl+x'])` makes ctrl+x interrupt the turn, from the composer too.
 - A list of keys replaces the keys beneath it, and `[]` unbinds.
 - A function adds to the keys beneath it, or takes some away: it is given the keys the action would have without it, and returns its keys. binnacle calls it each time a key or a click is resolved, so it holds whichever plugin loads first, and for an action set after it. Two such bindings by one name both apply, the newest given what the one beneath it gives. Use it to add a key without repeating the others.
 - `binnacle.keysOf(id)` is the keys that the newest action by that id is bound to now, enabled or not. Use it to show or to check a key, after the action is set: it is read when you call it, so it does not follow a binding or an action that comes later. It does not follow `enabled()` either: an action that names its own keys owns its id's keys, even while it is disabled.

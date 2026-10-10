@@ -52,6 +52,15 @@ export function apply(ctx: Context): void {
     places: drawing,
   })
   const exit: AppExit = ctx.appExit!
+  const core = coreActions({
+    now: () => internals.now(),
+    quit: () => exit(0),
+    suspend: () => host.suspend(),
+    interrupt: () => ctx.get('binnacleSession')?.interrupt(),
+    focusNext: () => drawing.nextFocus(),
+    scroll: (notches, at) => drawing.wheel(notches, at.x, at.y),
+  })
+  for (const [id, action] of Object.entries(core.actions)) service.action(id, action)
   route(input, {
     answered: (sequence) => host.answered(sequence),
     focused: () => drawing.focused(),
@@ -61,16 +70,7 @@ export function apply(ctx: Context): void {
     },
     click: (x, y, gesture) => drawing.click(x, y, gesture),
     actions: (data, first) => service.actions.key(data, drawing.focusedPlace(), first),
-    act: coreActions({
-      now: () => internals.now(),
-      quit: () => exit(0),
-      suspend: () => host.suspend(),
-      interrupt: () => ctx.get('binnacleSession')?.interrupt(),
-      focusNext: () => drawing.nextFocus(),
-      scroll: (notches, at) => {
-        if (at !== undefined) drawing.wheel(notches, at.x, at.y)
-      },
-    }),
+    wheel: (gesture, at) => core.wheel(at, () => service.actions.wheel(gesture)),
   })
   openChat(ctx, commandLine.session, (why) => {
     streams.stderr.write(`binnacle: ${why}\n`)
