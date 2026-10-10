@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import * as transcript from '../../src/plugins/transcript/index.ts'
 import type { EventLook, LiveBlock, LiveLook, TranscriptState } from '../../src/plugins/transcript/index.ts'
+import { failed, isPrompt, textOf, withoutReasoning } from '../../src/plugins/transcript/index.ts'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { gestureTable } from '../../src/core/gestures.ts'
 import { mount } from '../support/mount.ts'
 import { persistence } from '../support/sessions.ts'
@@ -678,4 +680,144 @@ test('the live block draws through the Look transcript.live, given its blocks an
     ],
     40,
   ])
+})
+
+const anEvent = (seq: number, type: string, data: unknown) => ({ seq, type, time: seq + 1, data }) as unknown as SessionEvent
+const prompt = anEvent(0, 'user/message', {
+  role: 'user',
+  source: { kind: 'user' },
+  content: [
+    { type: 'text', text: 'fix ' },
+    { type: 'text', text: 'the bug' },
+  ],
+})
+const context = anEvent(1, 'user/message', {
+  role: 'user',
+  source: { kind: 'file-change' },
+  content: [{ type: 'text', text: 'a.ts changed' }],
+})
+const answer = anEvent(2, 'assistant/message', {
+  turn: 1,
+  step: 1,
+  message: {
+    role: 'assistant',
+    source: { kind: 'model', provider: 'p', model: 'm' },
+    content: [
+      { type: 'reasoning', text: 'think' },
+      { type: 'text', text: 'Done.' },
+      { type: 'tool-call', id: 'c1', name: 'ls', arguments: '{}' },
+    ],
+  },
+  stream: [
+    { type: 'chunk', time: 1, chunk: { type: 'block-start', index: 0, blockType: 'reasoning' } },
+    { type: 'reasoning-chunks', time0: 1, index: 0, dt: [], texts: ['think'] },
+    { type: 'chunk', time: 2, chunk: { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'think' } } },
+    { type: 'chunk', time: 3, chunk: { type: 'reasoning-delta', index: 0, text: 'more' } },
+    { type: 'chunk', time: 3, chunk: { type: 'block-start', index: 1, blockType: 'text' } },
+    { type: 'text-chunks', time0: 3, index: 1, dt: [], texts: ['Done.'] },
+    { type: 'chunk', time: 4, chunk: { type: 'block-end', index: 1, block: { type: 'text', text: 'Done.' } } },
+  ],
+})
+const result = (seq: number, isError: boolean) =>
+  anEvent(seq, 'tool/result', {
+    turn: 1,
+    step: 1,
+    message: { role: 'tool', source: { kind: 'tool', callId: 'c1' }, toolCallId: 'c1', isError, content: [{ type: 'text', text: 'no' }] },
+  })
+const odd = [
+  anEvent(9, 'test/marker', undefined),
+  anEvent(9, 'user/message', null),
+  anEvent(9, 'assistant/message', { message: 7, stream: 'x' }),
+  anEvent(9, 'tool/result', []),
+]
+
+test("textOf gives the text of a person's message or an answer's, its text blocks joined, and '' for another event", () => {
+  assert.deepEqual(
+    [textOf(prompt), textOf(context), textOf(answer), textOf(result(3, false)), ...odd.map(textOf)],
+    ['fix the bug', 'a.ts changed', 'Done.', '', '', '', '', ''],
+  )
+})
+
+test('isPrompt says whether an event is a prompt the person typed, not context that dsh added', () => {
+  assert.deepEqual(
+    [isPrompt(prompt), isPrompt(context), isPrompt(answer), ...odd.map(isPrompt)],
+    [true, false, false, false, false, false, false],
+  )
+})
+
+test('failed says whether an event is a tool result that failed', () => {
+  const withError = anEvent(5, 'tool/result', {
+    turn: 1,
+    step: 1,
+    message: { isError: true, content: [] },
+    error: { name: 'E', code: 'X' },
+  })
+  assert.deepEqual(
+    [failed(result(3, true)), failed(withError), failed(result(4, false)), failed(answer), ...odd.map(failed)],
+    [true, true, false, false, false, false, false, false],
+  )
+})
+
+test('withoutReasoning takes the reasoning out of an answer, from its message and from its stream, and leaves the event it is given as it was', () => {
+  const before = JSON.stringify(answer)
+  const without = withoutReasoning(answer)
+  assert.deepEqual(without, {
+    ...answer,
+    data: {
+      ...(answer.data as object),
+      message: {
+        role: 'assistant',
+        source: { kind: 'model', provider: 'p', model: 'm' },
+        content: [
+          { type: 'text', text: 'Done.' },
+          { type: 'tool-call', id: 'c1', name: 'ls', arguments: '{}' },
+        ],
+      },
+      stream: [
+        { type: 'chunk', time: 3, chunk: { type: 'block-start', index: 1, blockType: 'text' } },
+        { type: 'text-chunks', time0: 3, index: 1, dt: [], texts: ['Done.'] },
+        { type: 'chunk', time: 4, chunk: { type: 'block-end', index: 1, block: { type: 'text', text: 'Done.' } } },
+      ],
+    },
+  })
+  assert.equal(JSON.stringify(answer), before)
+})
+
+test('withoutReasoning takes the reasoning out of the stream of an attempt that committed no message', () => {
+  const attempt = anEvent(6, 'assistant/attempt', {
+    turn: 1,
+    step: 1,
+    stream: [{ type: 'reasoning-chunks', time0: 1, index: 0, dt: [], texts: ['hm'] }],
+  })
+  assert.deepEqual(withoutReasoning(attempt).data, { turn: 1, step: 1, stream: [] })
+})
+
+test('withoutReasoning gives an event with no reasoning as it is', () => {
+  const plain = withoutReasoning(answer)
+  assert.deepEqual(
+    [prompt, plain, result(3, true), ...odd].map((each) => withoutReasoning(each) === each),
+    [true, true, true, true, true, true, true],
+  )
+})
+
+const answered: Stored = { id: 'session-stored', createdAt: 1, events: [prompt, context, answer] }
+
+test("an author hides an answer's reasoning with beneath(withoutReasoning(event), at)", async () => {
+  const { ctx, terminal } = await reading([answered], undefined, 60)
+  ctx.binnacle.look<EventLook>('transcript.event.assistant/message', (beneath) => (event, at) => beneath(withoutReasoning(event), at))
+  const rows = (await terminal.read()).rows
+  assert.deepEqual(
+    [rows.some((row) => row.includes('Done.')), rows.some((row) => row.includes('think') || row.includes('reasoning'))],
+    [true, false],
+  )
+})
+
+test("an author draws the person's prompts with isPrompt and textOf, and leaves dsh's context to the default", async () => {
+  const { ctx, terminal } = await reading([answered], undefined, 4)
+  ctx.binnacle.look<EventLook>(
+    'transcript.event.user/message',
+    (beneath) => (event, at) => (isPrompt(event) ? [`> ${textOf(event)}`] : beneath(event, at).slice(0, 1)),
+  )
+  ctx.binnacle.look<EventLook>('transcript.event.assistant/message', () => (event) => [textOf(event)])
+  assert.deepEqual((await terminal.read()).rows, ['> fix the bug', '▾ #1 user/message', 'Done.', ''])
 })

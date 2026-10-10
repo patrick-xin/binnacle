@@ -557,6 +557,29 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   })
   ```
 
+- Read an event with the readers from `binnacle/plugins/transcript`, so that a Look need not know dsh's shapes. Each is given an event of any type:
+  - `textOf(event)`: the text of a person's message or an answer's, its text blocks joined, or `''` for another event.
+  - `isPrompt(event)`: whether the event is a prompt the person typed, not context that dsh added, such as a file's change.
+  - `failed(event)`: whether the event is a tool result that failed.
+  - `withoutReasoning(event)`: the event with its reasoning taken out, from the answer's message and from its stream, or the event as it is.
+
+  This draws the person's prompts as `> <text>` in the accent Tone, and dsh's context as before:
+
+  ```js
+  import { toPlainText } from 'binnacle'
+  import { isPrompt, textOf } from 'binnacle/plugins/transcript'
+  ctx.binnacle.look('transcript.event.user/message', (beneath) => (event, at) =>
+    isPrompt(event) ? [ctx.binnacle.paint('accent', toPlainText(`> ${textOf(event)}`)), ''] : beneath(event, at),
+  )
+  ```
+
+  This hides the reasoning of each committed answer:
+
+  ```js
+  import { withoutReasoning } from 'binnacle/plugins/transcript'
+  ctx.binnacle.look('transcript.event.assistant/message', (beneath) => (event, at) => beneath(withoutReasoning(event), at))
+  ```
+
 - The transcript Marks an event's first line in inverse video, and a click on that line lands on the event. Its Look draws what a folded event shows.
 - An event whose Look returns no line takes no row, and the Mark passes over it: up and down move between the events that draw. A `marked` whose event draws no line, or that is no event, is drawn on the next event that draws, else the one before it, else nowhere. Drawing never changes `marked`, so the Mark comes back to its event when it draws again. This draws no system message:
 
@@ -564,7 +587,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ctx.binnacle.look('transcript.event.system/message', () => () => [])
   ```
 
-- The answer that streams draws through the Look `transcript.live`, of the type `LiveLook`: `(blocks, width) => string[]`, given the blocks, each a `LiveBlock`, and the width. This leaves out the reasoning:
+- The answer that streams draws through the Look `transcript.live`, of the type `LiveLook`: `(blocks, width) => string[]`, given the blocks, each a `LiveBlock`, and the width. This leaves out the reasoning of the answer that streams, as `withoutReasoning` does for the committed answer:
 
   ```js
   ctx.binnacle.look('transcript.live', (beneath) => (blocks, width) => beneath(blocks.filter((block) => block.kind !== 'reasoning'), width))

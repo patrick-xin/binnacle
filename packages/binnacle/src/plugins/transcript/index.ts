@@ -5,6 +5,8 @@ import { gestureTable } from '../../core/gestures.ts'
 import { createModel } from '../../core/model.ts'
 import { toPlainText } from '../../index.ts'
 
+export { failed, isPrompt, textOf, withoutReasoning } from './readers.ts'
+
 export const name = 'binnacle-transcript'
 
 export const inject = ['binnacle'] satisfies (keyof Context)[]
