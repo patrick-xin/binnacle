@@ -19,6 +19,8 @@ Row `binnacle-composer` · Code `binnacle:packages/binnacle/src/plugins/composer
 - What sending does: set an action `composer.send`, and run `beneath()` to keep the default, or leave it out, such as to queue the draft while the agent runs.
 - What ctrl+c does on a draft: the composer's `binnacle.clear`, which an author binds or changes as any action.
 - What is drawn beside the draft: an edit of the Layout `composer`, a row with the Place `composer.input`.
+- The rules above and below the draft: they are the Layout's box. Set the Layout `composer` with `{ ...COMPOSER_LAYOUT, border: false }`, from `binnacle/plugins/composer`, and the draft draws with none.
+- What an empty draft shows: the Look `composer.empty`, `(width) => line`, such as `Ask anything` in the dim Tone. Its default draws nothing.
 - Where the composer is in the Chat: an edit of the Chat's `{ layout: 'composer' }` node.
 - Replace the composer: turn off its row, and set the Layout `composer`, or place a Part in `composer.input`.
 - Take a key from the composer with an action of their own with no Place, or add a key to a core gesture with `binnacle.bind`, such as ctrl+x to `binnacle.interrupt`.
@@ -26,7 +28,10 @@ Row `binnacle-composer` · Code `binnacle:packages/binnacle/src/plugins/composer
 ## How it is built
 
 - **The copied editor.** The composer is pi-tui's editor, copied under `packages/binnacle/src/terminal/components/`, and it stays until a person or an author needs something it cannot do. It keeps the cursor, the history and the paste markers.
-- **The Layout `composer`**, `{ row: [{ place: 'composer.input', size: 'fill' }] }`, which the Chat draws with `{ layout: 'composer', size: 'content', unless: 'request' }`. The editor fills `composer.input`, where the Chat's Focus starts, and still draws its own rules. Turned off, the row leaves no composer, as the Layout `composer` is not set.
+- **The Layout `composer`** is `COMPOSER_LAYOUT`: `{ row: [{ place: 'composer.input', size: 'fill' }], border: ['top', 'bottom'] }`. It is frozen and exported. The Chat draws it with `{ layout: 'composer', size: 'content', unless: 'request' }`. The editor fills `composer.input`, where the Chat's Focus starts. Turned off, the row leaves no composer, as the Layout `composer` is not set.
+- **The rules are the Layout's box.** The box draws them in the `border` Tone. So an edit or a Layout of an author's draws them, or none. The copied editor draws no rules.
+- **The rows hidden from a tall draft.** While rows of the draft are hidden above it, the editor's first row is `↑ N more`. While rows are hidden below it, its last row is `↓ N more`. These rows are drawn in the `muted` Tone, inside the box. They count among the 7 rows shown. A draft that fits draws neither.
+- **The empty line.** While the draft is empty, `composer.input` draws the editor's cursor, then the Look `composer.empty`, given the cells after the cursor. It is drawn outside the cache of the editor's lines, so that it follows the Look when it changes.
 - **The model `composer`**, `{ text }`. The editor's `onChange` sets `text` to its expanded text, the paste markers' content in full. When `text` differs from the editor's expanded text, as when an author sets it, the composer calls the editor's `setText`, which drops the markers and puts the cursor at the end. The editor's own changes never differ, so they never call `setText`.
 - **Submit and new line are actions** of `composer.input`: `composer.send` takes the keys of the Gesture Table's `tui.input.submit`, enter, and `composer.newline` those of `tui.input.newLine`, shift+enter and ctrl+j. The composer gives the editor no key that matches either, so the editor sends nothing and makes no new line by itself.
 - **The sequences for shift+enter that name no key**, which pi-tui's editor takes as a new line by its fallbacks, run `composer.newline` while no action other than the editor's is bound to them. So does alt+enter's sequence, which some terminals send for shift+enter. A key bound to both actions runs `composer.newline`, as the editor made a new line before it submitted: ctrl+j's sequence is also enter's. pi's fallback for macOS's Terminal and for Windows reads the shift key through a native helper, and binnacle does not copy it: there, ctrl+j or a backslash before enter is a new line.
@@ -35,8 +40,8 @@ Row `binnacle-composer` · Code `binnacle:packages/binnacle/src/plugins/composer
 - **Esc interrupts**: it is the core's `binnacle.interrupt`; a steer that was queued runs after the interrupt, as in dsh. Ctrl+z suspends.
 - **Its other keys come from the Gesture Table**, as the editor reads them there.
 - **It passes on each key that another action is bound to.** It takes a key only when `binnacle.gestures.actionsOf` names no action but the editor's `tui.` ones, submit and new line left out. So escape goes on to the core's interrupt, and a key that an author binds to an action with no Place, or to a core gesture, reaches that action.
-- **It shows at most 24 rows** of a long draft.
+- **It shows at most 7 rows** of a long draft: the editor is told of 24 rows, and shows 30% of them.
 
 ## Built by
 
-Stage 2 (before Specs). PR [#153](https://github.com/patrick-xin/binnacle/pull/153): esc interrupts, ctrl+c clears and quits · Spec [#224](https://github.com/patrick-xin/binnacle/issues/224) · Ticket [#230](https://github.com/patrick-xin/binnacle/issues/230): it passes on an author's keys · Spec [#236](https://github.com/patrick-xin/binnacle/issues/236) · Ticket [#237](https://github.com/patrick-xin/binnacle/issues/237): the draft as a model, its actions, and the Layout `composer`.
+Stage 2 (before Specs). PR [#153](https://github.com/patrick-xin/binnacle/pull/153): esc interrupts, ctrl+c clears and quits · Spec [#224](https://github.com/patrick-xin/binnacle/issues/224) · Ticket [#230](https://github.com/patrick-xin/binnacle/issues/230): it passes on an author's keys · Spec [#236](https://github.com/patrick-xin/binnacle/issues/236) · Ticket [#237](https://github.com/patrick-xin/binnacle/issues/237): the draft as a model, its actions, and the Layout `composer` · Ticket [#238](https://github.com/patrick-xin/binnacle/issues/238): the rules as the Layout's box, and the empty line.

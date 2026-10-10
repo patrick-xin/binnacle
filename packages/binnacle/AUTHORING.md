@@ -512,10 +512,10 @@ tabs(ctx.binnacle, {
 
 ## The composer
 
-The row `binnacle-composer` sets the Layout `composer`, which the Chat draws while no Request stands. It is a row with the Place `composer.input`, where the editor draws the draft, and where the Chat's Focus starts:
+The row `binnacle-composer` sets the Layout `composer`, which the Chat draws while no Request stands. It is a row with the Place `composer.input`, where the editor draws the draft, and where the Chat's Focus starts. Its rules are its box, drawn in the `border` Tone:
 
 ```js
-{ row: [{ place: 'composer.input', size: 'fill' }] }
+{ row: [{ place: 'composer.input', size: 'fill' }], border: ['top', 'bottom'] }
 ```
 
 - The draft is the model `composer`, of the type `ComposerState` from `binnacle/plugins/composer`. Its state's `text` is the draft as it would be sent: a large paste's content in full, not its marker. Typing and pasting change it. Set `text` to another draft, and it replaces the one shown, drawn in full with the cursor at its end. Set it to the draft it holds, and nothing changes.
@@ -551,6 +551,19 @@ The row `binnacle-composer` sets the Layout `composer`, which the Chat draws whi
 
   ```js
   ctx.binnacle.edit('composer', { insert: { place: 'prompt', size: { fixed: 2 } }, before: 'composer.input' })
+  ```
+
+- `COMPOSER_LAYOUT`, the Layout above, frozen, is exported from `binnacle/plugins/composer`. Build on it to set the Layout `composer` again, such as with no rules:
+
+  ```js
+  import { COMPOSER_LAYOUT } from 'binnacle/plugins/composer'
+  ctx.binnacle.layout('composer', { ...COMPOSER_LAYOUT, border: false })
+  ```
+
+- An empty draft draws its line through the Look `composer.empty`, `(width) => line`, of the type `EmptyLook`. It is drawn after the cursor, and given the cells left. Its default draws nothing. This one shows a hint:
+
+  ```js
+  ctx.binnacle.look('composer.empty', () => () => ctx.binnacle.paint('dim', 'Ask anything'))
   ```
 
 ## The status line
