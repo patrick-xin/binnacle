@@ -84,7 +84,7 @@ What a plugin registers, such as a Part, a Layout, a theme layer, a Look, an act
 
 | To change | The shortest way |
 |---|---|
-| where a Place is drawn | a Layout built on `CHAT_LAYOUT`: `binnacle.layout('chat', …)` ([Layouts](#layouts)) |
+| where a Place is drawn | an edit of one node: `binnacle.edit('chat', …)` ([Edit one node](#edit-one-node)) |
 | a colour or a glyph, everywhere | a theme layer: `binnacle.theme(layer)` ([The theme](#the-theme)) |
 | how one piece of a component looks | a Look: `binnacle.look(name, make)` ([Looks](#looks)) |
 | what a Place draws | a Part: `binnacle.place(name, part)` ([Parts, Places and Screens](#parts-places-and-screens)) |
@@ -369,6 +369,30 @@ ctx.binnacle.layout('menu', { column: [{ place: 'menu.title' }, { place: 'menu.i
 ```
 
 `CHAT_LAYOUT` is frozen: make a new node, as above, rather than change one in place.
+
+### Edit one node
+
+`binnacle.edit(name, edit)` changes one node of the Layout or Screen by that name, and keeps the rest. Two plugins that edit one Layout both apply, where two Layouts set by one name replace each other. An edit names its node by an anchor: the name in a node's `place` or `layout`.
+
+| Edit | Does |
+|---|---|
+| `{ insert: node, after: 'x' }`, `{ insert: node, before: 'x' }` | adds `node` beside the anchor's node |
+| `{ remove: 'x' }` | takes the anchor's node out |
+| `{ replace: 'x', with: node }` | puts `node` in the anchor's node's place |
+
+So two edits move the status line above the transcript:
+
+```js
+ctx.binnacle.edit('chat', { remove: 'status' })
+ctx.binnacle.edit('chat', { insert: { place: 'status', size: 'content' }, before: 'transcript' })
+```
+
+- An edit applies each time the Layout is drawn, to the newest Layout by that name, whoever set it. While its anchor is not there, it does nothing, and it applies again when the anchor comes back.
+- It looks for its anchor through rows, columns, `first`, `over` and `float`, children in order and `over` before `float`, and takes the first node it finds. It does not look inside a named Layout that the Layout draws: edit that one by its own name.
+- An insert needs a row, a column or a `first` around its anchor. Beside the root, `over` or `float`, it does nothing. A removed root draws nothing.
+- Inserts apply first, then replaces, then removes. A replace or a remove acts on its anchor's node in the Layout as set, so it never acts on a node that an insert added. An insert beside a node that another plugin removes stays, and a remove after a replace takes out what the replace put there. An insert can find its anchor in a node that another insert added.
+- Within each kind, a built-in's edits apply before yours, then the edits go by the `name` of the plugin that made each, a plugin with no name first. Of two replaces of one node, the one applied last holds. So the order never depends on which plugin loads first.
+- Several inserts after one anchor go in that order: the first is next to it. Before it, the last is next to it.
 
 ## The Focus and the scroll
 

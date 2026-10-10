@@ -359,6 +359,36 @@ test('what a built-in row registers ranks beneath anything an author registers, 
   )
 })
 
+/** A row whose plugin draws its name in a Place of its own, and replaces the node `said` with that Place. */
+const replacing = (name: string, said: string, place: string) => ({
+  name,
+  plugin: {
+    name: said,
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.place(place, { lines: () => [said] })
+      plugin.binnacle.edit('chat', { replace: 'said', with: { place } })
+    },
+  },
+})
+
+test("of two replaces of one node, the one applied last holds: an author's over a built-in's, and among the authors, the plugin's name orders them, whichever loads first", async () => {
+  const { ctx, terminal, ready } = await mount({ columns: 30, rows: 1 })
+  ready()
+  const profile = await loaded(ctx, [
+    replacing('./plugins/zed', 'zed', 'one'),
+    replacing('binnacle-alpha', 'alpha', 'two'),
+    replacing('binnacle/plugins/built', 'built-in', 'three'),
+  ])
+  ctx.binnacle.layout('chat', { place: 'said' })
+  const shown = [(await terminal.read()).rows[0]]
+  profile.remove(0)
+  shown.push((await terminal.read()).rows[0])
+  profile.remove(1)
+  shown.push((await terminal.read()).rows[0])
+  assert.deepEqual(shown, ['zed', 'alpha', 'built-in'])
+})
+
 test('a Part placed while its plugin unloads is not held: the call throws, and the Place draws as before', async () => {
   const { ctx, terminal, ready } = await mount({ columns: 20, rows: 2 })
   ready()
