@@ -4,6 +4,7 @@ import type {
   Action,
   Binding,
   Binnacle,
+  Edit,
   Gestures,
   Handle,
   Layout,
@@ -21,6 +22,8 @@ import type { TerminalColorMode } from '../terminal/colors.ts'
 import { Actions } from './actions.ts'
 import type { SetAction, SetBinding } from './actions.ts'
 import { CHAT } from './chat.ts'
+import { edited } from './edit.ts'
+import type { Made } from './edit.ts'
 import { actionsOf } from './gestures.ts'
 import { drawer } from './looks.ts'
 import type { Make } from './looks.ts'
@@ -58,8 +61,10 @@ export interface Held<T> {
   readonly builtIn: boolean
 }
 
-/** The part of a Cordis fiber that the loader adds: the row whose plugin it is, or none on a child plugin. */
+/** The parts of a Cordis fiber that the core reads. The loader adds `entry`: the row whose plugin it is, or none on a child plugin. */
 interface Fiber {
+  /** The plugin's own `name`, with none on a plugin that names none. */
+  readonly runtime?: { readonly name?: string }
   readonly entry?: { readonly options: { readonly name: string } }
   readonly parent: { readonly fiber: Fiber }
 }
@@ -83,6 +88,7 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly chat: Held<Screen> = { item: CHAT, builtIn: true }
   private readonly screens: Held<Screen>[] = [this.chat]
   private readonly layouts = new Map<string, Held<Layout>[]>()
+  private readonly edits = new Map<string, Held<Made>[]>()
   private readonly parts = new Map<string, Held<Part>[]>()
   private readonly models = new Map<string, Held<Model<object>>[]>()
   // The Place the Focus was moved to, for each Screen shown; null once the core forgot it.
@@ -162,7 +168,7 @@ export class BinnacleService extends Service implements Binnacle {
 
   get layoutOnView(): Layout {
     const screen = this.screenOnView
-    return this.layouts.get(screen.name)?.at(-1)?.item ?? screen.layout
+    return this.edited(screen.name, this.layouts.get(screen.name)?.at(-1)?.item ?? screen.layout)
   }
 
   get screenOnView(): Screen {
@@ -221,8 +227,14 @@ export class BinnacleService extends Service implements Binnacle {
     return this.hold(listIn(this.layouts, name), layout, 'binnacle: a layout')
   }
 
+  edit(name: string, edit: Edit): Handle {
+    const plugin = (this.ctx.fiber as unknown as Fiber).runtime?.name
+    return this.hold(listIn(this.edits, name), { edit, plugin }, 'binnacle: an edit')
+  }
+
   layoutNamed(name: string): Layout | undefined {
-    return this.layouts.get(name)?.at(-1)?.item
+    const layout = this.layouts.get(name)?.at(-1)?.item
+    return layout === undefined ? undefined : this.edited(name, layout)
   }
 
   place(name: string, part: Part): PlacedHandle {
@@ -248,6 +260,10 @@ export class BinnacleService extends Service implements Binnacle {
 
   modelOf<S extends object>(name: string): Model<S> | undefined {
     return this.models.get(name)?.at(-1)?.item as Model<S> | undefined
+  }
+
+  private edited(name: string, layout: Layout): Layout {
+    return edited(layout, this.edits.get(name) ?? [])
   }
 
   private themeNow(): Themed {

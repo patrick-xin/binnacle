@@ -149,6 +149,25 @@ export type Layout =
   /** `over` fills the node, and `float` is drawn on top of it while `float` has a line to draw. A click lands on the float before what it covers. */
   | (Node & Omit<Kinds, 'over' | 'float' | 'at'> & { readonly over: Layout; readonly float: Layout; readonly at?: Anchor })
 
+interface Edits {
+  readonly insert?: never
+  readonly after?: never
+  readonly before?: never
+  readonly remove?: never
+  readonly replace?: never
+  readonly with?: never
+}
+
+/**
+ * A change to one node of a Layout, which it names by an anchor: the name in a node's `place` or `layout`.
+ * `insert` adds a node beside the anchor's, `remove` takes the anchor's node out, and `replace` puts `with` in its place.
+ */
+export type Edit =
+  | (Omit<Edits, 'insert' | 'after'> & { readonly insert: Layout; readonly after: string })
+  | (Omit<Edits, 'insert' | 'before'> & { readonly insert: Layout; readonly before: string })
+  | (Omit<Edits, 'remove'> & { readonly remove: string })
+  | (Omit<Edits, 'replace' | 'with'> & { readonly replace: string; readonly with: Layout })
+
 /** Where a float is drawn over what it covers: at its top, its bottom or its centre, and centred across. Its height is what its lines need. */
 export interface Anchor {
   readonly side?: 'top' | 'center' | 'bottom'
@@ -226,6 +245,13 @@ export interface Binnacle {
   show(screen: Screen): Handle
   /** Sets the Layout by that name: a Screen's, which replaces the Screen's own, or one that a `{ layout: name }` node draws. The newest wins. */
   layout(name: string, layout: Layout): Handle
+  /**
+   * Changes one node of the Layout or Screen by that name, and keeps the rest. It applies at each draw, to the newest Layout by that name; while its anchor is not there, it does nothing.
+   * Inserts apply first, then replaces, then removes. A replace or a remove acts on the node its anchor names in the Layout as set, never on a node that an insert added.
+   * Within each kind, a built-in's apply before an author's, then they go by the name of the plugin that made each, so the order never depends on which loads first.
+   * An insert needs a row, a column or a `first` around its anchor. Of several inserts after one anchor, the first in that order is next to it; before it, the last is.
+   */
+  edit(name: string, edit: Edit): Handle
   /** Fills the Place by that name on every Screen; the newest Part wins. */
   place(name: string, part: Part): PlacedHandle
   /**

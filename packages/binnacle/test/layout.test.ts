@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Layout, Point } from '../src/api.ts'
+import type { Binnacle, Edit, Layout, Point } from '../src/api.ts'
 import { CHAT_LAYOUT, createModel } from '../src/index.ts'
 import { mount } from './support/mount.ts'
 
@@ -672,4 +672,214 @@ test('a named Layout in a row is as wide as a fixed node in it is fixed, not as 
     binnacle.place('main', part('mmmmmmmmmm'))
   })
   assert.deepEqual(rows, ['AABmmm'])
+})
+
+test("`binnacle.edit` moves the status line above the transcript with two edits, and the rest of the Chat's Layout draws as before", async () => {
+  const { rows } = await drawn(10, 4, (binnacle) => {
+    binnacle.edit('chat', { remove: 'status' })
+    binnacle.edit('chat', { insert: { place: 'status', size: 'content' }, before: 'transcript' })
+    binnacle.place('transcript', part('t1', 't2', 't3'))
+    binnacle.place('status', part('working'))
+    binnacle.place('composer', part('draft'))
+  })
+  assert.deepEqual(rows, ['working', 't2', 't3', 'draft'])
+})
+
+const one = (place: string): Layout => ({ place, size: 'content' })
+
+test('an edit inserts a node after or before its anchor, the name of a Place or of a named Layout, removes its node, or replaces it with another, and keeps the rest', async () => {
+  const seen: string[][] = []
+  for (const edit of [
+    { insert: one('x'), after: 'a' },
+    { insert: one('x'), before: 'n' },
+    { insert: one('x'), after: 'n' },
+    { remove: 'a' },
+    { remove: 'n' },
+    { replace: 'c', with: one('x') },
+  ] satisfies Edit[]) {
+    const { rows } = await drawn(10, 4, (binnacle) => {
+      binnacle.layout('chat', { column: [one('a'), { layout: 'n', size: 'content' }, one('c')] })
+      binnacle.layout('n', { place: 'in n' })
+      for (const name of ['a', 'in n', 'c', 'x']) binnacle.place(name, part(name))
+      binnacle.edit('chat', edit)
+    })
+    seen.push(rows)
+  }
+  assert.deepEqual(seen, [
+    ['a', 'x', 'in n', 'c'],
+    ['a', 'x', 'in n', 'c'],
+    ['a', 'in n', 'x', 'c'],
+    ['in n', 'c', '', ''],
+    ['a', 'c', '', ''],
+    ['a', 'in n', 'x', ''],
+  ])
+})
+
+const editor = (name: string, edits: readonly Edit[]) => ({
+  name,
+  inject: ['binnacle'],
+  apply: (ctx: Context) => {
+    for (const edit of edits) ctx.binnacle.edit('chat', edit)
+  },
+})
+
+async function edited(columns: number, rows: number, layout: Layout, plugins: readonly ReturnType<typeof editor>[]) {
+  const { ctx, terminal } = await drawn(columns, rows, (binnacle) => {
+    binnacle.layout('chat', layout)
+    for (const name of ['a', 'b', 'c', 'p', 'pb', 'q', 'qb', 'x', 'y']) binnacle.place(name, part(name))
+  })
+  for (const plugin of plugins) await ctx.plugin(plugin)
+  return (await terminal.read()).rows
+}
+
+test('two plugins that each insert beside one Place both draw, in one order whichever loads first: after the anchor the first is next to it, and before it the last is', async () => {
+  const p = editor('p', [
+    { insert: one('p'), after: 'a' },
+    { insert: one('pb'), before: 'a' },
+  ])
+  const q = editor('q', [
+    { insert: one('q'), after: 'a' },
+    { insert: one('qb'), before: 'a' },
+  ])
+  const layout: Layout = { column: [one('a')] }
+  assert.deepEqual(
+    [await edited(10, 5, layout, [p, q]), await edited(10, 5, layout, [q, p])],
+    [
+      ['pb', 'qb', 'a', 'p', 'q'],
+      ['pb', 'qb', 'a', 'p', 'q'],
+    ],
+  )
+})
+
+test('inserts apply before replaces, and replaces before removes, on the nodes of the Layout as set: an insert beside a removed node stays, a remove takes out what a replace put, and a node an insert added is never replaced or removed', async () => {
+  const layout: Layout = { column: [one('a'), one('b')] }
+  const seen: string[][] = []
+  for (const edits of [
+    [{ remove: 'a' }, { insert: one('x'), after: 'a' }],
+    [{ remove: 'b' }, { replace: 'b', with: one('y') }],
+    [{ remove: 'x' }, { replace: 'x', with: one('y') }, { insert: one('x'), after: 'a' }],
+  ] satisfies Edit[][])
+    seen.push(await edited(10, 3, layout, [editor('author', edits)]))
+  assert.deepEqual(seen, [
+    ['x', 'b', ''],
+    ['a', '', ''],
+    ['a', 'x', 'b'],
+  ])
+})
+
+test('an insert finds its anchor among the nodes that other inserts added, whichever loads first', async () => {
+  const beside = editor('a-beside', [{ insert: one('y'), after: 'x' }])
+  const adds = editor('b-adds', [{ insert: { row: [one('x')], size: 'content' }, after: 'a' }])
+  const layout: Layout = { column: [one('a'), one('b')] }
+  assert.deepEqual(
+    [await edited(10, 3, layout, [beside, adds]), await edited(10, 3, layout, [adds, beside])],
+    [
+      ['a', 'xy', 'b'],
+      ['a', 'xy', 'b'],
+    ],
+  )
+})
+
+test('inserts beside a node that another insert added keep their order, after it and before it, though one waits for that node and the other does not', async () => {
+  const adds = editor('b', [{ insert: one('x'), after: 'a' }])
+  const seen: string[][] = []
+  for (const side of ['after', 'before'] as const) {
+    const beside = (place: string): Edit => (side === 'after' ? { insert: one(place), after: 'x' } : { insert: one(place), before: 'x' })
+    seen.push(await edited(10, 4, { column: [one('a')] }, [editor('a', [beside('p')]), adds, editor('c', [beside('q')])]))
+  }
+  assert.deepEqual(seen, [
+    ['a', 'x', 'p', 'q'],
+    ['a', 'p', 'q', 'x'],
+  ])
+})
+
+test('an edit looks through rows, columns, `first`, `over` and `float`, the first node found by the name first, and never inside a named Layout that the Layout draws', async () => {
+  const { rows } = await drawn(10, 5, (binnacle) => {
+    binnacle.layout('chat', {
+      over: {
+        column: [
+          { row: [{ place: 'a' }, { place: 'b' }], size: 'content' },
+          { first: [{ place: 'c' }], size: 'content' },
+          { layout: 'n', size: 'content' },
+        ],
+      },
+      float: { column: [{ place: 'a' }, { place: 'f' }] },
+      at: { side: 'bottom', width: 4 },
+    })
+    binnacle.layout('n', { column: [{ place: 'inner' }, { place: 'nn' }] })
+    for (const name of ['a', 'b', 'c', 'f', 'inner', 'nn', 'B', 'C', 'F']) binnacle.place(name, part(name))
+    binnacle.edit('chat', { remove: 'a' })
+    binnacle.edit('chat', { replace: 'b', with: { place: 'B' } })
+    binnacle.edit('chat', { replace: 'c', with: { place: 'C' } })
+    binnacle.edit('chat', { replace: 'f', with: { place: 'F' } })
+    binnacle.edit('chat', { remove: 'inner' })
+  })
+  assert.deepEqual(rows, ['B', 'C', 'inner', 'nn a', '   F'])
+})
+
+test('an insert beside the root, an `over` or a `float` does nothing, and a removed root draws nothing', async () => {
+  const seen: string[][] = []
+  for (const [layout, edits] of [
+    [{ place: 'a' }, [{ insert: one('x'), after: 'a' }]],
+    [
+      { over: { place: 'a' }, float: { place: 'b' }, at: { side: 'bottom', width: 4 } },
+      [
+        { insert: one('x'), before: 'a' },
+        { insert: one('x'), after: 'b' },
+      ],
+    ],
+    [{ place: 'a' }, [{ remove: 'a' }]],
+  ] satisfies [Layout, Edit[]][])
+    seen.push(await edited(10, 2, layout, [editor('author', edits)]))
+  assert.deepEqual(seen, [
+    ['a', ''],
+    ['a', '   b'],
+    ['', ''],
+  ])
+})
+
+const plugin = (name: string, apply: (binnacle: Binnacle) => void) => ({
+  name,
+  inject: ['binnacle'],
+  apply: (ctx: Context) => {
+    apply(ctx.binnacle)
+  },
+})
+
+test('an edit applies to the newest Layout by its name, whoever set it, does nothing while its anchor is not there, and applies again when the anchor comes back', async () => {
+  const { ctx, terminal, rows } = await drawn(10, 3, (binnacle) => {
+    binnacle.layout('chat', { layout: 'panel' })
+    for (const name of ['a', 'b', 'x']) binnacle.place(name, part(name))
+  })
+  await ctx.plugin(plugin('panel', (binnacle) => binnacle.layout('panel', { column: [{ place: 'a' }, { place: 'b' }] })))
+  await ctx.plugin(plugin('editor', (binnacle) => binnacle.edit('panel', { insert: { place: 'x' }, after: 'b' })))
+  const seen = [rows, (await terminal.read()).rows]
+  const newer = ctx.plugin(plugin('newer', (binnacle) => binnacle.layout('panel', { column: [{ place: 'a' }] })))
+  await newer
+  seen.push((await terminal.read()).rows)
+  await newer.dispose()
+  seen.push((await terminal.read()).rows)
+  assert.deepEqual(seen, [
+    ['', '', ''],
+    ['a', 'b', 'x'],
+    ['a', '', ''],
+    ['a', 'b', 'x'],
+  ])
+})
+
+test('an edit goes when the plugin that made it unloads, and the Layout draws again', async () => {
+  const { ctx, terminal } = await drawn(10, 3, (binnacle) => {
+    binnacle.place('transcript', part('t1'))
+    binnacle.place('status', part('working'))
+    binnacle.place('composer', part('draft'))
+  })
+  const author = ctx.plugin(plugin('author', (binnacle) => binnacle.edit('chat', { remove: 'status' })))
+  await author
+  const seen = [(await terminal.read()).rows]
+  await author.dispose()
+  seen.push((await terminal.read()).rows)
+  assert.deepEqual(seen, [
+    ['t1', '', 'draft'],
+    ['t1', 'working', 'draft'],
+  ])
 })
