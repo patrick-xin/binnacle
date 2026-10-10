@@ -1,7 +1,6 @@
 import type { Action, Binding, Point } from '../api.ts'
 import { matchesKey } from '../terminal/keys.ts'
 import type { KeyId } from '../terminal/keys.ts'
-import type { CoreAction } from './gestures.ts'
 import type { Held } from './service.ts'
 
 // pi's window for the second ctrl+c that quits.
@@ -19,21 +18,53 @@ export interface Acts {
   suspend(): void
   interrupt(): void
   focusNext(): void
-  scroll(notches: number, at: Pointer | undefined): void
+  scroll(notches: number, at: Pointer): void
 }
 
-/** The core's own actions, in one place, so a second ctrl+c is told from the first. */
-export function coreActions(acts: Acts): (action: CoreAction, at?: Pointer) => void {
+export interface CoreActions {
+  readonly actions: Readonly<Record<string, Action>>
+  /** Runs what takes a notch of the wheel, with the cell under its pointer for the core's scroll. */
+  wheel(at: Pointer, take: () => void): void
+}
+
+/** The core's own gestures, as actions that the core sets beneath an author's: one place, so that a second ctrl+c is told from the first. */
+export function coreActions(acts: Acts): CoreActions {
   let clearedAt = Number.NEGATIVE_INFINITY
-  return (action, at) => {
-    if (action === 'binnacle.suspend') return acts.suspend()
-    if (action === 'binnacle.interrupt') return acts.interrupt()
-    if (action === 'binnacle.focus.next') return acts.focusNext()
-    if (action === 'binnacle.scroll.up') return acts.scroll(1, at)
-    if (action === 'binnacle.scroll.down') return acts.scroll(-1, at)
-    const now = acts.now()
-    if (now - clearedAt < QUIT_WITHIN_MS) acts.quit()
-    clearedAt = now
+  // An action's `at` is a cell in a Part's lines, so the scroll reads the cell on the screen from here.
+  let pointer: Pointer | undefined
+  const scroll = (notches: number): void => {
+    if (pointer !== undefined) acts.scroll(notches, pointer)
+  }
+  const actions: Record<string, Action> = {
+    'binnacle.clear': {
+      keys: ['ctrl+c'],
+      description: 'Clear the draft; pressed twice on an empty draft, quit binnacle',
+      run: () => {
+        const now = acts.now()
+        if (now - clearedAt < QUIT_WITHIN_MS) acts.quit()
+        clearedAt = now
+      },
+    },
+    'binnacle.interrupt': { keys: ['escape'], description: 'Interrupt the turn that runs', run: () => acts.interrupt() },
+    'binnacle.suspend': { keys: ['ctrl+z'], description: 'Suspend binnacle, back to the shell', run: () => acts.suspend() },
+    'binnacle.focus.next': {
+      keys: ['shift+tab'],
+      description: 'Move the Focus to the next Place whose Part takes keys',
+      run: () => acts.focusNext(),
+    },
+    'binnacle.scroll.up': { keys: ['wheelup'], description: 'Scroll the Place under the pointer up', run: () => scroll(1) },
+    'binnacle.scroll.down': { keys: ['wheeldown'], description: 'Scroll the Place under the pointer down', run: () => scroll(-1) },
+  }
+  return {
+    actions,
+    wheel: (at, take) => {
+      pointer = at
+      try {
+        take()
+      } finally {
+        pointer = undefined
+      }
+    },
   }
 }
 
@@ -77,6 +108,23 @@ export class Actions {
     if (taker === undefined) return false
     this.#run(taker.entry, undefined)
     return true
+  }
+
+  /** The ids of the enabled actions that a gesture is bound to now: each that acts wherever the Focus is, and each that acts in the Place with the Focus. */
+  actionsOf(gesture: string, focus: string | undefined): readonly string[] {
+    return this.#tops()
+      .filter((entry) => this.#keysOf(entry).some((key) => bindsTo(key, gesture)))
+      .filter((entry) => {
+        const { place } = this.#placeOf(entry)
+        return place === undefined || (focus !== undefined && actsIn(place, focus))
+      })
+      .map(({ item }) => item.id)
+  }
+
+  /** A notch of the wheel, by its gesture's name, to the actions with no Place. */
+  wheel(name: string): void {
+    const taker = this.#tops().find((entry) => this.#placeOf(entry).place === undefined && this.#keysOf(entry).includes(name))
+    if (taker !== undefined) this.#run(taker, undefined)
   }
 
   /** A click that the Part in the Place did not take, by its gesture's name, such as `click` or `shift+click`. True when an action took it. */
@@ -149,6 +197,11 @@ export class Actions {
       .filter(({ item }) => item.name === name)
       .reduce((keys, { item }) => (typeof item.keys === 'function' ? item.keys(keys) : item.keys), beneath)
   }
+}
+
+// A mouse gesture is bound by its name; a key is matched as the terminal sends it.
+function bindsTo(key: string, gesture: string): boolean {
+  return key === gesture || matchesKey(gesture, key as KeyId)
 }
 
 function actsIn(own: Action['place'], place: string): boolean {

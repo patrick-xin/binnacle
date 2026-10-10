@@ -11,8 +11,8 @@ One canonical term for each concept that is binnacle's own, for a person who use
 
 ## Gestures
 
-- **Focus** — the Place whose Part takes each key first. A Screen names where it starts, a person moves it by a click or shift+tab, and the Chat's starts on the composer. A key that the Part does not take goes to the Gesture Table. Not the focus of the terminal's window. <a id="focus"></a>
-- **Gesture Table** — the core's one table of actions: each has an id, its default gestures — a key, as the terminal sends it, or a mouse gesture by name — and a description. The copied editor reads its keys from it. <a id="gesture-table"></a>
+- **Focus** — the Place whose Part takes each key first. A Screen names where it starts, a person moves it by a click or shift+tab, and the Chat's starts on the composer. A key that the Part does not take goes to the actions. Not the focus of the terminal's window. <a id="focus"></a>
+- **Gesture Table** — the core's table of the editor's actions, the `tui.` ids: each has an id, its default gestures — a key, as the terminal sends it, or a mouse gesture by name — and a description. The copied editor reads its keys from it. The core's own gestures are actions, which `binnacle.gestures.actionsOf` names beside it. <a id="gesture-table"></a>
 
 ## The Kit
 

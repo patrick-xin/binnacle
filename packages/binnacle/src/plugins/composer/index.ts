@@ -55,9 +55,9 @@ export function apply(ctx: Context): void {
     lines: (width) => drawn(width).lines,
     cursor: (width) => drawn(width).cursor,
     key: (data) => {
-      // pi-tui's editor names its actions `tui.`; a key bound to any other action is not the editor's.
+      // pi-tui's editor names its actions `tui.`; a key bound to any other action, the core's or an author's, goes on to it.
       const actions = ctx.binnacle.gestures.actionsOf(data)
-      // The Gesture Table's clear is the draft's to do while there is one; on an empty draft it goes on to the core.
+      // The core's clear is the draft's to do while there is one; on an empty draft it goes on to the core's action.
       if (actions.includes('binnacle.clear') && editor.getText() !== '') {
         editor.setText('')
         changed()
