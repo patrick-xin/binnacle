@@ -97,6 +97,11 @@ export interface ThemeLayer {
 /** How a piece of a component is drawn, such as a List's row: what it takes is the component's to say. */
 export type Look = (...args: never[]) => unknown
 
+export interface LookOptions {
+  /** What the Look is drawn from, as a Part's `models` are. */
+  readonly models?: readonly Watchable[]
+}
+
 /** A line of a Part's lines, and a column in cells. */
 export interface Point {
   readonly line: number
@@ -285,8 +290,9 @@ export interface Binnacle {
   /**
    * Sets how a piece of a component is drawn, by an instance's name, such as `request.choices.row`, or by its kind's, such as `list.row`.
    * `make` is handed the Look beneath it, and returns the Look. The Look beneath is found each time it draws.
+   * Everything drawn with Looks is drawn again after each of `options.models` changes.
    */
-  look<F extends Look>(name: string, make: (beneath: F) => F): Handle
+  look<F extends Look>(name: string, make: (beneath: F) => F, options?: LookOptions): Handle
   /**
    * The Look that draws a piece: the newest set by the first of these names, an instance's then its kind's.
    * Each Look's beneath is the one set before it by its name, then the newest by the next name, and at the end `fallback`.

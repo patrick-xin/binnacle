@@ -9,6 +9,7 @@ import type {
   Handle,
   Layout,
   Look,
+  LookOptions,
   Model,
   Part,
   PlacedHandle,
@@ -132,10 +133,16 @@ export class BinnacleService extends Service implements Binnacle {
     return this.hold(this.layers, layer, 'binnacle: a theme layer', undefined, restyle)
   }
 
-  look<F extends Look>(name: string, make: (beneath: F) => F): Handle {
+  look<F extends Look>(name: string, make: (beneath: F) => F, options?: LookOptions): Handle {
+    let stops: (() => void)[] = []
     const restyle = (): void => this.drawn.forgetAll()
     restyle()
-    return this.hold(listIn(this.looks, name), make as unknown as Make, 'binnacle: a look', undefined, restyle)
+    const handle = this.hold(listIn(this.looks, name), make as unknown as Make, 'binnacle: a look', restyle, () => {
+      for (const stop of stops) stop()
+      restyle()
+    })
+    stops = (options?.models ?? []).map((model) => model.watch(() => handle.redraw()))
+    return handle
   }
 
   lookOf<F extends Look>(names: readonly string[], fallback: F): F {
