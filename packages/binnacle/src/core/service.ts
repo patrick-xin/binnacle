@@ -86,6 +86,7 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly models = new Map<string, Held<Model<object>>[]>()
   // The Place the Focus was moved to, for each Screen shown; null once the core forgot it.
   private readonly moved = new Map<Held<Screen>, Moved | null>()
+  private readonly movedLast = new Map<Held<Screen>, string>()
   private readonly layers: Held<ThemeLayer>[] = []
   private readonly looks = new Map<string, Held<Make>[]>()
   // One list for every id, oldest first, as the newest set wins among actions of different ids.
@@ -174,6 +175,7 @@ export class BinnacleService extends Service implements Binnacle {
   /** A person or an author moved the Focus on the Screen on view. */
   moveFocus(place: string): void {
     this.moved.set(this.shown(), { place, had: false })
+    this.movedLast.set(this.shown(), place)
     this.drawn.redraw()
   }
 
@@ -190,6 +192,14 @@ export class BinnacleService extends Service implements Binnacle {
     return this.drawn.places.linesShown(place)
   }
 
+  /**
+   * The Place that a person or an author last moved the Focus to on the Screen on view, kept after the core forgets it; none if no one moved it. Not in the author's `Binnacle`.
+   * A Place that stops taking keys loses the Focus at the draw that finds it so, which can come before a watcher of the change that hid it.
+   */
+  focusMovedLast(): string | undefined {
+    return this.movedLast.get(this.shown())
+  }
+
   /** The Focus moved on the Screen on view is forgotten: its Place had it and stopped taking keys. */
   forgetMovedFocus(): void {
     this.moved.set(this.shown(), null)
@@ -200,7 +210,10 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   show(screen: Screen): Handle {
-    return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, (entry) => this.moved.delete(entry))
+    return this.hold(this.screens, screen, 'binnacle: a screen shown', undefined, (entry) => {
+      this.moved.delete(entry)
+      this.movedLast.delete(entry)
+    })
   }
 
   layout(name: string, layout: Layout): Handle {

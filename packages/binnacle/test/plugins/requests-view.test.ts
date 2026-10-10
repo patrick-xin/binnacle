@@ -192,6 +192,34 @@ test('an empty typed answer is not written, and the Line stays', async () => {
   )
 })
 
+test('the Line takes the Focus when the person opens it from the Choices, and the Choices take it back when esc closes it, while a Place above the Request takes keys', async () => {
+  const above: string[] = []
+  const { ctx, dsh, rows, typed } = await chat({
+    before: (context) =>
+      context.plugin({
+        name: 'above',
+        inject: ['binnacle'],
+        apply: (author: Context) => {
+          author.binnacle.place('transcript', {
+            lines: () => [''],
+            key: (data) => {
+              above.push(data)
+              return true
+            },
+          })
+        },
+      }),
+  })
+  const answer = ask(ctx, dsh, [{ id: 'q1', question: 'Colour?', options: [{ label: 'Red' }, { label: 'Blue' }] }])
+  await rows()
+  assert.deepEqual((await typed(DOWN, DOWN, ENTER, 'G')).slice(-3), ['Colour?', '› G ', RULE])
+  await typed(ESC)
+  await escaped()
+  await typed(UP, ENTER)
+  assert.deepEqual(above, [])
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: ['Blue'] }] })
+})
+
 test("esc on the Line goes back to the Choices, with the Line's text and the selected options kept", async () => {
   const { ctx, dsh, rows, typed } = await chat()
   const answer = ask(ctx, dsh, [
@@ -472,4 +500,45 @@ test("the default view is the Layout `request`, drawn in the Chat with the compo
   assert.deepEqual(shown.slice(2), [ruleWith('bash needs approval'), '› Allow once', '  Reject', RULE])
   pick(ctx.binnacle, ctx.binnacleRequests.shown!, 1)
   assert.deepEqual((await rows()).slice(-3), [RULE, ' ', RULE])
+})
+
+test('a plugin that focuses its own Place while `requests.send` runs keeps the Focus when the Line closes, and another Request that comes takes it', async () => {
+  const keys: string[] = []
+  const { ctx, dsh, typed } = await chat({
+    rows: 12,
+    before: (context) =>
+      context.plugin({
+        name: 'preview',
+        inject: ['binnacle', 'binnacleRequests'],
+        apply: (author: Context) => {
+          const model = author.binnacleRequests
+          author.binnacle.layout('request', { ...REQUEST_LAYOUT, column: [...REQUEST_LAYOUT.column, { place: 'request.preview' }] })
+          author.binnacle.place('request.preview', {
+            models: [model],
+            lines: () => (model.shown === undefined ? [] : ['preview']),
+            key: (data) => {
+              keys.push(data)
+              if (data === ENTER) model.shown?.submit()
+              return true
+            },
+          })
+          author.binnacle.action('requests.send', {
+            run: (_at, beneath) => {
+              const shown = model.shown
+              if (shown?.kind !== 'question') return beneath()
+              author.binnacle.focus('request.preview')
+              shown.type(false)
+            },
+          })
+        },
+      }),
+  })
+  const answer = ask(ctx, dsh, [{ id: 'q1', question: 'What?', options: [{ label: 'A' }] }])
+  const next = approve(ctx, dsh)
+  await typed(DOWN, ENTER, 'z', ENTER, 'k', ENTER)
+  assert.deepEqual(keys, ['k', ENTER])
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: [], custom: 'z' }] })
+  await typed(DOWN, ENTER)
+  assert.deepEqual(keys, ['k', ENTER])
+  assert.equal(await next, 'rejected')
 })
