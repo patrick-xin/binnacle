@@ -1,5 +1,8 @@
-import type { Layout } from '../api.ts'
 import { sliceByColumn, sliceWithWidth, truncateToWidth, visibleWidth } from '../terminal/utils.ts'
+import type { Layout } from '../api.ts'
+import type { Arranged, Hit, Placed, Places, Position } from './arranged.ts'
+import { cut, joined, nestedSegment, placeSegment, segmentsOf } from './separated.ts'
+import type { Drawn, Segment } from './separated.ts'
 import { bordersOf, edgeRow, gapOf, insetsOf, paddingOf } from './box.ts'
 import type { Spare } from './box.ts'
 import { withoutBlankEnd } from './row-end.ts'
@@ -8,59 +11,12 @@ import type { Tree } from './tree.ts'
 import { edgeNamed } from './theme.ts'
 import type { Theme } from './theme.ts'
 
-export interface Places {
-  rows(place: string, width: number): readonly string[]
-  scrolledUp(place: string): number
-  /** In the Place's rows; only the Place with the Focus has one. */
-  cursor(place: string, width: number): Position | undefined
-  /** An author paged the Place, and its cursor has not moved since: the Place shows the paged rows, not the cursor's. */
-  paged(place: string, width: number): boolean
-  /** The newest Layout set by that name. */
-  layout(name: string): Layout | undefined
-}
-
-export interface Position {
-  readonly row: number
-  readonly column: number
-}
-
-/** A Place as it was laid out: its box's cells, which the wheel hits, and the Part's rows inside, which a click hits. */
-export interface Placed {
-  readonly place: string
-  readonly top: number
-  readonly left: number
-  readonly width: number
-  readonly height: number
-  readonly maxScroll: number
-  readonly content: { readonly top: number; readonly left: number; readonly width: number; readonly height: number }
-  /** The Part's row shown at the top of its box, however the Place is scrolled. */
-  readonly shownFrom: number
-}
-
-/** Cells that a click or the wheel lands on: a Place drawn, or none, where the mouse does nothing or a float's box covers. */
-export interface Hit {
-  readonly top: number
-  readonly left: number
-  readonly width: number
-  readonly height: number
-  readonly placed: Placed | undefined
-}
-
-export interface Arranged {
-  readonly rows: string[]
-  /** In the order of the layout. */
-  readonly placed: Placed[]
-  /** The topmost first: what floats comes before what it covers. */
-  readonly hits: Hit[]
-  /** On the terminal, where the cursor of the Part with the Focus is drawn. */
-  readonly cursor: Position | undefined
-}
-
 const SPARES: readonly Spare[] = ['nothing', 'spacing', 'borders']
 
 const RESET_STYLE = '\x1b[0m'
 const blank = (width: number): string => ' '.repeat(Math.max(0, width))
 const fit = (row: string, width: number): string => truncateToWidth(row, width, '', true)
+const separated = (tree: Tree): boolean => tree.kind === 'row' && tree.node.separator === true
 
 class Arrangement {
   readonly placed: Placed[] = []
@@ -197,6 +153,7 @@ class Arrangement {
         this.#hasLines(tree.float, width) ? this.height(tree.float, floatWidthOf(tree.at, width)) : 0,
       )
     const shown = this.#shown(tree, width)
+    if (separated(tree)) return shown.some((child) => this.#hasLines(child, width)) ? 1 : 0
     if (tree.kind === 'row') {
       const widths = this.#widths(tree, width)
       return Math.max(0, ...shown.map((child, index) => this.height(child, widths[index] ?? 0)))
@@ -211,6 +168,7 @@ class Arrangement {
         this.width(tree.over, available),
         this.#hasLines(tree.float, available) ? coverWidthOf(tree.at, this.width(tree.float, available)) : 0,
       )
+    if (separated(tree)) return visibleWidth(this.#measured(tree, available))
     const shown = this.#shown(tree, available)
     if (tree.kind === 'row')
       return shown.reduce((sum, child) => sum + (fixedOf(child) ?? this.width(child, available)), this.#gaps(tree, available))
@@ -220,6 +178,7 @@ class Arrangement {
   #drawInner(tree: Tree, width: number, height: number, top: number, left: number): string[] {
     if (tree.kind === 'place') return this.#place(tree.place, top, left, width, height)
     if (tree.kind === 'over') return this.#over(tree, top, left, width, height)
+    if (separated(tree)) return this.#separated(tree, top, left, width, height)
     if (tree.kind === 'row') return this.#row(tree, top, left, width, height)
     return this.#column(tree, top, left, width, height)
   }
@@ -287,6 +246,41 @@ class Arrangement {
     return Array.from({ length: height }, (_, y) => blocks.map((block, index) => fit(block[y] ?? '', widths[index] ?? 0)).join(gap))
   }
 
+  /** The joined line, uncut, measured apart so that measuring leaves no hits. */
+  #measured(tree: Tree, width: number): string {
+    const scratch = new Arrangement(this.#places, this.#spare, this.#theme)
+    return joined(scratch.#segments(tree, 0, 0, width), this.#theme.tokens.glyphs.divider)
+  }
+
+  #segments(tree: Tree, top: number, left: number, width: number): Segment[] {
+    const draw = (child: Tree, at: number) => this.#segment(child, top, left + at, width)
+    return segmentsOf(this.#shown(tree, width), this.#theme.tokens.glyphs.divider, draw)
+  }
+
+  /** A child's first line, with no size and no box: a Part's before it wraps, or a node's first drawn row. */
+  #segment(child: Tree, top: number, left: number, width: number): Drawn {
+    const [hitsFrom, placedFrom, cursor, mouse] = [this.hits.length, this.placed.length, this.cursor, this.#mouse]
+    if (child.node.mouse === false) this.#mouse = false
+    try {
+      if (child.kind === 'place') {
+        const line = this.#places.firstLine(child.place, width) ?? ''
+        return placeSegment(child.place, line.includes('\x1b') ? line + RESET_STYLE : line, { top, left, width, height: 1 }, this.#mouse)
+      }
+      const rows = this.#drawInner(child, width, Math.max(1, this.#innerHeight(child, width)), top, left)
+      return nestedSegment(withoutBlankEnd(rows[0] ?? ''), this.hits.splice(hitsFrom), this.placed.splice(placedFrom), top, left)
+    } finally {
+      this.#mouse = mouse
+      this.cursor = cursor
+    }
+  }
+
+  #separated(tree: Tree, top: number, left: number, width: number, height: number): string[] {
+    const { line, hits, placed } = cut(this.#segments(tree, top, left, width), this.#theme.tokens.glyphs, top, left, width)
+    this.hits.push(...hits)
+    this.placed.push(...placed)
+    return [line, ...Array.from({ length: height - 1 }, () => '')].slice(0, height)
+  }
+
   #maxScroll(place: string, width: number, height: number): number {
     return Math.max(0, this.#places.rows(place, width).length - height)
   }
@@ -313,7 +307,7 @@ class Arrangement {
 
   /** The fewest rows a node takes before a Place in it that does not fill is cut: a node that fills can shrink to none. */
   #least(tree: Tree, width: number): number {
-    if (tree.kind === 'place' || tree.kind === 'over' || this.#vanishes(tree, width)) return this.height(tree, width)
+    if (tree.kind === 'place' || tree.kind === 'over' || separated(tree) || this.#vanishes(tree, width)) return this.height(tree, width)
     const insets = insetsOf(tree.node, this.#spare, this.#theme)
     const inner = width - insets.left - insets.right
     const widths = tree.kind === 'row' ? this.#widths(tree, inner) : []

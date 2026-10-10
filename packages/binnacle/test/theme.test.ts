@@ -87,7 +87,7 @@ test("with no layer, binnacle draws in v0's default tones, each one of the termi
   )
 })
 
-test("the default glyphs, edge, padding and gap are v0's", async () => {
+test("the default glyphs, edge, padding and gap are v0's, and the `divider` is ' · ', as the status line joined its parts", async () => {
   const { ctx } = await mount()
   assert.deepEqual(ctx.binnacle.tokens.glyphs, {
     mark: '›',
@@ -96,6 +96,7 @@ test("the default glyphs, edge, padding and gap are v0's", async () => {
     unchecked: '[ ]',
     rule: '─',
     separator: ' | ',
+    divider: ' · ',
     more: '…',
   })
   assert.deepEqual([ctx.binnacle.tokens.edge, ctx.binnacle.tokens.padding, ctx.binnacle.tokens.gap], ['rounded', 0, 0])

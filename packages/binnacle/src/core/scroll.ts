@@ -1,5 +1,5 @@
 import type { Point } from '../api.ts'
-import type { Placed } from './layout.ts'
+import type { Placed } from './arranged.ts'
 
 const ROWS_PER_WHEEL_NOTCH = 3
 

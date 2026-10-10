@@ -100,7 +100,7 @@ What a plugin registers, such as a Part, a Layout, a theme layer, a Look, an act
 A Place is a leaf of a Layout, by its name. A Part fills a Place: it gives the lines that the Place draws.
 
 ```js
-const placed = ctx.binnacle.place('status', {
+const placed = ctx.binnacle.place('status.state', {
   lines: (width) => [`${width} cells wide`],
 })
 ```
@@ -141,7 +141,7 @@ The core opens the session that the Chat shows, and provides it as `ctx.binnacle
 ```js
 export function apply(ctx) {
   ctx.inject(['binnacleSession'], (ctx) => {
-    ctx.binnacle.place('status', { lines: () => [ctx.binnacleSession.id] })
+    ctx.binnacle.place('status.model', { lines: () => [ctx.binnacleSession.id] })
   })
 }
 ```
@@ -166,7 +166,7 @@ counter.set((state) => {
 A Part that lists its Models in `models` is drawn again after each of them changes, so it needs no code to redraw:
 
 ```js
-ctx.binnacle.place('status', {
+ctx.binnacle.place('status.state', {
   models: [counter],
   lines: () => [`count: ${counter.state.count}`],
 })
@@ -192,7 +192,7 @@ ctx.binnacle.theme({
 - `binnacle.tokens` is the tokens as the layers make them now. `binnacle.paint(tone, text)` draws text in a Tone. Paint in a Part's `lines`, so that the lines follow the theme when it changes:
 
 ```js
-ctx.binnacle.place('status', {
+ctx.binnacle.place('status.state', {
   lines: () => [ctx.binnacle.paint('accent', `${ctx.binnacle.tokens.glyphs.mark} ready`)],
 })
 ```
@@ -212,7 +212,7 @@ The Tones, what draws with each, and their defaults:
 | `borderAccent` | the frame of what waits on the person, such as a Request | `cyan` |
 | `borderMuted` | a border that stands further back | `{ dim: true }` |
 
-The glyphs, and their defaults: `mark` `›`, `unmarked` a space, `checked` `[x]`, `unchecked` `[ ]`, `rule` `─`, `separator` ` | `, `more` `…`. A box's `edge` is `rounded`, and its `padding` and `gap` are `0`. A node of a Layout that names its own keeps it.
+The glyphs, and their defaults: `mark` `›`, `unmarked` a space, `checked` `[x]`, `unchecked` `[ ]`, `rule` `─`, `separator` ` | `, `divider` ` · `, `more` `…`. A box's `edge` is `rounded`, and its `padding` and `gap` are `0`. A node of a Layout that names its own keeps it.
 
 ## Looks
 
@@ -315,8 +315,9 @@ A Layout is a tree. Its leaves are Places, which Parts fill, by name.
 
 | Node | Draws |
 |---|---|
-| `{ place: 'status' }` | the Part placed in that Place |
+| `{ place: 'composer' }` | the Part placed in that Place |
 | `{ row: [...] }`, `{ column: [...] }` | its children side by side, or one above the other |
+| `{ row: [...], separator: true }` | one line: the first line of each child, joined by the `divider` glyph |
 | `{ layout: 'request' }` | the Layout set by that name |
 | `{ first: [...] }` | only its first child that has a line to draw |
 | `{ over, float, at }` | `over`, with `float` on top of it while `float` has a line to draw |
@@ -330,6 +331,8 @@ Every node can also take:
 
 A `{ layout: name }` node or a `first` that has no line to draw takes no cells, its box included. A node has a line to draw while a Place in it does.
 
+A row with `separator: true` draws one line, as the status line does. Each child is drawn at the row's whole width, and gives its first line: a Part's first line, before it wraps, or a node's first drawn row. Its lines past the first are not drawn. A child that draws nothing, or an empty line, takes no divider. The joined line is cut at its end with the `more` glyph, and draws empty where `more` does not fit. A child's `size` and box are not drawn, and `gap` does nothing. A click lands on the child under it.
+
 A float is the only node that draws over what it covers. A click and the wheel land on it first. `at.side` is `'top'`, `'center'` or `'bottom'`, and `at.width` is its width in cells. With no `at`, it is centred, and 4 cells narrower than what it covers, at most 80. Its height is what its lines need.
 
 `binnacle.layout(name, layout)` sets the Layout by that name, and the newest wins. A Screen's Layout has the Screen's name, so `binnacle.layout('chat', …)` replaces the Chat's. The Chat's own Layout is exported as `CHAT_LAYOUT`:
@@ -338,14 +341,14 @@ A float is the only node that draws over what it covers. A click and the wheel l
 {
   column: [
     { place: 'transcript', size: 'fill' },
-    { place: 'status', size: 'content' },
+    { layout: 'status', size: 'content' },
     { layout: 'request', size: 'content' },
     { place: 'composer', size: 'content', unless: 'request' },
   ],
 }
 ```
 
-A Request that stands is drawn by the Layout `request` in the composer's stead, as [Requests](#requests) says.
+The Layout `status` is the status line, as [The status line](#the-status-line) says. A Request that stands is drawn by the Layout `request` in the composer's stead, as [Requests](#requests) says.
 
 Build on it to move one node, such as the composer to the top:
 
@@ -361,7 +364,7 @@ Or float a Layout of your own over the Chat, and hide the status line while it s
 
 ```js
 ctx.binnacle.layout('chat', {
-  over: { column: CHAT_LAYOUT.column.map((node) => (node.place === 'status' ? { ...node, unless: 'menu' } : node)) },
+  over: { column: CHAT_LAYOUT.column.map((node) => (node.layout === 'status' ? { ...node, unless: 'menu' } : node)) },
   float: { layout: 'menu', border: true },
   at: { side: 'bottom', width: 40 },
 })
@@ -384,7 +387,7 @@ So two edits move the status line above the transcript:
 
 ```js
 ctx.binnacle.edit('chat', { remove: 'status' })
-ctx.binnacle.edit('chat', { insert: { place: 'status', size: 'content' }, before: 'transcript' })
+ctx.binnacle.edit('chat', { insert: { layout: 'status', size: 'content' }, before: 'transcript' })
 ```
 
 - An edit applies each time the Layout is drawn, to the newest Layout by that name, whoever set it. While its anchor is not there, it does nothing, and it applies again when the anchor comes back.
@@ -506,6 +509,35 @@ tabs(ctx.binnacle, {
 - The actions are `<name>.next` and `<name>.previous`, of the kinds `tabs.next` and `tabs.previous`, marked `first`.
 - The Look `tabs.tab`, or `<name>.tab`, draws one tab: `(label, { current, index }) => text`. Its default draws the `mark` glyph and the label in `accent` for the current tab, and the `unmarked` glyph and the label for the others. The `separator` glyph goes between the tabs.
 
+## The status line
+
+The row `binnacle-status-line` sets the Layout `status`, which the Chat draws. It is a separated row of segments, each a Place:
+
+```js
+{
+  row: [{ place: 'status.state' }, { place: 'status.model' }],
+  separator: true,
+}
+```
+
+- `status.state` is the agent's status, `idle` or `running`, or `read only` on a stored session.
+- `status.model` is the agent's model, or the stored session's id.
+- Each segment draws through the Look by its Place's name, `(value) => line`. It is given its value, plain already, and returns one line. Its default draws the value in `text`. Set one, and only that segment changes:
+
+  ```js
+  ctx.binnacle.look('status.state', (beneath) => (value) => (value === 'running' ? ctx.binnacle.paint('accent', value) : beneath(value)))
+  ```
+
+- Add a segment with an edit of the Layout `status`, and place a Part in it. It is joined by the `divider` glyph:
+
+  ```js
+  ctx.binnacle.edit('status', { insert: { place: 'cwd' }, after: 'status.model' })
+  ctx.binnacle.place('cwd', { lines: () => [process.cwd()] })
+  ```
+
+- Place a Part in a segment to draw it your own way. A segment draws only its Part's first line.
+- `STATUS_LAYOUT`, the Layout above, frozen, is exported from `binnacle/plugins/status-line`, with the type `SegmentLook`. Build on it to set the Layout `status` again.
+
 ## Requests
 
 When the agent asks a question, or a tool asks for an approval, a Request stands until a person answers it. The row `binnacle-requests` is its model: it talks to dsh, keeps the queue, and keeps each Request's draft answer. It draws nothing. It provides `ctx.binnacleRequests`, and its types are `Requests` and `Request` from `binnacle`. The row `binnacle-requests-view` is its default view, which draws from it ([The default view](#the-default-view)).
@@ -515,7 +547,7 @@ export const inject = ['binnacle', 'binnacleRequests']
 export function apply(ctx) {
   const requests = ctx.binnacleRequests
   ctx.effect(() => requests.attach())
-  ctx.binnacle.place('status', {
+  ctx.binnacle.place('status.state', {
     models: [requests],
     lines: () => (requests.shown === undefined ? [] : [`${requests.standing} waiting for you`]),
   })
