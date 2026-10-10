@@ -2,6 +2,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   Action,
+  Binding,
   Binnacle,
   Gestures,
   Handle,
@@ -137,7 +138,7 @@ export class BinnacleService extends Service implements Binnacle {
     return this.hold(this.set, { id, action }, 'binnacle: an action')
   }
 
-  bind(name: string, keys: readonly string[]): Handle {
+  bind(name: string, keys: Binding): Handle {
     return this.hold(this.bindings, { name, keys }, 'binnacle: a binding')
   }
 

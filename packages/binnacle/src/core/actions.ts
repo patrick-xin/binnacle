@@ -1,4 +1,4 @@
-import type { Action, Point } from '../api.ts'
+import type { Action, Binding, Point } from '../api.ts'
 import { matchesKey } from '../terminal/keys.ts'
 import type { KeyId } from '../terminal/keys.ts'
 import type { CoreAction } from './gestures.ts'
@@ -40,7 +40,7 @@ export function coreActions(acts: Acts): (action: CoreAction, at?: Pointer) => v
 /** One action set, held apart, so that one action set twice keeps two places beneath its id. */
 export type SetAction = Held<{ readonly id: string; readonly action: Action }>
 
-export type SetBinding = Held<{ readonly name: string; readonly keys: readonly string[] }>
+export type SetBinding = Held<{ readonly name: string; readonly keys: Binding }>
 
 /** The actions that authors set, read from their lists as they stand at each gesture and each call. */
 export class Actions {
@@ -55,7 +55,7 @@ export class Actions {
 
   keysOf(id: string): readonly string[] {
     const action = this.#set.findLast(({ item }) => item.id === id)
-    return action === undefined ? (this.#bound(id) ?? []) : this.#keysOf(action)
+    return action === undefined ? this.#bound(id, []) : this.#keysOf(action)
   }
 
   run(id: string, at: Point | undefined): void {
@@ -120,12 +120,9 @@ export class Actions {
     const { id } = entry.item
     const hidden = this.#hidden(entry)
     const kind = hidden.find((action) => action.kind !== undefined)?.kind
-    return (
-      this.#bound(id) ??
-      (kind === undefined ? undefined : this.#bound(kind)) ??
-      hidden.find((action) => action.keys !== undefined)?.keys ??
-      []
-    )
+    const own = hidden.find((action) => action.keys !== undefined)?.keys ?? []
+    // A kind named as its id holds the same bindings, which would apply twice.
+    return this.#bound(id, kind === undefined || kind === id ? own : this.#bound(kind, own))
   }
 
   /** An action that names no Place keeps the Place and the `first` of the action it hides, so that an action set by the id of a Place's action acts only in that Place. */
@@ -146,8 +143,11 @@ export class Actions {
       .map(({ item }) => item.action)
   }
 
-  #bound(name: string): readonly string[] | undefined {
-    return this.#bindings.findLast(({ item }) => item.name === name)?.item.keys
+  /** The keys that the bindings by the name give, oldest first, over the keys beneath them: a list replaces them, and a function is given them. */
+  #bound(name: string, beneath: readonly string[]): readonly string[] {
+    return this.#bindings
+      .filter(({ item }) => item.name === name)
+      .reduce((keys, { item }) => (typeof item.keys === 'function' ? item.keys(keys) : item.keys), beneath)
   }
 }
 

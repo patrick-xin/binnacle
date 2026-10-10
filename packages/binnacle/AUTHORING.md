@@ -271,11 +271,13 @@ A click goes to the Part under it, then to its Place's actions bound to `click`.
 
 ```js
 ctx.binnacle.bind('list.toggle', ['space'])
-ctx.binnacle.bind('requests.send', [...ctx.binnacle.keysOf('requests.send'), 'ctrl+n'])
+ctx.binnacle.bind('request.choices.down', (keys) => [...keys, 'j'])
 ```
 
-- `binnacle.bind(name, keys)` binds the action by that id, or every action of that kind, to these keys instead of its own. A binding by id wins over its kind's. The newest binding by a name wins, and `[]` unbinds. A binding goes when the plugin that set it unloads.
-- `binnacle.keysOf(id)` is the keys that the newest action by that id is bound to now, enabled or not. Use it to add a key without repeating the others. Call it after the action is set. It is read once, at load, while `enabled()` changes as the session runs, so it does not follow `enabled()`: an action that names its own keys owns its id's keys, even while it is disabled.
+- `binnacle.bind(name, keys)` binds the action by that id, or every action of that kind. A binding by id is given, or replaces, what its kind's gives. A binding goes when the plugin that set it unloads.
+- A list of keys replaces the keys beneath it, and `[]` unbinds.
+- A function adds to the keys beneath it, or takes some away: it is given the keys the action would have without it, and returns its keys. binnacle calls it each time a key or a click is resolved, so it holds whichever plugin loads first, and for an action set after it. Two such bindings by one name both apply, the newest given what the one beneath it gives. Use it to add a key without repeating the others.
+- `binnacle.keysOf(id)` is the keys that the newest action by that id is bound to now, enabled or not. Use it to show or to check a key, after the action is set: it is read when you call it, so it does not follow a binding or an action that comes later. It does not follow `enabled()` either: an action that names its own keys owns its id's keys, even while it is disabled.
 
 ### Run an action, and change what it does
 

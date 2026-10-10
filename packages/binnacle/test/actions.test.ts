@@ -172,6 +172,45 @@ test('an author adds a key to an action without repeating its others, using `bin
   assert.deepEqual([ran, ctx.binnacle.keysOf('send'), ctx.binnacle.keysOf('none')], [['send', 'send'], ['enter', 'ctrl+s', 'ctrl+n'], []])
 })
 
+test('two bindings by one name that are functions both apply, the newest given what the one beneath it gives, and a binding to a list of keys still replaces them', async () => {
+  const ran: string[] = []
+  const { author, terminal, ctx } = await booted()
+  const adds = await author('adds keys', (plugin) => {
+    plugin.binnacle.bind('send', (keys) => [...keys, 'ctrl+n'])
+    plugin.binnacle.bind('send', (keys) => [...keys, 'ctrl+s'])
+  })
+  await author('feature', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'send', { keys: ['enter'] }))
+  })
+  await terminal.read()
+  terminal.type(CTRL_N)
+  const stacked = ctx.binnacle.keysOf('send')
+  const replaced = await author('replaces', (plugin) => {
+    plugin.binnacle.bind('send', ['tab'])
+  })
+  terminal.type(CTRL_N)
+  terminal.type(TAB)
+  const listed = ctx.binnacle.keysOf('send')
+  await replaced.dispose()
+  await adds.dispose()
+  assert.deepEqual(
+    [ran, stacked, listed, ctx.binnacle.keysOf('send')],
+    [['send', 'send'], ['enter', 'ctrl+n', 'ctrl+s'], ['tab'], ['enter']],
+  )
+})
+
+test('a binding that is a function applies once to an action whose kind is its own id', async () => {
+  const ran: string[] = []
+  const { author, terminal, ctx } = await booted()
+  await author('feature', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'send', { kind: 'send', keys: ['enter', 'ctrl+n'] }))
+    plugin.binnacle.bind('send', (keys) => keys.slice(1))
+  })
+  await terminal.read()
+  terminal.type(CTRL_N)
+  assert.deepEqual([ran, ctx.binnacle.keysOf('send')], [['send'], ['ctrl+n']])
+})
+
 test('`binnacle.keysOf(id)` gives the keys of the newest action by the id, enabled or not, as an action that names its own keys owns its id’s keys', async () => {
   const { author, ctx } = await booted()
   await author('feature', (plugin) => {
