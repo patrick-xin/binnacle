@@ -33,7 +33,7 @@ async function answer(size: Size = 'content') {
       })
     },
   })
-  const model = () => mounted.ctx.binnacle.modelOf<LineState>('answer')!
+  const model = () => mounted.ctx.binnacle.modelOf<LineState>('answer')
   const rows = async () => (await mounted.terminal.read()).rows.map((row) => row.trimEnd())
   const press = async (...keys: string[]) => {
     await mounted.terminal.read()
@@ -68,7 +68,7 @@ test('each key of a Line keeps its own text in the Line’s Model', async () => 
   asked.set((state) => (state.key = 'a'))
   await settled()
   assert.deepEqual(
-    [other, await rows(), [...model().state.texts]],
+    [other, await rows(), [...model().state!.texts]],
     [
       ['›', 'below', ''],
       ['› hi', 'below', ''],

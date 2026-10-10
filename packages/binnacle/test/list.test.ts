@@ -162,7 +162,7 @@ test('a List’s view moves only as far as its mark needs: a mark within the row
 test('a page of a List is at least one item, as when its page action runs while its Place is not drawn', async () => {
   const { ctx } = await fruit({ layout: { place: 'other' } })
   ctx.binnacle.run('fruit.pageDown')
-  assert.equal(ctx.binnacle.modelOf<{ mark: number }>('fruit')?.state.mark, 1)
+  assert.equal(ctx.binnacle.modelOf<{ mark: number }>('fruit').state?.mark, 1)
 })
 
 test('when a List’s items shrink and its key is the same, the mark stays on the last item', async () => {
@@ -191,7 +191,7 @@ test('a List with no items has no mark, and enter and the page keys do nothing',
   const empty = await rows()
   shown.set((state) => (state.items = items('fig', 'pear')))
   await settled()
-  assert.deepEqual([empty, picked, model?.state.mark, await rows()], [[], [], 0, ['› fig', '  pear']])
+  assert.deepEqual([empty, picked, model.state?.mark, await rows()], [[], [], 0, ['› fig', '  pear']])
 })
 
 test('a List’s rows are drawn with the theme’s tokens and the Looks of its kind and of its instance', async () => {

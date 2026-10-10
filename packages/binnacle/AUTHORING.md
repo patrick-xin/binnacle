@@ -172,7 +172,12 @@ ctx.binnacle.place('status.state', {
 })
 ```
 
-`binnacle.model(name, model)` names a Model, so that another plugin can read and change it. `binnacle.modelOf(name)` finds it, or gives `undefined`. The newest Model by a name wins, and it goes when the plugin that named it unloads.
+`binnacle.model(name, model)` names a Model, so that another plugin can read and change it. The newest Model by a name wins, and it goes when the plugin that named it unloads.
+
+`binnacle.modelOf(name)` gives a Model that stands for the newest Model by that name, found each time it is read, set or watched. Find it in `apply`, whichever plugin names it first, and use it later:
+
+- While no Model by that name is named, its `state` is `undefined`, `set` does nothing, and a watcher waits for one.
+- A watcher is told when the newest Model changes, and when a newer Model by that name comes or goes.
 
 ## The theme
 

@@ -11,6 +11,7 @@ import type {
   Look,
   LookOptions,
   Model,
+  Watchable,
   Part,
   PlacedHandle,
   Point,
@@ -21,6 +22,7 @@ import type {
 } from '../api.ts'
 import type { TerminalColorMode } from '../terminal/colors.ts'
 import { Actions } from './actions.ts'
+import { foundModel } from './model.ts'
 import type { SetAction, SetBinding } from './actions.ts'
 import { CHAT } from './chat.ts'
 import { edited } from './edit.ts'
@@ -94,6 +96,8 @@ export class BinnacleService extends Service implements Binnacle {
   private readonly edits = new Map<string, Held<Made>[]>()
   private readonly parts = new Map<string, Held<Part>[]>()
   private readonly models = new Map<string, Held<Model<object>>[]>()
+  // What each watcher of a Model found by its name runs when a Model of that name is named or goes.
+  private readonly namings = new Map<string, (() => void)[]>()
   // The Place the Focus was moved to, for each Screen shown; null once the core forgot it.
   private readonly moved = new Map<Held<Screen>, Moved | null>()
   private readonly movedLast = new Map<Held<Screen>, string>()
@@ -266,11 +270,15 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   model<S extends object>(name: string, model: Model<S>): Handle {
-    return this.hold(listIn(this.models, name), model as Model<object>, 'binnacle: a model named')
+    const named = (): void => {
+      for (const moved of this.namings.get(name) ?? []) moved()
+    }
+    return this.hold(listIn(this.models, name), model as Model<object>, 'binnacle: a model named', undefined, named, named)
   }
 
-  modelOf<S extends object>(name: string): Model<S> | undefined {
-    return this.models.get(name)?.at(-1)?.item as Model<S> | undefined
+  modelOf<S extends object>(name: string): Watchable & { readonly state: S | undefined; set(change: (state: S) => void): void } {
+    const models = this.models
+    return foundModel(() => models.get(name)?.at(-1)?.item as Model<S> | undefined, listIn(this.namings, name))
   }
 
   private edited(name: string, layout: Layout): Layout {
@@ -289,7 +297,7 @@ export class BinnacleService extends Service implements Binnacle {
     return this.screens.at(-1) ?? this.chat
   }
 
-  private hold<T>(list: Held<T>[], item: T, label: string, changed?: () => void, off?: (entry: Held<T>) => void): Handle {
+  private hold<T>(list: Held<T>[], item: T, label: string, changed?: () => void, off?: (entry: Held<T>) => void, on?: () => void): Handle {
     // In a traced copy, `this.ctx` is the calling plugin's context, so its fiber is the plugin that registers.
     const entry: Held<T> = { item, builtIn: builtIn(this.ctx.fiber as unknown as Fiber) }
     let held = false
@@ -306,6 +314,7 @@ export class BinnacleService extends Service implements Binnacle {
       if (entry.builtIn && firstAuthor !== -1) list.splice(firstAuthor, 0, entry)
       else list.push(entry)
       held = true
+      on?.()
       this.drawn.redraw()
       return release
     }, label)
