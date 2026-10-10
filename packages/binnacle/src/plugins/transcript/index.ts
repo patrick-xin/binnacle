@@ -1,12 +1,37 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { Part } from '../../api.ts'
+import { gestureTable } from '../../core/gestures.ts'
+import { createModel } from '../../core/model.ts'
 import { toPlainText } from '../../index.ts'
 
 export const name = 'binnacle-transcript'
 
 export const inject = ['binnacle'] satisfies (keyof Context)[]
+
+/** A content block of the answer that streams, its deltas glued. */
+export interface LiveBlock {
+  readonly kind: 'text' | 'reasoning' | 'tool-call'
+  readonly text: string
+  /** A tool call's name, once dsh gives it. */
+  readonly name?: string
+}
+
+/** The state of the model `transcript`. The transcript sets `events` and `live`; set `folded` and `marked` to change what is drawn. */
+export interface TranscriptState {
+  /** The committed events, in order. */
+  events: readonly SessionEvent[]
+  /** The blocks of the answer that streams, in the answer's order, or `undefined` while none streams. */
+  live: readonly LiveBlock[] | undefined
+  /** The seqs of the folded events. */
+  folded: number[]
+  /** The seq of the Marked event. */
+  marked: number | undefined
+}
+
+type Glued = { -readonly [key in keyof LiveBlock]: LiveBlock[key] }
+
+const PLACE = 'transcript'
 
 // The Mark is the header line drawn in inverse video, which needs no theme.
 const INVERSE = '\x1b[7m'
@@ -14,132 +39,144 @@ const RESET = '\x1b[0m'
 const UNFOLDED = '▾'
 const FOLDED = '▸'
 
-/** A content block of the answer that streams, its deltas glued. */
-interface Streamed {
-  kind: string
-  text: string
+function liveLinesOf(blocks: readonly LiveBlock[]): string[] {
+  const lines = ['~ streaming']
+  for (const { kind, text, name: tool } of blocks) {
+    lines.push(tool === undefined ? kind : `${kind} ${toPlainText(tool)}`, ...text.split('\n').map(toPlainText))
+  }
+  return lines
 }
 
-function liveLinesOf(blocks: ReadonlyMap<number, Streamed>): string[] {
-  const lines = ['~ streaming']
-  for (const [, { kind, text }] of [...blocks].toSorted(([a], [b]) => a - b)) lines.push(kind, ...text.split('\n').map(toPlainText))
-  return lines
+interface Drawn {
+  readonly key: string
+  readonly events: readonly SessionEvent[]
+  readonly lines: readonly string[]
+  readonly headerOf: ReadonlyMap<number, number>
+  readonly seqAt: ReadonlyMap<number, number>
 }
 
 export function apply(plugin: Context): void {
   // The session opens after dsh's plugins settle; a plugin that waited for it at load would be reported as never active.
   plugin.inject(['binnacleSession'], (ctx) => {
+    const { binnacle } = ctx
     const chat = ctx.binnacleSession
-    // The events the session committed, and what a person did with each: folded, or Marked.
+    const model = createModel<TranscriptState>({ events: [], live: undefined, folded: [], marked: undefined })
+    // The transcript's own, so that an author who sets `events` or `live` has them replaced at the next event or frame.
     const events: SessionEvent[] = []
+    let live: Map<number, Glued> | undefined
     const jsonOf = new Map<number, readonly string[]>()
-    const folded = new Set<number>()
-    let marked: number | undefined
     let hasFocus = false
     let hasHadFocus = false
-    // The committed events' lines, then the live block's.
-    const lines: string[] = []
-    let committed = 0
-    let live: Map<number, Streamed> | undefined
-    const drawEvent = (event: SessionEvent): void => {
-      const json = jsonOf.get(event.seq)!
-      const isFolded = folded.has(event.seq)
-      // A folded event's header line ends with how many of its lines it hides, counted before the core wraps them.
-      const header = `${isFolded ? FOLDED : UNFOLDED} #${event.seq} ${toPlainText(event.type)}${isFolded ? ` (${json.length} lines)` : ''}`
-      lines.push(marked === event.seq && hasFocus ? INVERSE + header + RESET : header)
-      if (!isFolded) for (const line of json) lines.push(line)
-      lines.push('')
-    }
-    const drawLive = (): void => {
-      lines.length = committed
-      if (live !== undefined) for (const line of liveLinesOf(live)) lines.push(line)
-    }
-    const rebuild = (): void => {
-      lines.length = 0
-      for (const event of events) drawEvent(event)
-      committed = lines.length
-      drawLive()
-    }
+
+    const ownLive = (): LiveBlock[] | undefined =>
+      live && [...live].toSorted(([a], [b]) => a - b).map(([, block]): LiveBlock => ({ ...block }))
     const add = (event: SessionEvent): void => {
       events.push(event)
       jsonOf.set(event.seq, JSON.stringify(event.data, null, 2).split('\n'))
-      // With no event Marked, the first event that comes is, once the transcript has had the Focus.
-      if (marked === undefined && (hasFocus || hasHadFocus)) marked = event.seq
-      // An event is drawn where the last one ended, not from the start again: a session's events can be many.
-      lines.length = committed
-      drawEvent(event)
-      committed = lines.length
-      drawLive()
+      const blocks = ownLive()
+      model.set((state) => {
+        state.events = events
+        state.live = blocks
+        // With no event Marked, the first event that comes is, once the transcript has had the Focus.
+        if (state.marked === undefined && (hasFocus || hasHadFocus)) state.marked = event.seq
+      })
     }
     for (const event of chat.events) add(event)
-    const spanOf = (event: SessionEvent): number => (folded.has(event.seq) ? 2 : jsonOf.get(event.seq)!.length + 2)
-    const headerAt = (): number | undefined => {
-      let at = 0
-      for (const event of events) {
-        if (event.seq === marked) return at
-        at += spanOf(event)
+
+    // The committed events' lines are built again only when what they show changes, not at each frame of the live block.
+    let drawn: Drawn | undefined
+    const committed = (): Drawn => {
+      const { events: shown, folded, marked } = model.state
+      const key = `${shown.length}|${folded.join(',')}|${marked}|${hasFocus}`
+      if (drawn?.events === shown && drawn.key === key) return drawn
+      const lines: string[] = []
+      const headerOf = new Map<number, number>()
+      const seqAt = new Map<number, number>()
+      for (const event of shown) {
+        const json = jsonOf.get(event.seq) ?? JSON.stringify(event.data, null, 2).split('\n')
+        const isFolded = folded.includes(event.seq)
+        // A folded event's header line ends with how many of its lines it hides, counted before the core wraps them.
+        const header = `${isFolded ? FOLDED : UNFOLDED} #${event.seq} ${toPlainText(event.type)}${isFolded ? ` (${json.length} lines)` : ''}`
+        headerOf.set(event.seq, lines.length)
+        seqAt.set(lines.length, event.seq)
+        lines.push(marked === event.seq && hasFocus ? INVERSE + header + RESET : header)
+        if (!isFolded) lines.push(...json)
+        lines.push('')
       }
-      return undefined
+      drawn = { key, events: shown, lines, headerOf, seqAt }
+      return drawn
     }
-    const eventAtHeader = (line: number): SessionEvent | undefined => {
-      let at = 0
-      for (const event of events) {
-        if (line < at + spanOf(event)) return line === at ? event : undefined
-        at += spanOf(event)
-      }
-      return undefined
+
+    const mark = (seq: number): void => model.set((state) => (state.marked = seq))
+    const fold = (seq: number): void =>
+      model.set((state) => {
+        const at = state.folded.indexOf(seq)
+        if (at === -1) state.folded.push(seq)
+        else state.folded.splice(at, 1)
+      })
+    const step = (by: -1 | 1): void => {
+      const { events: shown, marked } = model.state
+      const index = shown.findIndex((event) => event.seq === marked)
+      const to = shown[index + by]
+      if (index !== -1 && to !== undefined) mark(to.seq)
     }
-    const part: Part = {
-      lines: () => lines,
+
+    binnacle.model(PLACE, model)
+    binnacle.action('transcript.up', {
+      keys: gestureTable.getKeys('tui.select.up'),
+      place: PLACE,
+      description: 'Mark the event above',
+      run: () => step(-1),
+    })
+    binnacle.action('transcript.down', {
+      keys: gestureTable.getKeys('tui.select.down'),
+      place: PLACE,
+      description: 'Mark the event below',
+      run: () => step(1),
+    })
+    binnacle.action('transcript.fold', {
+      keys: gestureTable.getKeys('tui.select.confirm'),
+      place: PLACE,
+      description: 'Fold or unfold the Marked event',
+      run: () => {
+        const { events: shown, marked } = model.state
+        if (marked !== undefined && shown.some((event) => event.seq === marked)) fold(marked)
+      },
+    })
+    binnacle.action('transcript.click', {
+      keys: ['click'],
+      place: PLACE,
+      description: 'Fold or unfold the event whose header is clicked, and Mark it',
+      run: (at) => {
+        const seq = at === undefined ? undefined : committed().seqAt.get(at.line)
+        if (seq === undefined) return
+        mark(seq)
+        fold(seq)
+      },
+    })
+
+    binnacle.place(PLACE, {
+      models: [model],
+      lines: () => {
+        const { lines } = committed()
+        const blocks = model.state.live
+        return blocks === undefined ? lines : [...lines, ...liveLinesOf(blocks)]
+      },
       cursor: () => {
-        const at = headerAt()
+        const { marked } = model.state
+        const at = marked === undefined ? undefined : committed().headerOf.get(marked)
         return at === undefined ? undefined : { line: at, column: 0 }
       },
       focus: (has) => {
         hasFocus = has
         if (has) hasHadFocus = true
         // The newest event is Marked when the transcript first has the Focus, and no event is Marked yet.
-        if (has && marked === undefined) marked = events.at(-1)?.seq
-        rebuild()
+        const newest = model.state.events.at(-1)
+        if (has && model.state.marked === undefined && newest !== undefined) mark(newest.seq)
       },
-      key: (data) => {
-        const actions = ctx.binnacle.gestures.actionsOf(data)
-        const index = events.findIndex((event) => event.seq === marked)
-        if (index === -1) return false
-        if (actions.includes('tui.select.up') && index > 0) {
-          marked = events[index - 1]!.seq
-          rebuild()
-          return true
-        }
-        if (actions.includes('tui.select.down') && index < events.length - 1) {
-          marked = events[index + 1]!.seq
-          rebuild()
-          return true
-        }
-        if (actions.includes('tui.select.confirm')) {
-          const seq = events[index]!.seq
-          if (folded.has(seq)) folded.delete(seq)
-          else folded.add(seq)
-          rebuild()
-          return true
-        }
-        return false
-      },
-      click: (at) => {
-        const event = eventAtHeader(at.line)
-        if (event === undefined) return false
-        marked = event.seq
-        if (folded.has(event.seq)) folded.delete(event.seq)
-        else folded.add(event.seq)
-        rebuild()
-        return true
-      },
-    }
-    const placed = ctx.binnacle.place('transcript', part)
+    })
     ctx.on('session/event', (session, event) => {
-      if (session.header.id !== chat.id) return
-      add(event)
-      placed.redraw()
+      if (session.header.id === chat.id) add(event)
     })
     const stream = (frame: AssistantStreamFrame): void => {
       if (frame.type === 'start') live = new Map()
@@ -152,19 +189,22 @@ export function apply(plugin: Context): void {
       else if (chunk.type === 'tool-call-delta') {
         const block = glue(live, chunk.index, 'tool-call', chunk.argumentsDelta)
         // A provider sends the tool's name in the delta where it learns it, which may not be the first.
-        if (chunk.name !== undefined) block.kind = `tool-call ${toPlainText(chunk.name)}`
+        if (chunk.name !== undefined) block.name = chunk.name
       }
     }
     ctx.on('agent/assistant-stream', ({ agent, frame }) => {
       if (agent !== chat.agent) return
       stream(frame)
-      drawLive()
-      placed.redraw()
+      const blocks = ownLive()
+      model.set((state) => {
+        state.events = events
+        state.live = blocks
+      })
     })
   })
 }
 
-function glue(blocks: Map<number, Streamed>, index: number, kind: string, text: string): Streamed {
+function glue(blocks: Map<number, Glued>, index: number, kind: LiveBlock['kind'], text: string): Glued {
   const block = blocks.get(index) ?? { kind, text: '' }
   block.text += text
   blocks.set(index, block)

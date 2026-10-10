@@ -516,6 +516,38 @@ tabs(ctx.binnacle, {
 - The actions are `<name>.next` and `<name>.previous`, of the kinds `tabs.next` and `tabs.previous`, marked `first`.
 - The Look `tabs.tab`, or `<name>.tab`, draws one tab: `(label, { current, index }) => text`. Its default draws the `mark` glyph and the label in `accent` for the current tab, and the `unmarked` glyph and the label for the others. The `separator` glyph goes between the tabs.
 
+## The transcript
+
+The row `binnacle-transcript` places its Part in the Place `transcript`, which the Chat draws. It draws each event of the session as its header, `▾ #<seq> <type>`, then its data as JSON, and the answer that streams as one live block.
+
+- Its state is the model `transcript`, of the type `TranscriptState` from `binnacle/plugins/transcript`:
+  - `events`: the committed events, in order.
+  - `live`: the blocks of the answer that streams, in the answer's order, or `undefined` while none streams. Each block, of the type `LiveBlock`, has a `kind` (`text`, `reasoning` or `tool-call`), its `text`, and a tool call's `name` once dsh gives it.
+  - `folded`: the seqs of the folded events, empty at first.
+  - `marked`: the seq of the Marked event, or `undefined`.
+- The transcript sets `events` and `live`. Read them. If you set them, the transcript replaces them at the next event or frame.
+- Set `folded` and `marked` to change what is drawn. This plugin folds each tool result when it comes:
+
+  ```js
+  const transcript = ctx.binnacle.modelOf('transcript')
+  ctx.effect(() =>
+    transcript.watch(() => {
+      const { events, folded } = transcript.state
+      const fresh = events.filter((event) => event.type === 'tool/result' && !folded.includes(event.seq))
+      if (fresh.length > 0) transcript.set((state) => state.folded.push(...fresh.map((event) => event.seq)))
+    }),
+  )
+  ```
+
+- Up, down and enter run the actions `transcript.up`, `transcript.down` and `transcript.fold`. They act in the Place `transcript`, with the keys of the Gesture Table's `tui.select.up`, `tui.select.down` and `tui.select.confirm`. A click on an event's header runs `transcript.click`. Bind them as any action, so `j` and `k` move the Mark:
+
+  ```js
+  ctx.binnacle.bind('transcript.down', ['j'])
+  ctx.binnacle.bind('transcript.up', ['k'])
+  ```
+
+- Set one of them by its id to change what it does, and run `beneath()` to keep the default.
+
 ## The composer
 
 The row `binnacle-composer` sets the Layout `composer`, which the Chat draws while no Request stands. It is a row with the Place `composer.input`, where the editor draws the draft, and where the Chat's Focus starts. Its rules are its box, drawn in the `border` Tone:
