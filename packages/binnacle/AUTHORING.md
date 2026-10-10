@@ -11,8 +11,7 @@ binnacle's own features are plugins too, and they use only what this page says. 
 | `binnacle-composer` | what a person types, before it is sent | `src/plugins/composer/index.ts` |
 | `binnacle-status-line` | whether the agent runs, and on which model | `src/plugins/status-line/index.ts` |
 | `binnacle-requests` | the approvals and the questions that stand, and the talk with dsh: a model that draws nothing | `src/plugins/requests/index.ts` |
-| `binnacle-approvals` | a tool asks for an approval, and a person answers | `src/plugins/approvals/index.ts` |
-| `binnacle-questions` | the agent asks a person a question | `src/plugins/questions/index.ts` |
+| `binnacle-requests-view` | the Requests' default view: a person answers an approval or a question | `src/plugins/requests-view/index.ts` |
 
 The components of the Kit, in `src/kit/`, are made from the author API, as your own can be.
 
@@ -113,6 +112,7 @@ const placed = ctx.binnacle.place('status', {
 - `key(data)` takes a key, as the terminal sent it, while the Place has the Focus. It returns `true` when it used the key.
 - `click(at)` takes a click on the Part's lines. `at` is `{ line, column }` in its own lines. It returns `true` when it used the click.
 - `focus(has)` says when the Place gets the Focus, or loses it.
+- `follow` says how the Place follows the cursor while it has the Focus. With `'end'`, the default, the Place shows its end, and a cursor above the rows shown is brought to the top row. With `'least'`, the Place keeps the rows it showed, and moves them only as far as the cursor's row needs. A List sets `'least'`.
 - The Handle has `redraw()`, `focus()`, which moves the Focus to the Part's Place, and `dispose()`, which takes the Part away.
 
 A Screen is a Layout that fills the terminal. The Chat is the first Screen, by the name `chat`, and its Layout is `CHAT_LAYOUT`.
@@ -321,7 +321,7 @@ A Layout is a tree. Its leaves are Places, which Parts fill, by name.
 
 Every node can also take:
 
-- `size`: `'fill'`, a share of what is left; `'content'`, the cells its lines need; or `{ fixed: n }`, in cells, its box included. A node with no size fills in a Screen's own Layout, and takes what its lines need in a Layout set by name.
+- `size`: `'fill'`, a share of what is left (in a column, a node that fills takes no more than its lines need while another that fills needs more, and what is left after is shared evenly); `'content'`, the cells its lines need; or `{ fixed: n }`, in cells, its box included. A node with no size fills in a Screen's own Layout, and takes what its lines need in a Layout set by name.
 - `unless: name`: it draws nothing, and takes no cells, while the Layout or the Place by that name has a line to draw.
 - `mouse: false`: a click or the wheel inside it does nothing, and a click there moves no Focus.
 - A box: `padding` and `gap` in cells, a `border` on every side (`true`) or on the sides it names, the `edge` its border is drawn with, and a `title` set in its top edge.
@@ -337,10 +337,13 @@ A float is the only node that draws over what it covers. A click and the wheel l
   column: [
     { place: 'transcript', size: 'fill' },
     { place: 'status', size: 'content' },
-    { place: 'composer', size: 'content' },
+    { layout: 'request', size: 'content' },
+    { place: 'composer', size: 'content', unless: 'request' },
   ],
 }
 ```
+
+A Request that stands is drawn by the Layout `request` in the composer's stead, as [Requests](#requests) says.
 
 Build on it to move one node, such as the composer to the top:
 
@@ -479,7 +482,7 @@ tabs(ctx.binnacle, {
 
 ## Requests
 
-When the agent asks a question, or a tool asks for an approval, a Request stands until a person answers it. The row `binnacle-requests` is its model: it talks to dsh, keeps the queue, and keeps each Request's draft answer. It draws nothing. It provides `ctx.binnacleRequests`, and its types are `Requests` and `Request` from `binnacle`. The rows `binnacle-approvals` and `binnacle-questions` draw from it.
+When the agent asks a question, or a tool asks for an approval, a Request stands until a person answers it. The row `binnacle-requests` is its model: it talks to dsh, keeps the queue, and keeps each Request's draft answer. It draws nothing. It provides `ctx.binnacleRequests`, and its types are `Requests` and `Request` from `binnacle`. The row `binnacle-requests-view` is its default view, which draws from it ([The default view](#the-default-view)).
 
 ```js
 export const inject = ['binnacle', 'binnacleRequests']
@@ -517,4 +520,44 @@ A question, `{ kind: 'question' }`, has:
 - `write(text)`: the typed answer to the question on view, trimmed. An empty one takes it back. Where only one can be chosen, it is the only answer.
 - `submit()` sends every question's draft, answered or not. `dismiss()` dismisses the whole Request, and the agent learns it.
 
-The model does not decide when a Request is sent: the view does. While `binnacle-approvals` or `binnacle-questions` is on, it fails closed a Request of a kind that no row of theirs draws. To draw the Requests your own way, turn off both rows.
+The model does not decide when a Request is sent: the view does. To draw the Requests your own way, change the default view, or turn off the row `binnacle-requests-view` and attach a view of your own. Turn off `binnacle-requests` and the view goes with it, as it waits for the model.
+
+### The default view
+
+The row `binnacle-requests-view` draws the Request on view in the Layout `request`, made from the Kit:
+
+```js
+{
+  column: [
+    { place: 'request.title', size: 'content' },
+    { place: 'request.body', size: 'fill' },
+    { place: 'request.choices', size: 'fill' },
+    { place: 'request.line', size: 'content' },
+  ],
+  border: ['bottom'],
+}
+```
+
+- `request.title` is a Title: an approval's tool, with the agent that asks when it is not the Chat's; a question's header, with `1 of 3` among several.
+- `request.body` is a Part: a question and its detail, or an approval's reason and its arguments. The body and the Choices fill, so that each takes what its lines need while there is room, and a tall one scrolls with both in view, the Line beneath them. The wheel scrolls it, and so do page up and page down from `request.choices` and `request.line`, by the actions `requests.pageUp` and `requests.pageDown`. The List's own page keys are not bound in `request.choices`.
+- `request.choices` is a List: `Allow once` and `Reject`, or a question's options, then `Type an answer`, then `Done` where more than one can be chosen. Enter or a click picks. Esc there runs `requests.dismiss`, which rejects an approval or dismisses a question. The action `requests.keep` takes ctrl+c, ctrl+z and shift+tab there and does nothing, so the core does not clear, quit, suspend or move the Focus while a Request stands.
+- `request.line` is a Line, shown while the person types an answer. Enter writes what was typed and goes on, and esc goes back to the Choices. Its text is kept by `keyOf` the Request and its question.
+- A Request that comes takes the Focus. The composer comes back, with its draft, once no Request stands.
+
+Each way that the view sends, a pick, `Done` or the last typed answer, runs the action `requests.send`. Its default sends the Request on view. Set it to change what sending does, and run `beneath` to send, as [Run an action, and change what it does](#run-an-action-and-change-what-it-does) shows. A plugin that sends later keeps its Request: it calls that Request's `submit()`, or runs `beneath` only while that Request is still on view, so that it never sends another.
+
+The view's entry, `binnacle/plugins/requests-view`, exports what it is built from:
+
+- `REQUEST_LAYOUT`, the Layout above, frozen. Build on it to add a Place, such as tabs above the title:
+
+  ```js
+  import { REQUEST_LAYOUT } from 'binnacle/plugins/requests-view'
+
+  ctx.binnacle.layout('request', { ...REQUEST_LAYOUT, column: [{ place: 'request.tabs' }, ...REQUEST_LAYOUT.column] })
+  ```
+
+- `titleOf(request)`: the Title's text.
+- `itemsOf(request)`: the Choices as List items, none while the person types. An option's item is its `text`, not its `label`.
+- `pick(binnacle, request, index)`: what a pick of the Choice at that index does.
+- `advance(binnacle, request)`: after a question is answered, the next question, or after the last, `requests.send`.
+- `keyOf(request)`: a key for each Request and each of its questions, for a List's `key` or a Line's.

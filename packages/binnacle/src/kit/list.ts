@@ -77,6 +77,7 @@ export function list(binnacle: Binnacle, options: ListOptions): ListComponent {
     },
     // The cursor stays hidden; it keeps the marked item in view as the Place scrolls.
     cursor: () => (items().length === 0 ? undefined : { line: model.state.mark, column: 0 }),
+    follow: 'least',
   })
   const act = (verb: string, keys: readonly string[], description: string, run: (at: Point | undefined) => void) =>
     binnacle.action(`${name}.${verb}`, { kind: `list.${verb}`, keys, place: name, description, run: (at) => run(at) })

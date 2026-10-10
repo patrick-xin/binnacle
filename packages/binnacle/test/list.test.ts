@@ -130,10 +130,32 @@ test('page up and page down move a List’s mark by as many items as its Place s
   seen.push(await rows())
   assert.deepEqual(seen, [
     ['› a', '  b long', 'long'],
-    ['› c', '  d', '  e'],
+    ['  b long', 'long', '› c'],
     ['  d', '  e', '› f'],
     ['› c', '  d', '  e'],
     ['› a', '  b long', 'long'],
+  ])
+})
+
+test('a List’s view moves only as far as its mark needs: a mark within the rows shown moves no row, and a mark past an edge brings the view on until it is at that edge', async () => {
+  const { rows, press, shown } = await fruit({ rows: 3, layout: { place: 'fruit', size: { fixed: 3 } } })
+  shown.set((state) => (state.items = items('a', 'b', 'c', 'd', 'e', 'f')))
+  await settled()
+  const seen = [await rows()]
+  await press(DOWN)
+  seen.push(await rows())
+  await press(DOWN, DOWN)
+  seen.push(await rows())
+  await press(UP)
+  seen.push(await rows())
+  await press(UP, UP)
+  seen.push(await rows())
+  assert.deepEqual(seen, [
+    ['› a', '  b', '  c'],
+    ['  a', '› b', '  c'],
+    ['  b', '  c', '› d'],
+    ['  b', '› c', '  d'],
+    ['› a', '  b', '  c'],
   ])
 })
 

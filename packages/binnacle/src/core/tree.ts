@@ -54,3 +54,46 @@ export function floatAt(at: Anchor | undefined, width: number, height: number, f
   const y = side === 'top' ? 0 : side === 'bottom' ? height - floatHeight : Math.floor((height - floatHeight) / 2)
   return { x: Math.floor((width - floatWidth) / 2), y }
 }
+
+/** What each child takes along its parent, and whether one took fewer cells than it needs. */
+export interface Shared {
+  readonly sizes: number[]
+  readonly short: boolean
+}
+
+/**
+ * `least` is the fewest cells a child that takes what its lines need can take before it is cut; with none, all it needs.
+ * `byNeed`: the nodes that fill take no more than they need while another needs more, then share what is left evenly.
+ */
+export function share(
+  children: readonly Tree[],
+  available: number,
+  natural: (child: Tree) => number,
+  least: (child: Tree) => number = natural,
+  byNeed = false,
+): Shared {
+  let short = available < 0
+  let left = Math.max(0, available)
+  const sizes = children.map((child) => {
+    const { size } = child
+    if (size === 'fill') return 0
+    const wanted = size === 'content' ? natural(child) : size.fixed
+    const taken = Math.min(wanted, left)
+    if (taken < (size === 'content' ? least(child) : wanted)) short = true
+    left -= taken
+    return taken
+  })
+  const fills = children.flatMap((child, index) => (child.size === 'fill' ? [index] : []))
+  if (byNeed) {
+    const needs = new Map(fills.map((index) => [index, natural(children[index]!)]))
+    const fewestFirst = fills.toSorted((a, b) => needs.get(a)! - needs.get(b)!)
+    fewestFirst.forEach((index, nth) => {
+      sizes[index] = Math.min(needs.get(index)!, Math.ceil(left / (fewestFirst.length - nth)))
+      left -= sizes[index]
+    })
+  }
+  fills.forEach((index, nth) => {
+    sizes[index]! += Math.floor(left / fills.length) + (nth < left % fills.length ? 1 : 0)
+  })
+  return { sizes, short }
+}

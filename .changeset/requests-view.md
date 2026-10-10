@@ -1,0 +1,5 @@
+---
+'binnacle': minor
+---
+
+Approvals and questions are drawn by a new row, `binnacle-requests-view`, made from the Kit: a Title, the question or the arguments, the Choices as a List, and a Line to type an answer. The rows `binnacle-approvals` and `binnacle-questions` are gone: a profile that turned one of them off turns off `binnacle-requests`, and the view goes with it. A tall Request scrolls its body with the wheel and with page up and page down, from the Choices or the Line, and the Choices stay in view. Every way the view sends runs the action `requests.send`, so an author changes what sending does by setting it. The view is the Layout `request`, which the Chat draws in the composer's stead, exported from `binnacle/plugins/requests-view` as `REQUEST_LAYOUT` with `titleOf`, `itemsOf`, `pick`, `advance` and `keyOf`. A List's view moves only as far as its mark needs, as a Part says with `follow: 'least'`. A node that takes what its lines need shrinks a node in it that fills before the screen gives up its borders, and in a column the nodes that fill take no more than they need while another needs more.

@@ -57,6 +57,16 @@ test("the packed export map gives what the Kit keeps, and not pi-tui's Input", a
   )
 })
 
+test("the packed Requests' view gives what an author builds on, and AUTHORING.md names each", async () => {
+  const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
+  const view = await import(pathToFileURL(join(unpacked, exports['./plugins/requests-view']!.default)).href)
+  const built = ['REQUEST_LAYOUT', 'titleOf', 'itemsOf', 'pick', 'advance', 'keyOf']
+  assert.deepEqual(
+    built.filter((name) => !(name in view) || !read('AUTHORING.md').includes(name)),
+    [],
+  )
+})
+
 test('the packed AUTHORING.md names every member of the author API, every export, every Tone, and how to load a plugin in a profile', () => {
   const guide = read('AUTHORING.md')
   const api = read('dist/api.d.ts')

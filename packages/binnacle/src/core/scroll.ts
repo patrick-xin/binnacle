@@ -36,6 +36,11 @@ export class Scroll {
     return false
   }
 
+  /** The Place stays where it was drawn, its end `up` rows below the rows shown, so that the next draw starts from them. */
+  keep(place: string, up: number): void {
+    this.#up.set(place, up)
+  }
+
   /** Each draw anchors each Place once. */
   startDraw(): void {
     this.#anchored.clear()

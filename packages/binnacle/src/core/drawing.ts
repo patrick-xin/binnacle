@@ -82,6 +82,8 @@ export class Drawing {
     this.#placed = arranged.placed
     this.#hits = arranged.hits
     this.#scroll.clamp(this.#placed)
+    for (const { place, maxScroll, shownFrom } of this.#placed)
+      if (view.partIn(place)?.follow === 'least') this.#scroll.keep(place, maxScroll - shownFrom)
     this.#display.draw(arranged.rows, arranged.cursor)
   }
 

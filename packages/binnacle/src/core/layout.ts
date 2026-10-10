@@ -3,7 +3,7 @@ import { sliceByColumn, sliceWithWidth, truncateToWidth, visibleWidth } from '..
 import { bordersOf, edgeRow, gapOf, insetsOf, paddingOf } from './box.ts'
 import type { Spare } from './box.ts'
 import { withoutBlankEnd } from './row-end.ts'
-import { coverWidthOf, fixedOf, floatAt, floatWidthOf, grow } from './tree.ts'
+import { coverWidthOf, fixedOf, floatAt, floatWidthOf, grow, share } from './tree.ts'
 import type { Tree } from './tree.ts'
 import { edgeNamed } from './theme.ts'
 import type { Theme } from './theme.ts'
@@ -260,7 +260,9 @@ class Arrangement {
   #column(tree: Tree, top: number, left: number, width: number, height: number): string[] {
     const gap = gapOf(tree.node, this.#spare, this.#theme)
     const children = this.#shown(tree, width)
-    const heights = this.#share(children, height - this.#gaps(tree, width), (child) => this.height(child, width))
+    const least = (child: Tree) => this.#least(child, width)
+    const { sizes: heights, short } = share(children, height - this.#gaps(tree, width), (child) => this.height(child, width), least, true)
+    this.overflowed ||= short
     let y = top
     const rows = children.flatMap((child, index) => {
       const drawn = [
@@ -304,28 +306,23 @@ class Arrangement {
   }
 
   #widths(tree: Tree, width: number): number[] {
-    return this.#share(this.#shown(tree, width), width - this.#gaps(tree, width), (child) => this.width(child, width))
+    const { sizes, short } = share(this.#shown(tree, width), width - this.#gaps(tree, width), (child) => this.width(child, width))
+    this.overflowed ||= short
+    return sizes
   }
 
-  #share(children: readonly Tree[], available: number, natural: (child: Tree) => number): number[] {
-    if (available < 0) this.overflowed = true
-    let left = Math.max(0, available)
-    const sizes = children.map(({ size }, index) => {
-      if (size === 'fill') return 0
-      const wanted = size === 'content' ? natural(children[index]!) : size.fixed
-      const given = Math.min(wanted, left)
-      if (given < wanted) this.overflowed = true
-      left -= given
-      return given
+  /** The fewest rows a node takes before a Place in it that does not fill is cut: a node that fills can shrink to none. */
+  #least(tree: Tree, width: number): number {
+    if (tree.kind === 'place' || tree.kind === 'over' || this.#vanishes(tree, width)) return this.height(tree, width)
+    const insets = insetsOf(tree.node, this.#spare, this.#theme)
+    const inner = width - insets.left - insets.right
+    const widths = tree.kind === 'row' ? this.#widths(tree, inner) : []
+    const least = this.#shown(tree, inner).map((child, index) => {
+      if (tree.kind === 'row') return this.#least(child, widths[index] ?? 0)
+      return child.size === 'fill' ? 0 : (fixedOf(child) ?? this.#least(child, inner))
     })
-    const fills = children.filter(({ size }) => size === 'fill').length
-    let nth = 0
-    return children.map(({ size }, index) => {
-      if (size !== 'fill') return sizes[index] ?? 0
-      const share = Math.floor(left / fills) + (nth < left % fills ? 1 : 0)
-      nth++
-      return share
-    })
+    const inside = tree.kind === 'row' ? Math.max(0, ...least) : least.reduce((sum, rows) => sum + rows, this.#gaps(tree, inner))
+    return insets.top + insets.bottom + inside
   }
 }
 

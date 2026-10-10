@@ -17,6 +17,11 @@ export interface Part {
   focus?(has: boolean): void
   /** What the Part is drawn from: the core draws it again after each of them changes. */
   readonly models?: readonly Watchable[]
+  /**
+   * How its Place follows its cursor, while the Place has the Focus. `'end'`, the default: the Place shows its end, and a cursor above the rows shown is brought to the top row.
+   * `'least'`: the Place keeps the rows it showed, and moves them only as far as the cursor's row needs.
+   */
+  readonly follow?: 'end' | 'least'
 }
 
 /** Anything a Part can be drawn from: it says when it changed. */
