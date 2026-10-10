@@ -91,11 +91,20 @@ export function keyOf(request: Request | undefined): string {
   return `${ids.get(request)}:${request.kind === 'question' ? request.index : 0}`
 }
 
+/** The core's own, which an author's `Binnacle` need not have. */
+interface Focused {
+  focusedPlace?(): string | undefined
+}
+
 export function apply(ctx: Context): void {
   const binnacle = ctx.binnacle
   const requests = ctx.binnacleRequests
   const models = [requests]
   const shown = (): Request | undefined => requests.shown
+  const ownsFocus = (): boolean => {
+    const place = (binnacle as Binnacle & Focused).focusedPlace?.()
+    return place === undefined || place === 'request.choices' || place === 'request.line'
+  }
   const typing = (): QuestionRequest | undefined => {
     const request = shown()
     return request?.kind === 'question' && request.typing ? request : undefined
@@ -190,12 +199,14 @@ export function apply(ctx: Context): void {
   })
 
   // A Request that comes takes the Focus: the Line while the person types, else the Choices.
-  let focused: string | undefined
+  // When the Line only opens or closes, a Place that a plugin focused keeps the Focus.
+  let followed: { key: string; typing: boolean } | undefined
   const follow = (): void => {
     const request = shown()
-    const now = request === undefined ? undefined : `${keyOf(request)}:${typing() === undefined ? 'choices' : 'line'}`
-    if (now !== undefined && now !== focused) (typing() === undefined ? choices : typed).handle.focus()
-    focused = now
+    const now = request === undefined ? undefined : { key: keyOf(request), typing: typing() !== undefined }
+    const moves = now !== undefined && (now.key !== followed?.key || (now.typing !== followed.typing && ownsFocus()))
+    if (moves) (now.typing ? typed : choices).handle.focus()
+    followed = now
   }
   ctx.effect(() => requests.watch(follow), 'binnacle-requests-view: the Focus follows the Request')
   ctx.effect(() => requests.attach(), 'binnacle-requests-view: attached to the Requests')

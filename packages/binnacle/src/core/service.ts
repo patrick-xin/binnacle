@@ -42,6 +42,8 @@ export interface DrawnPlaces {
   scroll(place: string, pages: number): void
   /** How many of the Part's lines the Place shows, a wrapped line counted once; none while it is not drawn. */
   linesShown(place: string): number | undefined
+  /** The Place with the Focus, as it was last drawn. */
+  focusedPlace(): string | undefined
 }
 
 /** The Place the Focus was moved to, and whether it has had the Focus since. */
@@ -188,6 +190,13 @@ export class BinnacleService extends Service implements Binnacle {
   /** How many of the Part's lines the Place shows now, a wrapped line counted once, for a List's page. Not in the author's `Binnacle`. */
   linesShown(place: string): number | undefined {
     return this.drawn.places.linesShown(place)
+  }
+
+  /** The Place with the Focus, or the Place it was moved to that is still to draw. Not in the author's `Binnacle`. */
+  focusedPlace(): string | undefined {
+    const moved = this.focusMovedTo()
+    if (typeof moved === 'object' && moved !== null && !moved.had) return moved.place
+    return this.drawn.places.focusedPlace()
   }
 
   /** The Focus moved on the Screen on view is forgotten: its Place had it and stopped taking keys. */

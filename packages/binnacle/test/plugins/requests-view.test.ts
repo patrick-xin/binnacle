@@ -473,3 +473,44 @@ test("the default view is the Layout `request`, drawn in the Chat with the compo
   pick(ctx.binnacle, ctx.binnacleRequests.shown!, 1)
   assert.deepEqual((await rows()).slice(-3), [RULE, ' ', RULE])
 })
+
+test('a plugin that focuses its own Place while `requests.send` runs keeps the Focus when the Line closes, and another Request that comes takes it', async () => {
+  const keys: string[] = []
+  const { ctx, dsh, typed } = await chat({
+    rows: 12,
+    before: (context) =>
+      context.plugin({
+        name: 'preview',
+        inject: ['binnacle', 'binnacleRequests'],
+        apply: (author: Context) => {
+          const model = author.binnacleRequests
+          author.binnacle.layout('request', { ...REQUEST_LAYOUT, column: [...REQUEST_LAYOUT.column, { place: 'request.preview' }] })
+          author.binnacle.place('request.preview', {
+            models: [model],
+            lines: () => (model.shown === undefined ? [] : ['preview']),
+            key: (data) => {
+              keys.push(data)
+              if (data === ENTER) model.shown?.submit()
+              return true
+            },
+          })
+          author.binnacle.action('requests.send', {
+            run: (_at, beneath) => {
+              const shown = model.shown
+              if (shown?.kind !== 'question') return beneath()
+              author.binnacle.focus('request.preview')
+              shown.type(false)
+            },
+          })
+        },
+      }),
+  })
+  const answer = ask(ctx, dsh, [{ id: 'q1', question: 'What?', options: [{ label: 'A' }] }])
+  const next = approve(ctx, dsh)
+  await typed(DOWN, ENTER, 'z', ENTER, 'k', ENTER)
+  assert.deepEqual(keys, ['k', ENTER])
+  assert.deepEqual(await answer, { answers: [{ id: 'q1', selected: [], custom: 'z' }] })
+  await typed(DOWN, ENTER)
+  assert.deepEqual(keys, ['k', ENTER])
+  assert.equal(await next, 'rejected')
+})
