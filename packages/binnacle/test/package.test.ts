@@ -67,6 +67,16 @@ test("the packed Requests' view gives what an author builds on, and AUTHORING.md
   )
 })
 
+test('the packed transcript gives its readers of an event, and AUTHORING.md names each', async () => {
+  const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
+  const transcript = await import(pathToFileURL(join(unpacked, exports['./plugins/transcript']!.default)).href)
+  const readers = ['textOf', 'isPrompt', 'failed', 'withoutReasoning']
+  assert.deepEqual(
+    readers.filter((name) => typeof transcript[name] !== 'function' || !read('AUTHORING.md').includes(`${name}(`)),
+    [],
+  )
+})
+
 test('the packed status line gives `STATUS_LAYOUT` to build on, and AUTHORING.md names it', async () => {
   const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
   const statusLine = await import(pathToFileURL(join(unpacked, exports['./plugins/status-line']!.default)).href)
