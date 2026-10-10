@@ -2,6 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import * as transcript from '../../src/plugins/transcript/index.ts'
+import type { TranscriptState } from '../../src/plugins/transcript/index.ts'
+import { gestureTable } from '../../src/core/gestures.ts'
 import { mount } from '../support/mount.ts'
 import { persistence } from '../support/sessions.ts'
 import { agents } from '../support/agents.ts'
@@ -359,4 +361,166 @@ test("a tool call's name that streams after its first delta still labels it", as
   dsh.stream(ctx, chunk(0, { type: 'tool-call-delta', index: 0, id: 't1', argumentsDelta: '{' }))
   dsh.stream(ctx, chunk(1, { type: 'tool-call-delta', index: 0, id: 't1', name: 'read', argumentsDelta: '}' }))
   assert.deepEqual(await drawn(), ['~ streaming', 'tool-call read', '{}'])
+})
+
+const stateOf = (ctx: Context) => ctx.binnacle.modelOf<TranscriptState>('transcript')
+
+test("the transcript's state is the model transcript: its events, the live blocks in the answer's order, the folds and the Mark", async () => {
+  const { ctx, dsh, terminal } = await talking(12)
+  const model = stateOf(ctx)
+  assert.deepEqual(model.state, { events: [], live: undefined, folded: [], marked: undefined })
+  dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
+  dsh.commit(ctx, { seq: 1, type: 'turn/start', time: 2, data: {} })
+  terminal.type(ENTER)
+  dsh.stream(ctx, { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 })
+  dsh.stream(ctx, chunk(0, { type: 'tool-call-delta', index: 2, id: 't1', argumentsDelta: '{' }))
+  dsh.stream(ctx, chunk(1, { type: 'text-delta', index: 1, text: 'Hi' }))
+  dsh.stream(ctx, chunk(2, { type: 'tool-call-delta', index: 2, id: 't1', name: 'read', argumentsDelta: '}' }))
+  dsh.stream(ctx, chunk(3, { type: 'reasoning-delta', index: 0, text: 'hm' }))
+  await terminal.read()
+  assert.deepEqual(model.state, {
+    events: [
+      { seq: 0, type: 'turn/start', time: 1, data: {} },
+      { seq: 1, type: 'turn/start', time: 2, data: {} },
+    ],
+    live: [
+      { kind: 'reasoning', text: 'hm' },
+      { kind: 'text', text: 'Hi' },
+      { kind: 'tool-call', text: '{}', name: 'read' },
+    ],
+    folded: [0],
+    marked: 0,
+  })
+  dsh.stream(ctx, {
+    type: 'end',
+    attemptId: 'a1',
+    revision: 1,
+    index: 4,
+    outcome: { kind: 'committed', eventType: 'assistant/message', seq: 2 },
+  })
+  await terminal.read()
+  assert.equal(stateOf(ctx).state?.live, undefined)
+})
+
+test('an author who sets folded folds and unfolds an event, and one who sets marked Marks it', async () => {
+  const { ctx, dsh, terminal } = await talking(9)
+  dsh.commit(ctx, { seq: 0, type: 'test/one', time: 1, data: {} })
+  dsh.commit(ctx, { seq: 1, type: 'test/two', time: 2, data: {} })
+  stateOf(ctx).set((state) => {
+    state.folded.push(0)
+    state.marked = 0
+  })
+  assert.deepEqual((await terminal.read()).rows.slice(0, 4), ['▸ #0 test/one (1 lines)', '', '▾ #1 test/two', '{}'])
+  assert.deepEqual([await terminal.inverseAt(0, 0), await terminal.inverseAt(0, 2)], [true, false])
+  stateOf(ctx).set((state) => {
+    state.folded = []
+  })
+  assert.deepEqual((await terminal.read()).rows.slice(0, 3), ['▾ #0 test/one', '{}', ''])
+})
+
+test('an author who watches the model and pushes each tool result onto folded has each tool result fold when it comes', async () => {
+  const { ctx, dsh, drawn } = await talking(6)
+  const model = stateOf(ctx)
+  model.watch(() => {
+    const state = model.state!
+    const fresh = state.events.filter((event) => event.type === 'tool/result' && !state.folded.includes(event.seq))
+    if (fresh.length > 0) model.set((each) => each.folded.push(...fresh.map((event) => event.seq)))
+  })
+  dsh.commit(ctx, { seq: 0, type: 'tool/result', time: 1, data: { ok: true } })
+  dsh.commit(ctx, { seq: 1, type: 'turn/start', time: 2, data: {} })
+  dsh.commit(ctx, { seq: 2, type: 'tool/result', time: 3, data: { ok: true } })
+  assert.deepEqual(await drawn(), ['▸ #0 tool/result (3 lines)', '', '▾ #1 turn/start', '{}', '', '▸ #2 tool/result (3 lines)'])
+})
+
+test('an author who sets events has them replaced at the next event', async () => {
+  const { ctx, dsh, drawn } = await talking(6)
+  dsh.commit(ctx, { seq: 0, type: 'test/one', time: 1, data: {} })
+  stateOf(ctx).set((state) => {
+    state.events = []
+  })
+  assert.deepEqual(await drawn(), ['', '', '', '', '', ''])
+  dsh.commit(ctx, { seq: 1, type: 'test/two', time: 2, data: {} })
+  assert.deepEqual(await drawn(), ['▾ #0 test/one', '{}', '', '▾ #1 test/two', '{}', ''])
+})
+
+test('an author who sets live has it replaced at the next event, whether or not an answer streams', async () => {
+  const { ctx, dsh, drawn } = await talking(6)
+  stateOf(ctx).set((state) => {
+    state.live = [{ kind: 'text', text: 'author' }]
+  })
+  assert.deepEqual(await drawn(), ['~ streaming', 'text', 'author', '', '', ''])
+  dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
+  assert.deepEqual([await drawn(), stateOf(ctx).state?.live], [['▾ #0 turn/start', '{}', '', '', '', ''], undefined])
+  dsh.stream(ctx, { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 })
+  dsh.stream(ctx, chunk(0, { type: 'text-delta', index: 0, text: 'Hi' }))
+  stateOf(ctx).set((state) => {
+    state.live = [{ kind: 'text', text: 'author' }]
+  })
+  await drawn()
+  dsh.commit(ctx, { seq: 1, type: 'turn/start', time: 2, data: {} })
+  assert.deepEqual((await drawn()).slice(3), ['▾ #1 turn/start', '{}', ''])
+  assert.deepEqual(stateOf(ctx).state?.live, [{ kind: 'text', text: 'Hi' }])
+})
+
+test("up, down and enter are the actions transcript.up, transcript.down and transcript.fold, of the Place transcript, with the Gesture Table's tui.select. keys", async () => {
+  const { ctx } = await talking()
+  const keys = ['transcript.up', 'transcript.down', 'transcript.fold'].map((id) => ctx.binnacle.keysOf(id))
+  assert.deepEqual(keys, [
+    gestureTable.getKeys('tui.select.up'),
+    gestureTable.getKeys('tui.select.down'),
+    gestureTable.getKeys('tui.select.confirm'),
+  ])
+  assert.deepEqual(ctx.binnacle.keysOf('transcript.click'), ['click'])
+  assert.deepEqual(
+    ctx.binnacle.gestures.actionsOf(UP).filter((id) => id.startsWith('transcript.')),
+    ['transcript.up'],
+  )
+})
+
+test('an author binds transcript.down to j and transcript.up to k, and j and k move the Mark', async () => {
+  const { ctx, terminal } = await reading([three], ['--session', 'session-stored'], 9)
+  ctx.binnacle.bind('transcript.down', ['j'])
+  ctx.binnacle.bind('transcript.up', ['k'])
+  const marked = async () => [await terminal.inverseAt(0, 0), await terminal.inverseAt(0, 3), await terminal.inverseAt(0, 6)]
+  terminal.type('k')
+  assert.deepEqual(await marked(), [false, true, false])
+  terminal.type('k')
+  assert.deepEqual(await marked(), [true, false, false])
+  terminal.type('j')
+  assert.deepEqual(await marked(), [false, true, false])
+  terminal.type(UP)
+  assert.deepEqual(await marked(), [false, true, false])
+})
+
+test('an author sets transcript.fold by its id, and runs beneath() to keep the default', async () => {
+  const { ctx, terminal } = await reading([stored])
+  const runs: number[] = []
+  ctx.binnacle.action('transcript.fold', {
+    run: (_, beneath) => {
+      runs.push(stateOf(ctx).state!.marked!)
+      beneath()
+    },
+  })
+  terminal.type(ENTER)
+  assert.deepEqual([runs, (await terminal.read()).rows.slice(5, 6)], [[1], ['▸ #1 test/marker (1 lines)']])
+})
+
+test("a click on an event's header runs transcript.click, which an author sets by its id", async () => {
+  const store = persistence([three])
+  const mounted = await mount({
+    args: ['--session', 'session-stored'],
+    columns: 40,
+    rows: 10,
+    provide: (ctx) => ctx.provide('sessionPersistence', store),
+  })
+  mounted.ready()
+  await mounted.ctx.plugin(transcript)
+  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
+  await settled()
+  const { ctx, terminal } = mounted
+  const clicked: (number | undefined)[] = []
+  ctx.binnacle.action('transcript.click', { run: (at) => clicked.push(at?.line) })
+  const rows = (await terminal.read()).rows
+  terminal.type(clickAt(0, 3))
+  assert.deepEqual([clicked, (await terminal.read()).rows], [[3], rows])
 })
