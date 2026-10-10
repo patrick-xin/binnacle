@@ -300,7 +300,11 @@ export interface Binnacle {
   lookOf<F extends Look>(names: readonly string[], fallback: F): F
   /** Names a model, such as a component's, so that anyone can read and change it; the newest by a name wins. */
   model<S extends object>(name: string, model: Model<S>): Handle
-  modelOf<S extends object>(name: string): Model<S> | undefined
+  /**
+   * A Model that stands for the newest Model by a name. It is found each time it is read, set or watched, so a plugin can find it before the Model is named.
+   * While none is named, its `state` is `undefined`, `set` does nothing, and a watcher waits for one. A watcher is told when the newest Model by the name changes, or another becomes the newest.
+   */
+  modelOf<S extends object>(name: string): Watchable & { readonly state: S | undefined; set(change: (state: S) => void): void }
 }
 
 /**

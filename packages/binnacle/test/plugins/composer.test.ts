@@ -160,14 +160,14 @@ test('ctrl+x interrupts the turn from the composer once an author binds it to bi
   assert.deepEqual([dsh.cancels, rows], [[{ cause: { kind: 'user' }, options: { keepInbox: true } }], ['', '', RULE, 'hi ', RULE]])
 })
 
-const draftOf = (ctx: Context) => ctx.binnacle.modelOf<ComposerState>('composer')!
+const draftOf = (ctx: Context) => ctx.binnacle.modelOf<ComposerState>('composer')
 const settled = () => new Promise((resolve) => setImmediate(resolve))
 const LARGE = Array.from({ length: 12 }, (_, n) => `l${n}`).join('\n')
 
 test("the draft is the model `composer`: typing and pasting change its text, a large paste's content in full and not its marker", async () => {
   const { ctx, typed } = await chat(30, 5)
   const rows = await typed('a', `\x1b[200~${LARGE}\x1b[201~`)
-  assert.deepEqual([draftOf(ctx).state.text, rows[3]], [`a${LARGE}`, 'a[paste #1 +12 lines] '])
+  assert.deepEqual([draftOf(ctx).state?.text, rows[3]], [`a${LARGE}`, 'a[paste #1 +12 lines] '])
 })
 
 test('an author who sets the draft to another replaces the one shown, drawn in full with the cursor at its end', async () => {
@@ -248,7 +248,7 @@ test('an author who sets composer.send and runs beneath() keeps what it did: the
   await authored(ctx, (plugin) => {
     plugin.binnacle.action('composer.send', {
       run: (_at, beneath) => {
-        seen.push(draftOf(plugin).state.text)
+        seen.push(draftOf(plugin).state!.text)
         beneath()
       },
     })
@@ -265,7 +265,7 @@ test('an author who sets composer.send without beneath() sends nothing, and clea
     plugin.binnacle.action('composer.send', {
       run: () => {
         const draft = draftOf(plugin)
-        queued.push(draft.state.text)
+        queued.push(draft.state!.text)
         draft.set((state) => {
           state.text = ''
         })
