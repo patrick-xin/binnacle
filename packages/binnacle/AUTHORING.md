@@ -375,6 +375,20 @@ ctx.binnacle.action('requests.send', {
 ```
 
 - An action with no `keys`, or no `kind`, keeps those of the action it hides. An action with no `place` keeps the `place` and the `first` of the action it hides. So it takes a gesture only where that action did. An action that names its own `place` acts there. To act from every Place, set an action of a new id.
+- An action with no `enabled` is enabled while the action it hides is: the newest beneath it that names `enabled`. With none, it is enabled always. To be enabled always over a gated action, name `enabled: () => true`.
+- An action with no `run` runs `beneath()`. Set one with only `keys`, `place` or `enabled` to change where or when the action acts, and keep what it does.
+
+This changes what enter does in the offer of commands, and keeps when it does it: enter sends the draft as it is typed, but only while the offer draws, as the List's own pick did:
+
+```js
+ctx.binnacle.action('commands.list.pick', { run: () => ctx.binnacle.run('composer.send') })
+```
+
+A `place` can be a function. It is given the Places the action would keep with no `place` of its own, as a list, `[]` where the action it hides has none, and returns the action's Places. The action keeps the `first` of the action it hides. binnacle reads it at each gesture, so it adds a Place to an action whichever plugin loads first. This moves the offer's mark with up from a search line of your own, `commands.search`, too:
+
+```js
+ctx.binnacle.action('commands.list.up', { place: (places) => [...places, 'commands.search'] })
+```
 - `beneath()` is found each time it runs: the newest enabled action by that id beneath this one, wherever the Focus is, or nothing. When the plugin of an action between them unloads, the next `beneath()` uses the actions as they stand.
 
 ## Layouts
@@ -562,6 +576,7 @@ const answer = line(ctx.binnacle, {
 
 - `shown()` says whether the Line is drawn. While it is, the Line takes every key while its Place has the Focus. Move the Focus to it with `answer.handle.focus()`.
 - `submit(text)` runs on enter, and `escape()` on escape. Neither clears the text.
+- `change(text)`, if you give it, runs after each key of the person's that changes the text, a paste too, with the new text. It does not run when you set the Model. Use it to act as the person types, such as to filter a List by what they type.
 - `key()`, if you give it, says which text the Line holds: each value keeps its own, as each question of a form keeps its answer.
 - `models` are what `shown()` and `key()` read, so that the Line is drawn again when they change.
 - `answer.model` is the Line's Model, also named `name`: `{ texts }`, a `Map` from each value of `key()` to its text. It is what the Line holds. Set the shown key's text to change the Line, with the cursor at its end, and delete it to clear the Line: `answer.model.set((state) => state.texts.delete(key))`. The text stays after a submit, an escape, or while the Line is hidden, until you clear it.

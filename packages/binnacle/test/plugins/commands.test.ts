@@ -5,6 +5,7 @@ import * as composer from '../../src/plugins/composer/index.ts'
 import * as commands from '../../src/plugins/commands/index.ts'
 import type { CommandsState } from '../../src/plugins/commands/index.ts'
 import type { ComposerState } from '../../src/plugins/composer/index.ts'
+import { line as searchLine } from '../../src/index.ts'
 import { mount } from '../support/mount.ts'
 import { agents } from '../support/agents.ts'
 import { persistence } from '../support/sessions.ts'
@@ -374,4 +375,44 @@ test("a command that a plugin registers with dsh's register is offered and runs,
   const shown = await typed('\r')
   const back = await typed('\x02')
   assert.deepEqual([offered, shown[0], back.slice(5)], [['› /settings — Show the Tones'], 'the Tones', [RULE, ' ', RULE]])
+})
+
+test('an author who changes what commands.list.pick does keeps its gate, so enter runs it only while the offer draws', async () => {
+  const { ctx, typed, draft, commands: dshCommands, dsh } = await offering()
+  const picked: (string | undefined)[] = []
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.action('commands.list.pick', {
+      run: () => {
+        picked.push(draft())
+        plugin.binnacle.run('composer.send')
+      },
+    })
+  })
+  await typed('/', 'p', 'l', '\r')
+  await typed('h', 'i', '\r')
+  assert.deepEqual([picked, dshCommands.ran.map(({ line }) => line), dsh.sent.map(({ text }) => text)], [['/pl'], ['/pl'], ['/pl', 'hi']])
+})
+
+test('an author adds a search line to the Places of commands.list.up, and up moves the offer’s mark from it while the offer draws', async () => {
+  const { ctx, typed } = await offering({ rows: 10 })
+  await authored(ctx, (plugin) => {
+    searchLine(plugin.binnacle, { name: 'commands.search', shown: () => true, submit: () => {}, escape: () => {} })
+    plugin.binnacle.edit('chat', { insert: { place: 'commands.search', size: 'content' }, after: 'composer' })
+    plugin.binnacle.action('commands.list.up', { place: (places) => [...places, 'commands.search'] })
+  })
+  await typed('/')
+  ctx.binnacle.focus('commands.search')
+  const rows = await typed('\x1b[A')
+  assert.deepEqual(rows, [
+    '',
+    '',
+    RULE,
+    '  /compact — Compact the session',
+    '  /goal — Set a goal',
+    '› /plan — Plan first',
+    RULE,
+    '/ ',
+    RULE,
+    '›  ',
+  ])
 })

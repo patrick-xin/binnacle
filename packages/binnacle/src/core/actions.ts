@@ -137,11 +137,12 @@ export class Actions {
 
   /** True while an action is set that acts in the Place, enabled or not, so that the Focus stays while one is disabled for a moment. */
   actsIn(place: string): boolean {
-    return this.#set.some(({ item }) => actsIn(item.action.place, place))
+    return this.#set.some((entry) => actsIn(this.#placeOf(entry).place, place))
   }
 
   #run(entry: SetAction, at: Point | undefined): void {
-    entry.item.action.run(at, () => {
+    const run = entry.item.action.run ?? ((_at, beneath) => beneath())
+    run(at, () => {
       // Found when it runs, never captured, so a plugin that unloads between them leaves the chain as it stands.
       const index = this.#set.indexOf(entry)
       const next = index === -1 ? undefined : this.#enabledBelow(entry.item.id, index)
@@ -150,15 +151,25 @@ export class Actions {
   }
 
   #enabledBelow(id: string, index: number): SetAction | undefined {
-    return this.#set.slice(0, index).findLast(({ item }) => item.id === id && item.action.enabled?.() !== false)
+    return this.#set.slice(0, index).findLast((entry) => entry.item.id === id && this.#enabled(entry))
+  }
+
+  /** An action that names no `enabled` keeps the gate of the newest action it hides that names one, so that changing what an action does keeps when it acts. */
+  #enabled(entry: SetAction): boolean {
+    return (
+      this.#hidden(entry)
+        .find((action) => action.enabled !== undefined)
+        ?.enabled?.() !== false
+    )
   }
 
   /** The newest enabled action of each id, newest first. */
   #tops(): readonly SetAction[] {
     const seen = new Set<string>()
-    return this.#set.toReversed().filter(({ item }) => {
-      if (seen.has(item.id) || item.action.enabled?.() === false) return false
-      seen.add(item.id)
+    return this.#set.toReversed().filter((entry) => {
+      const { id } = entry.item
+      if (seen.has(id) || !this.#enabled(entry)) return false
+      seen.add(id)
       return true
     })
   }
@@ -173,12 +184,24 @@ export class Actions {
     return this.#bound(id, kind === undefined || kind === id ? own : this.#bound(kind, own))
   }
 
-  /** An action that names no Place keeps the Place and the `first` of the action it hides, so that an action set by the id of a Place's action acts only in that Place. */
-  #placeOf(entry: SetAction): { readonly place: Action['place'] | undefined; readonly first: boolean | undefined } {
-    const hidden = this.#hidden(entry)
-    const placed = hidden.findIndex((action) => action.place !== undefined)
-    const kept = placed === -1 ? hidden : hidden.slice(0, placed + 1)
-    return { place: placed === -1 ? undefined : hidden[placed]!.place, first: kept.find((action) => action.first !== undefined)?.first }
+  /**
+   * An action that names no Place keeps the Place and the `first` of the action it hides, so that an action set by the id of a Place's action acts only in that Place.
+   * A `place` that is a function is given the Places it would keep, and keeps the `first` too.
+   */
+  #placeOf(entry: SetAction): { readonly place: Places | undefined; readonly first: boolean | undefined } {
+    let place: Places | undefined
+    let first: boolean | undefined
+    for (const action of this.#hidden(entry).toReversed()) {
+      if (action.place === undefined) first = action.first ?? first
+      else if (typeof action.place === 'function') {
+        place = action.place(place === undefined ? [] : typeof place === 'string' ? [place] : place)
+        first = action.first ?? first
+      } else {
+        place = action.place
+        first = action.first
+      }
+    }
+    return { place, first }
   }
 
   /** The action and each action that it hides, by its id, newest first. */
@@ -204,7 +227,9 @@ function bindsTo(key: string, gesture: string): boolean {
   return key === gesture || matchesKey(gesture, key as KeyId)
 }
 
-function actsIn(own: Action['place'], place: string): boolean {
+type Places = string | readonly string[]
+
+function actsIn(own: Places | undefined, place: string): boolean {
   if (own === undefined) return false
   return typeof own === 'string' ? own === place : own.includes(place)
 }

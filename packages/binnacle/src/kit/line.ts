@@ -28,6 +28,8 @@ export interface LineOptions {
   readonly submit: (text: string) => void
   /** The person pressed escape. */
   readonly escape: () => void
+  /** A key of the person's, a paste included, changed the text: `text` is the new text of the Line's `key()`. An author's set of the Model does not call it. */
+  readonly change?: (text: string) => void
   /** What `shown()` and `key()` read, so that the Line is drawn again when they change. */
   readonly models?: readonly Watchable[]
 }
@@ -80,7 +82,10 @@ export function line(binnacle: Binnacle, options: LineOptions): LineComponent {
       typed.handleInput(data)
       // Only a key that changed the text writes it, so that a `submit` that clears the Model is not undone.
       const after = typed.getValue()
-      if (after !== before) model.set((state) => state.texts.set(key, after))
+      if (after !== before) {
+        model.set((state) => state.texts.set(key, after))
+        options.change?.(after)
+      }
       return true
     },
   })

@@ -433,3 +433,119 @@ test('an action that names its own `place` acts there, not in the Place of the a
   terminal.type(' ')
   assert.deepEqual(ran, ['mine'])
 })
+
+test('an action set by another’s id that names no `enabled` keeps the `enabled` of the action it hides, at a gesture and at a call, and `enabled: () => true` is enabled always', async () => {
+  const ran: string[] = []
+  const on = { gate: false }
+  const { author, terminal, ctx } = await booted()
+  await author('built-in', (plugin) => {
+    plugin.binnacle.action('other', logging(ran, 'other', { keys: ['ctrl+n'] }))
+    plugin.binnacle.action('send', logging(ran, 'gated', { keys: ['ctrl+n'], enabled: () => on.gate }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'mine'))
+  })
+  await terminal.read()
+  terminal.type(CTRL_N)
+  ctx.binnacle.run('send')
+  on.gate = true
+  terminal.type(CTRL_N)
+  ctx.binnacle.run('send')
+  on.gate = false
+  const always = await author('always', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'always', { enabled: () => true }))
+  })
+  terminal.type(CTRL_N)
+  await always.dispose()
+  assert.deepEqual(ran, ['other', 'mine', 'mine', 'always'])
+})
+
+test('the `enabled` an action keeps is read at each gesture, so a gate that unloads beneath it leaves the action enabled always', async () => {
+  const ran: string[] = []
+  const { author, terminal } = await booted()
+  const gate = await author('gate', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'gated', { keys: ['ctrl+n'], enabled: () => false }))
+  })
+  await author('keys', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'keys', { keys: ['ctrl+n'] }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'mine'))
+  })
+  await terminal.read()
+  terminal.type(CTRL_N)
+  await gate.dispose()
+  terminal.type(CTRL_N)
+  assert.deepEqual(ran, ['mine'])
+})
+
+test('an action set by another’s id that names no `run` runs the action it hides', async () => {
+  const ran: string[] = []
+  const { author, terminal, ctx } = await booted()
+  await author('built-in', (plugin) => {
+    plugin.binnacle.action('send', logging(ran, 'send', { keys: ['ctrl+n'] }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('send', { keys: ['ctrl+x'] })
+  })
+  await terminal.read()
+  terminal.type(CTRL_N)
+  terminal.type('\x18')
+  ctx.binnacle.run('send')
+  assert.deepEqual(ran, ['send', 'send'])
+})
+
+test('an action’s `place` can be a function, given the Places of the action it hides, and it keeps that action’s `first`', async () => {
+  const ran: string[] = []
+  const typed: string[] = []
+  const given: (readonly string[])[] = []
+  const { author, terminal, ctx } = await booted(10, 3)
+  await author('built-in', (plugin) => {
+    plugin.binnacle.layout('chat', {
+      column: [
+        { place: 'choices', size: { fixed: 1 } },
+        { place: 'line', size: { fixed: 1 } },
+      ],
+    })
+    plugin.binnacle.place('choices', line(typed))
+    plugin.binnacle.place('line', { lines: () => ['line'], key: () => false })
+    plugin.binnacle.action('choices.up', logging(ran, 'up', { keys: ['ctrl+n'], place: ['choices'], first: true }))
+    plugin.binnacle.action('anywhere', logging(ran, 'anywhere', { keys: ['ctrl+x'] }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('choices.up', {
+      place: (places) => {
+        given.push(places)
+        return [...places, 'line']
+      },
+    })
+    plugin.binnacle.action('anywhere', { place: (places) => (given.push(places), 'line') })
+  })
+  await terminal.read()
+  ctx.binnacle.focus('line')
+  terminal.type('\x0e')
+  terminal.type('\x18')
+  ctx.binnacle.focus('choices')
+  terminal.type('\x0e')
+  terminal.type('\x18')
+  assert.deepEqual(
+    [ran, typed, given.some((places) => places.length === 1 && places[0] === 'choices'), given.some((places) => places.length === 0)],
+    [['up', 'anywhere', 'up'], ['\x18'], true, true],
+  )
+})
+
+test('a Place that an action’s `place` function adds takes the Focus, as a Place an action acts in does', async () => {
+  const ran: string[] = []
+  const { author, terminal } = await booted()
+  await author('built-in', (plugin) => {
+    plugin.binnacle.layout('chat', { column: [{ place: 'list', size: 'content' }] })
+    plugin.binnacle.place('list', { lines: () => ['list'] })
+    plugin.binnacle.action('elsewhere.pick', logging(ran, 'pick', { keys: ['enter'], place: 'elsewhere' }))
+  })
+  await author('author', (plugin) => {
+    plugin.binnacle.action('elsewhere.pick', { place: (places) => [...places, 'list'] })
+  })
+  await terminal.read()
+  terminal.type(ENTER)
+  assert.deepEqual(ran, ['pick'])
+})
