@@ -20,7 +20,10 @@ export interface Card {
   readonly args: unknown
   /** dsh's view of the call, from the tool's `presentCall`, or `undefined` when the tool gives none. */
   readonly call: ToolCallView | undefined
-  /** The result, once it came: dsh's view of it from the tool's `presentResult`, its text, and whether it failed. */
+  /**
+   * The result, once it came: dsh's view of it from the tool's `presentResult`, its text, and whether it failed.
+   * It failed when dsh's `isError` is true, or when a terminal view has a signal or an exit code other than 0.
+   */
   readonly result: { readonly view: ToolResultView | undefined; readonly text: string; readonly failed: boolean } | undefined
   /** The call's time, in epoch milliseconds. */
   readonly startedAt: number
@@ -44,10 +47,15 @@ export type CardTitleLook = (card: Card, width: number) => string
 /** The Look `transcript.card.time`: the text of how long the call took, or `''` for none. */
 export type CardTimeLook = (card: Card) => string
 
+/** The Look `transcript.card.mark`: a card's painted dot, which the default title draws before the title. */
+export type CardMarkLook = (card: Card) => string
+
+/** The Look `transcript.card.most`: how many lines a terminal, web, generic or no-view body shows at most. */
+export type CardMostLook = (card: Card) => number
+
 /** The Looks `transcript.tool.<name>` and `transcript.card.<kind>`: a card's body lines, without the `⎿` prefix, given the body's width. */
 export type CardBodyLook = (card: Card, width: number) => string[]
 
-const MOST_LINES = 12
 const FIRST = '  ⎿ '
 const REST = '    '
 
@@ -98,6 +106,12 @@ const parse = (args: string): { readonly args: unknown; readonly parsed: boolean
   }
 }
 
+// dsh's shell gives `isError` false for a command that exits 1, and a person reads that as a failure.
+const shellFailed = (view: ToolResultView | undefined): boolean =>
+  view?.card === 'terminal' && ((typeof view.exitCode === 'number' && view.exitCode !== 0) || view.signal !== undefined)
+
+const most: CardMostLook = () => 12
+
 const time: CardTimeLook = ({ startedAt, endedAt }) => {
   if (endedAt === undefined) return ''
   const took = Math.max(0, endedAt - startedAt)
@@ -111,15 +125,16 @@ export function apply(ctx: Context): void {
   const transcript = binnacle.modelOf<TranscriptState>('transcript')
   const paint = (tone: Tone, text: string): string => binnacle.paint(tone, text)
   const cut = (text: string, width: number): string => truncateToWidth(text, Math.max(0, width), binnacle.tokens.glyphs.more)
-  const first = (text: string, width: number): string[] =>
+  const first = (card: Card, text: string, width: number): string[] =>
     linesOf(text)
-      .slice(0, MOST_LINES)
+      .slice(0, Math.max(0, pieces.most()(card)))
       .map((line) => cut(toPlainText(line), width))
   const titled = (title: string | undefined, width: number): string[] => (title === undefined ? [] : [cut(oneLine(title), width)])
 
+  const mark: CardMarkLook = (card) => paint(card.result === undefined ? 'accent' : card.result.failed ? 'error' : 'success', '⏺')
   const title: CardTitleLook = (card, width) => {
-    const tone: Tone = card.result === undefined ? 'accent' : card.result.failed ? 'error' : 'success'
-    return `${paint(tone, '⏺')} ${cut(oneLine(card.call?.title ?? card.name), width - 2)}`
+    const dot = pieces.mark()(card)
+    return `${dot} ${cut(oneLine(card.call?.title ?? card.name), width - visibleWidth(dot) - 1)}`
   }
   // The raw arguments of each card the row makes, as parsing and serializing them again can change them, such as a number's digits.
   const raws = new WeakMap<Card, string>()
@@ -127,7 +142,7 @@ export function apply(ctx: Context): void {
     const { args, call, result } = card
     if (result !== undefined) {
       const view = result.view?.card === 'generic' ? result.view : undefined
-      return [...titled(view?.title, width), ...first(textBlocks(view?.content) ?? result.text, width)]
+      return [...titled(view?.title, width), ...first(card, textBlocks(view?.content) ?? result.text, width)]
     }
     if (call === undefined) return [cut(oneLine(raws.get(card) ?? (typeof args === 'string' ? args : JSON.stringify(args))), width)]
     if (call.card !== 'generic' || call.rawInput === undefined) return []
@@ -142,12 +157,13 @@ export function apply(ctx: Context): void {
     if (result.view?.card !== 'terminal') return generic(card, width)
     const { output, exitCode, signal } = result.view
     const lines = linesOf(output ?? '')
-    const earlier = lines.length - MOST_LINES
+    const shown = Math.max(0, pieces.most()(card))
+    const earlier = lines.length - shown
     const status =
       signal !== undefined ? `signal ${oneLine(signal)}` : exitCode !== undefined && exitCode !== 0 ? `exit ${exitCode}` : undefined
     return [
       ...(earlier > 0 ? [paint('muted', `${binnacle.tokens.glyphs.more} ${earlier} earlier lines`)] : []),
-      ...lines.slice(-MOST_LINES).map((line) => cut(toPlainText(line), width)),
+      ...lines.slice(Math.max(0, earlier)).map((line) => cut(toPlainText(line), width)),
       ...(status === undefined ? [] : [paint('error', cut(status, width))]),
     ]
   }
@@ -174,11 +190,13 @@ export function apply(ctx: Context): void {
   const web: CardBodyLook = (card, width) => {
     const { result } = card
     if (result?.view?.card !== 'web') return generic(card, width)
-    return [...titled(result.view.title, width), ...first(result.text, width)]
+    return [...titled(result.view.title, width), ...first(card, result.text, width)]
   }
   const kinds: Readonly<Record<string, CardBodyLook>> = { generic, terminal, diff, search, read, web }
 
   const pieces = {
+    mark: () => binnacle.lookOf<CardMarkLook>(['transcript.card.mark'], mark),
+    most: () => binnacle.lookOf<CardMostLook>(['transcript.card.most'], most),
     title: () => binnacle.lookOf<CardTitleLook>(['transcript.card.title'], title),
     time: () => binnacle.lookOf<CardTimeLook>(['transcript.card.time'], time),
     body: (card: Card) => {
@@ -194,7 +212,7 @@ export function apply(ctx: Context): void {
     if (body.length === 0) return [pieces.title()(card, width - visibleWidth(after)) + after]
     const region = `${card.seq}/body`
     const folded = isFolded(region)
-    const count = folded ? paint('muted', ` (${body.length} lines)`) : ''
+    const count = folded ? paint('muted', ` (${body.length} ${body.length === 1 ? 'line' : 'lines'})`) : ''
     const text = pieces.title()(card, width - visibleWidth(after) - visibleWidth(count)) + after + count
     return folded ? [{ text, fold: region }] : [{ text, fold: region }, ...body.map((line, at) => (at === 0 ? FIRST : REST) + line)]
   }
@@ -246,20 +264,17 @@ export function apply(ctx: Context): void {
     const answered = typeof callId === 'string' ? results.get(callId) : undefined
     const data = fields(answered?.data)
     const message = fields(data?.message)
-    const result =
+    const view =
       answered === undefined
         ? undefined
-        : {
-            view: viewOf(answered, tool, (each) =>
-              each.presentResult?.(args, {
-                content: Array.isArray(message?.content) ? message.content : [],
-                isError: message?.isError === true,
-                ...(data?.meta !== undefined && { meta: data.meta as never }),
-              }),
-            ),
-            text: textOf(answered),
-            failed: failed(answered),
-          }
+        : viewOf(answered, tool, (each) =>
+            each.presentResult?.(args, {
+              content: Array.isArray(message?.content) ? message.content : [],
+              isError: message?.isError === true,
+              ...(data?.meta !== undefined && { meta: data.meta as never }),
+            }),
+          )
+    const result = answered === undefined ? undefined : { view, text: textOf(answered), failed: failed(answered) || shellFailed(view) }
     const card: Card = {
       seq: event.seq,
       name: called.name,

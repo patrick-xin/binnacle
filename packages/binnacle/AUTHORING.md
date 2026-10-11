@@ -748,7 +748,7 @@ The row `binnacle-tool-cards` draws each tool call and its result as one card, w
   - `name`: the tool's name.
   - `args`: the call's arguments, parsed, or the raw string when they are not JSON.
   - `call`: dsh's view of the call, a `ToolCallView`, or `undefined` when the tool gives none. Its `card` is `terminal`, `diff` or `generic`.
-  - `result`: `{ view, text, failed }` once the result came, else `undefined`. `view` is dsh's view of the result, a `ToolResultView`, or `undefined`. Its `card` is `terminal`, `diff`, `search`, `read`, `web` or `generic`.
+  - `result`: `{ view, text, failed }` once the result came, else `undefined`. `failed` is true when dsh's `isError` is, or when `view` is `terminal` with an `exitCode` other than 0, or with a `signal`. `view` is dsh's view of the result, a `ToolResultView`, or `undefined`. Its `card` is `terminal`, `diff`, `search`, `read`, `web` or `generic`.
   - `startedAt` and `endedAt`: the times of the call's and the result's events, in epoch milliseconds. `endedAt` is `undefined` while the call runs.
 
   Text in `call` and `result` is Untrusted Text: make it plain before you draw it. This draws each card in a box, with `frame`:
@@ -765,14 +765,21 @@ The row `binnacle-tool-cards` draws each tool call and its result as one card, w
   | Look | Draws | Given | Type |
   |---|---|---|---|
   | `transcript.card.title` | the first line's text, without the time | the card, and the width left beside the time | `CardTitleLook` |
+  | `transcript.card.mark` | the painted `⏺`, which the default title draws before the title | the card | `CardMarkLook` |
   | `transcript.card.time` | how long the call took, or `''` for none | the card | `CardTimeLook` |
+  | `transcript.card.most` | how many lines a terminal, web, generic or no-view body shows, 12 by default | the card | `CardMostLook` |
   | `transcript.tool.<name>` | one tool's body, such as `transcript.tool.grep` | the card, and the body's width | `CardBodyLook` |
   | `transcript.card.<kind>` | one card kind's body, beneath `transcript.tool.<name>`, such as `transcript.card.terminal` | the card, and the body's width | `CardBodyLook` |
 
-  The kind is the result view's `card` once the result came, else the call view's, else `generic`. A body's Look returns its lines without the `⎿` prefix, which the card adds. This draws a shell command's last 3 lines, and no time on any card:
+  The kind is the result view's `card` once the result came, else the call view's, else `generic`. A body's Look returns its lines without the `⎿` prefix, which the card adds. This example changes three things:
+
+  - A shell command's card shows its last 3 lines, after `… <n> earlier lines`.
+  - A running call's dot is hollow.
+  - No card shows a time.
 
   ```js
-  ctx.binnacle.look('transcript.card.terminal', (beneath) => (card, width) => beneath(card, width).slice(-3))
+  ctx.binnacle.look('transcript.card.most', (beneath) => (card) => (card.result?.view?.card === 'terminal' ? 3 : beneath(card)))
+  ctx.binnacle.look('transcript.card.mark', (beneath) => (card) => (card.result === undefined ? '○' : beneath(card)))
   ctx.binnacle.look('transcript.card.time', () => () => '')
   ```
 
@@ -784,7 +791,7 @@ The row `binnacle-tool-cards` draws each tool call and its result as one card, w
     card.endedAt === undefined ? `${Math.floor((clock.state.now - card.startedAt) / 1000)}s` : beneath(card), { models: [clock] })
   ```
 
-- The default card's first line is `{ text, fold: '<seq>/body' }`, so enter on the Marked card, or a click on its first line, folds its body, and the card draws its first line alone, ending with `(<n> lines)`. A card with no body has nothing to fold, and its first line is a string. Set `transcript.card` to put the fold on another line, as [The transcript](#the-transcript) says of a `Line`.
+- The default card's first line is `{ text, fold: '<seq>/body' }`. So enter on the Marked card, or a click on its first line, folds its body. The folded card draws its first line alone, ending with `(1 line)` or `(<n> lines)`. A card with no body has nothing to fold, and its first line is a string. Set `transcript.card` to put the fold on another line, as [The transcript](#the-transcript) says of a `Line`.
 
 ## The composer
 
