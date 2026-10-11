@@ -28,6 +28,9 @@ export interface ListRowAt {
 /** The Look `list.row`, or `<name>.row`: how one item of a List is drawn, given as the List's items are. */
 export type ListRow<T extends ListItem = ListItem> = (item: T, at: ListRowAt) => string
 
+/** A piece of a List's default row: the Looks `list.mark`, `list.label` and `list.description`, or `<name>.mark` and the rest. */
+export type ListPiece<T extends ListItem = ListItem> = (item: T, at: ListRowAt) => string
+
 export interface ListOptions<T extends ListItem = ListItem> {
   /** The instance's name: its Place, its Model's name, and the start of its actions' ids and its Looks' names. */
   readonly name: string
@@ -74,7 +77,13 @@ export function list<T extends ListItem = ListItem>(binnacle: Binnacle, options:
   const placed = binnacle.place(name, {
     models: [model, ...(options.models ?? [])],
     lines: (width) => {
-      const row = binnacle.lookOf<ListRow<T>>([`${name}.row`, 'list.row'], (item, at) => defaultRow(binnacle, item, at))
+      const piece = (verb: string, fallback: ListPiece<T>) => binnacle.lookOf<ListPiece<T>>([`${name}.${verb}`, `list.${verb}`], fallback)
+      const pieces: Pieces<T> = {
+        mark: piece('mark', (_, at) => markOf(binnacle, at)),
+        label: piece('label', (item, at) => labelOf(binnacle, item, at)),
+        description: piece('description', (item) => descriptionOf(binnacle, item)),
+      }
+      const row = binnacle.lookOf<ListRow<T>>([`${name}.row`, 'list.row'], (item, at) => defaultRow(binnacle, pieces, item, at))
       return items().map((item, index) => row(item, { marked: index === model.state.mark, index, width }))
     },
     // The cursor stays hidden; it keeps the marked item in view as the Place scrolls.
@@ -112,13 +121,30 @@ export function list<T extends ListItem = ListItem>(binnacle: Binnacle, options:
   return { model, handle: together(placed, [named, ...actions]) }
 }
 
-function defaultRow(binnacle: Binnacle, item: ListItem, at: ListRowAt): string {
+interface Pieces<T extends ListItem> {
+  readonly mark: ListPiece<T>
+  readonly label: ListPiece<T>
+  readonly description: ListPiece<T>
+}
+
+function defaultRow<T extends ListItem>(binnacle: Binnacle, pieces: Pieces<T>, item: T, at: ListRowAt): string {
   const { glyphs } = binnacle.tokens
-  const mark = at.marked ? binnacle.paint('accent', glyphs.mark) : glyphs.unmarked
   const box = item.checked === undefined ? '' : `${boxOf(binnacle, item.checked ? glyphs.checked : glyphs.unchecked, item.checked)} `
+  return `${pieces.mark(item, at)} ${box}${pieces.label(item, at)}${pieces.description(item, at)}`
+}
+
+function markOf(binnacle: Binnacle, at: ListRowAt): string {
+  const { glyphs } = binnacle.tokens
+  return at.marked ? binnacle.paint('accent', glyphs.mark) : glyphs.unmarked
+}
+
+function labelOf(binnacle: Binnacle, item: ListItem, at: ListRowAt): string {
   const label = toPlainText(item.label)
-  const description = item.description === undefined ? '' : binnacle.paint('muted', ` — ${toPlainText(item.description)}`)
-  return `${mark} ${box}${at.marked ? binnacle.paint('accent', label) : label}${description}`
+  return at.marked ? binnacle.paint('accent', label) : label
+}
+
+function descriptionOf(binnacle: Binnacle, item: ListItem): string {
+  return item.description === undefined ? '' : binnacle.paint('muted', ` — ${toPlainText(item.description)}`)
 }
 
 const OPENS = '[(<{'

@@ -253,7 +253,7 @@ ctx.binnacle.theme({
 - A colour is one of the terminal's sixteen by name, such as `cyan` or `bright-black`, so the person's palette decides how it looks; a 256-colour index, such as `67`; or an exact colour, as `#rrggbb`, `#rgb`, `okhsl(h s% l%)` or `oklch(l c h)`. An exact colour is drawn as the nearest of 256 where the terminal has no truecolor.
 - A Tone's token is a colour, or a Style: `{ color, bold, dim, italic, underline }`. A plain colour stands for `{ color }`, and a Style with no `color` keeps the terminal's own.
 - `binnacle.theme` refuses a colour that is not one, such as `'36'`, and names its Tone.
-- `binnacle.tokens` is the tokens as the layers make them now. `binnacle.paint(tone, text)` draws text in a Tone. A Tone or a style painted inside it ends, and the text after it draws in the outer Tone again. Paint in a Part's `lines`, so that the lines follow the theme when it changes:
+- `binnacle.tokens` is the tokens as the layers make them now. `binnacle.paint(tone, text)` draws text in a Tone, and `binnacle.paint(style, text)` in a Style of your own, such as `{ bold: true }`, so you need no escape code. A Style's colour that is not one makes `paint` throw. A Tone follows the theme, and a Style does not. A Tone or a style painted inside it ends, and the text after it draws in the outer Tone again. Paint in a Part's `lines`, so that the lines follow the theme when it changes:
 
 ```js
 ctx.binnacle.place('status.state', {
@@ -287,7 +287,7 @@ A Look is how one piece of a component is drawn, such as a List's row. An author
 
 ```js
 ctx.binnacle.look('list.row', (beneath) => (item, at) => beneath(item, at).toUpperCase())
-ctx.binnacle.look('request.choices.row', (beneath) => (item, at) => `\x1b[1m${beneath(item, at)}\x1b[22m`)
+ctx.binnacle.look('request.choices.row', (beneath) => (item, at) => ctx.binnacle.paint({ bold: true }, beneath(item, at)))
 ```
 
 - `binnacle.look(name, make)` sets a Look. `make` is handed `beneath`, the Look that the new one hides, and returns the new Look, which takes what the component's piece takes. Draw `beneath` to keep what is beneath and add to it, or leave it out to draw the piece your own way.
@@ -540,7 +540,16 @@ const picker = list(ctx.binnacle, {
 
 - `picker.model` is the List's Model, also named `name`: `{ mark }`, the index of the marked item.
 - The actions are `<name>.up`, `<name>.down`, `<name>.pageUp`, `<name>.pageDown`, `<name>.pick`, `<name>.click` and `<name>.toggle`, of the kinds `list.up` and the rest.
-- The Look `list.row`, or `<name>.row`, draws one item: `(item, { marked, index, width }) => line`. Its default draws the `mark` glyph and the marked item in `accent`, a description in `muted`, a box's frame in `border`, and what a checked box holds in `success`. A box glyph that is not framed in brackets draws whole, in `success` when checked and in `border` when not.
+- The Look `list.row`, or `<name>.row`, draws one item: `(item, { marked, index, width }) => line`. Its default draws the mark, a space, the box, the label and the description. A row wider than the List wraps. A row Look of your own draws instead of all of it, and its `beneath` is the default row.
+- The default row draws three pieces, each a Look of the type `ListPiece<T>`, `(item, { marked, index, width }) => text`. Change one piece, and the row stays the List's own:
+
+  | Look | Default |
+  |---|---|
+  | `<name>.mark`, then `list.mark` | the `mark` glyph in `accent` when marked, and the `unmarked` glyph when not |
+  | `<name>.label`, then `list.label` | the label as plain text, in `accent` when marked |
+  | `<name>.description`, then `list.description` | ` — ` and the description as plain text, in `muted`, or `''` with none |
+
+- The box draws a box's frame in `border`, and what a checked box holds in `success`. A box glyph that is not framed in brackets draws whole, in `success` when checked and in `border` when not.
 
 ### Title
 
@@ -926,13 +935,15 @@ The Layout is `COMMANDS_LAYOUT`, from `binnacle/plugins/commands`, frozen: the L
   ```
 
 - The List `commands.list` takes its keys in `composer.input` with `keysIn`, so up, down, page up and page down move its mark while the person types. Its Model, `{ mark }`, and its actions, `commands.list.up` and the rest, are named apart from the model `commands` and its actions. Its mark goes back to the first command when `query` changes.
-- A command is drawn by the Look `commands.list.row`, then `list.row`, of the type `CommandRow`. It is given the item with its `name` and `hint`:
+- A command is drawn by the List's pieces, `commands.list.mark`, `commands.list.label` and `commands.list.description`, of the type `ListPiece<CommandItem>`. Each is given the item with its `name` and `hint`. Draw a command's hint after its name, and the row stays the List's own:
 
   ```js
-  ctx.binnacle.look('commands.list.row', (beneath) => (item, at) =>
-    item.hint === undefined ? beneath(item, at) : `${beneath(item, at)} ${ctx.binnacle.paint('dim', item.hint)}`,
+  ctx.binnacle.look('commands.list.label', (beneath) => (item, at) =>
+    item.hint === undefined ? beneath(item, at) : beneath(item, at) + ctx.binnacle.paint('dim', ` ${item.hint}`),
   )
   ```
+
+- The whole row is the Look `commands.list.row`, then `list.row`, of the type `CommandRow`. The row `binnacle-commands` sets it to cut the default row at the width with the `more` glyph, so a command draws in one line. A row Look of yours over it is given the cut row as its `beneath`, and is not cut.
 
 - Move the offer with an edit of the Chat, such as above the transcript:
 

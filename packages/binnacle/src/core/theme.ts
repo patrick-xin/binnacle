@@ -86,13 +86,16 @@ const styleOf = (given: Colour | Style): Style => (typeof given === 'object' ? g
 /** Throws, naming the Tone, when a layer gives a colour that is not one, so the author learns at load and not at a draw. */
 export function checkLayer(layer: ThemeLayer): void {
   for (const [tone, given] of Object.entries(layer.colors ?? {})) {
-    const color = given === undefined ? undefined : styleOf(given).color
-    if (color === undefined || SIXTEEN.includes(color as Sixteen)) continue
-    try {
-      parseColor(color)
-    } catch {
-      throw new Error(`binnacle: the theme's ${tone} is not a colour: ${JSON.stringify(color).replaceAll('"', "'")}`)
-    }
+    checkColour(given === undefined ? undefined : styleOf(given).color, `the theme's ${tone}`)
+  }
+}
+
+function checkColour(color: Colour | undefined, what: string): void {
+  if (color === undefined || SIXTEEN.includes(color as Sixteen)) return
+  try {
+    parseColor(color)
+  } catch {
+    throw new Error(`binnacle: ${what} is not a colour: ${JSON.stringify(color).replaceAll('"', "'")}`)
   }
 }
 
@@ -143,27 +146,35 @@ function closes(params: string): boolean {
   return false
 }
 
-/** How each Tone is drawn on a terminal of that many colours. */
-export function painter(tokens: Tokens, mode: TerminalColorMode): (tone: Tone, text: string) => string {
-  const wraps = new Map<Tone, { readonly open: string; readonly close: string }>()
-  for (const [tone, style] of Object.entries(tokens.colors) as [Tone, Style][]) {
-    let open = ''
-    let close = ''
-    for (const [name, on, off] of ATTRIBUTES) {
-      if (style[name] !== true) continue
-      open += `\x1b[${on}m`
-      close = `\x1b[${off}m${close}`
-    }
-    if (style.color !== undefined) {
-      open += opening(style.color, mode)
-      close = `\x1b[39m${close}`
-    }
-    wraps.set(tone, { open, close })
+interface Wrap {
+  readonly open: string
+  readonly close: string
+}
+
+function wrapOf(style: Style, mode: TerminalColorMode): Wrap {
+  let open = ''
+  let close = ''
+  for (const [name, on, off] of ATTRIBUTES) {
+    if (style[name] !== true) continue
+    open += `\x1b[${on}m`
+    close = `\x1b[${off}m${close}`
   }
-  return (tone, text) => {
-    const wrap = wraps.get(tone)
+  if (style.color !== undefined) {
+    open += opening(style.color, mode)
+    close = `\x1b[39m${close}`
+  }
+  return { open, close }
+}
+
+/** How each Tone, or a Style given as it is, is drawn on a terminal of that many colours. */
+export function painter(tokens: Tokens, mode: TerminalColorMode): (given: Tone | Style, text: string) => string {
+  const wraps = new Map<Tone, Wrap>()
+  for (const [tone, style] of Object.entries(tokens.colors) as [Tone, Style][]) wraps.set(tone, wrapOf(style, mode))
+  return (given, text) => {
+    if (typeof given === 'object') checkColour(given.color, "paint's colour")
+    const wrap = typeof given === 'object' ? wrapOf(given, mode) : wraps.get(given)
     if (wrap === undefined || wrap.open === '' || text === '') return text
-    // A style painted inside ends with its own close, which can end this Tone's too, so this Tone opens again after it.
+    // A style painted inside ends with its own close, which can end this one's too, so this one opens again after it.
     const held = text.replace(/\x1b\[([\d;:]*)m/g, (sequence, params: string) => (closes(params) ? sequence + wrap.open : sequence))
     return wrap.open + held + wrap.close
   }

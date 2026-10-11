@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import { createModel, line, list } from '../src/index.ts'
-import type { Layout, ListItem, ListRow } from '../src/index.ts'
+import type { Layout, ListItem, ListPiece, ListRow } from '../src/index.ts'
 import { mount } from './support/mount.ts'
 
 const UP = '\x1b[A'
@@ -347,4 +347,25 @@ test('a List gives its row Look each item of the author’s own type, with the a
     (await mounted.terminal.read()).rows.map((row) => row.trimEnd()),
     ['› fig purple', '  pear green'],
   )
+})
+
+test('a List’s default row draws its mark, its label and its description with the Looks of its kind and of its instance, each given the item and where it is drawn', async () => {
+  const { rows, shown, ctx } = await fruit({ columns: 30 })
+  shown.set(
+    (state) =>
+      (state.items = [
+        { label: 'fig', description: 'sweet' },
+        { label: 'pear', checked: true },
+      ]),
+  )
+  await ctx.plugin({
+    name: 'pieces',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.look<ListPiece>('list.mark', () => (_, at) => (at.marked ? '*' : '-'))
+      plugin.binnacle.look<ListPiece>('fruit.label', (beneath) => (item, at) => `${beneath(item, at)}#${at.index}`)
+      plugin.binnacle.look<ListPiece>('list.description', (beneath) => (item, at) => `${beneath(item, at)} w${at.width}`)
+    },
+  })
+  assert.deepEqual(await rows(), ['* fig#0 — sweet w30', '- [x] pear#1 w30'])
 })

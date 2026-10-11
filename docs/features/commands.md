@@ -18,7 +18,8 @@ Row `binnacle-commands` · Code `binnacle:packages/binnacle/src/plugins/commands
 
 - Read the offer: the model `commands`, `binnacle.modelOf('commands')`, holds `open` and `query`, and its `items` are the commands that match, each `{ label, description, name, hint }`.
 - What opening, closing, picking and completing do: set the action `commands.open`, `commands.close`, `commands.pick` or `commands.complete`. An empty `commands.open` takes the offer out.
-- How a command is drawn: the Look `commands.list.row`, then `list.row`, given the item with its `hint`.
+- How a piece of a command is drawn: the Looks `commands.list.mark`, `commands.list.label` and `commands.list.description`, then `list.mark` and the rest, each given the item with its `hint`. So `commands.list.label` draws a command's hint after its name, and the row stays the List's own.
+- How a whole command is drawn: the Look `commands.list.row`, then `list.row`. Its `beneath` is the row cut at the width.
 - Where the offer is drawn: an edit of the Chat's `{ layout: 'commands' }` node, such as a move above the transcript. For a float, set the Layout `commands` to draw nothing, and draw `COMMANDS_LAYOUT`, from `binnacle/plugins/commands`, under another name.
 - A command of their own: register it with dsh's `ctx.commands.register`, and it is offered and runs. Its handler can show a Screen with `binnacle.show`.
 
@@ -26,6 +27,7 @@ Row `binnacle-commands` · Code `binnacle:packages/binnacle/src/plugins/commands
 
 - **Running is the composer's, offering is this row's.** The default `composer.send` runs a command line. This row only changes the draft and runs `composer.send`. With the row off, every command still runs.
 - **The model `commands`** is `{ open, query, items }`. `items` is a getter: at each read, it lists the registry's commands for the Chat's agent with `commands.list(agent)`, and filters them by name with `fuzzy`. So a command registered mid-session is offered with nothing to invalidate. With no agent, or no service `commands`, it is empty. dsh's `commands/change` draws the List again.
+- **A command's row is cut.** The row sets the Look `commands.list.row` to its `beneath`, the List's default row, cut at the width with `more`. So a command draws in one line, and the offer's rows are its commands. Another List's default row wraps. A row Look of an author's over it is given the cut row as its `beneath`, and is not cut.
 - **The draft drives the offer.** The row watches the model `composer`, and acts only when its `text` changes. A name has letters, digits, `_` and `-`, and can be empty. A draft that is `/` and a name runs `commands.open` if the offer is closed, and sets `query` to the name. A draft that stops being one runs `commands.close`.
 - **The row acts only when the draft changes.** So an offer closed with esc stays closed until the person types. An offer that an author opens with no `/` in the draft stays open until it is closed. While the model `composer`'s `running` is `true`, the row closes the offer, and does not open it. So the offer changes no draft while a command runs.
 - **The actions.** `commands.open` sets `open` and a `query` of `''`. `commands.close` clears `open`. `commands.pick` takes the marked item. With a `hint`, it sets the draft to `/<name> `. With none, it sets the draft to `/<name>` and runs `composer.send`. `commands.complete` sets the draft to `/<name> `.
@@ -38,4 +40,4 @@ Row `binnacle-commands` · Code `binnacle:packages/binnacle/src/plugins/commands
 
 ## Built by
 
-Spec [#287](https://github.com/patrick-xin/binnacle/issues/287) · Ticket [#290](https://github.com/patrick-xin/binnacle/issues/290): the offer, its model, its actions, its Layout and its List.
+Spec [#287](https://github.com/patrick-xin/binnacle/issues/287) · Ticket [#290](https://github.com/patrick-xin/binnacle/issues/290): the offer, its model, its actions, its Layout and its List. · Ticket [#298](https://github.com/patrick-xin/binnacle/issues/298): a command's row in pieces, cut at the width.

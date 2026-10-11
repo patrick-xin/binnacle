@@ -261,3 +261,49 @@ test("a colour's arguments inside a Tone, as the zeroes of a truecolor green, ar
   const colours = await Promise.all([1, 2, 3].map(async (x) => (await terminal.styleAt(x, 0)).colour))
   assert.deepEqual(colours, ['#00ff00', '#0000ff', 6])
 })
+
+test('paint takes a Style as well as a Tone, drawn for the terminal’s colours, and an empty Style gives the text as it is', async () => {
+  const { terminal } = await drawn(
+    8,
+    3,
+    (binnacle) => {
+      binnacle.layout('chat', { place: 'a' })
+      binnacle.place('a', {
+        lines: () => [
+          binnacle.paint({ bold: true }, 'a') + binnacle.paint({ color: '#00ff00', italic: true }, 'b') + binnacle.paint({}, 'c'),
+        ],
+      })
+    },
+    '256color',
+  )
+  const styles = await Promise.all([0, 1, 2].map((x) => terminal.styleAt(x, 0)))
+  assert.deepEqual(
+    styles.map(({ colour, bold, italic }) => [colour, bold, italic]),
+    [
+      ['default', true, false],
+      [46, false, true],
+      ['default', false, false],
+    ],
+  )
+})
+
+test('a Style painted inside a Tone opens the Tone again after it ends', async () => {
+  const { terminal } = await drawn(8, 3, (binnacle) => {
+    binnacle.layout('chat', { place: 'a' })
+    binnacle.place('a', { lines: () => [binnacle.paint('heading', `a${binnacle.paint({ color: 'red', dim: true }, 'b')}c`)] })
+  })
+  const styles = await Promise.all([0, 1, 2].map((x) => terminal.styleAt(x, 0)))
+  assert.deepEqual(
+    styles.map(({ colour, bold, dim }) => [colour, bold, dim]),
+    [
+      [6, true, false],
+      [1, true, true],
+      [6, true, false],
+    ],
+  )
+})
+
+test('paint refuses a Style whose colour is not one, as the theme does', async () => {
+  const { ctx } = await mount()
+  assert.throws(() => ctx.binnacle.paint({ color: '36' }, 'x'), /'36'/)
+})

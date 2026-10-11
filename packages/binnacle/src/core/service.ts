@@ -16,6 +16,7 @@ import type {
   PlacedHandle,
   Point,
   Screen,
+  Style,
   ThemeLayer,
   Tokens,
   Tone,
@@ -85,7 +86,7 @@ function builtIn(fiber: Fiber): boolean {
 
 interface Themed {
   readonly tokens: Tokens
-  readonly paint: (tone: Tone, text: string) => string
+  readonly paint: (given: Tone | Style, text: string) => string
 }
 
 export class BinnacleService extends Service implements Binnacle {
@@ -123,8 +124,8 @@ export class BinnacleService extends Service implements Binnacle {
     return this.themeNow().tokens
   }
 
-  paint(tone: Tone, text: string): string {
-    return this.themeNow().paint(tone, text)
+  paint(given: Tone | Style, text: string): string {
+    return this.themeNow().paint(given, text)
   }
 
   theme(layer: ThemeLayer): Handle {
