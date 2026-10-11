@@ -7,6 +7,8 @@ export interface Places {
   scrolledUp(place: string): number
   /** In the Place's rows; only the Place with the Focus has one. */
   cursor(place: string, width: number): Position | undefined
+  /** In the Place's rows, the cursor that a `least` Part keeps in view without the Focus, as a List keeps its mark. It is not drawn. */
+  followed(place: string, width: number): Position | undefined
   /** An author paged the Place, and its cursor has not moved since: the Place shows the paged rows, not the cursor's. */
   paged(place: string, width: number): boolean
   /** The newest Layout set by that name. */

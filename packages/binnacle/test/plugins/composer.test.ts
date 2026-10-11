@@ -278,6 +278,17 @@ test('an author who sets composer.send without beneath() sends nothing, and clea
   assert.deepEqual([queued, dsh.sent, await typed()], [['hi'], [], ['', '', RULE, ' ', RULE]])
 })
 
+test('an author who sets the draft and runs composer.send in one call sends the draft that was set', async () => {
+  const dsh = agents()
+  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  await typed('h', 'i')
+  draftOf(ctx).set((state) => {
+    state.text = 'set'
+  })
+  ctx.binnacle.run('composer.send')
+  assert.deepEqual([dsh.sent, await typed()], [[{ how: 'followup', text: 'set' }], ['', '', RULE, ' ', RULE]])
+})
+
 test("ctrl+c is the core's binnacle.clear: an author who binds it to ctrl+q clears the draft with ctrl+q, and binnacle stays", async () => {
   const { ctx, typed, exits } = await chat()
   await authored(ctx, (plugin) => {

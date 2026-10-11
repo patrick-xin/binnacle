@@ -14,5 +14,6 @@ Each feature is a plugin with a row of its own in the bundle's patch ([ADR 1](ad
 | Transcript | [transcript](features/transcript.md) | `binnacle-transcript`, `binnacle-transcript-view` | `packages/binnacle/src/plugins/transcript/`, `packages/binnacle/src/plugins/transcript-view/` |
 | Tool cards | [tool cards](features/tool-cards.md) | `binnacle-tool-cards` | `packages/binnacle/src/plugins/tool-cards/` |
 | Composer | [composer](features/composer.md) | `binnacle-composer` | `packages/binnacle/src/plugins/composer/` |
+| Commands | [commands](features/commands.md) | `binnacle-commands` | `packages/binnacle/src/plugins/commands/` |
 | Status line | [status line](features/status-line.md) | `binnacle-status-line` | `packages/binnacle/src/plugins/status-line/` |
 | Requests | [requests](features/requests.md) | `binnacle-requests`, `binnacle-requests-view` | `packages/binnacle/src/plugins/requests/`, `packages/binnacle/src/plugins/requests-view/` |
