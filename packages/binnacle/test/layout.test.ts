@@ -285,6 +285,15 @@ test('a Part with the Focus, longer than its Place, shows the row of its cursor,
   assert.deepEqual([rows, (await terminal.read()).cursor], [['2', '3', '4'], { x: 1, y: 0 }])
 })
 
+test("a Part that follows its cursor the least, without the Focus, shows its cursor's row, and the terminal's cursor stays with the Part that has the Focus", async () => {
+  const { terminal, rows } = await drawn(10, 4, (binnacle) => {
+    binnacle.show({ name: 'editing', focus: 'b', layout: { column: [{ place: 'a', size: { fixed: 3 } }, { place: 'b' }] } })
+    binnacle.place('a', { lines: () => ['1', '2', '3', '4', '5', '6'], cursor: () => ({ line: 0, column: 0 }), follow: 'least' })
+    binnacle.place('b', { lines: () => ['typed'], key: () => false, cursor: () => ({ line: 0, column: 5 }) })
+  })
+  assert.deepEqual([rows, (await terminal.read()).cursor], [['1', '2', '3', 'typed'], { x: 5, y: 3 }])
+})
+
 test("a cursor in a line that wraps is put on the row and the column it wraps to, inside the Place's box", async () => {
   const { terminal, rows } = await drawn(12, 4, (binnacle) => {
     binnacle.show({ name: 'editing', focus: 'a', layout: { place: 'a', border: true } })

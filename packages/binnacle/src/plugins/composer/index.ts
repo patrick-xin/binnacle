@@ -133,6 +133,8 @@ export function apply(ctx: Context): void {
       // A stored session takes nothing that is sent, and a new one takes nothing until it is open.
       const agent = ctx.get('binnacleSession')?.agent
       if (agent === undefined) return
+      // A draft set in the same call, as the offer of commands sets it before it sends, reaches the editor only in a microtask.
+      if (draft.state.text !== editor.getExpandedText()) editor.setText(draft.state.text)
       const { line, col } = editor.getCursor()
       // pi-tui's fallback for a terminal that cannot tell shift+enter from enter.
       if (editor.getLines()[line]?.[col - 1] === '\\') {

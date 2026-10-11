@@ -28,6 +28,10 @@
       "types": "./dist/plugins/composer/index.d.ts",
       "default": "./dist/plugins/composer/index.js"
     },
+    "./plugins/commands": {
+      "types": "./dist/plugins/commands/index.d.ts",
+      "default": "./dist/plugins/commands/index.js"
+    },
     "./plugins/status-line": {
       "types": "./dist/plugins/status-line/index.d.ts",
       "default": "./dist/plugins/status-line/index.js"

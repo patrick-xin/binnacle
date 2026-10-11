@@ -86,6 +86,15 @@ test('the packed status line gives `STATUS_LAYOUT` to build on, and AUTHORING.md
   )
 })
 
+test('the packed offer of commands gives `COMMANDS_LAYOUT` to build on, and AUTHORING.md names it', async () => {
+  const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
+  const offer = await import(pathToFileURL(join(unpacked, exports['./plugins/commands']!.default)).href)
+  assert.deepEqual(
+    [offer.COMMANDS_LAYOUT, read('AUTHORING.md').includes('COMMANDS_LAYOUT')],
+    [{ place: 'commands.list', size: { most: 9 }, border: ['top'] }, true],
+  )
+})
+
 test('the packed AUTHORING.md names every member of the author API, every export, every Tone, and how to load a plugin in a profile', () => {
   const guide = read('AUTHORING.md')
   const api = read('dist/api.d.ts')

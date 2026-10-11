@@ -64,6 +64,7 @@ export class Drawing {
           firstLine: (place, width) => this.#rows.firstLineOf(view.partIn(place), width),
           scrolledUp: (place) => this.#scroll.up(place),
           cursor: (place, width) => (place === focus ? this.#rows.cursorOf(view.partIn(place), width) : undefined),
+          followed: (place, width) => (view.partIn(place)?.follow === 'least' ? this.#rows.cursorOf(view.partIn(place), width) : undefined),
           paged: (place, width) => this.#scroll.paged(place, view.partIn(place)?.cursor?.(width)),
           layout: (name) => view.layoutNamed(name),
         },

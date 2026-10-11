@@ -18,8 +18,9 @@ export interface Part {
   /** What the Part is drawn from: the core draws it again after each of them changes. */
   readonly models?: readonly Watchable[]
   /**
-   * How its Place follows its cursor, while the Place has the Focus. `'end'`, the default: the Place shows its end, and a cursor above the rows shown is brought to the top row.
+   * How its Place follows its cursor. `'end'`, the default: while the Place has the Focus, it shows its end. A cursor above the rows shown is brought to the top row.
    * `'least'`: the Place keeps the rows it showed, and moves them only as far as the cursor's row needs.
+   * It does this with the Focus or without it, so a List keeps its mark in view while the person types elsewhere.
    */
   readonly follow?: 'end' | 'least'
 }

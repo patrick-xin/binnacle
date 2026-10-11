@@ -288,9 +288,10 @@ class Arrangement {
   #place(place: string, top: number, left: number, width: number, height: number): string[] {
     const all = this.#places.rows(place, width)
     const cursor = this.#places.cursor(place, width)
+    const shows = cursor ?? this.#places.followed(place, width)
     let end = all.length - Math.min(this.#places.scrolledUp(place), this.#maxScroll(place, width, height))
-    // The Part with the Focus shows the row of its cursor, however it was scrolled.
-    if (cursor !== undefined && !this.#places.paged(place, width)) end = Math.min(Math.max(end, cursor.row + 1), cursor.row + height)
+    // The Part with the Focus shows the row of its cursor, however it was scrolled, and so does one that follows it the least.
+    if (shows !== undefined && !this.#places.paged(place, width)) end = Math.min(Math.max(end, shows.row + 1), shows.row + height)
     const start = Math.max(0, end - height)
     this.#shownFrom.set(place, start)
     if (cursor !== undefined && cursor.row >= start && cursor.row < end && cursor.column < width)

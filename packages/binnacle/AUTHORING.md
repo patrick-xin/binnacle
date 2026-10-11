@@ -11,6 +11,7 @@ binnacle's own features are plugins too, and they use only what this page says. 
 | `binnacle-transcript-view` | the transcript a person reads: prompts, answers and what the agent did | `src/plugins/transcript-view/index.ts` |
 | `binnacle-tool-cards` | each tool call and its result as one card, from the views dsh's tools give | `src/plugins/tool-cards/index.ts` |
 | `binnacle-composer` | what a person types, before it is sent | `src/plugins/composer/index.ts` |
+| `binnacle-commands` | the offer of dsh's commands while a person types `/` | `src/plugins/commands/index.ts` |
 | `binnacle-status-line` | whether the agent runs, and on which model | `src/plugins/status-line/index.ts` |
 | `binnacle-requests` | the approvals and the questions that stand, and the talk with dsh: a model that draws nothing | `src/plugins/requests/index.ts` |
 | `binnacle-requests-view` | the Requests' default view: a person answers an approval or a question | `src/plugins/requests-view/index.ts` |
@@ -114,7 +115,7 @@ const placed = ctx.binnacle.place('status.state', {
 - `key(data)` takes a key, as the terminal sent it, while the Place has the Focus. It returns `true` when it used the key.
 - `click(at)` takes a click on the Part's lines. `at` is `{ line, column }` in its own lines. It returns `true` when it used the click.
 - `focus(has)` says when the Place gets the Focus, or loses it.
-- `follow` says how the Place follows the cursor while it has the Focus. With `'end'`, the default, the Place shows its end, and a cursor above the rows shown is brought to the top row. With `'least'`, the Place keeps the rows it showed, and moves them only as far as the cursor's row needs. A List sets `'least'`.
+- `follow` says how the Place follows the cursor. With `'end'`, the default, the Place with the Focus shows its end, and a cursor above the rows shown is brought to the top row. With `'least'`, the Place keeps the rows it showed, and moves them only as far as the cursor's row needs. It does this with the Focus or without it. The terminal's cursor is drawn only in the Place with the Focus. A List sets `'least'`, so it keeps its mark in view while the person types in another Place.
 - The Handle has `redraw()`, `focus()`, which moves the Focus to the Part's Place, and `dispose()`, which takes the Part away.
 
 A Screen is a Layout that fills the terminal. The Chat is the first Screen, by the name `chat`, and its Layout is `CHAT_LAYOUT`.
@@ -825,6 +826,7 @@ The row `binnacle-composer` sets the Layout `composer`, which the Chat draws whi
   draft.set((state) => (state.text = ''))
   ```
 
+- Run `composer.send` right after you set `text`, and the draft that you set is sent.
 - Enter runs the action `composer.send`, and shift+enter runs `composer.newline`. Both act in `composer.input`. Bind them as any action, so ctrl+s sends and enter makes a new line:
 
   ```js
@@ -867,6 +869,76 @@ The row `binnacle-composer` sets the Layout `composer`, which the Chat draws whi
   ```js
   ctx.binnacle.look('composer.empty', () => () => ctx.binnacle.paint('dim', 'Ask anything'))
   ```
+
+## Commands
+
+The row `binnacle-commands` offers dsh's commands while a person types one. A draft that is `/` and a name opens the offer above the composer. The name can be empty. The offer shows the commands that match the name, each as `/<name>` with its description in `muted`.
+
+Up and down move the mark while the person types. Enter runs a command that takes no input, or puts `/<name> ` in the draft for its input. Tab puts `/<name> ` in the draft. Esc closes the offer and keeps the draft.
+
+The offer only offers: the composer runs a command line ([The composer](#the-composer)). So with the row off, a command typed in full still runs.
+
+The offer is the Layout `commands`. The row puts it in the Chat with this edit, so a Request that stands hides it with the composer:
+
+```js
+ctx.binnacle.edit('chat', { insert: { layout: 'commands', size: 'content', unless: 'request' }, before: 'composer' })
+```
+
+The Layout is `COMMANDS_LAYOUT`, from `binnacle/plugins/commands`, frozen: the List `commands.list`, at most 9 cells with its rule, so 8 rows:
+
+```js
+{ place: 'commands.list', size: { most: 9 }, border: ['top'] }
+```
+
+- The model `commands`, of the type `CommandsState`, holds `open`, whether the offer is open, and `query`, the name typed after the `/`. Its `items` are the commands whose names match `query` with `fuzzy`, read from dsh at each read, each `{ label, description, name, hint }` of the type `CommandItem`. `label` is `/<name>`, and `hint` is the command's input hint, or `undefined` when it takes no input. The row sets the model: read it, and change it through the actions.
+
+  ```js
+  const offer = ctx.binnacle.modelOf('commands')
+  offer.state.items.map((item) => item.name)
+  ```
+
+- The row opens the offer when the draft becomes `/` and a name, with nothing after it. It sets `query` to the name as the person types. It closes the offer when the draft stops being one. It acts only when the draft changes. So an offer closed with esc stays closed until the person types, and an offer that you open stays open until it is closed. While a command runs, the row closes the offer, and does not open it.
+- The offer opens, closes, picks and completes through four actions. Set one to change what it does, or to take it out:
+  - `commands.open`: the row runs it. It sets `open`, and a `query` of `''`.
+  - `commands.close`: esc, in `composer.input`, before the draft, while the offer draws a line. It clears `open`.
+  - `commands.pick`: enter, and a click on a command, through the List. It takes the marked command. With a `hint`, it sets the draft to `/<name> `. With none, it sets the draft to `/<name>`, and runs `composer.send`. Then it runs `commands.close`.
+  - `commands.complete`: tab, as esc. It sets the draft to `/<name> ` for the marked command, then runs `commands.close`.
+
+  This one takes the offer out, and a command typed in full still runs:
+
+  ```js
+  ctx.binnacle.action('commands.open', { run: () => {} })
+  ```
+
+- The List `commands.list` takes its keys in `composer.input` with `keysIn`, so up, down, page up and page down move its mark while the person types. Its Model, `{ mark }`, and its actions, `commands.list.up` and the rest, are named apart from the model `commands` and its actions. Its mark goes back to the first command when `query` changes.
+- A command is drawn by the Look `commands.list.row`, then `list.row`, of the type `CommandRow`. It is given the item with its `name` and `hint`:
+
+  ```js
+  ctx.binnacle.look('commands.list.row', (beneath) => (item, at) =>
+    item.hint === undefined ? beneath(item, at) : `${beneath(item, at)} ${ctx.binnacle.paint('dim', item.hint)}`,
+  )
+  ```
+
+- Move the offer with an edit of the Chat, such as above the transcript:
+
+  ```js
+  ctx.binnacle.edit('chat', { move: 'commands', before: 'transcript' })
+  ```
+
+  To float it over the transcript, set the Layout `commands` to draw nothing, and draw `COMMANDS_LAYOUT` under a name of your own:
+
+  ```js
+  import { COMMANDS_LAYOUT } from 'binnacle/plugins/commands'
+  ctx.binnacle.layout('commands', { column: [] })
+  ctx.binnacle.layout('offer', { ...COMMANDS_LAYOUT, border: true })
+  ctx.binnacle.edit('chat', {
+    replace: 'transcript',
+    with: { over: { place: 'transcript' }, float: { layout: 'offer' }, at: { side: 'center' } },
+  })
+  ```
+
+- A command that a plugin registers with dsh's `ctx.commands.register` is offered and runs as dsh's own. Its handler can show a Screen of its own with `binnacle.show`, and the Handle's `dispose` goes back to the Chat.
+- On a stored session, or before the session opens, nothing is offered: there is no agent to list the commands for.
 
 ## The status line
 
