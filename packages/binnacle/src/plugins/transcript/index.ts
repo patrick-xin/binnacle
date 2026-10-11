@@ -26,17 +26,32 @@ export interface TranscriptState {
   events: readonly SessionEvent[]
   /** The blocks of the answer that streams, in the answer's order, or `undefined` while none streams. */
   live: readonly LiveBlock[] | undefined
-  /** The seqs of the folded events. */
-  folded: number[]
+  /** The folded regions: an event's own, its seq as a string such as `'12'`, or a part of it, such as `'12/body'`. */
+  folded: string[]
   /** The seq of the Marked event. */
   marked: number | undefined
 }
 
+/**
+ * A line that a transcript Look returns: a string, or its `text` with what a click on it does.
+ * A click on a line with `fold` folds that region, and on a line with `run` runs that action, given the cell clicked. A line with both runs its action.
+ */
+export type Line = string | { readonly text: string; readonly fold?: string; readonly run?: string }
+
+/** What an event's Look is given beside the event. */
+export interface EventAt {
+  /** Whether the event's own region is folded. */
+  readonly folded: boolean
+  /** Whether a region is folded, such as `'12/body'`. */
+  readonly isFolded: (region: string) => boolean
+  readonly width: number
+}
+
 /** The Look `transcript.event.<type>`, beneath it `transcript.event`: an event's lines, given whether it is folded and the transcript's width. No line, and the event takes no row. */
-export type EventLook = (event: SessionEvent, at: { folded: boolean; width: number }) => string[]
+export type EventLook = (event: SessionEvent, at: EventAt) => Line[]
 
 /** The Look `transcript.live`: the lines of the answer that streams, given its blocks and the transcript's width. */
-export type LiveLook = (blocks: readonly LiveBlock[], width: number) => string[]
+export type LiveLook = (blocks: readonly LiveBlock[], width: number) => Line[]
 
 type Glued = { -readonly [key in keyof LiveBlock]: LiveBlock[key] }
 
@@ -65,15 +80,24 @@ function markedIn(drawing: readonly number[], marked: number | undefined): numbe
   return drawing.find((seq) => seq >= marked) ?? drawing.findLast((seq) => seq < marked)
 }
 
+type Acting = Exclude<Line, string>
+
 interface Drawn {
   readonly width: number
   readonly lines: readonly string[]
   /** The seqs of the events that draw, in order. */
   readonly drawing: readonly number[]
   readonly firstOf: ReadonlyMap<number, number>
-  readonly seqAt: ReadonlyMap<number, number>
+  /** The seq of the event that drew each line, by its index; none for the live block's. */
+  readonly ownerAt: ReadonlyMap<number, number>
+  /** What a click does on each line that says, by its index. */
+  readonly actingAt: ReadonlyMap<number, Acting>
+  /** The first region that each event marks on a line it draws. */
+  readonly firstFoldOf: ReadonlyMap<number, string>
   readonly mark: number | undefined
 }
+
+const regionOf = (seq: number): string => String(seq)
 
 export function apply(plugin: Context): void {
   // The session opens after dsh's plugins settle; a plugin that waited for it at load would be reported as never active.
@@ -119,32 +143,54 @@ export function apply(plugin: Context): void {
       const lines: string[] = []
       const drawing: number[] = []
       const firstOf = new Map<number, number>()
-      const seqAt = new Map<number, number>()
+      const ownerAt = new Map<number, number>()
+      const actingAt = new Map<number, Acting>()
+      const firstFoldOf = new Map<number, string>()
+      const isFolded = (region: string): boolean => folded.includes(region)
+      const push = (own: readonly Line[], seq: number | undefined): void => {
+        for (const line of own) {
+          if (seq !== undefined) ownerAt.set(lines.length, seq)
+          if (typeof line === 'string') {
+            lines.push(line)
+            continue
+          }
+          if (line.fold !== undefined && seq !== undefined && !firstFoldOf.has(seq)) firstFoldOf.set(seq, line.fold)
+          actingAt.set(lines.length, line)
+          lines.push(line.text)
+        }
+      }
       for (const event of shown) {
         const look = binnacle.lookOf<EventLook>([`transcript.event.${event.type}`, 'transcript.event'], eventLines)
-        const own = look(event, { folded: folded.includes(event.seq), width })
+        const own = look(event, { folded: isFolded(regionOf(event.seq)), isFolded, width })
         if (own.length === 0) continue
         drawing.push(event.seq)
         firstOf.set(event.seq, lines.length)
-        seqAt.set(lines.length, event.seq)
-        lines.push(...own)
+        push(own, event.seq)
       }
       const mark = markedIn(drawing, marked)
       const at = mark === undefined ? undefined : firstOf.get(mark)
       if (hasFocus && at !== undefined) lines[at] = inverse(lines[at] ?? '')
-      if (blocks !== undefined) lines.push(...binnacle.lookOf<LiveLook>(['transcript.live'], liveLinesOf)(blocks, width))
-      drawn = { width, lines, drawing, firstOf, seqAt, mark }
+      if (blocks !== undefined) push(binnacle.lookOf<LiveLook>(['transcript.live'], liveLinesOf)(blocks, width), undefined)
+      drawn = { width, lines, drawing, firstOf, ownerAt, actingAt, firstFoldOf, mark }
       return drawn
     }
     const again = (): Drawn => draw(drawn?.width ?? 0)
 
     const mark = (seq: number): void => model.set((state) => (state.marked = seq))
-    const fold = (seq: number): void =>
+    const fold = (region: string): void =>
       model.set((state) => {
-        const at = state.folded.indexOf(seq)
-        if (at === -1) state.folded.push(seq)
+        const at = state.folded.indexOf(region)
+        if (at === -1) state.folded.push(region)
         else state.folded.splice(at, 1)
       })
+    // A plain first line folds its event so that a Look that returns strings folds as it did before lines could act; another plain line folds nothing.
+    const regionAt = (line: number): string | undefined => {
+      const { actingAt, ownerAt, firstOf } = drawn ?? again()
+      const acting = actingAt.get(line)
+      if (acting !== undefined) return acting.fold
+      const seq = ownerAt.get(line)
+      return seq !== undefined && firstOf.get(seq) === line ? regionOf(seq) : undefined
+    }
     // Up and down move from where the Mark is drawn, among the events that draw.
     const step = (by: -1 | 1): void => {
       const { drawing, mark: at } = again()
@@ -168,22 +214,29 @@ export function apply(plugin: Context): void {
     binnacle.action('transcript.fold', {
       keys: gestureTable.getKeys('tui.select.confirm'),
       place: PLACE,
-      description: 'Fold or unfold the Marked event',
-      run: () => {
+      description: 'Fold or unfold the Marked event, or the region of the line clicked',
+      run: (at) => {
+        if (at !== undefined) {
+          const region = regionAt(at.line)
+          if (region !== undefined) fold(region)
+          return
+        }
         // The event where the Mark is drawn, which a person sees Marked.
-        const { mark: at } = again()
-        if (at !== undefined) fold(at)
+        const { mark: seq, firstFoldOf } = again()
+        if (seq !== undefined) fold(firstFoldOf.get(seq) ?? regionOf(seq))
       },
     })
     binnacle.action('transcript.click', {
       keys: ['click'],
       place: PLACE,
-      description: 'Fold or unfold the event whose header is clicked, and Mark it',
+      description: 'Mark the event clicked, then run the action of the line clicked, or else fold what it marks',
       run: (at) => {
-        const seq = at === undefined ? undefined : (drawn ?? again()).seqAt.get(at.line)
-        if (seq === undefined) return
-        mark(seq)
-        fold(seq)
+        if (at === undefined) return
+        const { ownerAt, actingAt } = drawn ?? again()
+        const seq = ownerAt.get(at.line)
+        const run = actingAt.get(at.line)?.run
+        if (seq !== undefined) mark(seq)
+        binnacle.run(run ?? 'transcript.fold', at)
       },
     })
 

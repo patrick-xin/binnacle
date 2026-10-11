@@ -14,6 +14,7 @@ import {
   withoutReasoning,
 } from '../../src/plugins/transcript/index.ts'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { Point } from '../../src/api.ts'
 import { gestureTable } from '../../src/core/gestures.ts'
 import { mount } from '../support/mount.ts'
 import { persistence } from '../support/sessions.ts'
@@ -412,7 +413,7 @@ test("the transcript's state is the model transcript: its events, the live block
       { kind: 'text', text: 'Hi' },
       { kind: 'tool-call', text: '{}', name: 'read' },
     ],
-    folded: [0],
+    folded: ['0'],
     marked: 0,
   })
   dsh.stream(ctx, {
@@ -431,7 +432,7 @@ test('an author who sets folded folds and unfolds an event, and one who sets mar
   dsh.commit(ctx, { seq: 0, type: 'test/one', time: 1, data: {} })
   dsh.commit(ctx, { seq: 1, type: 'test/two', time: 2, data: {} })
   stateOf(ctx).set((state) => {
-    state.folded.push(0)
+    state.folded.push('0')
     state.marked = 0
   })
   assert.deepEqual((await terminal.read()).rows.slice(0, 4), ['▸ #0 test/one (1 lines)', '', '▾ #1 test/two', '{}'])
@@ -447,8 +448,8 @@ test('an author who watches the model and pushes each tool result onto folded ha
   const model = stateOf(ctx)
   model.watch(() => {
     const state = model.state!
-    const fresh = state.events.filter((event) => event.type === 'tool/result' && !state.folded.includes(event.seq))
-    if (fresh.length > 0) model.set((each) => each.folded.push(...fresh.map((event) => event.seq)))
+    const fresh = state.events.filter((event) => event.type === 'tool/result' && !state.folded.includes(String(event.seq)))
+    if (fresh.length > 0) model.set((each) => each.folded.push(...fresh.map((event) => String(event.seq))))
   })
   dsh.commit(ctx, { seq: 0, type: 'tool/result', time: 1, data: { ok: true } })
   dsh.commit(ctx, { seq: 1, type: 'turn/start', time: 2, data: {} })
@@ -589,7 +590,7 @@ test('the Look transcript.event lies beneath each transcript.event.<type>, and i
   ])
   ctx.binnacle.look<EventLook>(
     'transcript.event.user/message',
-    (beneath) => (event, at) => beneath(event, at).map((line) => line.toUpperCase()),
+    (beneath) => (event, at) => beneath(event, at).map((line) => (typeof line === 'string' ? line.toUpperCase() : line)),
   )
   assert.deepEqual((await terminal.read()).rows.slice(0, 7), ['- USER/MESSAGE', '{', '  "TEXT": "HELLO"', '}', '', '- test/marker', '{}'])
   terminal.type(ENTER)
@@ -626,7 +627,7 @@ test('a click on the first line of an event that a Look draws lands on that even
   await terminal.read()
   terminal.type(clickAt(0, 6))
   await terminal.read()
-  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [2, [2]])
+  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [2, ['2']])
 })
 
 test('an event whose Look draws no line takes no row, and up and down pass over it', async () => {
@@ -675,7 +676,7 @@ test('up, down and enter act from where the Mark is drawn, and set marked to the
   stateOf(ctx).set((state) => (state.marked = 1))
   terminal.type(ENTER)
   await terminal.read()
-  assert.deepEqual([stateOf(ctx).state?.folded, stateOf(ctx).state?.marked], [[2], 1])
+  assert.deepEqual([stateOf(ctx).state?.folded, stateOf(ctx).state?.marked], [['2'], 1])
   terminal.type(UP)
   await terminal.read()
   assert.equal(stateOf(ctx).state?.marked, 0)
@@ -929,4 +930,130 @@ test("an author draws the person's prompts with isPrompt and textOf, and leaves 
   )
   ctx.binnacle.look<EventLook>('transcript.event.assistant/message', () => (event) => [textOf(event)])
   assert.deepEqual((await terminal.read()).rows, ['> fix the bug', '▾ #1 user/message', 'Done.', ''])
+})
+
+async function clicking(sessions: readonly Stored[], rows = 10) {
+  const store = persistence(sessions)
+  const mounted = await mount({
+    args: ['--session', 'session-stored'],
+    columns: 40,
+    rows,
+    provide: (each) => each.provide('sessionPersistence', store),
+  })
+  mounted.ready()
+  await mounted.ctx.plugin(transcript)
+  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
+  await settled()
+  return mounted
+}
+
+const bodied = (ctx: Context) =>
+  ctx.binnacle.look<EventLook>('transcript.event', () => (event, { isFolded }) => {
+    const body = `${event.seq}/body`
+    return [`#${event.seq}`, { text: isFolded(body) ? '[+]' : '[-]', fold: body }, ...(isFolded(body) ? [] : ['body'])]
+  })
+
+test('a line that a Look returns as { text, fold } draws its text, and a click on it folds its region, which the Look reads with isFolded', async () => {
+  const { ctx, terminal } = await clicking([three])
+  bodied(ctx)
+  assert.deepEqual((await terminal.read()).rows.slice(0, 6), ['#0', '[-]', 'body', '#1', '[-]', 'body'])
+  terminal.type(clickAt(1, 1))
+  assert.deepEqual((await terminal.read()).rows.slice(0, 5), ['#0', '[+]', '#1', '[-]', 'body'])
+  assert.deepEqual([stateOf(ctx).state?.folded, stateOf(ctx).state?.marked], [['0/body'], 0])
+  terminal.type(clickAt(1, 1))
+  assert.deepEqual((await terminal.read()).rows.slice(0, 3), ['#0', '[-]', 'body'])
+})
+
+test('a click on a line marked run runs its action, given the cell clicked, and Marks its event', async () => {
+  const { ctx, terminal } = await clicking([three])
+  const ran: (Point | undefined)[] = []
+  ctx.binnacle.action('my.action', { run: (at) => ran.push(at) })
+  ctx.binnacle.look<EventLook>('transcript.event', () => (event) => [`#${event.seq}`, { text: '[x]', run: 'my.action' }])
+  await terminal.read()
+  terminal.type(clickAt(2, 3))
+  await terminal.read()
+  assert.deepEqual([ran, stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [[{ line: 3, column: 2 }], 1, []])
+})
+
+test('a click on a line marked both fold and run runs its action, and folds nothing', async () => {
+  const { ctx, terminal } = await clicking([three])
+  const ran: (number | undefined)[] = []
+  ctx.binnacle.action('my.action', { run: (at) => ran.push(at?.line) })
+  ctx.binnacle.look<EventLook>('transcript.event', () => (event) => [
+    `#${event.seq}`,
+    { text: '[x]', fold: `${event.seq}/body`, run: 'my.action' },
+  ])
+  await terminal.read()
+  terminal.type(clickAt(0, 1))
+  await terminal.read()
+  assert.deepEqual([ran, stateOf(ctx).state?.folded], [[1], []])
+})
+
+test("a click on a plain line that is not its event's first Marks its event, and folds nothing", async () => {
+  const { ctx, terminal } = await clicking([three])
+  bodied(ctx)
+  await terminal.read()
+  terminal.type(clickAt(0, 2))
+  await terminal.read()
+  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [0, []])
+})
+
+test("enter folds the Marked event's first region marked fold on a line it draws, else the event's own region", async () => {
+  const { ctx, terminal } = await reading([three], ['--session', 'session-stored'], 9)
+  ctx.binnacle.look<EventLook>('transcript.event.test/three', () => (event, { isFolded }) => [
+    `#${event.seq}`,
+    { text: 'x', run: 'my.action' },
+    { text: isFolded('2/a') ? 'a+' : 'a-', fold: '2/a' },
+    { text: 'b', fold: '2/b' },
+  ])
+  terminal.type(ENTER)
+  await terminal.read()
+  assert.deepEqual(stateOf(ctx).state?.folded, ['2/a'])
+  terminal.type(UP)
+  terminal.type(ENTER)
+  await terminal.read()
+  assert.deepEqual(stateOf(ctx).state?.folded, ['2/a', '1'])
+})
+
+test('an empty transcript.fold stops every fold, by key and by click', async () => {
+  const { ctx, terminal } = await clicking([three])
+  bodied(ctx)
+  ctx.binnacle.action('transcript.fold', { run: () => {} })
+  const rows = (await terminal.read()).rows
+  terminal.type(ENTER)
+  terminal.type(clickAt(1, 1))
+  terminal.type(clickAt(0, 0))
+  assert.deepEqual([(await terminal.read()).rows, stateOf(ctx).state?.folded], [rows, []])
+})
+
+test("transcript.fold given a cell folds the region of a fold line there, the event's own region on its plain first line, and nothing on another line", async () => {
+  const { ctx, terminal } = await clicking([three])
+  bodied(ctx)
+  await terminal.read()
+  ctx.binnacle.run('transcript.fold', { line: 4, column: 0 })
+  ctx.binnacle.run('transcript.fold', { line: 0, column: 0 })
+  ctx.binnacle.run('transcript.fold', { line: 2, column: 0 })
+  await terminal.read()
+  assert.deepEqual(stateOf(ctx).state?.folded, ['1/body', '0'])
+})
+
+test('an event that draws no line keeps its regions folded', async () => {
+  const { ctx, terminal } = await reading([three], ['--session', 'session-stored'], 9)
+  stateOf(ctx).set((state) => state.folded.push('1', '1/body'))
+  const hidden = ctx.binnacle.look<EventLook>('transcript.event.test/two', () => () => [])
+  await terminal.read()
+  hidden.dispose()
+  assert.deepEqual([stateOf(ctx).state?.folded, (await terminal.read()).rows.slice(3, 4)], [['1', '1/body'], ['▸ #1 test/two (1 lines)']])
+})
+
+test('a click on a line of the answer that streams marked run runs its action, and Marks no event', async () => {
+  const { ctx, dsh, terminal } = await talking(4)
+  const ran: (number | undefined)[] = []
+  ctx.binnacle.action('my.stop', { run: (at) => ran.push(at?.line) })
+  ctx.binnacle.look<LiveLook>('transcript.live', () => () => ['streaming', { text: '[stop]', run: 'my.stop' }])
+  dsh.stream(ctx, { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 })
+  assert.deepEqual((await terminal.read()).rows, ['streaming', '[stop]', '', ''])
+  terminal.type(clickAt(1, 1))
+  await terminal.read()
+  assert.deepEqual([ran, stateOf(ctx).state?.marked], [[1], undefined])
 })
