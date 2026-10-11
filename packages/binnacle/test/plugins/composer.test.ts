@@ -10,14 +10,15 @@ import { persistence } from '../support/sessions.ts'
 async function chat(columns = 20, rows = 5, provide?: (ctx: Context) => void, args: string[] = []) {
   const mounted = await mount({ args, columns, rows, ...(provide === undefined ? {} : { provide }) })
   mounted.ready()
-  await mounted.ctx.plugin(composer)
+  const composerFiber = mounted.ctx.plugin(composer)
+  await composerFiber
   // The session opens after the core loads; let it settle.
   await new Promise((resolve) => setImmediate(resolve))
   const typed = async (...keys: string[]) => {
     for (const key of keys) mounted.terminal.type(key)
     return (await mounted.terminal.read()).rows
   }
-  return { ...mounted, typed }
+  return { ...mounted, composerFiber, typed }
 }
 
 const RULE = '─'.repeat(20)
@@ -349,4 +350,131 @@ test('a draft taller than the 7 rows shown tells the rows hidden above and below
       [RULE, 'l0', 'l1', 'l2', 'l3', 'l4', 'l5', '↓ 4 more', RULE],
     ],
   )
+})
+
+type Execution = { commandId: string; result: { kind: 'success' | 'error'; text?: string } } | undefined
+
+const success = (text?: string): Execution => ({ commandId: 'cmd-1', result: { kind: 'success', ...(text === undefined ? {} : { text }) } })
+const failure = (text: string): Execution => ({ commandId: 'cmd-1', result: { kind: 'error', text } })
+
+// dsh's command registry, as dsh-base provides it: each line it is given waits until the test settles it.
+function registry() {
+  const ran: { agent: unknown; line: string; attachments: readonly unknown[]; signal: AbortSignal }[] = []
+  const pending: { resolve: (execution: Execution) => void; reject: (error: unknown) => void }[] = []
+  const service = {
+    list: () => [],
+    find: () => undefined,
+    execute: (agent: unknown, line: string, attachments: readonly unknown[], signal: AbortSignal) => {
+      ran.push({ agent, line, attachments, signal })
+      return new Promise<Execution>((resolve, reject) => pending.push({ resolve, reject }))
+    },
+  }
+  const settle = async (execution: Execution | Error) => {
+    const next = pending.shift()
+    if (execution instanceof Error) next?.reject(execution)
+    else next?.resolve(execution)
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+  return { ran, service, settle, provide: (ctx: Context) => ctx.provide('commands' as never, service as never) }
+}
+
+async function commanding(rows = 5) {
+  const dsh = agents()
+  const commands = registry()
+  const mounted = await chat(20, rows, (ctx) => {
+    dsh.provide(ctx)
+    commands.provide(ctx)
+  })
+  return { ...mounted, dsh, commands }
+}
+
+test("enter on a command line gives it to dsh's commands with the Chat's agent, with only the composer's row on, and the model sees no prompt; a success clears the draft and keeps it in the history", async () => {
+  const { typed, dsh, commands } = await commanding()
+  await typed(...'/compact', '\r')
+  await commands.settle(success('compacted'))
+  const afterRun = await typed()
+  assert.deepEqual(
+    [commands.ran.map(({ agent, line, attachments }) => ({ agent, line, attachments })), dsh.sent, afterRun, await typed('\x1b[A')],
+    [[{ agent: dsh.agent, line: '/compact', attachments: [] }], [], ['', '', RULE, ' ', RULE], ['', '', RULE, '/compact', RULE]],
+  )
+})
+
+test('a command that fails, by its result or by a handler that throws, keeps the draft', async () => {
+  const { typed, commands } = await commanding()
+  await typed(...'/goal x', '\r')
+  await commands.settle(failure('no goal'))
+  const afterError = await typed()
+  await typed('\r')
+  await commands.settle(new Error('the handler threw'))
+  assert.deepEqual(
+    [afterError, await typed()],
+    [
+      ['', '', RULE, '/goal x ', RULE],
+      ['', '', RULE, '/goal x ', RULE],
+    ],
+  )
+})
+
+test("a line whose name is no command is sent as a prompt, as a skill's /name is, and so is a line that is not a slash and a letter, which dsh's commands never see", async () => {
+  const { typed, dsh, commands } = await commanding()
+  await typed(...'/review it', '\r')
+  await commands.settle(undefined)
+  await typed(...'/ 1', '\r', ...'/2', '\r')
+  assert.deepEqual(
+    [commands.ran.map(({ line }) => line), dsh.sent.map(({ text }) => text), await typed()],
+    [['/review it'], ['/review it', '/ 1', '/2'], ['', '', RULE, ' ', RULE]],
+  )
+})
+
+test('with no command registry, a command line is sent as a prompt', async () => {
+  const dsh = agents()
+  const { typed } = await chat(20, 5, dsh.provide)
+  await typed(...'/compact', '\r')
+  assert.deepEqual(dsh.sent, [{ how: 'followup', text: '/compact' }])
+})
+
+test('while a command runs, the model composer is running, and enter sends nothing', async () => {
+  const { ctx, typed, dsh, commands } = await commanding()
+  const model = () => draftOf(ctx).state?.running
+  const before = model()
+  await typed(...'/compact', '\r')
+  const whileRunning = model()
+  await typed('\r')
+  const ranWhileRunning = commands.ran.length
+  await commands.settle(success())
+  assert.deepEqual([before, whileRunning, ranWhileRunning, dsh.sent, model()], [false, true, 1, [], false])
+})
+
+test('a draft edited while its command ran stays at a success, and the line that ran goes into the history', async () => {
+  const { typed, commands } = await commanding()
+  await typed(...'/compact ', '\r', 'x')
+  await commands.settle(success())
+  const afterRun = await typed()
+  await typed('\x03')
+  assert.deepEqual(
+    [commands.ran.map(({ line }) => line), afterRun, await typed('\x1b[A')],
+    [['/compact'], ['', '', RULE, '/compact x ', RULE], ['', '', RULE, '/compact', RULE]],
+  )
+})
+
+test('the signal of a command that runs aborts when the core unloads', async () => {
+  const { fiber, typed, commands } = await commanding()
+  await typed(...'/compact', '\r')
+  const before = commands.ran[0]?.signal.aborted
+  await fiber.dispose()
+  assert.deepEqual([before, commands.ran[0]?.signal.aborted], [false, true])
+})
+
+async function settledLate(settlement: Execution | Error) {
+  const { ctx, composerFiber, typed, dsh, commands } = await commanding()
+  await typed(...'/compact', '\r')
+  const state = draftOf(ctx).state
+  await composerFiber.dispose()
+  await commands.settle(settlement)
+  return { state, sent: dsh.sent }
+}
+
+test('a composer that unloads before its command settles is changed by nothing, whether the command succeeds or throws', async () => {
+  const unchanged = { state: { text: '/compact', running: true }, sent: [] }
+  assert.deepEqual([await settledLate(success()), await settledLate(new Error('the handler threw'))], [unchanged, unchanged])
 })
