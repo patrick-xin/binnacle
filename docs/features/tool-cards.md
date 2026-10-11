@@ -1,0 +1,43 @@
+# Tool cards
+
+Row `binnacle-tool-cards` · Code `binnacle:packages/binnacle/src/plugins/tool-cards/index.ts#apply` · Intent: [Authoring](../../intents/authoring/intent.md)
+
+## What a person can do
+
+- See each tool call and its result as one card, where the call is in the transcript, with the row `binnacle-tool-cards` on, as binnacle ships it: its first line, its body, then a blank line.
+- Read on a card's first line `⏺ ` and the tool's title, as dsh's view of the call gives it, or the tool's name, cut at the width. The `⏺` is in the `accent` Tone while the call runs, `success` when it is done, and `error` when it failed. A card that is done ends its first line with how long the call took, in the `muted` Tone: ` · 1.2s` under a minute, ` · 1:15` after.
+- Read a card's body, each line after `  ⎿ ` for the first and `    ` for the rest, as the result's card kind says:
+  - a shell command's last 12 lines of output, after `… <n> earlier lines` when there are more, and `exit <code>` or `signal <name>` in the `error` Tone when it did not exit with 0;
+  - a diff's line for each file, `<path> +<added> -<removed>`, the counts in the `success` and `error` Tones;
+  - a search's `<n> matches` or `<n> paths`, and ` (truncated)` in the `warning` Tone when dsh cut it;
+  - a read's `<n> lines of <total>`;
+  - a web retrieval's title, then the first 12 lines of its text;
+  - any other tool's title, when its view has one, then the first 12 lines of its text.
+- While a call runs, read what it does: a shell command's description and working directory, a diff's line for each file, or the call's input as one line. A card with no body draws its first line alone.
+- Fold a card's body with enter on the Marked card, or a click on its first line: the card draws its first line alone, which ends with `(<n> lines)`. Again, and it unfolds. The Mark moves between cards as between events.
+- Read a stored session's cards the same way, with the times the calls took. A call that never got a result draws no time.
+- Watch the call that streams as the view draws it, `⏺ <tool>(<the arguments so far>)`. Its card takes its place once it commits.
+- Turn the row `binnacle-tool-cards` off, and read a call and its result as two lines again, as [Transcript](transcript.md) draws them.
+
+## What an author can change
+
+- A whole card: the Look `transcript.card`, a `CardLook` from `binnacle/plugins/tool-cards`, given the `Card` and `{ width, isFolded }`. A `Card` holds the call's `seq`, its `name`, its `args`, parsed, or the raw string when they are not JSON, dsh's `call` view, its `result`, `{ view, text, failed }`, once it came, and `startedAt` and `endedAt`, in epoch milliseconds. Such as a card in a box, drawn with `frame` from `binnacle`.
+- A piece of every card: `transcript.card.title`, given the card and the width left beside the time, returns the first line's text without the time; `transcript.card.time`, given the card, returns the time's text, or `''` for none. Such as no card that shows a time, or a running time counted from the model `clock`.
+- One card kind's body: `transcript.card.<kind>`, such as `transcript.card.terminal`, given the card and the body's width, returns the body's lines without the `⎿` prefix. Such as a shell command's last 3 lines, not 12.
+- One tool's body: `transcript.tool.<name>`, such as `transcript.tool.grep`, which lies on its card kind's Look.
+- What folds a card: the card's first line is `{ text, fold: '<seq>/body' }`, so a `transcript.card` that marks another line, or none, moves or takes out the trigger ([Transcript](transcript.md)).
+
+## How it is built
+
+- **A row of its own**, as the view lies on the raw transcript. `binnacle-tool-cards` lays its Looks over the view's: on `transcript.event.tool/call`, to draw the card, and on `transcript.event.tool/result`, to draw nothing when its call is in the session's events, and `beneath` when it is not. It loads after `binnacle-transcript-view` in the bundle's patch, so that its Looks are the newer of the two built-ins'.
+- **The card's data.** The row finds a call's result by its `callId`, as the result's `message.toolCallId`, in the model `transcript`'s `events`. It indexes the events once, and then only the events that came since, as they only grow until an author replaces them. It asks dsh's tools service, `ctx.tools.get(name, agent)`, for the tool, with the Chat's agent, or with none on a stored session, and gets the views from the tool's `presentCall(args)` and `presentResult(args, { content, isError, meta })`. A presenter that throws, a tool the service does not know, and arguments that are not JSON give no view. A view is kept for its event while the tool is the same, as a presenter is pure. `startedAt` and `endedAt` are the call's and the result's events' `time`.
+- **The body's kind** is the result view's `card` once the result came, else the call view's, else `generic`. So the result chooses, whatever the call's was. The body draws through `transcript.tool.<name>`, beneath it `transcript.card.<kind>`, and at the end the kind's default.
+- **The kinds' defaults** make each text plain and cut each line at the body's width. The `generic` default draws a result's title and its content's text blocks, else the result's text, so a result with no view draws its text. While a call runs, it draws the call view's `rawInput` as compact JSON, or the raw arguments when there is no call view. A kind's default given a view of another kind draws as `generic`.
+- **A diff's counts** compare the lines of `oldText` and `newText`, split at each line break with a last empty line dropped: `added` counts the new lines that are not among the old, `removed` the old lines that are not among the new. A `null` `oldText`, a new file, counts every new line added. Two diffs of one path are two lines.
+- **The fold** is of the body's region, `'<seq>/body'`, on the card's first line. Folded, the card draws its first line alone, ending with `(<n> lines)`, the body's lines before the core wraps them. A card with no body has nothing to fold, and its first line is a plain string, so a click on it folds the event's own region, which draws the same card.
+- **The default reads no clock**, so nothing ticks while no author asks for a running time.
+- **The call that streams** stays the view's `transcript.live`, and approvals stay the Requests'.
+
+## Built by
+
+Spec [#269](https://github.com/patrick-xin/binnacle/issues/269) · Ticket [#274](https://github.com/patrick-xin/binnacle/issues/274): each call and its result as one card, from dsh's views.

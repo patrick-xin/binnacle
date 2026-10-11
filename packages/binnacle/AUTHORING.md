@@ -9,6 +9,7 @@ binnacle's own features are plugins too, and they use only what this page says. 
 | `binnacle` | the core: the terminal, Layouts, Places, the Focus, gestures, and the Kit | `src/index.ts`, `src/core/`, `src/kit/` |
 | `binnacle-transcript` | the session's events | `src/plugins/transcript/index.ts` |
 | `binnacle-transcript-view` | the transcript a person reads: prompts, answers and what the agent did | `src/plugins/transcript-view/index.ts` |
+| `binnacle-tool-cards` | each tool call and its result as one card, from the views dsh's tools give | `src/plugins/tool-cards/index.ts` |
 | `binnacle-composer` | what a person types, before it is sent | `src/plugins/composer/index.ts` |
 | `binnacle-status-line` | whether the agent runs, and on which model | `src/plugins/status-line/index.ts` |
 | `binnacle-requests` | the approvals and the questions that stand, and the talk with dsh: a model that draws nothing | `src/plugins/requests/index.ts` |
@@ -724,6 +725,54 @@ The row `binnacle-transcript-view` draws the transcript a person reads. A prompt
 
 - The type's Look joins its pieces' lines. A folded event with more than one line draws its first line, then `… <n> more lines` in the `muted` Tone. Then a prompt, an answer and a tool result end with a blank line. A context, a call and a notice do not, so a call and its result stand together. Set `transcript.event.<type>` to space or fold an event your own way.
 - The answer that streams draws through the same pieces: its reasoning, then its text, then a blank line, then each tool call with its arguments so far.
+
+### Tool cards
+
+The row `binnacle-tool-cards` draws each tool call and its result as one card, where the call is: `⏺ ` and the tool's title, its body, then a blank line. The `⏺` is in the `accent` Tone while the call runs, `success` when it is done, and `error` when it failed, and a card that is done ends its first line with how long the call took, such as ` · 1.2s`, in the `muted` Tone. The body comes from dsh's views of the call and its result, which each tool gives with its `presentCall` and `presentResult`: a shell command's last 12 lines, a diff's counts for each file, a search's matches, or a read's lines. Turn the row off, and a call and its result draw as two lines again, as [The transcript's view](#the-transcripts-view) says.
+
+- It sets `transcript.event.tool/call` to draw the card, and `transcript.event.tool/result` to draw nothing when its call is in the session, and `beneath` when it is not.
+- A card draws through the Look `transcript.card`, of the type `CardLook` from `binnacle/plugins/tool-cards`: `(card, { width, isFolded }) => Line[]`. It is given a `Card`:
+  - `seq`: the seq of the call's event.
+  - `name`: the tool's name.
+  - `args`: the call's arguments, parsed, or the raw string when they are not JSON.
+  - `call`: dsh's view of the call, a `ToolCallView`, or `undefined` when the tool gives none. Its `card` is `terminal`, `diff` or `generic`.
+  - `result`: `{ view, text, failed }` once the result came, else `undefined`. `view` is dsh's view of the result, a `ToolResultView`, or `undefined`. Its `card` is `terminal`, `diff`, `search`, `read`, `web` or `generic`.
+  - `startedAt` and `endedAt`: the times of the call's and the result's events, in epoch milliseconds. `endedAt` is `undefined` while the call runs.
+
+  Text in `call` and `result` is Untrusted Text: make it plain before you draw it. This draws each card in a box, with `frame`:
+
+  ```js
+  import { frame, toPlainText } from 'binnacle'
+  ctx.binnacle.look('transcript.card', () => (card, { width }) =>
+    frame(ctx.binnacle, [toPlainText(card.result?.text ?? 'running')], width, { title: toPlainText(card.call?.title ?? card.name) }),
+  )
+  ```
+
+- The default card draws each of its pieces through a Look of its own:
+
+  | Look | Draws | Given | Type |
+  |---|---|---|---|
+  | `transcript.card.title` | the first line's text, without the time | the card, and the width left beside the time | `CardTitleLook` |
+  | `transcript.card.time` | how long the call took, or `''` for none | the card | `CardTimeLook` |
+  | `transcript.tool.<name>` | one tool's body, such as `transcript.tool.grep` | the card, and the body's width | `CardBodyLook` |
+  | `transcript.card.<kind>` | one card kind's body, beneath `transcript.tool.<name>`, such as `transcript.card.terminal` | the card, and the body's width | `CardBodyLook` |
+
+  The kind is the result view's `card` once the result came, else the call view's, else `generic`. A body's Look returns its lines without the `⎿` prefix, which the card adds. This draws a shell command's last 3 lines, and no time on any card:
+
+  ```js
+  ctx.binnacle.look('transcript.card.terminal', (beneath) => (card, width) => beneath(card, width).slice(-3))
+  ctx.binnacle.look('transcript.card.time', () => () => '')
+  ```
+
+- The default time reads no clock, so it shows nothing while the call runs. Name the model `clock` in the Look's `models` to count a running time, as [The clock](#the-clock) says:
+
+  ```js
+  const clock = ctx.binnacle.modelOf('clock')
+  ctx.binnacle.look('transcript.card.time', (beneath) => (card) =>
+    card.endedAt === undefined ? `${Math.floor((clock.state.now - card.startedAt) / 1000)}s` : beneath(card), { models: [clock] })
+  ```
+
+- The default card's first line is `{ text, fold: '<seq>/body' }`, so enter on the Marked card, or a click on its first line, folds its body, and the card draws its first line alone, ending with `(<n> lines)`. A card with no body has nothing to fold, and its first line is a string. Set `transcript.card` to put the fold on another line, as [The transcript](#the-transcript) says of a `Line`.
 
 ## The composer
 
