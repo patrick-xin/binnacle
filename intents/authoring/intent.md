@@ -44,7 +44,7 @@ Nothing yet is shared between features. Each one draws its own list of choices a
 
 1. Authoring is built one feature at a time: build the feature, try it as an author, refine it, then the next.
 2. A feature is done only when an author has tried it. That author knows only what any author gets from binnacle, and is from another family than the builder.
-3. Each feature's Intent holds a few changes that a person might ask for, written by the Maintainer. A trial makes at least one change of each kind, and the author also makes up some of its own.
+3. Each feature's Intent holds a few changes that a person might ask for, written by the Maintainer. A trial makes at least one change of each kind, and the author also makes up some of its own. At least one change takes something out entirely, such as no folding at all, as a person may not want what we did not think to ask about.
 4. A change that an author cannot make in a small change is a gap, and it is fixed before the feature is done.
 5. Every feature is made from the components and the theme. A feature that needs a piece they do not have adds that piece to them first, so the next feature can use it too.
 6. There is no way to share a change before 1.0. A change is a dsh bundle, and it is shared the way bundles are.
@@ -56,7 +56,11 @@ Each stage ends in something the Maintainer can try under dsh.
 
 1. **The first layers, and Requests made from them.** The theme, the components that Requests needs, and Requests built from those components. An author makes each of these changes small: space selects a choice where more than one can be chosen; tabs, or a click on a header, move between questions; a preview of every answer shows before they are sent; clicks do nothing; a Request draws as a dialog; a Request draws on the side.
 2. **The features built so far.** The core, gestures, the transcript, the composer and the status line are each tried by an author, and refined. The product's next stage is built the same way after this.
-3. **Asking inside binnacle.** A person picks an author agent, asks for a change while the session runs, sees it take effect, and undoes it. A broken change does not stop the session.
+3. **The transcript a person reads, tool cards and commands.** Each is built from the kit, with the pieces it lacks added to the kit first, and tried by an author.
+   - **A readable transcript:** a person can tell what happens in the session, its prompts, answers and what the agent did, without reading dsh's data.
+   - **Tool cards:** each tool call draws as a card, with its result. An author moves where a card folds, shows how long a call took or has run, and takes out folding or the times entirely.
+   - **`/` commands:** typing `/` offers the commands, dsh's and binnacle's own. An author draws the offer as a dialog, adds a search line to it, and makes a command open a screen of its own, such as settings.
+4. **Asking inside binnacle.** A person picks an author agent with `/preset`, among dsh's presets and binnacle's, asks for a change while the session runs, sees it take effect, and undoes it. A broken change does not stop the session: a change that fails to load or draw is skipped and named, and a person can start with every change off. The author agent finds the authoring guide and the profile's files itself, and a person approves each change before it is turned on.
 
 ## Specs
 
