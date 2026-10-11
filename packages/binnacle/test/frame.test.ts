@@ -65,6 +65,38 @@ test('a frame narrower than 4 cells draws its lines without the box', async () =
   assert.deepEqual(unstyled(frame(binnacle, ['abcde'], 3, { title: 'T' })), ['abc', 'de'])
 })
 
+test('frame keeps each line’s fields beside its text on each row it wraps to, and gives strings for strings', async () => {
+  const { binnacle } = await booted()
+  const framed = frame(binnacle, ['one', { text: 'ab cd', fold: '3/body', run: 'my.action' }], 6)
+  assert.deepEqual(
+    framed.map((line) => (typeof line === 'string' ? typeof line : { ...line, text: unstyled([line.text])[0] })),
+    [
+      'string',
+      'string',
+      { text: '│ab  │', fold: '3/body', run: 'my.action', from: 1 },
+      { text: '│cd  │', fold: '3/body', run: 'my.action', from: 1 },
+      'string',
+    ],
+  )
+})
+
+test('frame moves a line’s from past the left edge on its first row, and each row after it acts from its first cell inside the edge', async () => {
+  const { binnacle } = await booted()
+  binnacle.theme({ edge: 'block' })
+  const froms = frame(binnacle, [{ text: 'ab cd', fold: 'x', from: 3 }], 6).map((line) =>
+    typeof line === 'string' ? undefined : line.from,
+  )
+  assert.deepEqual(froms, [undefined, 4, 1, undefined])
+})
+
+test('a frame narrower than 4 cells keeps each line’s fields on each row it wraps to', async () => {
+  const { binnacle } = await booted()
+  assert.deepEqual(frame(binnacle, [{ text: 'abcde', fold: 'x', from: 1 }], 3), [
+    { text: 'abc', fold: 'x', from: 1 },
+    { text: 'de', fold: 'x', from: 0 },
+  ])
+})
+
 test('rule draws the rule glyph across the width with the text in it, in the accent Tone', async () => {
   const { binnacle } = await booted()
   binnacle.theme({ glyphs: { rule: '=' } })

@@ -10,7 +10,7 @@ export type { LineComponent, LineOptions, LineRow, LineState, Typed } from './li
 export { tabs } from './tabs.ts'
 export type { TabAt, TabLook, TabsOptions } from './tabs.ts'
 export { frame, rule } from './frame.ts'
-export type { FrameOptions } from './frame.ts'
+export type { FrameOptions, Framed } from './frame.ts'
 export { wrap } from './wrap.ts'
 export type { WrapPrefixes } from './wrap.ts'
 export { markdown } from './markdown.ts'
