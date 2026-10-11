@@ -81,6 +81,7 @@ Stage 3:
 
 - [#260](https://github.com/patrick-xin/binnacle/issues/260) The transcript a person reads, made of pieces an author changes one at a time.
 - [#269](https://github.com/patrick-xin/binnacle/issues/269) Tool cards: each call and its result as a card from dsh's views, with folds an author moves and times an author shows or takes out.
+- [#287](https://github.com/patrick-xin/binnacle/issues/287) `/` commands: a command line runs as a command, and typing `/` offers the commands in a List an author moves, draws and takes out.
 
 ## Open questions
 
