@@ -92,9 +92,31 @@ test('an answer draws its reasoning in the dim Tone, then its text, then a blank
   assert.deepEqual([await style(0), await style(1)], [true, false])
 })
 
-test("an answer's text wraps at the width, as plain text until markdown comes", async () => {
-  const { drawn } = await reading([answer(0, [{ type: 'text', text: 'one two three four five six seven eight nine ten' }])], 6, 20)
-  assert.deepEqual((await drawn()).slice(0, 4), ['one two three four', 'five six seven eight', 'nine ten', ''])
+test("an answer's text draws as markdown, wrapped at the width, and a list item's lines that wrap start under its text", async () => {
+  const { drawn, terminal } = await reading(
+    [answer(0, [{ type: 'text', text: '## Fixed\nThe **parser** drops a `quote`.\n\n- one two three four five\n- six' }])],
+    9,
+    20,
+  )
+  assert.deepEqual((await drawn()).slice(0, 8), [
+    'Fixed',
+    '',
+    'The parser drops a',
+    'quote.',
+    '',
+    '• one two three four',
+    '  five',
+    '• six',
+  ])
+  const styles = await Promise.all([terminal.styleAt(0, 0), terminal.styleAt(4, 2), terminal.styleAt(0, 3)])
+  assert.deepEqual(
+    styles.map(({ colour, bold }) => [colour, bold]),
+    [
+      [CYAN, true],
+      ['default', true],
+      [YELLOW, false],
+    ],
+  )
 })
 
 test('an answer with no text and no reasoning, such as one that only calls tools, draws nothing and takes no row', async () => {
@@ -222,6 +244,14 @@ test('the answer that streams draws its reasoning, its text, a blank line, then 
   dsh.stream(ctx, chunk(2, { type: 'reasoning-delta', index: 0, text: 'hm' }))
   assert.deepEqual((await drawn()).slice(0, 6), ['› hi', '', 'hm', 'Let me look.', '', '⏺ read({"pa)'])
   assert.equal((await terminal.styleAt(0, 2)).dim, true)
+})
+
+test('the answer that streams draws its text as markdown, and an unclosed code block as code to the end', async () => {
+  const { ctx, dsh, drawn, terminal } = await talking()
+  dsh.stream(ctx, start)
+  dsh.stream(ctx, chunk(0, { type: 'text-delta', index: 0, text: '**Run:**\n\n```sh\nls -la\n# all' }))
+  assert.deepEqual((await drawn()).slice(0, 5), ['Run:', '', '  ls -la', '  # all', ''])
+  assert.deepEqual([(await terminal.styleAt(0, 0)).bold, await terminal.colourAt(2, 3)], [true, YELLOW])
 })
 
 test('the answer that streams draws the rows it draws once it commits and its calls come in', async () => {
