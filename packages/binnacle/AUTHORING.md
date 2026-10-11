@@ -611,7 +611,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   )
   ```
 
-  This hides the reasoning of each committed answer:
+  With the row `binnacle-transcript-view` off, this hides the reasoning of each committed answer. With the view on, set `transcript.reasoning`, as [The transcript's view](#the-transcripts-view) says:
 
   ```js
   import { withoutReasoning } from 'binnacle/plugins/transcript'
@@ -625,7 +625,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ctx.binnacle.look('transcript.event.system/message', () => () => [])
   ```
 
-- The answer that streams draws through the Look `transcript.live`, of the type `LiveLook`: `(blocks, width) => string[]`, given the blocks, each a `LiveBlock`, and the width. This leaves out the reasoning of the answer that streams, as `withoutReasoning` does for the committed answer:
+- The answer that streams draws through the Look `transcript.live`, of the type `LiveLook`: `(blocks, width) => string[]`, given the blocks, each a `LiveBlock`, and the width. With the view off, this leaves out the reasoning of the answer that streams, as `withoutReasoning` does for the committed answer:
 
   ```js
   ctx.binnacle.look('transcript.live', (beneath) => (blocks, width) => beneath(blocks.filter((block) => block.kind !== 'reasoning'), width))
@@ -638,7 +638,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
 The row `binnacle-transcript-view` draws the transcript a person reads. A prompt draws as `› ` and its text, in the `accent` Tone. An answer draws its reasoning in the `dim` Tone, then its text as markdown, wrapped at the width, with `markdown`. A tool call draws as one line, `⏺ <tool>(<its arguments>)`, and its result as one line, `⎿ ` and its first line of text, or `✗ ` and its first line in the `error` Tone when it failed. Context that dsh added draws as one line in the `dim` Tone, such as `· context: agent-instructions`. A command, a retry, a compaction and how a turn ended draw one line each, such as `/compact`, `retrying (1/3): <why>` in the `warning` Tone, or `✗ <why>` in the `error` Tone. Every other event draws nothing, and takes no row.
 
 - It sets the Looks `transcript.event.<type>` of the types it draws, `transcript.event` beneath them to draw nothing, and `transcript.live`.
-- Each piece it draws is a Look of its own, given plain data and `{ width }`, never dsh's shapes, and returns lines. The types are from `binnacle/plugins/transcript-view`:
+- Each piece it draws is a Look of its own, given plain data and `{ width, time }`, never dsh's shapes, and returns lines. `time` is the event's, in epoch milliseconds, and `undefined` for a piece of the answer that streams, which is no event yet. The types are from `binnacle/plugins/transcript-view`:
 
   | Look | Draws | Given | Type |
   |---|---|---|---|
@@ -658,6 +658,16 @@ The row `binnacle-transcript-view` draws the transcript a person reads. A prompt
     wrap(toPlainText(text), width, { first: '> ', rest: '> ' }).map((line) => ctx.binnacle.paint('accent', line)),
   )
   ctx.binnacle.look('transcript.reasoning', () => () => [])
+  ```
+
+- `transcript.reasoning` alone hides the reasoning, of each committed answer and of the answer that streams. With the view on, `transcript.live` and `withoutReasoning` are not needed for it.
+- This draws each prompt after the time it was sent, with no change to its type's Look:
+
+  ```js
+  ctx.binnacle.look('transcript.prompt', (beneath) => (text, at) => {
+    const sent = at.time === undefined ? '' : new Date(at.time).toTimeString().slice(0, 5)
+    return [ctx.binnacle.paint('muted', `── ${sent}`), ...beneath(text, at)]
+  })
   ```
 
 - The default `transcript.answer` draws the text with `markdown`, as [Text](#text) says, so a markdown Look, such as `markdown.code`, changes the answers. This draws each answer indented by two cells, with a `●` before its first line:

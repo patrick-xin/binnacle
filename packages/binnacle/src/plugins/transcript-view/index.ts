@@ -12,6 +12,8 @@ export const inject = ['binnacle'] satisfies (keyof Context)[]
 /** What each piece's Look is given beside its data. */
 export interface PieceAt {
   readonly width: number
+  /** The event's time, in epoch milliseconds, or `undefined` in the answer that streams, which is no event yet. */
+  readonly time: number | undefined
 }
 
 /** The Looks `transcript.prompt`, `transcript.answer` and `transcript.reasoning`: a text's lines, given the text as it came, Untrusted Text. */
@@ -97,7 +99,7 @@ export function apply(ctx: Context): void {
   const typed =
     (linesOf: (event: SessionEvent, at: PieceAt) => string[], blank: boolean): EventLook =>
     (event, { folded, width }) => {
-      const lines = linesOf(event, { width })
+      const lines = linesOf(event, { width, time: event.time })
       if (lines.length === 0) return []
       const shown =
         folded && lines.length > 1
@@ -144,7 +146,7 @@ export function apply(ctx: Context): void {
         .filter((block) => block.kind === kind)
         .map((block) => block.text)
         .join('')
-    const at = { width }
+    const at = { width, time: undefined }
     const lines = said(joined('reasoning'), joined('text'), at)
     const calls = blocks
       .filter((block) => block.kind === 'tool-call')
