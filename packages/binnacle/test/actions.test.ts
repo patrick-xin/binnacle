@@ -240,6 +240,24 @@ test('`binnacle.run(id)` runs the newest enabled action by that id, wherever the
   assert.deepEqual(ran, ['older', 'newer'])
 })
 
+test('`binnacle.run(id, at)` gives the action the cell, as a click does, and its `beneath` the same cell', async () => {
+  const given: (Point | undefined)[] = []
+  const { author, terminal, ctx } = await booted()
+  await author('feature', (plugin) => {
+    plugin.binnacle.action('pick', { run: (at) => given.push(at) })
+    plugin.binnacle.action('pick', {
+      run: (at, beneath) => {
+        given.push(at)
+        beneath()
+      },
+    })
+  })
+  await terminal.read()
+  ctx.binnacle.run('pick', { line: 2, column: 5 })
+  ctx.binnacle.run('pick')
+  assert.deepEqual(given, [{ line: 2, column: 5 }, { line: 2, column: 5 }, undefined, undefined])
+})
+
 test('an action set with the id of another is handed the one it hides, as `beneath`, and can run it, so two plugins that each change what one action does both act, the newest first', async () => {
   const ran: string[] = []
   const { author, terminal } = await booted()

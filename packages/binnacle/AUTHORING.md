@@ -321,7 +321,7 @@ ctx.binnacle.bind('request.choices.down', (keys) => [...keys, 'j'])
 
 ### Run an action, and change what it does
 
-`binnacle.run(id)` runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture. With none enabled, nothing runs.
+`binnacle.run(id)` runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture. With none enabled, nothing runs. `binnacle.run(id, at)` gives the action `at`, a cell `{ line, column }` in the lines of its Part, as a click gives the cell clicked. So an action that a click runs can hand its cell to the action that owns what the click does.
 
 To give an action another gesture, set an action of your own that runs it by its id. Here ctrl+d pages down the List `fruit` of [List](#list). It does this only while the List has more than ten items:
 
@@ -557,7 +557,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
 - Its state is the model `transcript`, of the type `TranscriptState` from `binnacle/plugins/transcript`:
   - `events`: the committed events, in order.
   - `live`: the blocks of the answer that streams, in the answer's order, or `undefined` while none streams. Each block, of the type `LiveBlock`, has a `kind` (`text`, `reasoning` or `tool-call`), its `text`, and a tool call's `name` once dsh gives it. The blocks end when the answer commits.
-  - `folded`: the seqs of the folded events, empty at first.
+  - `folded`: the folded regions, as strings, empty at first. An event's own region is its seq, such as `'12'`, and a part of it is a region such as `'12/body'`, which a Look names on a line it draws. An event that draws no line keeps its regions folded.
   - `marked`: the seq of the Marked event, or `undefined`.
 - The transcript sets `events` and `live`. Read them. If you set them, the transcript replaces them at the next event or frame.
 - Set `folded` and `marked` to change what is drawn. This plugin folds each tool result when it comes:
@@ -567,13 +567,13 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ctx.effect(() =>
     transcript.watch(() => {
       const { events, folded } = transcript.state
-      const fresh = events.filter((event) => event.type === 'tool/result' && !folded.includes(event.seq))
-      if (fresh.length > 0) transcript.set((state) => state.folded.push(...fresh.map((event) => event.seq)))
+      const fresh = events.filter((event) => event.type === 'tool/result' && !folded.includes(String(event.seq)))
+      if (fresh.length > 0) transcript.set((state) => state.folded.push(...fresh.map((event) => String(event.seq))))
     }),
   )
   ```
 
-- Up, down and enter run the actions `transcript.up`, `transcript.down` and `transcript.fold`. They act in the Place `transcript`, with the keys of the Gesture Table's `tui.select.up`, `tui.select.down` and `tui.select.confirm`. A click on an event's first line runs `transcript.click`. Bind them as any action, so `j` and `k` move the Mark:
+- Up, down and enter run the actions `transcript.up`, `transcript.down` and `transcript.fold`. They act in the Place `transcript`, with the keys of the Gesture Table's `tui.select.up`, `tui.select.down` and `tui.select.confirm`. A click in the transcript runs `transcript.click`. Bind them as any action, so `j` and `k` move the Mark:
 
   ```js
   ctx.binnacle.bind('transcript.down', ['j'])
@@ -581,13 +581,30 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ```
 
 - Set one of them by its id to change what it does, and run `beneath()` to keep the default.
-- Each event draws through the Look `transcript.event.<type>`, such as `transcript.event.tool/call`, and beneath it `transcript.event`, which draws every type. Its type is `EventLook` from `binnacle/plugins/transcript`: `(event, { folded, width }) => string[]`. It is given the event, whether the event is folded, and the transcript's width, and returns the event's lines. The transcript's own default draws the header, the JSON and a blank line, or the header with its count while folded. Make an event's text plain with `toPlainText` before you draw it, and cut a line at `width` to keep it to one row: the core wraps a wider one. This draws each tool call as one line:
+- Every fold goes through `transcript.fold`. Given no cell, at a key, it folds the Marked event's first region marked `fold` on a line it draws, else the event's own region. Given a cell, it folds the region of the line there when the line is marked `fold`, the event's own region when the line is the event's first and a plain string, and nothing else. `transcript.click` Marks the event clicked, then runs the action of the line clicked when it is marked `run`, else `transcript.fold`, each with the cell. So an empty `transcript.fold` stops every fold, by a key and by a click:
+
+  ```js
+  ctx.binnacle.action('transcript.fold', { run: () => {} })
+  ```
+
+- Each event draws through the Look `transcript.event.<type>`, such as `transcript.event.tool/call`, and beneath it `transcript.event`, which draws every type. Its type is `EventLook` from `binnacle/plugins/transcript`: `(event, { folded, isFolded, width }) => Line[]`. It is given the event, whether the event's own region is folded, `isFolded(region)` for any region, and the transcript's width, and returns the event's lines. The transcript's own default draws the header, the JSON and a blank line, or the header with its count while folded. Make an event's text plain with `toPlainText` before you draw it, and cut a line at `width` to keep it to one row: the core wraps a wider one. This draws each tool call as one line:
 
   ```js
   import { toPlainText, truncateToWidth } from 'binnacle'
   ctx.binnacle.look('transcript.event.tool/call', () => (event, { width }) => {
     const { name, arguments: args } = event.data
     return [truncateToWidth(toPlainText(`⏺ ${name}(${args})`), width)]
+  })
+  ```
+
+- A line is a `Line` from `binnacle/plugins/transcript`: a string, or `{ text, fold }` or `{ text, run }`. The transcript draws its `text`. A click on a line with `fold` folds that region, and a click on a line with `run` runs that action, given the cell clicked. A line with both runs its action. A click on an event's first line, when it is a string, folds the event's own region, so a Look that returns strings folds as before. A click on any other string Marks its event, and folds nothing. A Look that changes the lines of the Look beneath it reads a line's text with `typeof line === 'string' ? line : line.text`. This draws a `[-]` that folds the body of each tool call, and a `[x]` that runs an action of the author's, given the cell clicked:
+
+  ```js
+  ctx.binnacle.action('my.copy', { run: (at) => {} })
+  ctx.binnacle.look('transcript.event.tool/call', () => (event, { isFolded, width }) => {
+    const body = `${event.seq}/body`
+    const head = [`⏺ ${toPlainText(event.data.name)}`, { text: isFolded(body) ? '[+]' : '[-]', fold: body }, { text: '[x]', run: 'my.copy' }]
+    return isFolded(body) ? head : [...head, truncateToWidth(toPlainText(event.data.arguments), width)]
   })
   ```
 
@@ -618,14 +635,14 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ctx.binnacle.look('transcript.event.assistant/message', (beneath) => (event, at) => beneath(withoutReasoning(event), at))
   ```
 
-- The transcript Marks an event's first line in inverse video, and a click on that line lands on the event. Its Look draws what a folded event shows.
+- The transcript Marks an event's first line in inverse video, and a click lands on the line it was drawn on. Its Look draws what a folded event shows.
 - An event whose Look returns no line takes no row, and the Mark passes over it: up and down move between the events that draw. A `marked` whose event draws no line, or that is no event, is drawn on the next event that draws, else the one before it, else nowhere. Drawing never changes `marked`, so the Mark comes back to its event when it draws again. This draws no system message:
 
   ```js
   ctx.binnacle.look('transcript.event.system/message', () => () => [])
   ```
 
-- The answer that streams draws through the Look `transcript.live`, of the type `LiveLook`: `(blocks, width) => string[]`, given the blocks, each a `LiveBlock`, and the width. With the view off, this leaves out the reasoning of the answer that streams, as `withoutReasoning` does for the committed answer:
+- The answer that streams draws through the Look `transcript.live`, of the type `LiveLook`: `(blocks, width) => Line[]`, given the blocks, each a `LiveBlock`, and the width. A click on its line marked `run` runs that action. The live block is no event, so it is never Marked. With the view off, this leaves out the reasoning of the answer that streams, as `withoutReasoning` does for the committed answer:
 
   ```js
   ctx.binnacle.look('transcript.live', (beneath) => (blocks, width) => beneath(blocks.filter((block) => block.kind !== 'reasoning'), width))

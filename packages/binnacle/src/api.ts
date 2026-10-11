@@ -273,7 +273,7 @@ export interface Binnacle {
   bind(name: string, keys: Binding): Handle
   /** The gestures that the newest action by that id, enabled or not, is bound to now. With no action by that id, what its bindings by id give, or none. */
   keysOf(id: string): readonly string[]
-  /** Runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture. With none enabled, nothing runs. */
+  /** Runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture, given `at` as a click gives its cell. With none enabled, nothing runs. */
   run(id: string, at?: Point): void
   /** Only the newest Screen shown is drawn. The Chat is the first. */
   show(screen: Screen): Handle

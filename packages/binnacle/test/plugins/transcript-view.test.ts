@@ -16,6 +16,7 @@ const settled = () => new Promise((resolve) => setImmediate(resolve))
 const ENTER = '\r'
 const UP = '\x1b[A'
 const DOWN = '\x1b[B'
+const clickAt = (x: number, y: number) => `\x1b[<0;${x + 1};${y + 1}M`
 const CYAN = 6
 const BRIGHT_BLACK = 8
 const YELLOW = 3
@@ -226,13 +227,23 @@ test('a folded event with more than one line draws its first line, then … <n> 
     ]),
     call(1, 'ls', '{}'),
   ])
-  stateOf(ctx).set((state) => state.folded.push(0, 1))
+  stateOf(ctx).set((state) => state.folded.push('0', '1'))
   assert.deepEqual((await drawn()).slice(0, 4), ['think', '… 2 more lines', '', '⏺ ls({})'])
   assert.equal(await terminal.colourAt(0, 1), BRIGHT_BLACK)
   terminal.type(ENTER)
   terminal.type(UP)
   terminal.type(ENTER)
   assert.deepEqual((await drawn()).slice(0, 6), ['think', 'one', 'two', '', '⏺ ls({})', ''])
+})
+
+test("a click on the first line of an event that the view draws folds it, as the view's first lines are plain strings, and a click on its next line folds nothing", async () => {
+  const { drawn, ctx, terminal } = await reading([answer(0, [{ type: 'text', text: 'one\ntwo' }]), call(1, 'ls', '{}')])
+  await drawn()
+  terminal.type(clickAt(0, 1))
+  await drawn()
+  assert.deepEqual(stateOf(ctx).state?.folded, [])
+  terminal.type(clickAt(0, 0))
+  assert.deepEqual((await drawn()).slice(0, 3), ['one', '… 1 more lines', ''])
 })
 
 test('the answer that streams draws its reasoning, its text, a blank line, then each tool call with the arguments so far', async () => {
