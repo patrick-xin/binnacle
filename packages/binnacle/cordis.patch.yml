@@ -24,6 +24,9 @@
     # The transcript's view: what a person reads, each piece a Look. Off, the transcript draws each event raw.
     - id: binnacle-transcript-view
       name: 'binnacle/plugins/transcript-view'
+    # The tool cards: each tool call and its result as one card, drawn from the views dsh's tools give. Off, the view draws a call and its result as two lines.
+    - id: binnacle-tool-cards
+      name: 'binnacle/plugins/tool-cards'
     # The composer: what a person types, before it is sent.
     - id: binnacle-composer
       name: 'binnacle/plugins/composer'

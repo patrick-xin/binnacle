@@ -12,6 +12,7 @@ Each feature is a plugin with a row of its own in the bundle's patch ([ADR 1](ad
 | Gestures | [gestures](features/gestures.md) | `binnacle` | `packages/binnacle/src/core/gestures.ts`, `packages/binnacle/src/core/input.ts`, `packages/binnacle/src/core/keyboard.ts`, `packages/binnacle/src/core/actions.ts` |
 | Kit | [kit](features/kit.md) | `binnacle` | `packages/binnacle/src/core/model.ts`, `packages/binnacle/src/core/theme.ts`, `packages/binnacle/src/core/looks.ts`, `packages/binnacle/src/kit/`, `packages/binnacle/AUTHORING.md` |
 | Transcript | [transcript](features/transcript.md) | `binnacle-transcript`, `binnacle-transcript-view` | `packages/binnacle/src/plugins/transcript/`, `packages/binnacle/src/plugins/transcript-view/` |
+| Tool cards | [tool cards](features/tool-cards.md) | `binnacle-tool-cards` | `packages/binnacle/src/plugins/tool-cards/` |
 | Composer | [composer](features/composer.md) | `binnacle-composer` | `packages/binnacle/src/plugins/composer/` |
 | Status line | [status line](features/status-line.md) | `binnacle-status-line` | `packages/binnacle/src/plugins/status-line/` |
 | Requests | [requests](features/requests.md) | `binnacle-requests`, `binnacle-requests-view` | `packages/binnacle/src/plugins/requests/`, `packages/binnacle/src/plugins/requests-view/` |
