@@ -77,6 +77,11 @@ Stage 2:
 - [#236](https://github.com/patrick-xin/binnacle/issues/236) The composer, made of a draft, its actions and a Layout an author changes one at a time.
 - [#248](https://github.com/patrick-xin/binnacle/issues/248) The transcript, drawn by a Look for each type of event, with a model and actions an author changes one at a time.
 
+Stage 3:
+
+- [#260](https://github.com/patrick-xin/binnacle/issues/260) The transcript a person reads, made of pieces an author changes one at a time.
+- [#269](https://github.com/patrick-xin/binnacle/issues/269) Tool cards: each call and its result as a card from dsh's views, with folds an author moves and times an author shows or takes out.
+
 ## Open questions
 
 None.
