@@ -37,6 +37,12 @@ export interface Model<S extends object> extends Watchable {
   set(change: (state: S) => void): void
 }
 
+/** The state of the core's model `clock`. */
+export interface ClockState {
+  /** The time in epoch milliseconds. While it is read, the clock changes each second; once a second passes with no read, it stops. */
+  readonly now: number
+}
+
 /** A colour of the theme's, named by what is drawn in it, as pi's themes name it. */
 export type Tone =
   | 'text'

@@ -40,8 +40,35 @@ export async function mount(
   core.internals.terminal = () => terminal
   core.internals.process = process
   core.internals.colorMode = () => options.colorMode ?? 'truecolor'
-  const clock = { now: 0 }
+  const timers: { at: number; run: () => void }[] = []
+  const clock = {
+    now: 0,
+    /** Moves the time on by `ms`, and runs each timer that falls due, in order. */
+    pass: async (ms: number) => {
+      const end = clock.now + ms
+      for (;;) {
+        timers.sort((a, b) => a.at - b.at)
+        const next = timers[0]
+        if (next === undefined || next.at > end) break
+        timers.shift()
+        clock.now = next.at
+        next.run()
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      }
+      clock.now = end
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    },
+    timers: () => timers.length,
+  }
   core.internals.now = () => clock.now
+  core.internals.later = (ms, run) => {
+    const timer = { at: clock.now + ms, run }
+    timers.push(timer)
+    return () => {
+      const at = timers.indexOf(timer)
+      if (at !== -1) timers.splice(at, 1)
+    }
+  }
   const ctx = new Context()
   provideCmdline(ctx, {
     args: options.args ?? [],

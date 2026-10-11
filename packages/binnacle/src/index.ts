@@ -1,7 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { AppExit, AppReady } from '@deepseek-ai/dsh-cmdline'
+import type { AppExit } from '@deepseek-ai/dsh-cmdline'
 import { readCommandLine } from './core/command-line.ts'
 import { coreActions } from './core/actions.ts'
+import { startClock } from './core/clock.ts'
 import { Drawing } from './core/drawing.ts'
 import { gestureTable } from './core/gestures.ts'
 import { Host } from './core/host.ts'
@@ -31,10 +32,9 @@ export function apply(ctx: Context): void {
   // On --help or a refused command line, the launcher exits, and binnacle must not take the terminal.
   if (commandLine === undefined) return
 
-  const { streams } = internals
   const input = new StdinBuffer()
   const host = new Host(
-    [streams.stdout, streams.stderr],
+    [internals.streams.stdout, internals.streams.stderr],
     internals.process,
     (data) => input.process(data),
     () => drawing.redrawAll(),
@@ -61,6 +61,7 @@ export function apply(ctx: Context): void {
     scroll: (notches, at) => drawing.wheel(notches, at.x, at.y),
   })
   for (const [id, action] of Object.entries(core.actions)) service.action(id, action)
+  service.model('clock', startClock(ctx))
   route(input, {
     answered: (sequence) => host.answered(sequence),
     focused: () => drawing.focused(),
@@ -73,12 +74,11 @@ export function apply(ctx: Context): void {
     wheel: (gesture, at) => core.wheel(at, () => service.actions.wheel(gesture)),
   })
   openChat(ctx, commandLine.session, (why) => {
-    streams.stderr.write(`binnacle: ${why}\n`)
+    internals.streams.stderr.write(`binnacle: ${why}\n`)
     exit(1)
   })
 
-  const ready: AppReady = ctx.appReady!
-  const cancelReady = ready.onReady(() => host.open(internals.terminal()))
+  const cancelReady = ctx.appReady!.onReady(() => host.open(internals.terminal()))
   ctx.effect(
     () => () => {
       cancelReady()
