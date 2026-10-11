@@ -6,6 +6,7 @@ import * as commands from '../../src/plugins/commands/index.ts'
 import type { CommandsState } from '../../src/plugins/commands/index.ts'
 import type { ComposerState } from '../../src/plugins/composer/index.ts'
 import { line as searchLine } from '../../src/index.ts'
+import type { ListPiece } from '../../src/index.ts'
 import { mount } from '../support/mount.ts'
 import { agents } from '../support/agents.ts'
 import { persistence } from '../support/sessions.ts'
@@ -355,6 +356,33 @@ test('an author changes how a command is drawn with the Look commands.list.row, 
     plugin.binnacle.look<commands.CommandRow>('commands.list.row', () => (item) => `${item.label} ${item.hint ?? ''}`.trimEnd())
   })
   assert.deepEqual((await typed('/', 'g')).slice(3, 5), [RULE, '/goal <goal>'])
+})
+
+test('an author draws a command’s hint after its name with the Look commands.list.label, and the row stays the List’s own', async () => {
+  const { ctx, typed, terminal } = await offering()
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.look<ListPiece<commands.CommandItem>>(
+      'commands.list.label',
+      (beneath) => (item, at) => beneath(item, at) + plugin.binnacle.paint('dim', item.hint === undefined ? '' : ` ${item.hint}`),
+    )
+  })
+  const rows = (await typed('/')).slice(2, 5)
+  assert.deepEqual(
+    [rows, (await terminal.styleAt(2, 2)).colour, (await terminal.styleAt(8, 3)).dim],
+    [['› /compact — Compact the session', '  /goal <goal> — Set a goal', '  /plan — Plan first'], 6, true],
+  )
+})
+
+test('a command whose description is wider than the terminal draws in one line, cut with the `more` glyph, and an author’s row Look is given the cut row as its beneath', async () => {
+  const { ctx, typed } = await offering({ columns: 20 })
+  const cut = (await typed('/', 'c')).slice(-5)
+  await authored(ctx, (plugin) => {
+    plugin.binnacle.look<commands.CommandRow>('commands.list.row', (beneath) => (item, at) => beneath(item, at).replace('›', '>'))
+  })
+  assert.deepEqual(
+    [cut, (await typed()).at(-4)],
+    [['─'.repeat(20), '› /compact — Compac…', '─'.repeat(20), '/c ', '─'.repeat(20)], '> /compact — Compac…'],
+  )
 })
 
 test("a command that a plugin registers with dsh's register is offered and runs, and its handler shows a Screen that goes back to the Chat", async () => {

@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types'
 import type { Layout } from '../../api.ts'
 import { linesShown } from '../../kit/component.ts'
-import { createModel, fuzzy, list } from '../../kit/index.ts'
+import { createModel, fuzzy, list, truncateToWidth } from '../../kit/index.ts'
 import type { ListItem, ListRow } from '../../kit/index.ts'
 import type { ComposerState } from '../composer/index.ts'
 
@@ -81,6 +81,11 @@ export function apply(ctx: Context): void {
     },
   })
   ctx.on('commands/change', () => offer.handle.redraw())
+  // A command's row stays one line, so the offer's rows are its commands. A Request's Choice wraps instead, to be read whole.
+  binnacle.look<CommandRow>(
+    `${LIST}.row`,
+    (beneath) => (item, at) => truncateToWidth(beneath(item, at), at.width, binnacle.tokens.glyphs.more),
+  )
 
   const drawn = (): boolean => (linesShown(binnacle, LIST) ?? 0) > 0
   const marked = (): CommandItem | undefined => model.state.items[offer.model.state.mark]

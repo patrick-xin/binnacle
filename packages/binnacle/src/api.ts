@@ -317,8 +317,11 @@ export interface Binnacle {
   theme(layer: ThemeLayer): Handle
   /** The theme's tokens, as its layers make them now. */
   readonly tokens: Tokens
-  /** The text in the Tone's style. A Part paints at each draw, so that its lines follow the theme. */
-  paint(tone: Tone, text: string): string
+  /**
+   * The text in the Tone's style, or in the Style given, such as `{ bold: true }`. A Part paints at each draw, so that its lines follow the theme.
+   * A Style is drawn for the terminal's colours, as a Tone is. It refuses a colour that is not one.
+   */
+  paint(given: Tone | Style, text: string): string
   /**
    * Sets how a piece of a component is drawn, by an instance's name, such as `request.choices.row`, or by its kind's, such as `list.row`.
    * `make` is handed the Look beneath it, and returns the Look. The Look beneath is found each time it draws.
