@@ -17,6 +17,7 @@ async function answer(size: Size = 'content') {
   mounted.ready()
   const asked = createModel({ shown: true, key: 'a' })
   const told: string[] = []
+  const changed: string[] = []
   await mounted.ctx.plugin({
     name: 'feature',
     inject: ['binnacle'],
@@ -29,6 +30,7 @@ async function answer(size: Size = 'content') {
         key: () => asked.state.key,
         submit: (text) => told.push(`submit ${text}`),
         escape: () => told.push('escape'),
+        change: (text) => changed.push(text),
         models: [asked],
       })
     },
@@ -42,7 +44,7 @@ async function answer(size: Size = 'content') {
       await settled()
     }
   }
-  return { ...mounted, asked, told, model, rows, press }
+  return { ...mounted, asked, told, changed, model, rows, press }
 }
 
 test('a shown Line takes every key, enter calls submit and escape calls escape, and its text stays after them', async () => {
@@ -140,4 +142,15 @@ test('a Line is drawn with the Looks of its kind and of its instance, and its cu
   })
   await press('h', 'i')
   assert.deepEqual([(await rows())[0], (await terminal.read()).cursor], ['[› Hi              ]', { x: 5, y: 0 }])
+})
+
+test('`change(text)` is called after each key of the person’s that changes the text, a paste included, with the text of the Line’s key, and not at enter, escape or an author’s set', async () => {
+  const { press, asked, model, changed } = await answer()
+  await press('h', 'i', '\x1b[200~yo\x1b[201~', LEFT, '\x7f', ENTER, ESCAPE)
+  await escaped()
+  model().set((state) => state.texts.set('a', 'hello'))
+  asked.set((state) => (state.key = 'b'))
+  await settled()
+  await press('x')
+  assert.deepEqual(changed, ['h', 'hi', 'hiyo', 'hio', 'x'])
 })

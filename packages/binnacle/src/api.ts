@@ -249,17 +249,24 @@ export interface Action {
   /**
    * At a click, `at` is the cell clicked in the lines of the Part in the Place; at a key, or below the Part's lines, it is `undefined`.
    * `beneath` runs the action that this one hides, the newest enabled action by its id beneath it, with the same `at`; with none, it does nothing.
+   * With no `run`, the action runs `beneath`.
    */
-  run(at: Point | undefined, beneath: () => void): void
+  run?(at: Point | undefined, beneath: () => void): void
   /** The gestures it is bound to until someone binds it or its kind: keys by name, such as `enter`, `space`, `tab` or `ctrl+n`, and `click`. */
   readonly keys?: readonly string[]
-  /** It takes a gesture only while this Place, or one of these, has the Focus, or for a click, while the click is in it. With none, it keeps the Place of the action it hides, and with none there either, it takes a key wherever the Focus is, and the wheel. A Place that an action acts in takes the Focus. */
-  readonly place?: string | readonly string[]
-  /** An action of a Place takes its key before the Part with the Focus, such as tab while a line is being typed. An action with no Place is never before the Part. An action that names no Place keeps the newest `first` named among the actions it hides, down to the action whose Place it keeps. */
+  /**
+   * It takes a gesture only while this Place, or one of these, has the Focus, or for a click, while the click is in it. With none, it keeps the Place of the action it hides, and with none there either, it takes a key wherever the Focus is, and the wheel. A Place that an action acts in takes the Focus.
+   * A function is given the Places that the action would keep with none of its own, `[]` where the action it hides has none, and gives the action's Places, read at each gesture, such as `(places) => [...places, 'search']`.
+   */
+  readonly place?: string | readonly string[] | ((places: readonly string[]) => string | readonly string[])
+  /** An action of a Place takes its key before the Part with the Focus, such as tab while a line is being typed. An action with no Place is never before the Part. An action that names no Place, or whose `place` is a function, keeps the newest `first` named among the actions it hides, down to the action whose Place it keeps. */
   readonly first?: boolean
   /** The name that every action of its kind shares, such as `list.toggle`: binding the kind binds each of them. */
   readonly kind?: string
-  /** While it returns false, the action is as if it were not set: a gesture goes on to the action beneath it by its id, then to the next taker. */
+  /**
+   * While it returns false, the action is as if it were not set: a gesture goes on to the action beneath it by its id, then to the next taker.
+   * With none, the action is enabled while the newest action it hides that names one is, and always when none does. Name `() => true` to be enabled always over a gated action.
+   */
   enabled?(): boolean
   readonly description?: string
 }
