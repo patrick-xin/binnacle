@@ -804,6 +804,7 @@ test('noticeOf gives a command, a retry, a compaction and how a turn ended as a 
     [
       notice('command/run', { commandId: 'c', name: 'compact', source: {} }),
       notice('command/run', { commandId: 'c', name: 'model', args: 'flash', source: {} }),
+      notice('command/run', { commandId: 'c', name: 'goal', args: ' pause', source: {} }),
       notice('command/done', { commandId: 'c', kind: 'success', text: 'switched' }),
       notice('command/done', { commandId: 'c', kind: 'error', text: 'no such model' }),
       notice('llm/retry', { retry: 1, maxRetries: 3, failure: { message: 'overloaded', code: 'X' } }),
@@ -817,6 +818,7 @@ test('noticeOf gives a command, a retry, a compaction and how a turn ended as a 
     [
       { kind: 'command', text: '/compact', severity: 'info' },
       { kind: 'command', text: '/model flash', severity: 'info' },
+      { kind: 'command', text: '/goal pause', severity: 'info' },
       { kind: 'command', text: 'switched', severity: 'info' },
       { kind: 'command', text: 'no such model', severity: 'error' },
       { kind: 'retry', text: 'retrying (1/3): overloaded', severity: 'warning' },

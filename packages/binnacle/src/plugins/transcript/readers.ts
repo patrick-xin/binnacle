@@ -85,7 +85,8 @@ export function noticeOf(event: SessionEvent): Notice | undefined {
   switch (event.type as string) {
     case 'command/run': {
       if (typeof data.name !== 'string') return undefined
-      const args = typeof data.args === 'string' && data.args !== '' ? ` ${data.args}` : ''
+      // dsh keeps the whitespace between the name and the input in `args`.
+      const args = typeof data.args !== 'string' || data.args.trim() === '' ? '' : /^\s/.test(data.args) ? data.args : ` ${data.args}`
       return { kind: 'command', text: `/${data.name}${args}`, severity: 'info' }
     }
     case 'command/done':
