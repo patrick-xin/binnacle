@@ -1,4 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import type { Handle, Layout, Point } from '../../api.ts'
 import { gestureTable } from '../../core/gestures.ts'
 import { createModel } from '../../core/model.ts'
@@ -11,9 +13,10 @@ export const name = 'binnacle-composer'
 
 export const inject = ['binnacle'] satisfies (keyof Context)[]
 
-/** The state of the model `composer`: the draft as it would be sent, a large paste's content in full. */
+/** The state of the model `composer`: the draft as it would be sent, a large paste's content in full, and whether a command line that was sent runs. */
 export interface ComposerState {
   text: string
+  running: boolean
 }
 
 /** The Look `composer.empty`: the line of an empty draft, after its cursor, drawn in that many cells. */
@@ -34,6 +37,8 @@ const INPUT = 'composer.input'
 const SUBMIT = 'tui.input.submit'
 const NEW_LINE = 'tui.input.newLine'
 const PASTE_START = '\x1b[200~'
+// dsh's registry names a command by a slash, then a name that starts with a letter, so a draft such as `/ ` or `/1` is never one, and is a prompt.
+const COMMAND_LINE = /^\/[a-z]/i
 
 const plain = (text: string): string => text
 
@@ -71,12 +76,7 @@ export function apply(ctx: Context): void {
   }
   const editor = new Editor({ requestRender: edited, terminal: { rows: ROWS } }, THEME)
   editor.focused = true
-  editor.onSubmit = (text) => {
-    editor.addToHistory(text)
-    ctx.get('binnacleSession')?.send(text)
-  }
-
-  const draft = createModel<ComposerState>({ text: '' })
+  const draft = createModel<ComposerState>({ text: '', running: false })
   binnacle.model('composer', draft)
   // The editor keeps the cursor and the paste markers, so only a text that differs from its own is set on it, and its own changes never loop back.
   editor.onChange = () => {
@@ -96,13 +96,43 @@ export function apply(ctx: Context): void {
     'binnacle-composer: the editor shows the draft that is set',
   )
 
+  // dsh stops waiting for a handler at the signal, though the handler can go on.
+  const unloaded = new AbortController()
+  ctx.effect(() => () => unloaded.abort(), 'binnacle-composer: a command that runs is waited for no more')
+  // The draft stays editable while a command runs, so it is cleared only if it is still the draft that was sent.
+  const finish = (sent: string, prompt: boolean): void => {
+    if (prompt) ctx.get('binnacleSession')?.send(sent.trim())
+    editor.addToHistory(sent)
+    if (editor.getExpandedText() === sent) editor.submitValue()
+    edited()
+  }
+  const setRunning = (running: boolean) =>
+    draft.set((state) => {
+      state.running = running
+    })
+  const runCommand = async (commands: CommandRuntime, agent: Agent, sent: string): Promise<void> => {
+    setRunning(true)
+    let kind: 'success' | 'error' | undefined
+    try {
+      kind = (await commands.execute(agent, sent.trimEnd(), [], unloaded.signal))?.result.kind
+    } catch {
+      kind = 'error'
+    }
+    // The model of a composer that unloaded can still be held, and a result that comes after is not its own.
+    if (unloaded.signal.aborted) return
+    setRunning(false)
+    if (kind !== 'error') finish(sent, kind === undefined)
+  }
+
   binnacle.action('composer.send', {
     keys: gestureTable.getKeys(SUBMIT),
     place: INPUT,
-    description: 'Send the draft as a prompt, or steer the turn that runs',
+    description: 'Send the draft as a prompt, or steer the turn that runs; run a command line as a command',
     run: () => {
+      if (draft.state.running) return
       // A stored session takes nothing that is sent, and a new one takes nothing until it is open.
-      if (ctx.get('binnacleSession')?.agent === undefined) return
+      const agent = ctx.get('binnacleSession')?.agent
+      if (agent === undefined) return
       const { line, col } = editor.getCursor()
       // pi-tui's fallback for a terminal that cannot tell shift+enter from enter.
       if (editor.getLines()[line]?.[col - 1] === '\\') {
@@ -110,9 +140,14 @@ export function apply(ctx: Context): void {
         binnacle.run('composer.newline')
         return
       }
-      if (editor.getExpandedText().trim() === '') return
-      editor.submitValue()
-      edited()
+      const sent = editor.getExpandedText()
+      if (sent.trim() === '') return
+      const commands = ctx.get('commands')
+      if (commands !== undefined && COMMAND_LINE.test(sent)) {
+        void runCommand(commands, agent, sent)
+        return
+      }
+      finish(sent, true)
     },
   })
   binnacle.action('composer.newline', {
