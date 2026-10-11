@@ -6,7 +6,7 @@ import type { Drawn, Segment } from './separated.ts'
 import { bordersOf, edgeRow, gapOf, insetsOf, paddingOf } from './box.ts'
 import type { Spare } from './box.ts'
 import { withoutBlankEnd } from './row-end.ts'
-import { coverWidthOf, fixedOf, floatAt, floatWidthOf, grow, share } from './tree.ts'
+import { coverWidthOf, floatAt, floatWidthOf, grow, share, wantedOf } from './tree.ts'
 import type { Tree } from './tree.ts'
 import { edgeNamed } from './theme.ts'
 import type { Theme } from './theme.ts'
@@ -158,7 +158,7 @@ class Arrangement {
       const widths = this.#widths(tree, width)
       return Math.max(0, ...shown.map((child, index) => this.height(child, widths[index] ?? 0)))
     }
-    return shown.reduce((sum, child) => sum + (fixedOf(child) ?? this.height(child, width)), this.#gaps(tree, width))
+    return shown.reduce((sum, child) => sum + wantedOf(child, (node) => this.height(node, width)), this.#gaps(tree, width))
   }
 
   #innerWidth(tree: Tree, available: number): number {
@@ -171,7 +171,7 @@ class Arrangement {
     if (separated(tree)) return visibleWidth(this.#measured(tree, available))
     const shown = this.#shown(tree, available)
     if (tree.kind === 'row')
-      return shown.reduce((sum, child) => sum + (fixedOf(child) ?? this.width(child, available)), this.#gaps(tree, available))
+      return shown.reduce((sum, child) => sum + wantedOf(child, (node) => this.width(node, available)), this.#gaps(tree, available))
     return Math.max(0, ...shown.map((child) => this.width(child, available)))
   }
 
@@ -313,7 +313,7 @@ class Arrangement {
     const widths = tree.kind === 'row' ? this.#widths(tree, inner) : []
     const least = this.#shown(tree, inner).map((child, index) => {
       if (tree.kind === 'row') return this.#least(child, widths[index] ?? 0)
-      return child.size === 'fill' ? 0 : (fixedOf(child) ?? this.#least(child, inner))
+      return child.size === 'fill' ? 0 : wantedOf(child, (node) => this.#least(node, inner))
     })
     const inside = tree.kind === 'row' ? Math.max(0, ...least) : least.reduce((sum, rows) => sum + rows, this.#gaps(tree, inner))
     return insets.top + insets.bottom + inside

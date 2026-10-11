@@ -1,4 +1,4 @@
-import type { Binnacle, Model, Point, Watchable } from '../api.ts'
+import type { Action, Binnacle, Model, Point, Watchable } from '../api.ts'
 import { createModel } from '../core/model.ts'
 import { toPlainText } from '../core/view.ts'
 import { linesShown, together } from './component.ts'
@@ -25,19 +25,21 @@ export interface ListRowAt {
   readonly width: number
 }
 
-/** The Look `list.row`, or `<name>.row`: how one item of a List is drawn. */
-export type ListRow = (item: ListItem, at: ListRowAt) => string
+/** The Look `list.row`, or `<name>.row`: how one item of a List is drawn, given as the List's items are. */
+export type ListRow<T extends ListItem = ListItem> = (item: T, at: ListRowAt) => string
 
-export interface ListOptions {
+export interface ListOptions<T extends ListItem = ListItem> {
   /** The instance's name: its Place, its Model's name, and the start of its actions' ids and its Looks' names. */
   readonly name: string
-  readonly items: () => readonly ListItem[]
+  readonly items: () => readonly T[]
   /** When what it returns changes, the mark goes back to the first item, as other items are shown. */
   readonly key?: () => unknown
   /** The person picked the item at this index: enter, or a click. */
   readonly pick: (index: number) => void
   /** The person toggled the marked item. Its action, `<name>.toggle`, has no keys until someone binds it or `list.toggle`. */
   readonly toggle?: (index: number) => void
+  /** The Places where up, down, page up, page down and enter act on the List while it draws a line, even while their Part takes keys. With none, the List's own. A click and `toggle` stay in the List's own Place. */
+  readonly keysIn?: string | readonly string[]
   /** What the items are drawn from, so that the List is drawn again when they change. */
   readonly models?: readonly Watchable[]
 }
@@ -47,12 +49,12 @@ export interface ListComponent extends Component {
 }
 
 /** Makes a List in the Place `name`, with its actions `<name>.<verb>` of the kind `list.<verb>`: `up`, `down`, `pageUp`, `pageDown`, `pick`, `click` and `toggle`. */
-export function list(binnacle: Binnacle, options: ListOptions): ListComponent {
+export function list<T extends ListItem = ListItem>(binnacle: Binnacle, options: ListOptions<T>): ListComponent {
   const { name } = options
   const model = createModel<ListState>({ mark: 0 })
   let key: unknown
   // The mark is set right as the items are read, without a change to watch: a draw reads them, and must not draw again.
-  const items = (): readonly ListItem[] => {
+  const items = (): readonly T[] => {
     const now = options.key?.()
     const shown = options.items()
     if (now !== key) {
@@ -72,29 +74,38 @@ export function list(binnacle: Binnacle, options: ListOptions): ListComponent {
   const placed = binnacle.place(name, {
     models: [model, ...(options.models ?? [])],
     lines: (width) => {
-      const row = binnacle.lookOf<ListRow>([`${name}.row`, 'list.row'], (item, at) => defaultRow(binnacle, item, at))
+      const row = binnacle.lookOf<ListRow<T>>([`${name}.row`, 'list.row'], (item, at) => defaultRow(binnacle, item, at))
       return items().map((item, index) => row(item, { marked: index === model.state.mark, index, width }))
     },
     // The cursor stays hidden; it keeps the marked item in view as the Place scrolls.
     cursor: () => (items().length === 0 ? undefined : { line: model.state.mark, column: 0 }),
     follow: 'least',
   })
-  const act = (verb: string, keys: readonly string[], description: string, run: (at: Point | undefined) => void) =>
-    binnacle.action(`${name}.${verb}`, { kind: `list.${verb}`, keys, place: name, description, run: (at) => run(at) })
+  const own = { place: name }
+  const { keysIn } = options
+  // In another Place, the List's keys come before that Place's Part, and only while the List is there to see.
+  const keyed = keysIn === undefined ? own : { place: keysIn, first: true, enabled: () => (linesShown(binnacle, name) ?? 0) > 0 }
+  const act = (
+    where: Pick<Action, 'place' | 'first' | 'enabled'>,
+    verb: string,
+    keys: readonly string[],
+    description: string,
+    run: (at: Point | undefined) => void,
+  ) => binnacle.action(`${name}.${verb}`, { kind: `list.${verb}`, keys, ...where, description, run: (at) => run(at) })
   const actions = [
-    act('up', ['up'], 'Mark the item above', () => markTo((count, mark) => (mark - 1 + count) % count)),
-    act('down', ['down'], 'Mark the item below', () => markTo((count, mark) => (mark + 1) % count)),
-    act('pageUp', ['pageUp'], 'Mark the item a page above', () => markTo((_, mark) => Math.max(0, mark - page()))),
-    act('pageDown', ['pageDown'], 'Mark the item a page below', () => markTo((count, mark) => Math.min(count - 1, mark + page()))),
-    act('pick', ['enter'], 'Pick the marked item', () => {
+    act(keyed, 'up', ['up'], 'Mark the item above', () => markTo((count, mark) => (mark - 1 + count) % count)),
+    act(keyed, 'down', ['down'], 'Mark the item below', () => markTo((count, mark) => (mark + 1) % count)),
+    act(keyed, 'pageUp', ['pageUp'], 'Mark the item a page above', () => markTo((_, mark) => Math.max(0, mark - page()))),
+    act(keyed, 'pageDown', ['pageDown'], 'Mark the item a page below', () => markTo((count, mark) => Math.min(count - 1, mark + page()))),
+    act(keyed, 'pick', ['enter'], 'Pick the marked item', () => {
       if (items().length > 0) options.pick(model.state.mark)
     }),
-    act('click', ['click'], 'Pick the item clicked', (at) => {
+    act(own, 'click', ['click'], 'Pick the item clicked', (at) => {
       if (at === undefined || at.line >= items().length) return
       model.set((state) => (state.mark = at.line))
       options.pick(at.line)
     }),
-    act('toggle', [], 'Toggle the marked item', () => {
+    act(own, 'toggle', [], 'Toggle the marked item', () => {
       if (items().length > 0) options.toggle?.(model.state.mark)
     }),
   ]

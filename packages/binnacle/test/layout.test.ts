@@ -673,6 +673,62 @@ test('a float is as high as a fixed node in it is fixed, not as what the node ho
   assert.deepEqual(rows, ['2222222222', '33╭────╮33', '44│T   │44', '55│i8  │55', '66│i9  │66', '77╰────╯77', '8888888888', '9999999999'])
 })
 
+test('a node of `{ most: n }` takes the rows its lines need, its box included, up to n, and its Place scrolls in what it takes', async () => {
+  const lines = createModel({ a: ['a1'] })
+  const { rows, terminal } = await drawn(6, 6, (binnacle) => {
+    binnacle.layout('chat', { column: [{ place: 'a', size: { most: 3 }, border: ['top'] }, { place: 'rest' }] })
+    binnacle.place('a', { models: [lines], lines: () => lines.state.a })
+    binnacle.place('rest', part('r1', 'r2', 'r3', 'r4', 'r5'))
+  })
+  lines.set((state) => (state.a = ['a1', 'a2', 'a3', 'a4', 'a5']))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.deepEqual(
+    [rows, (await terminal.read()).rows],
+    [
+      ['──────', 'a1', 'r2', 'r3', 'r4', 'r5'],
+      ['──────', 'a4', 'a5', 'r3', 'r4', 'r5'],
+    ],
+  )
+})
+
+test('a named Layout whose node is of `{ most: n }` takes no more than n rows where its lines are needed, and none while it has no line', async () => {
+  const lines = createModel({ offer: ['o1', 'o2', 'o3', 'o4'] })
+  const { rows, terminal } = await drawn(6, 5, (binnacle) => {
+    binnacle.layout('chat', {
+      column: [{ place: 'transcript' }, { layout: 'offer', size: 'content' }, { place: 'draft', size: 'content' }],
+    })
+    binnacle.layout('offer', { place: 'offer', size: { most: 3 }, border: ['top'] })
+    binnacle.place('transcript', part('t1', 't2', 't3', 't4'))
+    binnacle.place('offer', { models: [lines], lines: () => lines.state.offer })
+    binnacle.place('draft', part('d'))
+  })
+  lines.set((state) => (state.offer = []))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.deepEqual(
+    [rows, (await terminal.read()).rows],
+    [
+      ['t4', '──────', 'o3', 'o4', 'd'],
+      ['t1', 't2', 't3', 't4', 'd'],
+    ],
+  )
+})
+
+test('a node of `{ most: n }` in a row takes the width its lines need, up to n cells', async () => {
+  const { rows } = await drawn(10, 3, (binnacle) => {
+    binnacle.layout('chat', {
+      column: [
+        { row: [{ place: 'a', size: { most: 4 } }, { place: 'b' }], size: 'content' },
+        { row: [{ place: 'c', size: { most: 4 } }, { place: 'd' }], size: 'content' },
+      ],
+    })
+    binnacle.place('a', part('aaaaaaa'))
+    binnacle.place('b', part('b'))
+    binnacle.place('c', part('cc'))
+    binnacle.place('d', part('d'))
+  })
+  assert.deepEqual(rows, ['aaaab', 'aaa', 'ccd'])
+})
+
 test('a named Layout in a row is as wide as a fixed node in it is fixed, not as what the node holds', async () => {
   const { rows } = await drawn(10, 1, (binnacle) => {
     binnacle.layout('chat', { row: [{ layout: 'side', size: 'content' }, { place: 'main' }] })
