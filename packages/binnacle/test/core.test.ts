@@ -414,3 +414,77 @@ test('a Part placed while its plugin unloads is not held: the call throws, and t
   await late.dispose()
   assert.deepEqual([(await terminal.read()).rows, thrown.length], [['', ''], 1])
 })
+
+const clockReader = (models: 'part' | 'look') => ({
+  name: 'clock-reader',
+  inject: ['binnacle'],
+  apply: (plugin: Context) => {
+    const clock = plugin.binnacle.modelOf<{ readonly now: number }>('clock')
+    const since = (): string => `${Math.floor((clock.state?.now ?? 0) / 1000)}s`
+    if (models === 'part') {
+      plugin.binnacle.place('transcript', { models: [clock], lines: () => [since()] })
+    } else {
+      const time = plugin.binnacle.lookOf(['probe.time'], since)
+      plugin.binnacle.look('probe.time', () => since, { models: [clock] })
+      plugin.binnacle.place('transcript', { lines: () => [time()] })
+    }
+  },
+})
+
+test('the model clock holds now, and a Part that names it is drawn again each second while it is drawn', async () => {
+  const { ctx, terminal, ready, clock } = await mount({ rows: 3 })
+  ready()
+  clock.now = 5_000
+  await ctx.plugin(clockReader('part'))
+  assert.equal((await terminal.read()).rows[0], '5s')
+  await clock.pass(1_000)
+  assert.equal((await terminal.read()).rows[0], '6s')
+  await clock.pass(2_000)
+  assert.equal((await terminal.read()).rows[0], '8s')
+})
+
+test('a Look that names the model clock is drawn again each second while it is drawn', async () => {
+  const { ctx, terminal, ready, clock } = await mount({ rows: 3 })
+  ready()
+  await ctx.plugin(clockReader('look'))
+  assert.equal((await terminal.read()).rows[0], '0s')
+  await clock.pass(3_000)
+  assert.equal((await terminal.read()).rows[0], '3s')
+})
+
+test('once a second passes with no read of the clock, nothing ticks, and a read starts it again', async () => {
+  const { ctx, terminal, ready, clock } = await mount({ rows: 3 })
+  ready()
+  const ticks: number[] = []
+  await ctx.plugin({
+    name: 'clock-watcher',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.modelOf('clock').watch(() => ticks.push(clock.now))
+    },
+  })
+  await clock.pass(5_000)
+  assert.deepEqual(ticks, [])
+  assert.equal(clock.timers(), 0)
+  const reader = await ctx.plugin(clockReader('part'))
+  await clock.pass(2_000)
+  assert.deepEqual(ticks, [1_000 + 5_000, 2_000 + 5_000])
+  await reader.dispose()
+  await clock.pass(5_000)
+  assert.deepEqual(ticks, [6_000, 7_000, 8_000])
+  assert.equal(clock.timers(), 0)
+  assert.equal((await terminal.read()).rows[0], '')
+})
+
+test('set on the clock does nothing, and its timer stops with the core', async () => {
+  const { ctx, fiber, clock } = await mount()
+  const model = ctx.binnacle.modelOf<{ now: number }>('clock')
+  clock.now = 2_000
+  model.set((state) => {
+    state.now = 0
+  })
+  assert.equal(model.state?.now, 2_000)
+  assert.equal(clock.timers(), 1)
+  await fiber.dispose()
+  assert.equal(clock.timers(), 0)
+})

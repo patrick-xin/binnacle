@@ -210,6 +210,23 @@ ctx.binnacle.place('status.state', {
 - While no Model by that name is named, its `state` is `undefined`, `set` does nothing, and a watcher waits for one.
 - A watcher is told when the newest Model changes, and when a newer Model by that name comes or goes.
 
+### The clock
+
+The core names the model `clock`. Its state's `now` is the time in epoch milliseconds. Name it in `models`, as any Model, to draw a time that changes:
+
+```js
+const clock = ctx.binnacle.modelOf('clock')
+const started = Date.now()
+ctx.binnacle.look('status.state', (beneath) => (value) => `${beneath(value)} ${Math.floor((clock.state.now - started) / 1000)}s`, {
+  models: [clock],
+})
+```
+
+- While `now` is read, the clock changes each second, and what names it is drawn again.
+- Once a second passes with no read, nothing ticks. What is not drawn reads nothing, so it costs nothing.
+- `set` on the clock does nothing.
+- The type of its state is `ClockState`.
+
 ## The theme
 
 The theme is the tokens that everything binnacle draws is drawn with: a colour for each Tone, the glyphs, and a box's edge, padding and gap. An author changes a token once, and everything drawn with it changes.

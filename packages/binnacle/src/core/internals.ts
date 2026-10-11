@@ -10,10 +10,16 @@ export const internals: {
   process: Process
   streams: { stdout: Stream; stderr: Stream }
   now: () => number
+  /** Runs `run` once after `ms`, and returns what cancels it. */
+  later: (ms: number, run: () => void) => () => void
   colorMode: () => TerminalColorMode
 } = {
   terminal: () => new ProcessTerminal(),
   now: () => Date.now(),
+  later: (ms, run) => {
+    const timer = setTimeout(run, ms)
+    return () => clearTimeout(timer)
+  },
   // A terminal that does not say in COLORTERM that it has truecolor gets the nearest of 256 for an exact colour.
   colorMode: () => (['truecolor', '24bit'].includes(process.env.COLORTERM?.toLowerCase() ?? '') ? 'truecolor' : '256color'),
   process: {
