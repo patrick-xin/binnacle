@@ -391,7 +391,7 @@ A Layout is a tree. Its leaves are Places, which Parts fill, by name.
 
 Every node can also take:
 
-- `size`: `'fill'`, a share of what is left (in a column, a node that fills takes no more than its lines need while another that fills needs more, and what is left after is shared evenly); `'content'`, the cells its lines need; or `{ fixed: n }`, in cells, its box included. A node with no size fills in a Screen's own Layout, and takes what its lines need in a Layout set by name.
+- `size`: `'fill'`, a share of what is left (in a column, a node that fills takes no more than its lines need while another that fills needs more, and what is left after is shared evenly); `'content'`, the cells its lines need; `{ fixed: n }`, in cells, its box included; or `{ most: n }`, the cells its lines need, up to `n`, its box included. A Place taller than a node of `{ most: n }` scrolls in it, as a Place does, so a List keeps its mark in view. A node with no size fills in a Screen's own Layout, and takes what its lines need in a Layout set by name.
 - `unless: name`: it draws nothing, and takes no cells, while the Layout or the Place by that name has a line to draw.
 - `mouse: false`: a click or the wheel inside it does nothing, and a click there moves no Focus.
 - A box: `padding` and `gap` in cells, a `border` on every side (`true`) or on the sides it names, the `edge` its border is drawn with, and a `title` set in its top edge.
@@ -501,11 +501,28 @@ const picker = list(ctx.binnacle, {
 ```
 
 - `items()` gives the items: a `label`, an optional `description`, and an optional `checked`. An item with `checked` draws a box, `[x]` or `[ ]`. The List makes each label and description plain.
+- An item can hold fields of your own, such as a command's `hint`. The List gives the Look `<name>.row` each item as `items()` gave it. In TypeScript, `list<Fruit>(…)` takes items of your type `Fruit`, which extends `ListItem`, and `ListRow<Fruit>` is the type of its row Look, so `item.hint` type-checks there.
 - `pick(index)` runs when the person picks an item: enter picks the marked item, and a click picks the item clicked.
 - Up and down move the mark, and wrap. Page up and page down move it by a page, and stop at the first and the last item. A page is as many items as the Place shows at once, an item that wraps counted once, and at least one.
 - `key()`, if you give it, says which items are shown. When what it returns changes, the mark goes back to the first item. When the items are fewer and `key()` is the same, the mark stays on the last item. With no items there is no mark, and enter and the page keys do nothing.
 - `toggle(index)`, if you give it, runs for the marked item on the action `<name>.toggle`. It has no keys until someone binds it: `ctx.binnacle.bind('list.toggle', ['space'])`.
+- `keysIn` names the Places where up, down, page up, page down and enter act on the List, before the Part that has the Focus there, while the List draws a line. So a List above a Line moves its mark while the person types in the Line, as Tabs' `keysIn` does. While the List draws no line, the keys go to the Part. With no `keysIn`, the keys act in the List's own Place. A click and `toggle` always act in the List's own Place.
 - `models` are what the items are drawn from, so that the List is drawn again when they change.
+- `fuzzy(query, items, text)` gives the items whose `text(item)` holds the letters of `query` in order, whatever their case: the items whose text starts with the query first, then the items whose letters are closest together, then in their order. An empty query gives every item. This filters a List by `query()`, what the person types in the Line `search`:
+
+  ```js
+  import { fuzzy, list } from 'binnacle'
+  const shown = () => fuzzy(query(), fruit.state.items, (item) => item.label)
+  list(ctx.binnacle, {
+    name: 'fruit',
+    items: shown,
+    key: query,
+    keysIn: 'search',
+    pick: (index) => eat(shown()[index]),
+    models: [fruit],
+  })
+  ```
+
 - `picker.model` is the List's Model, also named `name`: `{ mark }`, the index of the marked item.
 - The actions are `<name>.up`, `<name>.down`, `<name>.pageUp`, `<name>.pageDown`, `<name>.pick`, `<name>.click` and `<name>.toggle`, of the kinds `list.up` and the rest.
 - The Look `list.row`, or `<name>.row`, draws one item: `(item, { marked, index, width }) => line`. Its default draws the `mark` glyph and the marked item in `accent`, a description in `muted`, a box's frame in `border`, and what a checked box holds in `success`. A box glyph that is not framed in brackets draws whole, in `success` when checked and in `border` when not.

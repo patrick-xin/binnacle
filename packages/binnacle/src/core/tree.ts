@@ -11,7 +11,7 @@ export type Tree = { readonly node: Layout; readonly size: Size } & (
 /** `named`: the node is in a Layout set by name, where a node with no size takes what its lines need. `names`: the named Layouts it is in, as one that draws itself draws nothing the second time. */
 export function grow(node: Layout, named: boolean, names: readonly string[], layoutOf: (name: string) => Layout | undefined): Tree {
   const given = node.size ?? (named ? 'content' : 'fill')
-  const size: Size = typeof given === 'object' ? { fixed: cells(given.fixed) } : given
+  const size: Size = typeof given !== 'object' ? given : 'fixed' in given ? { fixed: cells(given.fixed) } : { most: cells(given.most) }
   const all = (children: readonly Layout[]) => children.map((child) => grow(child, named, names, layoutOf))
   if (node.place !== undefined) return { node, size, kind: 'place', place: node.place }
   if (node.row !== undefined) return { node, size, kind: 'row', children: all(node.row) }
@@ -34,7 +34,16 @@ export function grow(node: Layout, named: boolean, names: readonly string[], lay
 }
 
 /** A node of a fixed size takes that many cells along its parent, whatever it holds. */
-export const fixedOf = (tree: Tree): number | undefined => (typeof tree.size === 'object' ? tree.size.fixed : undefined)
+export const fixedOf = (tree: Tree): number | undefined =>
+  typeof tree.size === 'object' && 'fixed' in tree.size ? tree.size.fixed : undefined
+
+/** The cells a node takes along its parent when nothing is short: a fixed size, or what it needs, up to its `most`. */
+export function wantedOf(tree: Tree, needs: (tree: Tree) => number): number {
+  const fixed = fixedOf(tree)
+  if (fixed !== undefined) return fixed
+  const needed = needs(tree)
+  return typeof tree.size === 'object' && 'most' in tree.size ? Math.min(needed, tree.size.most) : needed
+}
 
 const MOST_FLOAT_WIDTH = 80
 const FLOAT_MARGIN = 4
@@ -75,11 +84,10 @@ export function share(
   let short = available < 0
   let left = Math.max(0, available)
   const sizes = children.map((child) => {
-    const { size } = child
-    if (size === 'fill') return 0
-    const wanted = size === 'content' ? natural(child) : size.fixed
+    if (child.size === 'fill') return 0
+    const wanted = wantedOf(child, natural)
     const taken = Math.min(wanted, left)
-    if (taken < (size === 'content' ? least(child) : wanted)) short = true
+    if (taken < (fixedOf(child) ?? Math.min(wanted, least(child)))) short = true
     left -= taken
     return taken
   })

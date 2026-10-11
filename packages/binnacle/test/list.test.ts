@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import { createModel, list } from '../src/index.ts'
+import { createModel, line, list } from '../src/index.ts'
 import type { Layout, ListItem, ListRow } from '../src/index.ts'
 import { mount } from './support/mount.ts'
 
@@ -242,5 +242,109 @@ test('a List’s box draws its frame in the theme’s border Tone, and a checked
       { checked: [dim, { colour: 2, dim: false }, dim], unchecked: [dim, dim] },
       { checked: [red, { colour: 4, dim: false }, red], unchecked: [red, red] },
     ],
+  )
+})
+
+async function typedBeside(labels: string[]) {
+  const mounted = await mount({ columns: 20, rows: 6 })
+  mounted.ready()
+  const shown = createModel({ items: items(...labels) })
+  const picked: number[] = []
+  const submitted: string[] = []
+  await mounted.ctx.plugin({
+    name: 'feature',
+    inject: ['binnacle'],
+    apply: (ctx: Context) => {
+      ctx.binnacle.show({
+        name: 'ask',
+        focus: 'answer',
+        layout: {
+          column: [
+            { place: 'fruit', size: 'content' },
+            { place: 'answer', size: 'content' },
+          ],
+        },
+      })
+      line(ctx.binnacle, { name: 'answer', shown: () => true, submit: (text) => submitted.push(text), escape: () => {} })
+      list(ctx.binnacle, {
+        name: 'fruit',
+        items: () => shown.state.items,
+        pick: (index) => picked.push(index),
+        keysIn: 'answer',
+        models: [shown],
+      })
+    },
+  })
+  const rows = async () => (await mounted.terminal.read()).rows.map((row) => row.trimEnd()).filter((row) => row !== '')
+  const press = async (...keys: string[]) => {
+    await mounted.terminal.read()
+    for (const key of keys) {
+      mounted.terminal.type(key)
+      await settled()
+    }
+  }
+  return { ...mounted, shown, picked, submitted, rows, press }
+}
+
+test('a List with `keysIn` moves its mark and picks in those Places, before the Part that has the Focus there, while the person types', async () => {
+  const { rows, press, picked, submitted } = await typedBeside(['a', 'b', 'c', 'd'])
+  await press('h', DOWN, 'i', UP, UP)
+  const moved = await rows()
+  await press(PAGE_UP)
+  const paged = [await rows()]
+  await press(PAGE_DOWN)
+  paged.push(await rows())
+  await press(ENTER)
+  assert.deepEqual(
+    [moved, paged, picked, submitted],
+    [
+      ['  a', '  b', '  c', '› d', '› hi'],
+      [
+        ['› a', '  b', '  c', '  d', '› hi'],
+        ['  a', '  b', '  c', '› d', '› hi'],
+      ],
+      [3],
+      [],
+    ],
+  )
+})
+
+test('a List with `keysIn` that draws no line leaves its keys to the Part that has the Focus there', async () => {
+  const { rows, press, picked, submitted, shown } = await typedBeside(['a', 'b'])
+  shown.set((state) => (state.items = []))
+  await settled()
+  await press('h', 'i', ENTER)
+  assert.deepEqual([await rows(), picked, submitted], [['› hi'], [], ['hi']])
+})
+
+test('a List with `keysIn` still picks the item clicked in its own Place', async () => {
+  const { press, picked } = await typedBeside(['a', 'b', 'c'])
+  await press(clickAt(2, 1))
+  assert.deepEqual(picked, [1])
+})
+
+interface Fruit extends ListItem {
+  readonly colour: string
+}
+
+test('a List gives its row Look each item of the author’s own type, with the author’s fields', async () => {
+  const mounted = await mount({ columns: 20, rows: 2 })
+  mounted.ready()
+  const fruits: Fruit[] = [
+    { label: 'fig', colour: 'purple' },
+    { label: 'pear', colour: 'green' },
+  ]
+  await mounted.ctx.plugin({
+    name: 'feature',
+    inject: ['binnacle'],
+    apply: (ctx: Context) => {
+      ctx.binnacle.show({ name: 'pick', focus: 'fruit', layout: { place: 'fruit' } })
+      list(ctx.binnacle, { name: 'fruit', items: () => fruits, pick: () => {} })
+      ctx.binnacle.look<ListRow<Fruit>>('fruit.row', (beneath) => (item, at) => `${beneath(item, at)} ${item.colour}`)
+    },
+  })
+  assert.deepEqual(
+    (await mounted.terminal.read()).rows.map((row) => row.trimEnd()),
+    ['› fig purple', '  pear green'],
   )
 })

@@ -127,8 +127,8 @@ export interface Point {
   readonly column: number
 }
 
-/** A `fixed` size is in cells, its box included; `content` is the cells its lines need; `fill` shares what is left. */
-export type Size = { readonly fixed: number } | 'content' | 'fill'
+/** A `fixed` size is in cells, its box included; `content` is the cells its lines need; `most` is the cells its lines need, up to that many, its box included; `fill` shares what is left. */
+export type Size = { readonly fixed: number } | { readonly most: number } | 'content' | 'fill'
 
 export type Side = 'top' | 'right' | 'bottom' | 'left'
 
