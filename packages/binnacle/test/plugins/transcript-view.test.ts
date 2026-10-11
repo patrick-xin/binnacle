@@ -300,6 +300,43 @@ test('an author changes the prompts with the Look transcript.prompt, given plain
   assert.deepEqual((await drawn()).slice(0, 5), ['> one two', '| three', '| four', '', 'ok'])
 })
 
+test("each piece's Look is given its event's time, so a prompt draws with the time it was sent in a Look of transcript.prompt alone", async () => {
+  const sent = Date.UTC(2026, 9, 10, 9, 5)
+  const { drawn, ctx } = await reading([
+    { ...prompt(0, 'hi'), time: sent },
+    { ...call(1, 'ls', '{}'), time: sent + 1000 },
+  ])
+  ctx.binnacle.look<TextLook>('transcript.prompt', () => (text, { time }) => [`${new Date(time ?? 0).toISOString().slice(11, 16)} ${text}`])
+  ctx.binnacle.look<CallLook>('transcript.call', () => ({ name }, { time }) => [`${name} at ${time}`])
+  assert.deepEqual((await drawn()).slice(0, 3), ['09:05 hi', '', `ls at ${sent + 1000}`])
+})
+
+test('a piece of the answer that streams is given no time, as it is no event yet', async () => {
+  const { ctx, dsh, drawn } = await talking()
+  ctx.binnacle.look<TextLook>('transcript.answer', () => (text, { time }) => [`${text} at ${time}`])
+  ctx.binnacle.look<CallLook>('transcript.call', () => ({ name }, { time }) => [`${name} at ${time}`])
+  dsh.stream(ctx, start)
+  dsh.stream(ctx, chunk(0, { type: 'text-delta', index: 0, text: 'Let me look.' }))
+  dsh.stream(ctx, chunk(1, { type: 'tool-call-delta', index: 1, id: 't1', name: 'ls', argumentsDelta: '{}' }))
+  assert.deepEqual((await drawn()).slice(0, 3), ['Let me look. at undefined', '', 'ls at undefined'])
+})
+
+test('with the view on, transcript.reasoning alone hides the reasoning, committed and streaming', async () => {
+  const { ctx, dsh, drawn } = await talking()
+  ctx.binnacle.look<TextLook>('transcript.reasoning', () => () => [])
+  dsh.commit(
+    ctx,
+    answer(0, [
+      { type: 'reasoning', text: 'think' },
+      { type: 'text', text: 'Done.' },
+    ]),
+  )
+  dsh.stream(ctx, start)
+  dsh.stream(ctx, chunk(0, { type: 'reasoning-delta', index: 0, text: 'hm' }))
+  dsh.stream(ctx, chunk(1, { type: 'text-delta', index: 1, text: 'Next.' }))
+  assert.deepEqual((await drawn()).slice(0, 5), ['Done.', '', 'Next.', '', ''])
+})
+
 test('each piece is a Look of its own, which an author changes alone', async () => {
   const { drawn, ctx } = await reading([
     context(0, 'skill'),
