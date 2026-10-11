@@ -5,7 +5,15 @@ import * as transcript from '../../src/plugins/transcript/index.ts'
 import * as view from '../../src/plugins/transcript-view/index.ts'
 import * as cards from '../../src/plugins/tool-cards/index.ts'
 import type { TranscriptState } from '../../src/plugins/transcript/index.ts'
-import type { Card, CardBodyLook, CardLook, CardTimeLook, CardTitleLook } from '../../src/plugins/tool-cards/index.ts'
+import type {
+  Card,
+  CardBodyLook,
+  CardLook,
+  CardMarkLook,
+  CardMostLook,
+  CardTimeLook,
+  CardTitleLook,
+} from '../../src/plugins/tool-cards/index.ts'
 import { frame } from '../../src/index.ts'
 import { agents } from '../support/agents.ts'
 import { mount } from '../support/mount.ts'
@@ -306,7 +314,7 @@ test("a click on a card's first line folds its body, and the Mark moves between 
   const { drawn, terminal, ctx } = await reading([call(0, 'ls', '{}'), result(1, 'c0', 'a'), call(2, 'pwd', '{}'), result(3, 'c2', '/')])
   await drawn()
   terminal.type(clickAt(3, 0))
-  assert.deepEqual((await drawn()).slice(0, 3), ['⏺ ls · 1.0s (1 lines)', '', '⏺ pwd · 1.0s'])
+  assert.deepEqual((await drawn()).slice(0, 3), ['⏺ ls · 1.0s (1 line)', '', '⏺ pwd · 1.0s'])
   assert.equal(stateOf(ctx).state?.marked, 0)
   terminal.type(clickAt(3, 2))
   await drawn()
@@ -463,4 +471,68 @@ test('a running call with no view draws its raw arguments as the model wrote the
   })
   assert.deepEqual((await drawn()).slice(0, 6), ['⏺ unknown', '  ⎿ {"n":9007199254740993}', '', '⏺ unknown', '  ⎿ "hello"', ''])
   assert.deepEqual(given.slice(-2), [{ n: 9007199254740992 }, 'hello'])
+})
+
+test("an author changes a card's dot with transcript.card.mark, which the default title draws before the title", async () => {
+  const { drawn, ctx } = await reading([call(0, 'ls', '{}'), result(1, 'c0', 'a'), call(2, 'pwd', '{}')])
+  const given: Card[] = []
+  ctx.binnacle.look<CardMarkLook>('transcript.card.mark', (beneath) => (card) => {
+    given.push(card)
+    return card.result === undefined ? '…' : beneath(card)
+  })
+  assert.deepEqual((await drawn()).slice(0, 4), ['⏺ ls · 1.0s', '  ⎿ a', '', '… pwd'])
+  assert.deepEqual(new Set(given.map(({ seq }) => seq)), new Set([0, 2]))
+})
+
+test('an author changes how many lines a body shows with transcript.card.most, and … n earlier lines counts what it leaves out', async () => {
+  const output = Array.from({ length: 6 }, (_, line) => `line ${line + 1}`).join('\n')
+  const { drawn, ctx } = await reading(
+    [
+      call(0, 'bash', '{"command":"seq"}'),
+      result(1, 'c0', '', { meta: { output, exitCode: 0 } }),
+      call(2, 'none', '{}'),
+      result(3, 'c2', 'a\nb\nc'),
+    ],
+    { bash: shell },
+  )
+  ctx.binnacle.look<CardMostLook>('transcript.card.most', () => () => 2)
+  assert.deepEqual((await drawn()).slice(0, 9), [
+    '⏺ seq · 1.0s',
+    '  ⎿ … 4 earlier lines',
+    '    line 5',
+    '    line 6',
+    '',
+    '⏺ none · 1.0s',
+    '  ⎿ a',
+    '    b',
+    '',
+  ])
+})
+
+test('a shell command that ends with an exit code other than 0, or with a signal, is a failed call, its ⏺ in the error Tone', async () => {
+  const { drawn, ctx, terminal } = await reading(
+    [
+      call(0, 'bash', '{"command":"false"}'),
+      result(1, 'c0', '', { meta: { output: 'no', exitCode: 1 } }),
+      call(2, 'bash', '{"command":"sleep"}'),
+      result(3, 'c2', '', { meta: { signal: 'SIGTERM' } }),
+      call(4, 'bash', '{"command":"true"}'),
+      result(5, 'c4', '', { meta: { output: 'ok', exitCode: 0 } }),
+    ],
+    { bash: shell },
+    20,
+  )
+  const given = new Map<number, boolean | undefined>()
+  ctx.binnacle.look<CardTitleLook>('transcript.card.title', (beneath) => (card, width) => {
+    given.set(card.seq, card.result?.failed)
+    return beneath(card, width)
+  })
+  const rows = await drawn()
+  assert.deepEqual([rows[0], rows[4], rows[7]], ['⏺ false · 1.0s', '⏺ sleep · 1.0s', '⏺ true · 1.0s'])
+  assert.deepEqual(await Promise.all([0, 4, 7].map((y) => terminal.colourAt(0, y))), [RED, RED, GREEN])
+  assert.deepEqual([...given.entries()].toSorted(), [
+    [0, true],
+    [2, true],
+    [4, false],
+  ])
 })
