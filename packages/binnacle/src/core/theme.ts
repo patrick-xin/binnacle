@@ -52,6 +52,9 @@ export const DEFAULT_TOKENS: Tokens = {
     border: { dim: true },
     borderAccent: { color: 'cyan' },
     borderMuted: { dim: true },
+    heading: { color: 'cyan', bold: true },
+    code: { color: 'yellow' },
+    link: { color: 'blue', underline: true },
   },
   glyphs: { mark: '›', unmarked: ' ', checked: '[x]', unchecked: '[ ]', rule: '─', separator: ' | ', divider: ' · ', more: '…' },
   edge: 'rounded',
@@ -123,6 +126,23 @@ function opening(color: Colour, mode: TerminalColorMode): string {
   return foregroundAnsi(parseColor(color), mode)
 }
 
+const CLOSES = new Set(['', '0', '22', '23', '24', '39'])
+const COLOURS = new Set(['38', '48', '58'])
+
+// A colour's arguments, as the 0 of `38;5;0`, are walked over, so only a real reset or close counts.
+function closes(params: string): boolean {
+  const parts = params.split(';')
+  for (let at = 0; at < parts.length; at++) {
+    const [head = '', ...rest] = parts[at]!.split(':')
+    if (COLOURS.has(head)) {
+      if (rest.length === 0) at += parts[at + 1] === '5' ? 2 : parts[at + 1] === '2' ? 4 : 0
+      continue
+    }
+    if (CLOSES.has(head)) return true
+  }
+  return false
+}
+
 /** How each Tone is drawn on a terminal of that many colours. */
 export function painter(tokens: Tokens, mode: TerminalColorMode): (tone: Tone, text: string) => string {
   const wraps = new Map<Tone, { readonly open: string; readonly close: string }>()
@@ -142,6 +162,9 @@ export function painter(tokens: Tokens, mode: TerminalColorMode): (tone: Tone, t
   }
   return (tone, text) => {
     const wrap = wraps.get(tone)
-    return wrap === undefined || wrap.open === '' || text === '' ? text : wrap.open + text + wrap.close
+    if (wrap === undefined || wrap.open === '' || text === '') return text
+    // A style painted inside ends with its own close, which can end this Tone's too, so this Tone opens again after it.
+    const held = text.replace(/\x1b\[([\d;:]*)m/g, (sequence, params: string) => (closes(params) ? sequence + wrap.open : sequence))
+    return wrap.open + held + wrap.close
   }
 }

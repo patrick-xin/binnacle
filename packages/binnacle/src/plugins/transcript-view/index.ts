@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { toPlainText, truncateToWidth, wrap } from '../../index.ts'
+import { markdown, toPlainText, truncateToWidth, wrap } from '../../index.ts'
 import type { Binnacle, Tone } from '../../index.ts'
 import { callOf, failed, isPrompt, noticeOf, producerOf, reasoningOf, textOf } from '../transcript/index.ts'
 import type { Call, EventLook, LiveLook, Notice } from '../transcript/index.ts'
@@ -51,8 +51,6 @@ const oneLine = (text: string): string => toPlainText(text.replace(/\s*[\r\n]+\s
 
 const firstLineOf = (text: string): string => text.split(/\r\n|\r|\n/).find((line) => line.trim() !== '') ?? ''
 
-const answer: TextLook = (text, { width }) => (plain(text) === '' ? [] : wrap(plain(text), width))
-
 const SEVERITY: Readonly<Record<Notice['severity'], { readonly tone: Tone; readonly prefix: string }>> = {
   info: { tone: 'muted', prefix: '· ' },
   warning: { tone: 'warning', prefix: '' },
@@ -64,6 +62,7 @@ function defaults(binnacle: Binnacle) {
   const cut = (text: string, width: number): string => truncateToWidth(text, width, binnacle.tokens.glyphs.more)
   const prompt: TextLook = (text, { width }) =>
     wrap(plain(text), width, { first: `${binnacle.tokens.glyphs.mark} ` }).map((line) => paint('accent', line))
+  const answer: TextLook = (text, { width }) => markdown(binnacle, text, width)
   const reasoning: TextLook = (text, { width }) => (plain(text) === '' ? [] : wrap(plain(text), width).map((line) => paint('dim', line)))
   const call: CallLook = ({ name: tool, args }, { width }) => [cut(`⏺ ${oneLine(tool)}(${oneLine(args)})`, width)]
   const result: ResultLook = ({ text, failed: hasFailed }, { width }) => {

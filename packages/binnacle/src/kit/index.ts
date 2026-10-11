@@ -11,3 +11,14 @@ export { tabs } from './tabs.ts'
 export type { TabAt, TabLook, TabsOptions } from './tabs.ts'
 export { wrap } from './wrap.ts'
 export type { WrapPrefixes } from './wrap.ts'
+export { markdown } from './markdown.ts'
+export type {
+  MarkdownAt,
+  MarkdownCodeLook,
+  MarkdownHeadingLook,
+  MarkdownItemAt,
+  MarkdownItemLook,
+  MarkdownParagraphLook,
+  MarkdownQuoteLook,
+  MarkdownRuleLook,
+} from './markdown.ts'

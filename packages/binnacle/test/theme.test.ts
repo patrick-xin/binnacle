@@ -28,7 +28,21 @@ function themer(ctx: Context, layer: ThemeLayer) {
   })
 }
 
-const TONES: readonly Tone[] = ['text', 'accent', 'muted', 'dim', 'success', 'warning', 'error', 'border', 'borderAccent', 'borderMuted']
+const TONES: readonly Tone[] = [
+  'text',
+  'accent',
+  'muted',
+  'dim',
+  'success',
+  'warning',
+  'error',
+  'border',
+  'borderAccent',
+  'borderMuted',
+  'heading',
+  'code',
+  'link',
+]
 
 test('a theme layer changes everything drawn with the tokens it names, and the tokens it does not name stay as they were', async () => {
   const { ctx, terminal } = await drawn(12, 3, (binnacle) => {
@@ -81,6 +95,9 @@ test("with no layer, binnacle draws in v0's default tones, each one of the termi
         border: 'default dim',
         borderAccent: '6',
         borderMuted: 'default dim',
+        heading: '6',
+        code: '3',
+        link: '4',
       },
       true,
     ],
@@ -207,4 +224,40 @@ test('blanks at the end of a line keep a background given in the colon form of a
     binnacle.place('transcript', { lines: () => ['X\x1b[48:2::255:0:0m   '] })
   })
   assert.deepEqual(await Promise.all([1, 3].map(async (x) => terminal.backgroundAt(x, 0))), ['#ff0000', '#ff0000'])
+})
+
+test('a Tone painted inside another opens the other again after it ends, its colour and its attributes', async () => {
+  const { terminal } = await drawn(8, 3, (binnacle) => {
+    binnacle.layout('chat', { place: 'a' })
+    binnacle.place('a', {
+      lines: () => [binnacle.paint('heading', `a${binnacle.paint('warning', 'b')}c\x1b[1md\x1b[22me\x1b[1;38;5;0mf`)],
+    })
+  })
+  const styles = await Promise.all([0, 1, 2, 4, 5].map((x) => terminal.styleAt(x, 0)))
+  assert.deepEqual(
+    styles.map(({ colour, bold }) => [colour, bold]),
+    [
+      [6, true],
+      [3, true],
+      [6, true],
+      [6, true],
+      [0, true],
+    ],
+  )
+})
+
+test("a colour's arguments inside a Tone, as the zeroes of a truecolor green, are no reset, and the outer Tone does not open after them", async () => {
+  const { terminal } = await drawn(
+    8,
+    3,
+    (binnacle) => {
+      binnacle.layout('chat', { place: 'a' })
+      binnacle.place('a', {
+        lines: () => [binnacle.paint('heading', 'a\x1b[1;38;2;0;255;0mb\x1b[38:2::0:0:255mc\x1b[39md')],
+      })
+    },
+    'truecolor',
+  )
+  const colours = await Promise.all([1, 2, 3].map(async (x) => (await terminal.styleAt(x, 0)).colour))
+  assert.deepEqual(colours, ['#00ff00', '#0000ff', 6])
 })

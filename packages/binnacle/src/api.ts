@@ -38,7 +38,20 @@ export interface Model<S extends object> extends Watchable {
 }
 
 /** A colour of the theme's, named by what is drawn in it, as pi's themes name it. */
-export type Tone = 'text' | 'accent' | 'muted' | 'dim' | 'success' | 'warning' | 'error' | 'border' | 'borderAccent' | 'borderMuted'
+export type Tone =
+  | 'text'
+  | 'accent'
+  | 'muted'
+  | 'dim'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'border'
+  | 'borderAccent'
+  | 'borderMuted'
+  | 'heading'
+  | 'code'
+  | 'link'
 
 export type Glyph = 'mark' | 'unmarked' | 'checked' | 'unchecked' | 'rule' | 'separator' | 'divider' | 'more'
 

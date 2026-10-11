@@ -141,6 +141,30 @@ const lineOf = (untrusted, width) => truncateToWidth(toPlainText(untrusted), wid
   const lines = wrap(toPlainText(untrusted), width, { first: '> ', rest: '> ' })
   ```
 
+- `markdown(binnacle, text, width)` gives the lines of a markdown text, wrapped at that many cells. It makes the text plain itself, so give it the text as it came. The transcript's view draws each answer with it. It draws headings, bold, italic, inline code, code blocks, lists, quotes, links and rules. Any other token, such as a table, raw HTML, a strikethrough or an image, draws as its source text. An empty text gives no line. Blocks are joined by one blank line, and the items of a list by none.
+- Each block draws through a Look of its own, given what it draws, already drawn, and `{ width }`, and returns lines. Its types are from `binnacle`:
+
+  | Look | Draws | Given | Default | Type |
+  |---|---|---|---|---|
+  | `markdown.heading` | a heading | its inline text, and `{ depth }` | the text in the `heading` Tone, with no `#` | `MarkdownHeadingLook` |
+  | `markdown.paragraph` | a paragraph, and a token drawn as its source | its inline text | wrapped at the width | `MarkdownParagraphLook` |
+  | `markdown.code` | a code block | its lines, made plain, and `{ lang }`, `''` with none | each line indented two cells in the `code` Tone, wrapped under its indent | `MarkdownCodeLook` |
+  | `markdown.item` | a list item | its blocks' lines, drawn at the width less its marker, and `{ marker, ordered, number }` | the marker, `• ` or `<number>. `, before the first line, and the other lines under the text | `MarkdownItemLook` |
+  | `markdown.quote` | a quote | its blocks' lines, drawn at the width less two | each line after `│ `, in the `muted` Tone | `MarkdownQuoteLook` |
+  | `markdown.rule` | a rule | `{ width }` alone | the `rule` glyph across the width, in the `border` Tone | `MarkdownRuleLook` |
+
+  Inline, bold and italic draw as the terminal's bold and italic, code in the `code` Tone, and a link as its text in the `link` Tone, then ` (<destination>)` when the destination is not its text. An item's `number` counts from its list's start, and from 1 in a list that is not ordered. A nested list is a block of its item, so it draws under the item's text. A task's box draws as its source, such as `[x] `, at the start of the text, and counts toward its wrap. This draws each code block in a frame with its language in the top edge:
+
+  ```js
+  import { markdown } from 'binnacle'
+  ctx.binnacle.look('markdown.code', () => (lines, { lang, width }) => [
+    `┌─ ${lang} ${'─'.repeat(Math.max(0, width - lang.length - 4))}`,
+    ...lines.map((line) => ctx.binnacle.paint('code', `│ ${line}`)),
+    `└${'─'.repeat(Math.max(0, width - 1))}`,
+  ])
+  const lines = markdown(ctx.binnacle, untrusted, width)
+  ```
+
 ### The Chat's session
 
 The core opens the session that the Chat shows, and provides it as `ctx.binnacleSession`: its `id`, its `agent`, its `events`, `send(text)` and `interrupt()`. It opens after dsh's plugins start. So wait for it in `apply`, as the status line does:
@@ -201,7 +225,7 @@ ctx.binnacle.theme({
 - A colour is one of the terminal's sixteen by name, such as `cyan` or `bright-black`, so the person's palette decides how it looks; a 256-colour index, such as `67`; or an exact colour, as `#rrggbb`, `#rgb`, `okhsl(h s% l%)` or `oklch(l c h)`. An exact colour is drawn as the nearest of 256 where the terminal has no truecolor.
 - A Tone's token is a colour, or a Style: `{ color, bold, dim, italic, underline }`. A plain colour stands for `{ color }`, and a Style with no `color` keeps the terminal's own.
 - `binnacle.theme` refuses a colour that is not one, such as `'36'`, and names its Tone.
-- `binnacle.tokens` is the tokens as the layers make them now. `binnacle.paint(tone, text)` draws text in a Tone. Paint in a Part's `lines`, so that the lines follow the theme when it changes:
+- `binnacle.tokens` is the tokens as the layers make them now. `binnacle.paint(tone, text)` draws text in a Tone. A Tone or a style painted inside it ends, and the text after it draws in the outer Tone again. Paint in a Part's `lines`, so that the lines follow the theme when it changes:
 
 ```js
 ctx.binnacle.place('status.state', {
@@ -223,6 +247,9 @@ The Tones, what draws with each, and their defaults:
 | `border` | the borders of a box | `{ dim: true }` |
 | `borderAccent` | the frame of what waits on the person, such as a Request | `cyan` |
 | `borderMuted` | a border that stands further back | `{ dim: true }` |
+| `heading` | a markdown heading | `{ color: 'cyan', bold: true }` |
+| `code` | markdown's inline code and code blocks | `yellow` |
+| `link` | a markdown link's text | `{ color: 'blue', underline: true }` |
 
 The glyphs, and their defaults: `mark` `›`, `unmarked` a space, `checked` `[x]`, `unchecked` `[ ]`, `rule` `─`, `separator` ` | `, `divider` ` · `, `more` `…`. A box's `edge` is `rounded`, and its `padding` and `gap` are `0`. A node of a Layout that names its own keeps it.
 
@@ -608,7 +635,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
 
 ### The transcript's view
 
-The row `binnacle-transcript-view` draws the transcript a person reads. A prompt draws as `› ` and its text, in the `accent` Tone. An answer draws its reasoning in the `dim` Tone, then its text, wrapped at the width. A tool call draws as one line, `⏺ <tool>(<its arguments>)`, and its result as one line, `⎿ ` and its first line of text, or `✗ ` and its first line in the `error` Tone when it failed. Context that dsh added draws as one line in the `dim` Tone, such as `· context: agent-instructions`. A command, a retry, a compaction and how a turn ended draw one line each, such as `/compact`, `retrying (1/3): <why>` in the `warning` Tone, or `✗ <why>` in the `error` Tone. Every other event draws nothing, and takes no row.
+The row `binnacle-transcript-view` draws the transcript a person reads. A prompt draws as `› ` and its text, in the `accent` Tone. An answer draws its reasoning in the `dim` Tone, then its text as markdown, wrapped at the width, with `markdown`. A tool call draws as one line, `⏺ <tool>(<its arguments>)`, and its result as one line, `⎿ ` and its first line of text, or `✗ ` and its first line in the `error` Tone when it failed. Context that dsh added draws as one line in the `dim` Tone, such as `· context: agent-instructions`. A command, a retry, a compaction and how a turn ended draw one line each, such as `/compact`, `retrying (1/3): <why>` in the `warning` Tone, or `✗ <why>` in the `error` Tone. Every other event draws nothing, and takes no row.
 
 - It sets the Looks `transcript.event.<type>` of the types it draws, `transcript.event` beneath them to draw nothing, and `transcript.live`.
 - Each piece it draws is a Look of its own, given plain data and `{ width }`, never dsh's shapes, and returns lines. The types are from `binnacle/plugins/transcript-view`:
@@ -631,6 +658,15 @@ The row `binnacle-transcript-view` draws the transcript a person reads. A prompt
     wrap(toPlainText(text), width, { first: '> ', rest: '> ' }).map((line) => ctx.binnacle.paint('accent', line)),
   )
   ctx.binnacle.look('transcript.reasoning', () => () => [])
+  ```
+
+- The default `transcript.answer` draws the text with `markdown`, as [Text](#text) says, so a markdown Look, such as `markdown.code`, changes the answers. This draws each answer indented by two cells, with a `●` before its first line:
+
+  ```js
+  import { markdown } from 'binnacle'
+  ctx.binnacle.look('transcript.answer', () => (text, { width }) =>
+    markdown(ctx.binnacle, text, width - 2).map((line, at) => (at === 0 ? '● ' : '  ') + line),
+  )
   ```
 
 - The type's Look joins its pieces' lines. A folded event with more than one line draws its first line, then `… <n> more lines` in the `muted` Tone. Then a prompt, an answer and a tool result end with a blank line. A context, a call and a notice do not, so a call and its result stand together. Set `transcript.event.<type>` to space or fold an event your own way.
