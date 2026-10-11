@@ -165,6 +165,15 @@ const lineOf = (untrusted, width) => truncateToWidth(toPlainText(untrusted), wid
   const lines = markdown(ctx.binnacle, untrusted, width)
   ```
 
+- `frame(binnacle, lines, width, { title, tone })` gives the lines in a box, `width` wide, drawn with the theme's `edge`. Each line is wrapped inside the box. The edge draws in the `border` Tone, or in `tone` when you give one. `title` draws in the top edge, cut with the `more` glyph where it does not fit. A frame narrower than 4 cells gives the lines wrapped at the width, with no box. A line keeps its colour and style, so make Untrusted Text plain first. Its options' type is `FrameOptions`. This draws an error in a box of the `error` Tone:
+
+  ```js
+  import { frame, toPlainText } from 'binnacle'
+  const lines = frame(ctx.binnacle, [toPlainText(untrusted)], width, { title: 'Failed', tone: 'error' })
+  ```
+
+- `rule(binnacle, text, width)` gives a Title's rule: the `rule` glyph across the width, with the text in it, in the `accent` Tone, such as `── Fruit ─────`. An empty text gives the rule alone. The default Look of a [Title](#title) draws it.
+
 ### The Chat's session
 
 The core opens the session that the Chat shows, and provides it as `ctx.binnacleSession`: its `id`, its `agent`, its `events`, `send(text)` and `interrupt()`. It opens after dsh's plugins start. So wait for it in `apply`, as the status line does:
@@ -512,7 +521,7 @@ title(ctx.binnacle, { name: 'fruit.title', text: () => 'Fruit' })
 
 - `text()` gives the text, which the Title makes plain. While it gives `undefined`, the Title draws nothing. `''` draws the rule alone.
 - `models` are what the text is drawn from, so that the Title is drawn again when it changes.
-- The Look `title.row`, or `<name>.row`, draws it: `(text, { width }) => line`. Its default draws the `rule` glyph and the text in `accent`.
+- The Look `title.row`, or `<name>.row`, draws it: `(text, { width }) => line`. Its default is `rule(binnacle, text, width)`, which draws the `rule` glyph and the text in `accent`.
 
 ### Line
 

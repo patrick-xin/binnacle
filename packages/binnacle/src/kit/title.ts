@@ -1,7 +1,7 @@
 import type { Binnacle, Watchable } from '../api.ts'
 import { toPlainText } from '../core/view.ts'
-import { visibleWidth } from '../terminal/utils.ts'
 import type { Component } from './component.ts'
+import { rule } from './frame.ts'
 
 /** The Look `title.row`, or `<name>.row`: a Title drawn as a rule across the width. */
 export type TitleRow = (text: string, at: { readonly width: number }) => string
@@ -23,16 +23,9 @@ export function title(binnacle: Binnacle, options: TitleOptions): Component {
     lines: (width) => {
       const text = options.text()
       if (text === undefined) return []
-      const row = binnacle.lookOf<TitleRow>([`${name}.row`, 'title.row'], (plain, at) => defaultRow(binnacle, plain, at.width))
+      const row = binnacle.lookOf<TitleRow>([`${name}.row`, 'title.row'], (plain, at) => rule(binnacle, plain, at.width))
       return [row(toPlainText(text), { width })]
     },
   })
   return { handle }
-}
-
-function defaultRow(binnacle: Binnacle, text: string, width: number): string {
-  const { rule } = binnacle.tokens.glyphs
-  const head = text === '' ? '' : `${rule}${rule} ${text} `
-  const ruleWidth = Math.max(1, visibleWidth(rule))
-  return binnacle.paint('accent', head + rule.repeat(Math.max(0, Math.floor((width - visibleWidth(head)) / ruleWidth))))
 }
