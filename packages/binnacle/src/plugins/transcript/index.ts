@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { Point } from '../../api.ts'
 import { gestureTable } from '../../core/gestures.ts'
 import { createModel } from '../../core/model.ts'
 import { toPlainText } from '../../index.ts'
@@ -35,8 +36,9 @@ export interface TranscriptState {
 /**
  * A line that a transcript Look returns: a string, or its `text` with what a click on it does.
  * A click on a line with `fold` folds that region, and on a line with `run` runs that action, given the cell clicked. A line with both runs its action.
+ * Either acts only at the column `from` of its text and after it, 0 by default: a click before it Marks the event alone.
  */
-export type Line = string | { readonly text: string; readonly fold?: string; readonly run?: string }
+export type Line = string | { readonly text: string; readonly fold?: string; readonly run?: string; readonly from?: number }
 
 /** What an event's Look is given beside the event. */
 export interface EventAt {
@@ -183,13 +185,17 @@ export function apply(plugin: Context): void {
         if (at === -1) state.folded.push(region)
         else state.folded.splice(at, 1)
       })
+    // A line acts only from its `from`. Before it, a click is on the line as on a plain one that is not its event's first, so it Marks alone.
+    const actingAtCell = ({ line, column }: Point): Acting | undefined => {
+      const acting = (drawn ?? again()).actingAt.get(line)
+      return acting !== undefined && column >= (acting.from ?? 0) ? acting : undefined
+    }
     // A plain first line folds its event so that a Look that returns strings folds as it did before lines could act; another plain line folds nothing.
-    const regionAt = (line: number): string | undefined => {
+    const regionAt = (at: Point): string | undefined => {
       const { actingAt, ownerAt, firstOf } = drawn ?? again()
-      const acting = actingAt.get(line)
-      if (acting !== undefined) return acting.fold
-      const seq = ownerAt.get(line)
-      return seq !== undefined && firstOf.get(seq) === line ? regionOf(seq) : undefined
+      if (actingAt.has(at.line)) return actingAtCell(at)?.fold
+      const seq = ownerAt.get(at.line)
+      return seq !== undefined && firstOf.get(seq) === at.line ? regionOf(seq) : undefined
     }
     // Up and down move from where the Mark is drawn, among the events that draw.
     const step = (by: -1 | 1): void => {
@@ -217,7 +223,7 @@ export function apply(plugin: Context): void {
       description: 'Fold or unfold the Marked event, or the region of the line clicked',
       run: (at) => {
         if (at !== undefined) {
-          const region = regionAt(at.line)
+          const region = regionAt(at)
           if (region !== undefined) fold(region)
           return
         }
@@ -232,9 +238,8 @@ export function apply(plugin: Context): void {
       description: 'Mark the event clicked, then run the action of the line clicked, or else fold what it marks',
       run: (at) => {
         if (at === undefined) return
-        const { ownerAt, actingAt } = drawn ?? again()
-        const seq = ownerAt.get(at.line)
-        const run = actingAt.get(at.line)?.run
+        const seq = (drawn ?? again()).ownerAt.get(at.line)
+        const run = actingAtCell(at)?.run
         if (seq !== undefined) mark(seq)
         binnacle.run(run ?? 'transcript.fold', at)
       },

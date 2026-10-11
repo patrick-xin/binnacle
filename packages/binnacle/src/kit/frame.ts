@@ -13,10 +13,21 @@ export interface FrameOptions {
   readonly tone?: Tone
 }
 
-/** The lines in a box of the theme's edge, `width` wide, each line wrapped inside it. Narrower than 4 cells, the lines without the box. */
-export function frame(binnacle: Binnacle, lines: readonly string[], width: number, options: FrameOptions = {}): string[] {
+/** A line that `frame` takes: a string, or an object with its `text`, whose other fields `frame` keeps. */
+export type Framed = string | { readonly text: string; readonly from?: number }
+
+/**
+ * The lines in a box of the theme's edge, `width` wide, each line wrapped inside it. Narrower than 4 cells, the lines without the box.
+ * Each row an object wraps to keeps its other fields. Its `from` is moved past the left edge on its first row, and is the first cell inside the edge on each row after it.
+ */
+export function frame<L extends Framed>(
+  binnacle: Binnacle,
+  lines: readonly L[],
+  width: number,
+  options: FrameOptions = {},
+): (string | L)[] {
   const cells = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : 0
-  if (cells < 4) return lines.flatMap((line) => wrap(line, cells))
+  if (cells < 4) return lines.flatMap((line) => rowsOf(line, cells, 0, (row) => row))
   const edge = edgeNamed(undefined, binnacle.tokens)
   const paint = (glyphs: string) => binnacle.paint(options.tone ?? 'border', glyphs)
   const inner = cells - visibleWidth(edge.left) - visibleWidth(edge.right)
@@ -28,10 +39,17 @@ export function frame(binnacle: Binnacle, lines: readonly string[], width: numbe
       : `${paint(edge.topLeft + edge.top)} ${title} ${paint(edge.top.repeat(Math.max(0, between - 3 - visibleWidth(title))) + edge.topRight)}`
   const bottomBetween = cells - visibleWidth(edge.bottomLeft) - visibleWidth(edge.bottomRight)
   const bottom = paint(edge.bottomLeft + edge.bottom.repeat(bottomBetween) + edge.bottomRight)
-  const body = lines
-    .flatMap((line) => wrap(line, inner))
-    .map((line) => paint(edge.left) + line + RESET_STYLE + ' '.repeat(Math.max(0, inner - visibleWidth(line))) + paint(edge.right))
-  return [top, ...body, bottom]
+  const boxed = (row: string): string =>
+    paint(edge.left) + row + RESET_STYLE + ' '.repeat(Math.max(0, inner - visibleWidth(row))) + paint(edge.right)
+  return [top, ...lines.flatMap((line) => rowsOf(line, inner, visibleWidth(edge.left), boxed)), bottom]
+}
+
+function rowsOf<L extends Framed>(line: L, width: number, left: number, drawn: (row: string) => string): (string | L)[] {
+  if (typeof line === 'string') return wrap(line, width).map(drawn)
+  const acting: Exclude<Framed, string> = line
+  return wrap(acting.text, width).map(
+    (row, nth) => ({ ...acting, text: drawn(row), from: left + (nth === 0 ? (acting.from ?? 0) : 0) }) as L,
+  )
 }
 
 /** The Title's rule: the `rule` glyph across the width, in the `accent` Tone, with the text in it. */

@@ -16,6 +16,7 @@ import {
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { Point } from '../../src/api.ts'
 import { gestureTable } from '../../src/core/gestures.ts'
+import { frame } from '../../src/index.ts'
 import { mount } from '../support/mount.ts'
 import { persistence } from '../support/sessions.ts'
 import { agents } from '../support/agents.ts'
@@ -996,6 +997,70 @@ test("a click on a plain line that is not its event's first Marks its event, and
   terminal.type(clickAt(0, 2))
   await terminal.read()
   assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [0, []])
+})
+
+test('a click on a line marked fold at its from or after folds its region, and a click before it only Marks its event', async () => {
+  const { ctx, terminal } = await clicking([three])
+  ctx.binnacle.look<EventLook>('transcript.event', () => (event) => [
+    `#${event.seq}`,
+    { text: 'ls · 0.1s [-]', fold: `${event.seq}/body`, from: 10 },
+  ])
+  await terminal.read()
+  terminal.type(clickAt(9, 3))
+  await terminal.read()
+  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [1, []])
+  terminal.type(clickAt(10, 1))
+  await terminal.read()
+  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [0, ['0/body']])
+})
+
+test('a click on a line marked run before its from runs nothing, and only Marks its event', async () => {
+  const { ctx, terminal } = await clicking([three])
+  const ran: (number | undefined)[] = []
+  ctx.binnacle.action('my.action', { run: (at) => ran.push(at?.column) })
+  ctx.binnacle.look<EventLook>('transcript.event', () => (event) => [`#${event.seq}`, { text: 'go [x]', run: 'my.action', from: 3 }])
+  await terminal.read()
+  terminal.type(clickAt(2, 3))
+  terminal.type(clickAt(4, 1))
+  await terminal.read()
+  assert.deepEqual([ran, stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [[4], 0, []])
+})
+
+test("an event's first line marked fold with a from folds nothing on a click before it", async () => {
+  const { ctx, terminal } = await clicking([three])
+  ctx.binnacle.look<EventLook>('transcript.event', () => (event) => [{ text: `#${event.seq} [-]`, fold: `${event.seq}/body`, from: 3 }])
+  await terminal.read()
+  terminal.type(clickAt(0, 1))
+  await terminal.read()
+  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [1, []])
+})
+
+test('a line drawn in a frame still folds from its from, and a click on the edge only Marks its event', async () => {
+  const { ctx, terminal } = await clicking([three])
+  ctx.binnacle.look<EventLook>(
+    'transcript.event',
+    () =>
+      (event, { width }) =>
+        frame(ctx.binnacle, [{ text: `#${event.seq} [-]`, fold: `${event.seq}/body`, from: 3 }], width),
+  )
+  await terminal.read()
+  terminal.type(clickAt(0, 1))
+  terminal.type(clickAt(3, 1))
+  await terminal.read()
+  assert.deepEqual([stateOf(ctx).state?.marked, stateOf(ctx).state?.folded], [0, []])
+  terminal.type(clickAt(4, 1))
+  await terminal.read()
+  assert.deepEqual(stateOf(ctx).state?.folded, ['0/body'])
+})
+
+test("enter folds the Marked event's first region marked fold, whatever its from", async () => {
+  const { ctx, terminal } = await reading([three], ['--session', 'session-stored'], 9)
+  ctx.binnacle.look<EventLook>('transcript.event.test/three', () => (event) => [
+    { text: `#${event.seq} [-]`, fold: `${event.seq}/body`, from: 3 },
+  ])
+  terminal.type(ENTER)
+  await terminal.read()
+  assert.deepEqual(stateOf(ctx).state?.folded, ['2/body'])
 })
 
 test("enter folds the Marked event's first region marked fold on a line it draws, else the event's own region", async () => {

@@ -166,7 +166,7 @@ const lineOf = (untrusted, width) => truncateToWidth(toPlainText(untrusted), wid
   const lines = markdown(ctx.binnacle, untrusted, width)
   ```
 
-- `frame(binnacle, lines, width, { title, tone })` gives the lines in a box, `width` wide, drawn with the theme's `edge`. Each line is wrapped inside the box. The edge draws in the `border` Tone, or in `tone` when you give one. `title` draws in the top edge, cut with the `more` glyph where it does not fit. A frame narrower than 4 cells gives the lines wrapped at the width, with no box. A line keeps its colour and style, so make Untrusted Text plain first. Its options' type is `FrameOptions`. This draws an error in a box of the `error` Tone:
+- `frame(binnacle, lines, width, { title, tone })` gives the lines in a box, `width` wide, drawn with the theme's `edge`. Each line is wrapped inside the box. The edge draws in the `border` Tone, or in `tone` when you give one. `title` draws in the top edge, cut with the `more` glyph where it does not fit. A frame narrower than 4 cells gives the lines wrapped at the width, with no box. A line keeps its colour and style, so make Untrusted Text plain first. A line is a string, or an object with its `text`, such as a transcript's `Line`: each row it wraps to keeps its other fields, so a line marked `fold` or `run` still acts in a frame. Its `from` moves past the left edge on its first row, and each row after it acts from its first cell inside the edge. Its options' type is `FrameOptions`, and a line's `Framed`. This draws an error in a box of the `error` Tone:
 
   ```js
   import { frame, toPlainText } from 'binnacle'
@@ -624,7 +624,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   })
   ```
 
-- A line is a `Line` from `binnacle/plugins/transcript`: a string, or `{ text, fold }` or `{ text, run }`. The transcript draws its `text`. A click on a line with `fold` folds that region, and a click on a line with `run` runs that action, given the cell clicked. A line with both runs its action. A click on an event's first line, when it is a string, folds the event's own region, so a Look that returns strings folds as before. A click on any other string Marks its event, and folds nothing. A Look that changes the lines of the Look beneath it reads a line's text with `typeof line === 'string' ? line : line.text`. This draws a `[-]` that folds the body of each tool call, and a `[x]` that runs an action of the author's, given the cell clicked:
+- A line is a `Line` from `binnacle/plugins/transcript`: a string, or `{ text, fold }` or `{ text, run }`, each with an optional `from`. The transcript draws its `text`. A click on a line with `fold` folds that region, and a click on a line with `run` runs that action, given the cell clicked. A line with both runs its action. Either acts only at the column `from` of its text and after it, counted in cells without its styles, 0 by default: a click before it only Marks its event. Enter folds the first `fold` region whatever its `from`. A click on an event's first line, when it is a string, folds the event's own region, so a Look that returns strings folds as before. A click on any other string Marks its event, and folds nothing. A Look that changes the lines of the Look beneath it reads a line's text with `typeof line === 'string' ? line : line.text`. This draws a `[-]` that folds the body of each tool call, and a `[x]` that runs an action of the author's, given the cell clicked:
 
   ```js
   ctx.binnacle.action('my.copy', { run: (at) => {} })
@@ -632,6 +632,18 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
     const body = `${event.seq}/body`
     const head = [`⏺ ${toPlainText(event.data.name)}`, { text: isFolded(body) ? '[+]' : '[-]', fold: body }, { text: '[x]', run: 'my.copy' }]
     return isFolded(body) ? head : [...head, truncateToWidth(toPlainText(event.data.arguments), width)]
+  })
+  ```
+
+  This folds each tool call's body from the `[-]` at the end of its first line, and a click on its name only Marks it:
+
+  ```js
+  import { toPlainText, truncateToWidth, visibleWidth } from 'binnacle'
+  ctx.binnacle.look('transcript.event.tool/call', () => (event, { isFolded, width }) => {
+    const body = `${event.seq}/body`
+    const name = `⏺ ${toPlainText(event.data.name)} `
+    const head = { text: name + (isFolded(body) ? '[+]' : '[-]'), fold: body, from: visibleWidth(name) }
+    return isFolded(body) ? [head] : [head, truncateToWidth(toPlainText(event.data.arguments), width)]
   })
   ```
 
