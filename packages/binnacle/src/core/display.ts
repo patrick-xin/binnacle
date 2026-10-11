@@ -22,7 +22,8 @@ export class Display {
     for (let y = 0; y < count; y++) {
       const row = rows[y] ?? ''
       if (row === (this.#drawn[y] ?? '')) continue
-      changes += moveTo(y) + row + RESET_STYLE + CLEAR_TO_LINE_END
+      // The line is cleared before the row: after a row as wide as the terminal, the cursor waits on its last cell, which an erase would clear.
+      changes += moveTo(y) + CLEAR_TO_LINE_END + row + RESET_STYLE
     }
     this.#drawn = rows
     // Writing a row moves the cursor, so it is put back after any row changes. It stays hidden: a Part draws its own.
