@@ -21,6 +21,9 @@
     # The transcript: the session's events, raw.
     - id: binnacle-transcript
       name: 'binnacle/plugins/transcript'
+    # The transcript's view: what a person reads, each piece a Look. Off, the transcript draws each event raw.
+    - id: binnacle-transcript-view
+      name: 'binnacle/plugins/transcript-view'
     # The composer: what a person types, before it is sent.
     - id: binnacle-composer
       name: 'binnacle/plugins/composer'

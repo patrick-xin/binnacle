@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const kept = ['toPlainText', 'visibleWidth', 'truncateToWidth', 'createModel', 'list', 'line', 'tabs', 'title', 'CHAT_LAYOUT']
+const kept = ['toPlainText', 'visibleWidth', 'truncateToWidth', 'createModel', 'list', 'line', 'tabs', 'title', 'wrap', 'CHAT_LAYOUT']
 
 let into: string
 let files: string[]
@@ -70,7 +70,7 @@ test("the packed Requests' view gives what an author builds on, and AUTHORING.md
 test('the packed transcript gives its readers of an event, and AUTHORING.md names each', async () => {
   const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
   const transcript = await import(pathToFileURL(join(unpacked, exports['./plugins/transcript']!.default)).href)
-  const readers = ['textOf', 'isPrompt', 'failed', 'withoutReasoning']
+  const readers = ['textOf', 'reasoningOf', 'callOf', 'producerOf', 'noticeOf', 'isPrompt', 'failed', 'withoutReasoning']
   assert.deepEqual(
     readers.filter((name) => typeof transcript[name] !== 'function' || !read('AUTHORING.md').includes(`${name}(`)),
     [],

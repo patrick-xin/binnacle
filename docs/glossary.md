@@ -26,7 +26,7 @@ One canonical term for each concept that is binnacle's own, for a person who use
 
 ## The transcript
 
-- **Fold** — an event of the transcript drawn as its one header line, which ends with how many of its lines it hides. Enter folds and unfolds the Marked event, and a click on an event's header line folds that event. <a id="fold"></a>
+- **Fold** — an event of the transcript drawn short: its first line, then how many more lines it has, or raw, its one header line, which ends with how many of its lines it hides. Enter folds and unfolds the Marked event, and a click on an event's first line folds that event. <a id="fold"></a>
 - **Mark** — the event of the transcript that its keys act on, which up and down move. The transcript Marks its newest event when it first has the Focus, and a click Marks the event it hits. Drawn in inverse video while the transcript has the Focus. Not the terminal's cursor. <a id="mark"></a>
 
 ## Waiting on a person

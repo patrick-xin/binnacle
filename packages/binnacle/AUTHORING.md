@@ -8,6 +8,7 @@ binnacle's own features are plugins too, and they use only what this page says. 
 |---|---|---|
 | `binnacle` | the core: the terminal, Layouts, Places, the Focus, gestures, and the Kit | `src/index.ts`, `src/core/`, `src/kit/` |
 | `binnacle-transcript` | the session's events | `src/plugins/transcript/index.ts` |
+| `binnacle-transcript-view` | the transcript a person reads: prompts, answers and what the agent did | `src/plugins/transcript-view/index.ts` |
 | `binnacle-composer` | what a person types, before it is sent | `src/plugins/composer/index.ts` |
 | `binnacle-status-line` | whether the agent runs, and on which model | `src/plugins/status-line/index.ts` |
 | `binnacle-requests` | the approvals and the questions that stand, and the talk with dsh: a model that draws nothing | `src/plugins/requests/index.ts` |
@@ -133,6 +134,12 @@ const lineOf = (untrusted, width) => truncateToWidth(toPlainText(untrusted), wid
 - `toPlainText(text)` takes every control sequence out of the text.
 - `visibleWidth(text)` is the cells that the text takes in the terminal, with its colour and style not counted.
 - `truncateToWidth(text, width, ellipsis)` cuts the text to that many cells, and ends it with `ellipsis` where it is cut, `...` if you give none.
+- `wrap(text, width, { first, rest })` wraps the text at that many cells, with `first` before its first line and `rest` before each line after it. With no `rest`, the lines after the first start under the text. A style that spans a wrap is carried to the next line. An empty text gives `first` alone. A prefix wider than the width draws as wide as it is, and the text gets one cell a line. This wraps a prompt with a `> ` before each line:
+
+  ```js
+  import { toPlainText, wrap } from 'binnacle'
+  const lines = wrap(toPlainText(untrusted), width, { first: '> ', rest: '> ' })
+  ```
 
 ### The Chat's session
 
@@ -518,11 +525,11 @@ tabs(ctx.binnacle, {
 
 ## The transcript
 
-The row `binnacle-transcript` places its Part in the Place `transcript`, which the Chat draws. It draws each event of the session as its header, `▾ #<seq> <type>`, then its data as JSON, and the answer that streams as one live block.
+The row `binnacle-transcript` places its Part in the Place `transcript`, which the Chat draws. On its own, it draws each event of the session raw: its header, `▾ #<seq> <type>`, then its data as JSON, and the answer that streams as one live block. The row `binnacle-transcript-view` lays the transcript a person reads over it, as [The transcript's view](#the-transcripts-view) says. Turn the view off to see each event raw.
 
 - Its state is the model `transcript`, of the type `TranscriptState` from `binnacle/plugins/transcript`:
   - `events`: the committed events, in order.
-  - `live`: the blocks of the answer that streams, in the answer's order, or `undefined` while none streams. Each block, of the type `LiveBlock`, has a `kind` (`text`, `reasoning` or `tool-call`), its `text`, and a tool call's `name` once dsh gives it.
+  - `live`: the blocks of the answer that streams, in the answer's order, or `undefined` while none streams. Each block, of the type `LiveBlock`, has a `kind` (`text`, `reasoning` or `tool-call`), its `text`, and a tool call's `name` once dsh gives it. The blocks end when the answer commits.
   - `folded`: the seqs of the folded events, empty at first.
   - `marked`: the seq of the Marked event, or `undefined`.
 - The transcript sets `events` and `live`. Read them. If you set them, the transcript replaces them at the next event or frame.
@@ -547,7 +554,7 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ```
 
 - Set one of them by its id to change what it does, and run `beneath()` to keep the default.
-- Each event draws through the Look `transcript.event.<type>`, such as `transcript.event.tool/call`, and beneath it `transcript.event`, which draws every type. Its type is `EventLook` from `binnacle/plugins/transcript`: `(event, { folded, width }) => string[]`. It is given the event, whether the event is folded, and the transcript's width, and returns the event's lines. The default draws the header, the JSON and a blank line, or the header with its count while folded. Make an event's text plain with `toPlainText` before you draw it, and cut a line at `width` to keep it to one row: the core wraps a wider one. This draws each tool call as one line:
+- Each event draws through the Look `transcript.event.<type>`, such as `transcript.event.tool/call`, and beneath it `transcript.event`, which draws every type. Its type is `EventLook` from `binnacle/plugins/transcript`: `(event, { folded, width }) => string[]`. It is given the event, whether the event is folded, and the transcript's width, and returns the event's lines. The transcript's own default draws the header, the JSON and a blank line, or the header with its count while folded. Make an event's text plain with `toPlainText` before you draw it, and cut a line at `width` to keep it to one row: the core wraps a wider one. This draws each tool call as one line:
 
   ```js
   import { toPlainText, truncateToWidth } from 'binnacle'
@@ -557,8 +564,12 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   })
   ```
 
-- Read an event with the readers from `binnacle/plugins/transcript`, so that a Look need not know dsh's shapes. Each is given an event of any type:
-  - `textOf(event)`: the text of a person's message or an answer's, its text blocks joined, or `''` for another event.
+- Read an event with the readers from `binnacle/plugins/transcript`, so that a Look need not know dsh's shapes. Each is given an event of any type, and gives `''` or `undefined` for an event of another type or of a shape it cannot read:
+  - `textOf(event)`: the text of a person's message, an answer's or a tool result's, its text blocks joined, or `''`.
+  - `reasoningOf(event)`: an answer's reasoning, its reasoning blocks joined, or `''`.
+  - `callOf(event)`: a tool call's `{ name, args }`, its arguments as the model wrote them, or `''` with none. It is `undefined` for another event, or a call with no name.
+  - `producerOf(event)`: the producer of context that the person did not type, such as `agent-instructions`, or `'unknown'` when it names none. It is `undefined` for a prompt or another event.
+  - `noticeOf(event)`: what a command, a retry, a compaction or a turn's end says, as a `Notice`: `{ kind, text, severity }`. The `kind` is `command`, `retry`, `compaction` or `turn`, and the `severity` is `info`, `warning` or `error`. It is `undefined` for another event, such as a turn that completed.
   - `isPrompt(event)`: whether the event is a prompt the person typed, not context that dsh added, such as a file's change.
   - `failed(event)`: whether the event is a tool result that failed.
   - `withoutReasoning(event)`: the event with its reasoning taken out, from the answer's message and from its stream, or the event as it is.
@@ -594,6 +605,36 @@ The row `binnacle-transcript` places its Part in the Place `transcript`, which t
   ```
 
 - The transcript calls each Look at each draw, so a Look follows the theme, and the models it names in `binnacle.look`'s `{ models }`.
+
+### The transcript's view
+
+The row `binnacle-transcript-view` draws the transcript a person reads. A prompt draws as `› ` and its text, in the `accent` Tone. An answer draws its reasoning in the `dim` Tone, then its text, wrapped at the width. A tool call draws as one line, `⏺ <tool>(<its arguments>)`, and its result as one line, `⎿ ` and its first line of text, or `✗ ` and its first line in the `error` Tone when it failed. Context that dsh added draws as one line in the `dim` Tone, such as `· context: agent-instructions`. A command, a retry, a compaction and how a turn ended draw one line each, such as `/compact`, `retrying (1/3): <why>` in the `warning` Tone, or `✗ <why>` in the `error` Tone. Every other event draws nothing, and takes no row.
+
+- It sets the Looks `transcript.event.<type>` of the types it draws, `transcript.event` beneath them to draw nothing, and `transcript.live`.
+- Each piece it draws is a Look of its own, given plain data and `{ width }`, never dsh's shapes, and returns lines. The types are from `binnacle/plugins/transcript-view`:
+
+  | Look | Draws | Given | Type |
+  |---|---|---|---|
+  | `transcript.prompt` | a prompt the person typed | its text | `TextLook` |
+  | `transcript.answer` | an answer's text | its text | `TextLook` |
+  | `transcript.reasoning` | an answer's reasoning | its text | `TextLook` |
+  | `transcript.call` | a tool call | `{ name, args }` | `CallLook` |
+  | `transcript.result` | a tool result | `{ text, failed }` | `ResultLook` |
+  | `transcript.context` | context that dsh added | `{ producer }` | `ContextLook` |
+  | `transcript.notice` | a command, a retry, a compaction or a turn's end | `{ kind, text, severity }` | `NoticeLook` |
+
+- A piece is given its text as it came, Untrusted Text: make it plain before you draw it. A Look that returns no line takes the piece out. An event left with no line takes no row, its blank line included. This draws each prompt with a `> ` before each of its lines, and takes the reasoning out:
+
+  ```js
+  import { toPlainText, wrap } from 'binnacle'
+  ctx.binnacle.look('transcript.prompt', () => (text, { width }) =>
+    wrap(toPlainText(text), width, { first: '> ', rest: '> ' }).map((line) => ctx.binnacle.paint('accent', line)),
+  )
+  ctx.binnacle.look('transcript.reasoning', () => () => [])
+  ```
+
+- The type's Look joins its pieces' lines. A folded event with more than one line draws its first line, then `… <n> more lines` in the `muted` Tone. Then a prompt, an answer and a tool result end with a blank line. A context, a call and a notice do not, so a call and its result stand together. Set `transcript.event.<type>` to space or fold an event your own way.
+- The answer that streams draws through the same pieces: its reasoning, then its text, then a blank line, then each tool call with its arguments so far.
 
 ## The composer
 

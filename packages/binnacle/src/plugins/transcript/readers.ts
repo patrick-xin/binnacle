@@ -26,16 +26,91 @@ const isReasoningRecord = (record: unknown): boolean => {
   )
 }
 
-export function textOf(event: SessionEvent): string {
-  if (event.type !== 'user/message' && event.type !== 'assistant/message') return ''
+const blocksOf = (event: SessionEvent, kind: 'text' | 'reasoning'): string => {
   const content = messageOf(event)?.content
   if (!Array.isArray(content)) return ''
   return content
     .map((block) => {
       const { type, text } = fields(block) ?? {}
-      return type === 'text' && typeof text === 'string' ? text : ''
+      return type === kind && typeof text === 'string' ? text : ''
     })
     .join('')
+}
+
+export function textOf(event: SessionEvent): string {
+  return blocksOf(event, 'text')
+}
+
+export function reasoningOf(event: SessionEvent): string {
+  return event.type === 'assistant/message' ? blocksOf(event, 'reasoning') : ''
+}
+
+/** A tool call, as the model wrote it: its arguments are not parsed. */
+export interface Call {
+  readonly name: string
+  readonly args: string
+}
+
+export function callOf(event: SessionEvent): Call | undefined {
+  if (event.type !== 'tool/call') return undefined
+  const { name, arguments: args } = fields(event.data) ?? {}
+  if (typeof name !== 'string') return undefined
+  return { name, args: typeof args === 'string' ? args : '' }
+}
+
+export function producerOf(event: SessionEvent): string | undefined {
+  if (event.type !== 'user/message' || isPrompt(event)) return undefined
+  const message = messageOf(event)
+  if (message === undefined) return undefined
+  const kind = fields(message.source)?.kind
+  return typeof kind === 'string' ? kind : 'unknown'
+}
+
+/** What a command, a retry, a compaction or a turn's end says to a person. */
+export interface Notice {
+  readonly kind: 'command' | 'retry' | 'compaction' | 'turn'
+  readonly text: string
+  readonly severity: 'info' | 'warning' | 'error'
+}
+
+const messageText = (failure: unknown): string | undefined => {
+  const message = fields(failure)?.message
+  return typeof message === 'string' ? message : undefined
+}
+
+// Only the event that says how a thing ended gives a notice: dsh appends a compaction's summary before the compaction can still fail.
+export function noticeOf(event: SessionEvent): Notice | undefined {
+  const data = fields(event.data)
+  if (data === undefined) return undefined
+  switch (event.type as string) {
+    case 'command/run': {
+      if (typeof data.name !== 'string') return undefined
+      const args = typeof data.args === 'string' && data.args !== '' ? ` ${data.args}` : ''
+      return { kind: 'command', text: `/${data.name}${args}`, severity: 'info' }
+    }
+    case 'command/done':
+      if (typeof data.text !== 'string' || data.text === '') return undefined
+      return { kind: 'command', text: data.text, severity: data.kind === 'error' ? 'error' : 'info' }
+    case 'llm/retry': {
+      if (typeof data.retry !== 'number') return undefined
+      const of = typeof data.maxRetries === 'number' ? `${data.retry}/${data.maxRetries}` : `${data.retry}`
+      const why = messageText(data.failure)
+      return { kind: 'retry', text: why === undefined ? `retrying (${of})` : `retrying (${of}): ${why}`, severity: 'warning' }
+    }
+    case 'compaction/end':
+      return typeof data.error === 'string'
+        ? { kind: 'compaction', text: `compaction failed: ${data.error}`, severity: 'error' }
+        : { kind: 'compaction', text: 'context compacted', severity: 'info' }
+    case 'turn/end': {
+      const reason = fields(data.reason)
+      if (reason?.kind === 'error') return { kind: 'turn', text: messageText(reason.error) ?? 'the turn failed', severity: 'error' }
+      if (reason?.kind === 'aborted') return { kind: 'turn', text: 'interrupted', severity: 'info' }
+      if (reason?.kind === 'max-tokens') return { kind: 'turn', text: 'stopped at the output limit', severity: 'warning' }
+      return undefined
+    }
+    default:
+      return undefined
+  }
 }
 
 export function isPrompt(event: SessionEvent): boolean {
