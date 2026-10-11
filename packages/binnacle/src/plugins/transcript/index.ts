@@ -5,7 +5,8 @@ import { gestureTable } from '../../core/gestures.ts'
 import { createModel } from '../../core/model.ts'
 import { toPlainText } from '../../index.ts'
 
-export { failed, isPrompt, textOf, withoutReasoning } from './readers.ts'
+export { callOf, failed, isPrompt, noticeOf, producerOf, reasoningOf, textOf, withoutReasoning } from './readers.ts'
+export type { Call, Notice } from './readers.ts'
 
 export const name = 'binnacle-transcript'
 
@@ -91,6 +92,8 @@ export function apply(plugin: Context): void {
       live && [...live].toSorted(([a], [b]) => a - b).map(([, block]): LiveBlock => ({ ...block }))
     const add = (event: SessionEvent): void => {
       events.push(event)
+      // dsh commits the answer before it ends the stream, so the answer would draw twice until the end.
+      if (event.type === 'assistant/message' || event.type === 'assistant/attempt') live = undefined
       jsonOf.set(event, JSON.stringify(event.data, null, 2).split('\n'))
       const blocks = ownLive()
       model.set((state) => {
@@ -205,7 +208,6 @@ export function apply(plugin: Context): void {
     })
     const stream = (frame: AssistantStreamFrame): void => {
       if (frame.type === 'start') live = new Map()
-      // dsh commits the answer's event before it ends the stream, so the event is drawn already.
       if (frame.type === 'end') live = undefined
       if (frame.type !== 'chunk' || live === undefined) return
       const { chunk } = frame

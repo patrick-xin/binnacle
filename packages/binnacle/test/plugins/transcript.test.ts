@@ -3,7 +3,16 @@ import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import * as transcript from '../../src/plugins/transcript/index.ts'
 import type { EventLook, LiveBlock, LiveLook, TranscriptState } from '../../src/plugins/transcript/index.ts'
-import { failed, isPrompt, textOf, withoutReasoning } from '../../src/plugins/transcript/index.ts'
+import {
+  callOf,
+  failed,
+  isPrompt,
+  noticeOf,
+  producerOf,
+  reasoningOf,
+  textOf,
+  withoutReasoning,
+} from '../../src/plugins/transcript/index.ts'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { gestureTable } from '../../src/core/gestures.ts'
 import { mount } from '../support/mount.ts'
@@ -332,6 +341,19 @@ test('the event that the answer commits replaces its live block', async () => {
     outcome: { kind: 'committed', eventType: 'assistant/message', seq: 3 },
   })
   assert.deepEqual(await drawn(), ['▾ #3 assistant/message', '{', '  "text": "Hello"', '}', '', ''])
+})
+
+test("the live blocks end when the agent's answer or attempt commits, before the stream ends", async () => {
+  const { ctx, dsh, drawn } = await talking(4)
+  dsh.stream(ctx, { type: 'start', attemptId: 'a1', revision: 1, turn: 1, step: 1 })
+  dsh.stream(ctx, chunk(0, { type: 'text-delta', index: 0, text: 'Hello' }))
+  dsh.commit(ctx, { seq: 0, type: 'assistant/attempt', time: 2, data: {} })
+  assert.deepEqual([await drawn(), stateOf(ctx).state?.live], [['▾ #0 assistant/attempt', '{}', '', ''], undefined])
+  dsh.stream(ctx, { type: 'start', attemptId: 'a2', revision: 1, turn: 1, step: 1 })
+  dsh.stream(ctx, chunk(0, { type: 'text-delta', index: 0, text: 'Hi' }))
+  dsh.commit(ctx, { seq: 1, type: 'assistant/message', time: 3, data: {} })
+  dsh.stream(ctx, chunk(1, { type: 'text-delta', index: 0, text: ' again' }))
+  assert.deepEqual([(await drawn()).slice(3), stateOf(ctx).state?.live], [['▾ #1 assistant/message'], undefined])
 })
 
 test("another session's events and another agent's answer, such as a subagent's, are not drawn", async () => {
@@ -724,6 +746,7 @@ const result = (seq: number, isError: boolean) =>
     step: 1,
     message: { role: 'tool', source: { kind: 'tool', callId: 'c1' }, toolCallId: 'c1', isError, content: [{ type: 'text', text: 'no' }] },
   })
+const call = anEvent(8, 'tool/call', { turn: 1, step: 1, callId: 'c1', name: 'read', arguments: '{"path":"a.ts"}' })
 const odd = [
   anEvent(9, 'test/marker', undefined),
   anEvent(9, 'user/message', null),
@@ -731,10 +754,96 @@ const odd = [
   anEvent(9, 'tool/result', []),
 ]
 
-test("textOf gives the text of a person's message or an answer's, its text blocks joined, and '' for another event", () => {
+test("textOf gives the text of a person's message, an answer's or a tool result's, its text blocks joined, and '' for another event", () => {
   assert.deepEqual(
-    [textOf(prompt), textOf(context), textOf(answer), textOf(result(3, false)), ...odd.map(textOf)],
-    ['fix the bug', 'a.ts changed', 'Done.', '', '', '', '', ''],
+    [textOf(prompt), textOf(context), textOf(answer), textOf(result(3, false)), textOf(call), ...odd.map(textOf)],
+    ['fix the bug', 'a.ts changed', 'Done.', 'no', '', '', '', '', ''],
+  )
+})
+
+test("reasoningOf gives an answer's reasoning, its reasoning blocks joined, and '' for another event", () => {
+  const twice = anEvent(4, 'assistant/message', {
+    message: {
+      content: [
+        { type: 'reasoning', text: 'a' },
+        { type: 'text', text: 'b' },
+        { type: 'reasoning', text: 'c' },
+      ],
+    },
+  })
+  const thinking = anEvent(5, 'user/message', { source: { kind: 'user' }, content: [{ type: 'reasoning', text: 'x' }] })
+  assert.deepEqual(
+    [reasoningOf(answer), reasoningOf(twice), reasoningOf(thinking), reasoningOf(result(3, false)), ...odd.map(reasoningOf)],
+    ['think', 'ac', '', '', '', '', '', ''],
+  )
+})
+
+test("callOf gives a tool call's name and its arguments as the model wrote them, and undefined for another event or a call with no name", () => {
+  const noArguments = anEvent(5, 'tool/call', { name: 'ls' })
+  const noName = anEvent(6, 'tool/call', { name: 7, arguments: '{}' })
+  assert.deepEqual(
+    [callOf(call), callOf(noArguments), callOf(noName), callOf(answer), ...odd.map(callOf)],
+    [{ name: 'read', args: '{"path":"a.ts"}' }, { name: 'ls', args: '' }, undefined, undefined, undefined, undefined, undefined, undefined],
+  )
+})
+
+test("producerOf gives the producer of context the person did not type, 'unknown' when it names none, and undefined for a prompt or another event", () => {
+  const nameless = anEvent(7, 'user/message', { role: 'user', content: [] })
+  assert.deepEqual(
+    [producerOf(context), producerOf(nameless), producerOf(prompt), producerOf(answer), ...odd.map(producerOf)],
+    ['file-change', 'unknown', undefined, undefined, undefined, undefined, undefined, undefined],
+  )
+})
+
+const notice = (type: string, data: unknown) => noticeOf(anEvent(9, type, data))
+
+test('noticeOf gives a command, a retry, a compaction and how a turn ended as a notice, its kind, text and severity', () => {
+  assert.deepEqual(
+    [
+      notice('command/run', { commandId: 'c', name: 'compact', source: {} }),
+      notice('command/run', { commandId: 'c', name: 'model', args: 'flash', source: {} }),
+      notice('command/done', { commandId: 'c', kind: 'success', text: 'switched' }),
+      notice('command/done', { commandId: 'c', kind: 'error', text: 'no such model' }),
+      notice('llm/retry', { retry: 1, maxRetries: 3, failure: { message: 'overloaded', code: 'X' } }),
+      notice('llm/retry', { retry: 2, failure: { message: 'overloaded', code: 'X' } }),
+      notice('compaction/end', { compactionId: 'k', turn: 1 }),
+      notice('compaction/end', { compactionId: 'k', turn: 1, error: 'too long' }),
+      notice('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'the key is wrong', code: 'X' } } }),
+      notice('turn/end', { turn: 1, reason: { kind: 'aborted', reason: {} } }),
+      notice('turn/end', { turn: 1, reason: { kind: 'max-tokens' } }),
+    ],
+    [
+      { kind: 'command', text: '/compact', severity: 'info' },
+      { kind: 'command', text: '/model flash', severity: 'info' },
+      { kind: 'command', text: 'switched', severity: 'info' },
+      { kind: 'command', text: 'no such model', severity: 'error' },
+      { kind: 'retry', text: 'retrying (1/3): overloaded', severity: 'warning' },
+      { kind: 'retry', text: 'retrying (2): overloaded', severity: 'warning' },
+      { kind: 'compaction', text: 'context compacted', severity: 'info' },
+      { kind: 'compaction', text: 'compaction failed: too long', severity: 'error' },
+      { kind: 'turn', text: 'the key is wrong', severity: 'error' },
+      { kind: 'turn', text: 'interrupted', severity: 'info' },
+      { kind: 'turn', text: 'stopped at the output limit', severity: 'warning' },
+    ],
+  )
+})
+
+test('noticeOf gives undefined for every other event, a command done with no text and a turn that completed among them', () => {
+  assert.deepEqual(
+    [
+      notice('command/done', { commandId: 'c', kind: 'success' }),
+      notice('command/done', { commandId: 'c', kind: 'success', text: '' }),
+      notice('turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      notice('compaction/start', { compactionId: 'k' }),
+      notice('compaction/summary', { compactionId: 'k' }),
+      notice('llm/retry-started', { retryId: 'r' }),
+      notice('assistant/attempt', { stream: [] }),
+      notice('command/run', { name: 7 }),
+      notice('turn/end', null),
+      noticeOf(prompt),
+      ...odd.map(noticeOf),
+    ],
+    Array(14).fill(undefined),
   )
 })
 

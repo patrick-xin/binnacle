@@ -16,6 +16,10 @@
       "types": "./dist/plugins/transcript/index.d.ts",
       "default": "./dist/plugins/transcript/index.js"
     },
+    "./plugins/transcript-view": {
+      "types": "./dist/plugins/transcript-view/index.d.ts",
+      "default": "./dist/plugins/transcript-view/index.js"
+    },
     "./plugins/composer": {
       "types": "./dist/plugins/composer/index.d.ts",
       "default": "./dist/plugins/composer/index.js"
