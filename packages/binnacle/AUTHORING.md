@@ -2,7 +2,7 @@
 
 binnacle is a terminal app for dsh. Everything it draws and answers is a plugin. This page says how an author changes it.
 
-binnacle's own features are plugins too, and they use only what this page says and what the package exports. Each one is a default that you replace, whole or one piece at a time. This page names what each one sets, so you need not read its source. A check holds each built-in to the package's exports. Their source is in `src/` of this package:
+binnacle's own features are plugins too, and they use only what this page says and what the package exports. Each one is a default that you replace, whole or one piece at a time. This page names what each one sets, so you need not read its source. Checks hold each built-in to the package's exports, and each name it sets to this page. Their source is in `src/` of this package:
 
 | Row | Feature | Source |
 |---|---|---|
