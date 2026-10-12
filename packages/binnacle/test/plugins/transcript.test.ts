@@ -649,7 +649,7 @@ test('the live block draws through the Look transcript.live, given its blocks an
   ])
 })
 
-const anEvent = (seq: number, type: string, data: unknown) => ({ seq, type, time: seq + 1, data }) as unknown as SessionEvent
+const anEvent = (seq: number, type: string, data: unknown) => ({ seq, type, time: seq + 1, data }) as SessionEvent
 const prompt = anEvent(0, 'user/message', {
   role: 'user',
   source: { kind: 'user' },

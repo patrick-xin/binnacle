@@ -104,6 +104,7 @@ export class Actions {
    * True when an action took it.
    */
   key(data: string, focus: string | undefined, first: boolean): boolean {
+    // matchesKey parses any string, and a key that it cannot parse matches nothing.
     const takers = this.#tops().filter((entry) => this.#keysOf(entry).some((key) => matchesKey(data, key as KeyId)))
     const placed = takers.map((entry) => ({ entry, ...this.#placeOf(entry) }))
     const inFocus = placed.filter(({ place }) => focus !== undefined && actsIn(place, focus))
@@ -229,6 +230,7 @@ export class Actions {
 
 // A mouse gesture is bound by its name; a key is matched as the terminal sends it.
 function bindsTo(key: string, gesture: string): boolean {
+  // matchesKey parses any string, and a key that it cannot parse matches nothing.
   return key === gesture || matchesKey(gesture, key as KeyId)
 }
 

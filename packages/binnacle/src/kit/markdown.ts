@@ -1,9 +1,12 @@
 import { Lexer } from 'marked'
-import type { Token, Tokens } from 'marked'
+import type { MarkedToken, Token, Tokens } from 'marked'
 import type { Binnacle } from '../api.ts'
 import { toPlainText } from '../core/view.ts'
 import { visibleWidth } from '../terminal/utils.ts'
 import { wrap } from './wrap.ts'
+
+// binnacle's Lexer has no extension, so each token it makes is one of marked's own.
+const own = (token: Token): MarkedToken => token as MarkedToken
 
 /** What each block's Look is given beside what it draws. */
 export interface MarkdownAt {
@@ -77,23 +80,24 @@ export function markdown(binnacle: Binnacle, text: string, width: number): strin
 
   const inline = (tokens: readonly Token[]): string => tokens.map(inlineOf).join('')
   const inlineOf = (token: Token): string => {
-    switch (token.type) {
+    const known = own(token)
+    switch (known.type) {
       case 'text':
-        return token.tokens !== undefined && token.tokens.length > 0 ? inline(token.tokens) : plain(token.text)
+        return known.tokens !== undefined && known.tokens.length > 0 ? inline(known.tokens) : plain(known.text)
       case 'escape':
-        return plain(token.text)
+        return plain(known.text)
       case 'strong':
-        return `\x1b[1m${inline(token.tokens ?? [])}\x1b[22m`
+        return `\x1b[1m${inline(known.tokens ?? [])}\x1b[22m`
       case 'em':
-        return `\x1b[3m${inline(token.tokens ?? [])}\x1b[23m`
+        return `\x1b[3m${inline(known.tokens ?? [])}\x1b[23m`
       case 'codespan':
-        return binnacle.paint('code', plain(token.text))
+        return binnacle.paint('code', plain(known.text))
       case 'br':
         return '\n'
       case 'link': {
-        const { href } = token as Tokens.Link
-        const drawn = binnacle.paint('link', inline(token.tokens ?? []))
-        return token.text === href ? drawn : `${drawn} (${plain(href)})`
+        const { href } = known
+        const drawn = binnacle.paint('link', inline(known.tokens ?? []))
+        return known.text === href ? drawn : `${drawn} (${plain(href)})`
       }
       default:
         return source(token)
@@ -120,20 +124,24 @@ export function markdown(binnacle: Binnacle, text: string, width: number): strin
 
   const block = (token: Token, at: number, lead = ''): string[] => {
     const where = { width: at }
-    switch (token.type) {
+    const known = own(token)
+    switch (known.type) {
       case 'heading':
-        return looks.heading(inline(token.tokens ?? []), { ...where, depth: (token as Tokens.Heading).depth })
+        return looks.heading(inline(known.tokens ?? []), { ...where, depth: known.depth })
       case 'paragraph':
       case 'text':
-        return looks.paragraph(lead + inline(token.tokens ?? [{ type: 'text', raw: token.raw, text: token.text } as Token]), where)
+        return looks.paragraph(
+          lead + inline(known.tokens ?? [{ type: 'text', raw: known.raw, text: known.text } satisfies Tokens.Text]),
+          where,
+        )
       case 'code':
-        return looks.code(plain(token.text).split('\n'), { ...where, lang: plain((token as Tokens.Code).lang ?? '') })
+        return looks.code(plain(known.text).split('\n'), { ...where, lang: plain(known.lang ?? '') })
       case 'blockquote':
-        return looks.quote(blocks(token.tokens ?? [], Math.max(1, at - 2), true), where)
+        return looks.quote(blocks(known.tokens ?? [], Math.max(1, at - 2), true), where)
       case 'hr':
         return looks.rule(where)
       case 'list':
-        return list(token as Tokens.List, at)
+        return list(known, at)
       default:
         return looks.paragraph(source(token), where)
     }

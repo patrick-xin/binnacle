@@ -10,7 +10,9 @@ export interface Entry {
 
 /** The Look on top of the chain. Each `beneath` reads the chain again when it draws, so that it is never captured. */
 export function drawer<F extends Look>(chain: () => readonly Entry[], fallback: F): F {
+  // Each Look in the chain of a name is of that name's kind, F.
   const made = (entry: Entry): F => entry.item(beneathOf(entry)) as F
+  // It is called as an F is, and returns what that F returns.
   const beneathOf = (entry: Entry): F =>
     ((...args: never[]) => {
       const now = chain()

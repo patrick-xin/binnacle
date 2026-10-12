@@ -1,6 +1,12 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["unicorn", "oxc", "import", "node"],
+  "jsPlugins": [
+    {
+      "name": "anti-slop",
+      "specifier": "./tools/oxlint/anti-slop/index.ts"
+    }
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
@@ -13,7 +19,14 @@
       {
         "case": "kebabCase"
       }
-    ]
+    ],
+    "oxc/no-accumulating-spread": "error",
+    "anti-slop/no-chained-type-assertions": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-reduce-accumulator-copy": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-widen-then-assert": "error"
   },
   "overrides": [
     {
@@ -85,6 +98,19 @@
       "files": ["packages/binnacle/src/terminal/**"],
       "rules": {
         "max-lines": "off"
+      }
+    },
+    {
+      "files": ["packages/binnacle/src/**"],
+      "excludeFiles": ["packages/binnacle/src/terminal/**"],
+      "rules": {
+        "anti-slop/require-comment-for-type-assertion": "error"
+      }
+    },
+    {
+      "files": ["tools/oxlint/anti-slop/index.ts"],
+      "rules": {
+        "import/no-default-export": "off"
       }
     }
   ],

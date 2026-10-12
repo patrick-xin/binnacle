@@ -17,6 +17,7 @@ export async function openStored(ctx: Context, id: string): Promise<ChatSession 
   await ctx.get('loader')?.await()
   const store = ctx.get('sessionPersistence')
   if (store === undefined) return undefined
+  // A SessionId only brands a string, and dsh too makes one with a cast.
   const handle = await store.open(id as SessionId, 'read')
   try {
     const { events } = await handle.read()
@@ -42,6 +43,7 @@ export async function openNew(ctx: Context): Promise<ChatSession | undefined> {
   ctx.on('session/event', (session, event) => {
     if (session.header.id === id) events.push(event)
   })
+  // A SessionId only brands a string, and dsh too makes one with a cast.
   const { agent } = await agents.create({
     sessionId: id as SessionId,
     meta: { cwd },

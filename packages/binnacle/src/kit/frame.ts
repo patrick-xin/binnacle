@@ -47,6 +47,7 @@ export function frame<L extends Framed>(
 function rowsOf<L extends Framed>(line: L, width: number, left: number, drawn: (row: string) => string): (string | L)[] {
   if (typeof line === 'string') return wrap(line, width).map(drawn)
   const acting: Exclude<Framed, string> = line
+  // Each row keeps every field of the line, so it is an L too.
   return wrap(acting.text, width).map(
     (row, nth) => ({ ...acting, text: drawn(row), from: left + (nth === 0 ? (acting.from ?? 0) : 0) }) as L,
   )

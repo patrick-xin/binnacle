@@ -22,13 +22,14 @@
     "check:features": "node scripts/check-features.mjs",
     "check:intents": "node scripts/check-intents.mjs",
     "check": "pnpm run check:paths && pnpm run check:placeholders && pnpm run check:citations && pnpm run check:links && pnpm run check:skills && pnpm run check:features && pnpm run check:intents && pnpm run check:plugins && pnpm run check:names && pnpm run lint && pnpm run fmt:check && pnpm run typecheck",
-    "test": "pnpm run check && node --test --test-timeout=30000 \"scripts/**/*.test.mjs\" && pnpm --filter binnacle test",
+    "test": "pnpm run check && node --test --test-timeout=30000 \"scripts/**/*.test.mjs\" \"tools/**/*.test.mjs\" && pnpm --filter binnacle test",
     "check:plugins": "node scripts/check-plugins.mjs",
     "check:names": "node scripts/check-names.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
+    "@oxlint/plugins": "1.85.0",
     "js-yaml": "4.3.1",
     "oxc-parser": "0.151.0",
     "oxfmt": "0.71.0",

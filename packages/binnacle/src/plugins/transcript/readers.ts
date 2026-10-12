@@ -3,6 +3,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 // An event's data is read as unknown: a Look is given every type, and a log written by another harness can hold any shape.
 type Fields = Readonly<Record<string, unknown>>
 
+// An object that is not an array is keyed by strings.
 const fields = (value: unknown): Fields | undefined =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Fields) : undefined
 

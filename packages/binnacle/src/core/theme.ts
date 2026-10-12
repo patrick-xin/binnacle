@@ -91,7 +91,7 @@ export function checkLayer(layer: ThemeLayer): void {
 }
 
 function checkColour(color: Colour | undefined, what: string): void {
-  if (color === undefined || SIXTEEN.includes(color as Sixteen)) return
+  if (color === undefined || SIXTEEN.some((sixteen) => sixteen === color)) return
   try {
     parseColor(color)
   } catch {
@@ -103,6 +103,7 @@ function checkColour(color: Colour | undefined, what: string): void {
 export function layered(layers: readonly ThemeLayer[]): Tokens {
   return layers.reduce<Tokens>((tokens, layer) => {
     const colors = { ...tokens.colors }
+    // Object.entries widens each key to a string; a layer's colours are keyed by Tone.
     for (const [tone, given] of Object.entries(layer.colors ?? {}) as [Tone, Colour | Style | undefined][])
       if (given !== undefined) colors[tone] = styleOf(given)
     return {
@@ -124,7 +125,7 @@ const ATTRIBUTES = [
 ] as const
 
 function opening(color: Colour, mode: TerminalColorMode): string {
-  const index = SIXTEEN.indexOf(color as Sixteen)
+  const index = SIXTEEN.findIndex((sixteen) => sixteen === color)
   if (index >= 0) return `\x1b[${index < 8 ? 30 + index : 90 + index - 8}m`
   return foregroundAnsi(parseColor(color), mode)
 }

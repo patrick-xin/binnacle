@@ -22,6 +22,7 @@ docs/features/<feature>.md  how a feature is built so far: the second source, af
 .agents/task.md             a Task's folders, states and Hand-offs
 .agents/try.md              how the Lead tries a branch under dsh
 scripts/                    the checks and the Task tool, each with its test
+tools/oxlint/anti-slop/     binnacle's own lint rules, from anti-slop
 references.json             the repositories that pnpm refs fetches into .refs/
 .refs/<name>/               each Reference at its pin, to read and never to write
 ```

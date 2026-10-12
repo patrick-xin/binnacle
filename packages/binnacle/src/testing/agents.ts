@@ -15,10 +15,11 @@ function textOf(message: { content: readonly { type: string; text?: string }[] }
 export function agents(selection: { readonly provider: string; readonly model: string } = SELECTION) {
   const created: { sessionId: string; meta: unknown; agentOptions: unknown }[] = []
   const sent: Sent[] = []
-  const cancels: unknown[] = []
+  const cancels: { cause: unknown; options: unknown }[] = []
   let session: { header: { id: string } } | undefined
   const agent = {
     options: selection,
+    // Wide, so that `status` can make it `running`.
     status: 'idle' as 'idle' | 'running',
     get session() {
       return session
@@ -39,13 +40,16 @@ export function agents(selection: { readonly provider: string; readonly model: s
   }
   // dsh emits each event its session commits, and each frame of the answer that streams, on the Context.
   const commit = (ctx: Context, event: { seq: number; type: string; time: number; data: unknown }): void => {
+    // The fake agent and session hold only what binnacle reads, so they are no dsh types.
     ctx.emit('session/event', session as never, event as never)
   }
   const stream = (ctx: Context, frame: unknown): void => {
+    // The fake agent and session hold only what binnacle reads, so they are no dsh types.
     ctx.emit('agent/assistant-stream', { agent, frame } as never)
   }
   const status = (ctx: Context, now: 'idle' | 'running'): void => {
     agent.status = now
+    // The fake agent and session hold only what binnacle reads, so they are no dsh types.
     ctx.emit('agent/status', { agent, status: now } as never)
   }
   return { created, sent, cancels, agent, provide, commit, stream, status }

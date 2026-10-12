@@ -195,8 +195,10 @@ async function mounting(options: MountOptions, made: { ctx?: Context; restore?: 
     provide: (ctx) => {
       options.provide?.(ctx)
       const provideUnless = (name: string, value: unknown): void => {
+        // Cordis types a service by its registered name; the fake dsh provides each by a name it is given.
         if (ctx.get(name as never) === undefined) ctx.provide(name as never, value as never)
       }
+      // The fake dsh provides with this function only, which is no Context.
       dsh.provide({ provide: provideUnless } as never)
       if (store !== undefined) provideUnless('sessionPersistence', store)
     },
@@ -222,6 +224,7 @@ async function mounting(options: MountOptions, made: { ctx?: Context; restore?: 
     rows.push({ id, name })
   }
   for (const [index, given] of (options.plugins ?? []).entries()) {
+    // Array.isArray does not narrow a union with a readonly tuple.
     const [plugin, config] = Array.isArray(given) ? (given as readonly [Plugin, unknown]) : [given as Plugin, undefined]
     // A row named `binnacle` or `binnacle/…` ranks as a built-in, so an author's row takes its plugin's own name.
     const name = `author:${plugin.name ?? `plugin-${index + 1}`}`
@@ -242,7 +245,7 @@ async function mounting(options: MountOptions, made: { ctx?: Context; restore?: 
   const waterfall = (name: string, payload: object, agent: object, fallback: () => Promise<unknown>) => {
     if (closed) return Promise.reject(new Error(CLOSED))
     // dsh's Requests are hooks on a scope of the agent's, typed by dsh's own packages: the fake agent is no such Agent.
-    const asked = (ctx.waterfall as unknown as (...args: unknown[]) => Promise<unknown>)(
+    const asked = (ctx.waterfall as (...args: unknown[]) => Promise<unknown>)(
       scopeTarget(agent, agent as never),
       name,
       { ...payload, agent },
@@ -298,7 +301,7 @@ async function mounting(options: MountOptions, made: { ctx?: Context; restore?: 
         return dsh.sent
       },
       get cancels() {
-        return dsh.cancels as readonly { readonly cause: unknown; readonly options: unknown }[]
+        return dsh.cancels
       },
       child: (id) => {
         live()
@@ -308,12 +311,14 @@ async function mounting(options: MountOptions, made: { ctx?: Context; restore?: 
       },
     },
     ask: (questions, { signal, agent = dsh.agent } = {}) =>
+      // A Request's answer is of the type its hooks return.
       waterfall('user-questions/request', { questions, signal }, agent, () =>
         Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')),
       ) as Promise<AskUserQuestionAnswer>,
     approve: (toolName, { signal, agent = dsh.agent, ...request } = {}) =>
+      // A Request's answer is of the type its hooks return.
       waterfall('approval/request', { ...request, toolName, signal }, agent, () =>
-        Promise.resolve('unavailable' as ApprovalOutcome),
+        Promise.resolve<ApprovalOutcome>('unavailable'),
       ) as Promise<ApprovalOutcome>,
     clock: {
       get now() {

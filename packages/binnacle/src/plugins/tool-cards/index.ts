@@ -61,6 +61,7 @@ const REST = '    '
 
 type Fields = Readonly<Record<string, unknown>>
 
+// An object that is not an array is keyed by strings.
 const fields = (value: unknown): Fields | undefined =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Fields) : undefined
 
@@ -100,7 +101,8 @@ const safely = <T>(present: () => T): T | undefined => {
 
 const parse = (args: string): { readonly args: unknown; readonly parsed: boolean } => {
   try {
-    return { args: JSON.parse(args) as unknown, parsed: true }
+    const value: unknown = JSON.parse(args)
+    return { args: value, parsed: true }
   } catch {
     return { args, parsed: false }
   }
@@ -241,16 +243,17 @@ export function apply(ctx: Context): void {
 
   // A presenter is pure, so a view is kept for its event while the tool that made it is the same.
   const views = new WeakMap<SessionEvent, { readonly tool: ToolDefinition; readonly view: ToolCallView | ToolResultView | undefined }>()
-  const viewOf = <V>(
+  const viewOf = <V extends ToolCallView | ToolResultView>(
     event: SessionEvent,
     tool: ToolDefinition | undefined,
     present: (tool: ToolDefinition) => V | undefined,
   ): V | undefined => {
     if (tool === undefined) return undefined
     const kept = views.get(event)
+    // An event is a call or a result, and each is presented one way, so its kept view is of the kind asked for.
     if (kept?.tool === tool) return kept.view as V | undefined
     const view = safely(() => present(tool))
-    views.set(event, { tool, view: view as ToolCallView | ToolResultView | undefined })
+    views.set(event, { tool, view })
     return view
   }
 
@@ -271,6 +274,7 @@ export function apply(ctx: Context): void {
             each.presentResult?.(args, {
               content: Array.isArray(message?.content) ? message.content : [],
               isError: message?.isError === true,
+              // A tool reads the meta that its own result wrote.
               ...(data?.meta !== undefined && { meta: data.meta as never }),
             }),
           )
