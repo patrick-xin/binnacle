@@ -70,7 +70,6 @@ export function apply(ctx: Context): void {
     placed?.redraw()
   }
   const editor = new Editor({ requestRender: edited, terminal: { rows: ROWS } }, THEME)
-  editor.focused = true
   const draft = createModel<ComposerState>({ text: '', running: false })
   binnacle.model('composer', draft)
   // The editor keeps the cursor and the paste markers, so only a text that differs from its own is set on it, and its own changes never loop back.
@@ -188,9 +187,13 @@ export function apply(ctx: Context): void {
         return lines.map((text, index) => ((above && index === 0) || (below && index === last) ? binnacle.paint('muted', text) : text))
       }
       const empty = binnacle.lookOf<EmptyLook>(['composer.empty'], () => '')
-      return [EMPTY_CURSOR + empty(Math.max(0, width - 1))]
+      return [(editor.focused ? EMPTY_CURSOR : ' ') + empty(Math.max(0, width - 1))]
     },
     cursor: (width) => drawn(width).cursor,
+    focus: (has) => {
+      editor.focused = has
+      changed()
+    },
     key: (data) => {
       if (!data.startsWith(PASTE_START)) {
         const actions = binnacle.gestures.actionsOf(data)
