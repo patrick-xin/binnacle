@@ -2,7 +2,7 @@
 
 binnacle is a terminal app for dsh. Everything it draws and answers is a plugin. This page says how an author changes it.
 
-binnacle's own features are plugins too, and they use only what this page says. Each one is a default that you replace, and an example to copy. Their source is in `src/` of this package:
+binnacle's own features are plugins too, and they use only what this page says and what the package exports. Each one is a default that you replace, whole or one piece at a time. This page names what each one sets, so you need not read its source. A check holds each built-in to the package's exports. Their source is in `src/` of this package:
 
 | Row | Feature | Source |
 |---|---|---|
@@ -346,6 +346,7 @@ ctx.binnacle.bind('request.choices.down', (keys) => [...keys, 'j'])
 - A list of keys replaces the keys beneath it, and `[]` unbinds.
 - A function adds to the keys beneath it, or takes some away: it is given the keys the action would have without it, and returns its keys. binnacle calls it each time a key or a click is resolved, so it holds whichever plugin loads first, and for an action set after it. Two such bindings by one name both apply, the newest given what the one beneath it gives. Use it to add a key without repeating the others.
 - `binnacle.keysOf(id)` is the keys that the newest action by that id is bound to now, enabled or not. Use it to show or to check a key, after the action is set: it is read when you call it, so it does not follow a binding or an action that comes later. It does not follow `enabled()` either: an action that names its own keys owns its id's keys, even while it is disabled.
+- With no action by an id, `binnacle.keysOf(id)` gives what the bindings by that id give over the Gesture Table's keys for it. The Gesture Table holds the editor's keys, by pi-tui's names, such as `tui.select.up` (up), `tui.select.confirm` (enter), `tui.input.submit` (enter) and `tui.input.newLine` (shift+enter and ctrl+j). The transcript and the composer take their keys from it so: `keys: ctx.binnacle.keysOf('tui.select.up')`.
 
 ### Run an action, and change what it does
 
@@ -493,6 +494,8 @@ ctx.binnacle.scroll('transcript', -1)
 - A Place that is not drawn yet, or that takes no keys yet, takes the Focus once it draws and takes keys. The Focus moved is forgotten after its Place has had it and stopped taking keys. Then the Focus goes back to the Screen's own, else to the first Place that takes keys.
 - `binnacle.scroll(place, pages)` scrolls the Place by that name by pages, and stops at its first and its last line. A positive `pages` moves toward the last line, as page down does, and a negative one toward the first. A page is as many rows as the Place's box shows, from the rows it shows now.
 - A scroll of a Place that is not drawn, or that has no rows of room, does nothing. A scroll never moves the Focus.
+- `binnacle.focusMovedLast()` is the Place that a person or an author last moved the Focus to on the Screen on view, kept after the core forgets the move, or `undefined` if no one moved it. The Requests' view reads it to leave a Focus that a plugin moved.
+- `binnacle.linesShown(place)` is how many of the Part's lines the Place shows now, a wrapped line counted once, or `undefined` while the Place is not drawn. The List reads it for its page, and the offer of commands for whether it draws.
 - A Place with the Focus shows its Part's cursor. After `binnacle.scroll`, it shows the rows paged to, until the Part's cursor moves to another line or column, as when a key moves it. Then it follows the cursor again. The wheel follows the cursor, as before.
 
 ## Components
@@ -893,6 +896,36 @@ The row `binnacle-composer` sets the Layout `composer`, which the Chat draws whi
   ```js
   ctx.binnacle.look('composer.empty', () => () => ctx.binnacle.paint('dim', 'Ask anything'))
   ```
+
+- To replace the composer whole, turn the row `binnacle-composer` off, and draw an editor of your own in `composer.input`. `Editor`, the editor that the composer draws, is exported from `binnacle`, with its theme's type `EditorTheme`. It marks its cursor in its lines with `CURSOR_MARKER`. Take the mark out of each line, and give the Place its column as the cursor:
+
+  ```js
+  import { CURSOR_MARKER, Editor, visibleWidth } from 'binnacle'
+
+  const plain = (text) => text
+  let placed
+  const editor = new Editor({ requestRender: () => placed?.redraw(), terminal: { rows: 24 } }, {
+    selectList: { selectedPrefix: plain, selectedText: plain, description: plain, scrollInfo: plain, noMatch: plain },
+  })
+  editor.focused = true
+  editor.onSubmit = (text) => ctx.get('binnacleSession')?.send(text)
+  ctx.binnacle.layout('composer', { row: [{ place: 'composer.input' }] })
+  placed = ctx.binnacle.place('composer.input', {
+    lines: (width) => editor.render(width).map((line) => line.replace(CURSOR_MARKER, '')),
+    cursor: (width) => {
+      const lines = editor.render(width)
+      const line = lines.findIndex((text) => text.includes(CURSOR_MARKER))
+      return line === -1 ? undefined : { line, column: visibleWidth(lines[line].slice(0, lines[line].indexOf(CURSOR_MARKER))) }
+    },
+    key: (data) => {
+      editor.handleInput(data)
+      placed.redraw()
+      return true
+    },
+  })
+  ```
+
+  The editor reads its keys from the Gesture Table, such as `tui.input.submit` for enter. The built-in composer adds the model `composer`, its actions, a command line run through dsh, and the keys that it passes on to other actions.
 
 ## Commands
 

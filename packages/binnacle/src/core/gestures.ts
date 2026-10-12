@@ -12,6 +12,11 @@ const EDITOR_KEYS: KeybindingDefinitions = {
 /** The Gesture Table of the editor's keys: the copied editor reads it through pi-tui's `getKeybindings`. The core's own gestures are actions. */
 export const gestureTable = new KeybindingsManager(EDITOR_KEYS)
 
+/** The keys that the Gesture Table holds for one of its names, or none for a name that is not its own. */
+export function tableKeysOf(name: string): readonly string[] {
+  return Object.hasOwn(EDITOR_KEYS, name) ? gestureTable.getKeys(name as Keybinding) : []
+}
+
 export function editorActionsOf(gesture: string): string[] {
   return Object.keys(EDITOR_KEYS).filter((action) => gestureTable.matches(gesture, action as Keybinding))
 }

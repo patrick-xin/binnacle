@@ -6,7 +6,20 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const kept = ['toPlainText', 'visibleWidth', 'truncateToWidth', 'createModel', 'list', 'line', 'tabs', 'title', 'wrap', 'CHAT_LAYOUT']
+const kept = [
+  'toPlainText',
+  'visibleWidth',
+  'truncateToWidth',
+  'createModel',
+  'list',
+  'line',
+  'tabs',
+  'title',
+  'wrap',
+  'CHAT_LAYOUT',
+  'Editor',
+  'CURSOR_MARKER',
+]
 
 let into: string
 let files: string[]
@@ -44,7 +57,7 @@ test("the packed package holds AUTHORING.md and the built-ins' source", () => {
   )
 })
 
-test("the packed export map gives what the Kit keeps, and not pi-tui's Input", async () => {
+test("the packed export map gives what the Kit keeps, the composer's editor, and not pi-tui's Input", async () => {
   const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
   const index = await import(pathToFileURL(join(unpacked, exports['.']!.default)).href)
   assert.deepEqual(
@@ -52,7 +65,7 @@ test("the packed export map gives what the Kit keeps, and not pi-tui's Input", a
     [],
   )
   assert.deepEqual(
-    ['Input', 'CURSOR_MARKER'].filter((name) => name in index),
+    ['Input'].filter((name) => name in index),
     [],
   )
 })

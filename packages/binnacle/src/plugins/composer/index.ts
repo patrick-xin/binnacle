@@ -1,13 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
-import type { Handle, Layout, Point } from '../../api.ts'
-import { gestureTable } from '../../core/gestures.ts'
-import { createModel } from '../../core/model.ts'
-import { Editor } from '../../terminal/components/editor.ts'
-import type { EditorTheme } from '../../terminal/components/editor.ts'
-import { CURSOR_MARKER } from '../../terminal/tui.ts'
-import { visibleWidth } from '../../terminal/utils.ts'
+import { CURSOR_MARKER, Editor, createModel, visibleWidth } from '../../index.ts'
+import type { EditorTheme, Handle, Layout, Point } from '../../index.ts'
 
 export const name = 'binnacle-composer'
 
@@ -125,7 +120,7 @@ export function apply(ctx: Context): void {
   }
 
   binnacle.action('composer.send', {
-    keys: gestureTable.getKeys(SUBMIT),
+    keys: binnacle.keysOf(SUBMIT),
     place: INPUT,
     description: 'Send the draft as a prompt, or steer the turn that runs; run a command line as a command',
     run: () => {
@@ -153,7 +148,7 @@ export function apply(ctx: Context): void {
     },
   })
   binnacle.action('composer.newline', {
-    keys: gestureTable.getKeys(NEW_LINE),
+    keys: binnacle.keysOf(NEW_LINE),
     place: INPUT,
     description: 'Make a new line in the draft',
     run: () => {

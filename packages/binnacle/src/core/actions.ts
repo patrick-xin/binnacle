@@ -77,16 +77,21 @@ export type SetBinding = Held<{ readonly name: string; readonly keys: Binding }>
 export class Actions {
   readonly #set: readonly SetAction[]
   readonly #bindings: readonly SetBinding[]
+  readonly #table: (name: string) => readonly string[]
 
-  /** Both lists are oldest first, a built-in's beneath an author's, and the service changes them in place. */
-  constructor(set: readonly SetAction[], bindings: readonly SetBinding[]) {
+  /**
+   * Both lists are oldest first, a built-in's beneath an author's, and the service changes them in place.
+   * `table` gives the Gesture Table's keys for a name of its own, which no action holds.
+   */
+  constructor(set: readonly SetAction[], bindings: readonly SetBinding[], table: (name: string) => readonly string[] = () => []) {
     this.#set = set
     this.#bindings = bindings
+    this.#table = table
   }
 
   keysOf(id: string): readonly string[] {
     const action = this.#set.findLast(({ item }) => item.id === id)
-    return action === undefined ? this.#bound(id, []) : this.#keysOf(action)
+    return action === undefined ? this.#bound(id, this.#table(id)) : this.#keysOf(action)
   }
 
   run(id: string, at: Point | undefined): void {

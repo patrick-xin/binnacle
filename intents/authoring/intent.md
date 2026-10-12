@@ -23,7 +23,7 @@ Nothing yet is shared between features. Each one draws its own list of choices a
 4. An author is the author agent, or a person who writes a plugin by hand. Both can do the same things.
 5. A person picks an author agent for the session, as dsh's Creator mode does, and asks it for a change.
 6. A change is saved in the person's profile. It applies to every later session and survives a restart, until the person undoes it.
-7. Each built-in feature uses only what an author can use, so it is a default to replace and an example to copy.
+7. Each built-in feature uses only what an author can use, so it is a default to replace, whole or one piece at a time. An author needs only what binnacle exports and its guide, never its source.
 8. A person can still turn a whole feature off.
 9. binnacle is built in layers, as a web app is built from a framework, a design system and its pages:
    - **the core** owns the terminal, where things go, the Focus and the gestures;
@@ -82,6 +82,7 @@ Stage 3:
 - [#260](https://github.com/patrick-xin/binnacle/issues/260) The transcript a person reads, made of pieces an author changes one at a time.
 - [#269](https://github.com/patrick-xin/binnacle/issues/269) Tool cards: each call and its result as a card from dsh's views, with folds an author moves and times an author shows or takes out.
 - [#287](https://github.com/patrick-xin/binnacle/issues/287) `/` commands: a command line runs as a command, and typing `/` offers the commands in a List an author moves, draws and takes out.
+- [#308](https://github.com/patrick-xin/binnacle/issues/308) An author needs only what binnacle exports: built-ins on the API, the turn's start, a test kit, and each name written down.
 
 ## Open questions
 

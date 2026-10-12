@@ -1,7 +1,7 @@
 import type { Action, Binnacle, Model, Point, Watchable } from '../api.ts'
 import { createModel } from '../core/model.ts'
 import { toPlainText } from '../core/view.ts'
-import { linesShown, together } from './component.ts'
+import { together } from './component.ts'
 import type { Component } from './component.ts'
 
 export interface ListItem {
@@ -71,7 +71,7 @@ export function list<T extends ListItem = ListItem>(binnacle: Binnacle, options:
     const count = items().length
     if (count > 0) model.set((state) => (state.mark = to(count, state.mark)))
   }
-  const page = (): number => Math.max(1, linesShown(binnacle, name) ?? 1)
+  const page = (): number => Math.max(1, binnacle.linesShown(name) ?? 1)
 
   const named = binnacle.model(name, model)
   const placed = binnacle.place(name, {
@@ -93,7 +93,7 @@ export function list<T extends ListItem = ListItem>(binnacle: Binnacle, options:
   const own = { place: name }
   const { keysIn } = options
   // In another Place, the List's keys come before that Place's Part, and only while the List is there to see.
-  const keyed = keysIn === undefined ? own : { place: keysIn, first: true, enabled: () => (linesShown(binnacle, name) ?? 0) > 0 }
+  const keyed = keysIn === undefined ? own : { place: keysIn, first: true, enabled: () => (binnacle.linesShown(name) ?? 0) > 0 }
   const act = (
     where: Pick<Action, 'place' | 'first' | 'enabled'>,
     verb: string,

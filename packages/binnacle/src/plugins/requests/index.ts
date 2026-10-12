@@ -10,9 +10,8 @@ import type {
   AskUserQuestionOption,
   AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
-import type { ApprovalChoice, ApprovalRequest, Choice, Question, QuestionRequest, Request, Requests } from '../../api.ts'
-import { createModel } from '../../core/model.ts'
-import { toPlainText } from '../../core/view.ts'
+import { createModel, toPlainText } from '../../index.ts'
+import type { ApprovalChoice, ApprovalRequest, Choice, Question, QuestionRequest, Request, Requests } from '../../index.ts'
 
 export const name = 'binnacle-requests'
 
