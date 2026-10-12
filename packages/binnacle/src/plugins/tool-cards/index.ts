@@ -257,7 +257,8 @@ export function apply(ctx: Context): void {
     const took = pieces.time()(card)
     const after = took === '' ? '' : paint('muted', ` · ${took}`)
     const body = pieces.body(card)(card, Math.max(1, width - visibleWidth(FIRST)))
-    if (body.length === 0) return [pieces.title()(card, width - visibleWidth(after)) + after]
+    // A card of one line has nothing to fold, so its line is a Line that folds nothing.
+    if (body.length === 0) return [{ text: pieces.title()(card, width - visibleWidth(after)) + after }]
     // A question and a checklist are read whole, so their first line is a Line that folds nothing.
     if (WHOLE.has(card.name))
       return [
