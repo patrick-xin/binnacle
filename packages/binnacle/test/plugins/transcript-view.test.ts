@@ -227,6 +227,31 @@ test("a click on the first line of an event that the view draws folds it, as the
   assert.deepEqual((await drawn()).slice(0, 3), ['one', '… 1 more lines', ''])
 })
 
+test('a click on a prompt folds nothing, and a prompt Marked draws whole at enter', async () => {
+  const { drawn, ctx, terminal } = await reading([prompt(0, 'one\ntwo')])
+  await drawn()
+  terminal.type(clickAt(2, 0))
+  const clicked = [(await drawn()).slice(0, 3), [...(stateOf(ctx).state?.folded ?? [])]]
+  terminal.type(ENTER)
+  const entered = (await drawn()).slice(0, 3)
+  assert.deepEqual(
+    [clicked, entered],
+    [
+      [['› one', '  two', ''], []],
+      ['› one', '  two', ''],
+    ],
+  )
+})
+
+test('a click on an event of one line folds nothing', async () => {
+  const { drawn, ctx, terminal } = await reading([answer(0, [{ type: 'text', text: 'done' }]), context(1, 'instructions')])
+  await drawn()
+  terminal.type(clickAt(0, 0))
+  terminal.type(clickAt(0, 2))
+  await drawn()
+  assert.deepEqual(stateOf(ctx).state?.folded, [])
+})
+
 test('the answer that streams draws its reasoning, its text, a blank line, then each tool call with the arguments so far', async () => {
   const { ctx, dsh, drawn, terminal } = await talking()
   dsh.commit(ctx, prompt(0, 'hi'))
