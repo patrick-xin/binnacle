@@ -28,7 +28,7 @@ import type { SetAction, SetBinding } from './actions.ts'
 import { CHAT } from './chat.ts'
 import { edited } from './edit.ts'
 import type { Made } from './edit.ts'
-import { editorActionsOf } from './gestures.ts'
+import { editorActionsOf, tableKeysOf } from './gestures.ts'
 import { drawer } from './looks.ts'
 import type { Make } from './looks.ts'
 import { checkLayer, layered, painter } from './theme.ts'
@@ -107,7 +107,7 @@ export class BinnacleService extends Service implements Binnacle {
   // One list for every id, oldest first, as the newest set wins among actions of different ids.
   private readonly set: SetAction[] = []
   private readonly bindings: SetBinding[] = []
-  readonly actions = new Actions(this.set, this.bindings)
+  readonly actions = new Actions(this.set, this.bindings, tableKeysOf)
   // Made again from the layers at the next read, after a layer comes or goes. A method runs on a traced copy, where a field set stays on the copy, so the field is an object that is changed.
   private readonly themed: { now?: Themed } = {}
   private readonly drawn: Drawn
@@ -210,13 +210,13 @@ export class BinnacleService extends Service implements Binnacle {
     this.drawn.places.scroll(place, pages)
   }
 
-  /** How many of the Part's lines the Place shows now, a wrapped line counted once, for a List's page. Not in the author's `Binnacle`. */
+  /** How many of the Part's lines the Place shows now, a wrapped line counted once, for a List's page. */
   linesShown(place: string): number | undefined {
     return this.drawn.places.linesShown(place)
   }
 
   /**
-   * The Place that a person or an author last moved the Focus to on the Screen on view, kept after the core forgets it; none if no one moved it. Not in the author's `Binnacle`.
+   * The Place that a person or an author last moved the Focus to on the Screen on view, kept after the core forgets it; none if no one moved it.
    * A Place that stops taking keys loses the Focus at the draw that finds it so, which can come before a watcher of the change that hid it.
    */
   focusMovedLast(): string | undefined {

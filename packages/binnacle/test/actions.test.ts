@@ -549,3 +549,16 @@ test('a Place that an action’s `place` function adds takes the Focus, as a Pla
   terminal.type(ENTER)
   assert.deepEqual(ran, ['pick'])
 })
+
+test('`binnacle.keysOf(name)` of a name in the Gesture Table, such as `tui.select.up`, gives its keys while no action and no binding by that name is set', async () => {
+  const { author, ctx } = await booted()
+  const table = [ctx.binnacle.keysOf('tui.select.up'), ctx.binnacle.keysOf('tui.input.newLine'), ctx.binnacle.keysOf('tui.nothing')]
+  await author('binds', (plugin) => {
+    plugin.binnacle.bind('tui.select.up', (keys) => [...keys, 'k'])
+    plugin.binnacle.action('tui.input.newLine', { keys: ['ctrl+o'], run: () => {} })
+  })
+  assert.deepEqual(
+    [...table, ctx.binnacle.keysOf('tui.select.up'), ctx.binnacle.keysOf('tui.input.newLine')],
+    [['up'], ['shift+enter', 'ctrl+j'], [], ['up', 'k'], ['ctrl+o']],
+  )
+})

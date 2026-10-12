@@ -1143,3 +1143,31 @@ test("a click on a separated row reaches a child's Part at the row's whole width
   for (const x of [0, 5, 10]) terminal.type(clickAt(x, 0))
   assert.deepEqual([(await terminal.read()).rows, heard], [['ww · aa · bb'], ['wide click 0:0', 'a click 0:0', 'b click 0:0']])
 })
+
+test("`binnacle.linesShown(place)` gives how many of the Part's lines the Place shows now, a wrapped line counted once, or `undefined` while the Place is not drawn", async () => {
+  const { ctx, rows } = await drawn(6, 5, (binnacle) => {
+    binnacle.layout('chat', { column: [{ place: 'list', size: { fixed: 4 } }, { place: 'rest' }] })
+    binnacle.place('list', part('one', 'two', 'a long one'))
+    binnacle.place('hidden', part('nowhere'))
+  })
+  assert.deepEqual(
+    [rows.slice(0, 4), ctx.binnacle.linesShown('list'), ctx.binnacle.linesShown('hidden'), ctx.binnacle.linesShown('none')],
+    [['one', 'two', 'a long', 'one'], 3, undefined, undefined],
+  )
+})
+
+const takes = (text: string) => ({ lines: () => [text], key: () => true })
+
+test('`binnacle.focusMovedLast()` gives the Place that a person or an author last moved the Focus to, on the Screen on view, and nothing before a move', async () => {
+  const { ctx, terminal } = await drawn(10, 4, (binnacle) => {
+    binnacle.layout('chat', { column: [{ place: 'a' }, { place: 'b' }] })
+    binnacle.place('a', takes('a'))
+    binnacle.place('b', takes('b'))
+  })
+  const before = ctx.binnacle.focusMovedLast()
+  ctx.binnacle.focus('b')
+  const moved = ctx.binnacle.focusMovedLast()
+  terminal.type(clickAt(0, 0))
+  await terminal.read()
+  assert.deepEqual([before, moved, ctx.binnacle.focusMovedLast()], [undefined, 'b', 'a'])
+})

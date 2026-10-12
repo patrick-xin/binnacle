@@ -1,9 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types'
-import type { Layout } from '../../api.ts'
-import { linesShown } from '../../kit/component.ts'
-import { createModel, fuzzy, list, truncateToWidth } from '../../kit/index.ts'
-import type { ListItem, ListRow } from '../../kit/index.ts'
+import { createModel, fuzzy, list, truncateToWidth } from '../../index.ts'
+import type { Layout, ListItem, ListRow } from '../../index.ts'
 import type { ComposerState } from '../composer/index.ts'
 
 export const name = 'binnacle-commands'
@@ -87,7 +85,7 @@ export function apply(ctx: Context): void {
     (beneath) => (item, at) => truncateToWidth(beneath(item, at), at.width, binnacle.tokens.glyphs.more),
   )
 
-  const drawn = (): boolean => (linesShown(binnacle, LIST) ?? 0) > 0
+  const drawn = (): boolean => (binnacle.linesShown(LIST) ?? 0) > 0
   const marked = (): CommandItem | undefined => model.state.items[offer.model.state.mark]
   const setDraft = (text: string): void => composer.set((state) => (state.text = text))
   // Esc and tab are the offer's only while it is drawn. But the row also closes an offer that draws nothing, such as one that matches no command.

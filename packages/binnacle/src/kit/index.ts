@@ -1,5 +1,9 @@
 export { createModel } from '../core/model.ts'
 export { truncateToWidth, visibleWidth } from '../terminal/utils.ts'
+// The composer's editor, so that an author who replaces the composer builds on what it builds on.
+export { Editor } from '../terminal/components/editor.ts'
+export type { EditorOptions, EditorTheme } from '../terminal/components/editor.ts'
+export { CURSOR_MARKER } from '../terminal/tui.ts'
 export { fuzzy } from './fuzzy.ts'
 export { list } from './list.ts'
 export type { ListComponent, ListItem, ListOptions, ListPiece, ListRow, ListRowAt, ListState } from './list.ts'

@@ -1,10 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { Point } from '../../api.ts'
-import { gestureTable } from '../../core/gestures.ts'
-import { createModel } from '../../core/model.ts'
-import { toPlainText } from '../../index.ts'
+import { createModel, toPlainText } from '../../index.ts'
+import type { Point } from '../../index.ts'
 
 export { callOf, failed, isPrompt, noticeOf, producerOf, reasoningOf, textOf, withoutReasoning } from './readers.ts'
 export type { Call, Notice } from './readers.ts'
@@ -206,19 +204,19 @@ export function apply(plugin: Context): void {
 
     binnacle.model(PLACE, model)
     binnacle.action('transcript.up', {
-      keys: gestureTable.getKeys('tui.select.up'),
+      keys: binnacle.keysOf('tui.select.up'),
       place: PLACE,
       description: 'Mark the event above',
       run: () => step(-1),
     })
     binnacle.action('transcript.down', {
-      keys: gestureTable.getKeys('tui.select.down'),
+      keys: binnacle.keysOf('tui.select.down'),
       place: PLACE,
       description: 'Mark the event below',
       run: () => step(1),
     })
     binnacle.action('transcript.fold', {
-      keys: gestureTable.getKeys('tui.select.confirm'),
+      keys: binnacle.keysOf('tui.select.confirm'),
       place: PLACE,
       description: 'Fold or unfold the Marked event, or the region of the line clicked',
       run: (at) => {

@@ -285,8 +285,17 @@ export interface Binnacle {
    * A binding by id is given, or replaces, what its kind's gives. Bindings by one name apply oldest first: a list replaces, and `[]` unbinds.
    */
   bind(name: string, keys: Binding): Handle
-  /** The gestures that the newest action by that id, enabled or not, is bound to now. With no action by that id, what its bindings by id give, or none. */
+  /**
+   * The gestures that the newest action by that id, enabled or not, is bound to now. With no action by that id, what its bindings by id give over the Gesture Table's keys for that name, such as `tui.select.up`, or none.
+   */
   keysOf(id: string): readonly string[]
+  /** How many of the Part's lines the Place shows now, a wrapped line counted once, or `undefined` while the Place is not drawn. */
+  linesShown(place: string): number | undefined
+  /**
+   * The Place that a person or an author last moved the Focus to on the Screen on view, kept after the core forgets the move; `undefined` if no one moved it.
+   * A Place that stops taking keys loses the Focus at the draw that finds it so, which can come before a watcher of the change that hid it.
+   */
+  focusMovedLast(): string | undefined
   /** Runs the newest enabled action by that id, wherever the Focus is, as a call is not a gesture, given `at` as a click gives its cell. With none enabled, nothing runs. */
   run(id: string, at?: Point): void
   /** Only the newest Screen shown is drawn. The Chat is the first. */

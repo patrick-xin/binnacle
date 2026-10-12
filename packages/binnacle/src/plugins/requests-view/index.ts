@@ -1,7 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { Binnacle, Layout, QuestionRequest, Request } from '../../api.ts'
-import { line, list, title } from '../../kit/index.ts'
-import type { ListItem } from '../../kit/index.ts'
+import { line, list, title } from '../../index.ts'
+import type { Binnacle, Layout, ListItem, QuestionRequest, Request } from '../../index.ts'
 
 export const name = 'binnacle-requests-view'
 
@@ -91,18 +90,13 @@ export function keyOf(request: Request | undefined): string {
   return `${ids.get(request)}:${request.kind === 'question' ? request.index : 0}`
 }
 
-/** The core's own, which an author's `Binnacle` need not have. */
-interface Focused {
-  focusMovedLast?(): string | undefined
-}
-
 export function apply(ctx: Context): void {
   const binnacle = ctx.binnacle
   const requests = ctx.binnacleRequests
   const models = [requests]
   const shown = (): Request | undefined => requests.shown
   const ownsFocus = (): boolean => {
-    const place = (binnacle as Binnacle & Focused).focusMovedLast?.()
+    const place = binnacle.focusMovedLast()
     return place === undefined || place === 'request.choices' || place === 'request.line'
   }
   const typing = (): QuestionRequest | undefined => {
