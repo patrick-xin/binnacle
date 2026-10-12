@@ -98,9 +98,12 @@ A PR reads alone: a person or an agent knows what it does and why, with no other
 
 ## A Fix or a Chore Task
 
-1. Make a worktree in `~/.binnacle/worktrees/<n>`, on the branch `task/<n>`.
+1. Make a worktree in `~/.binnacle/worktrees/<n>`, on the branch `task/<n>`, from `origin/main`. A branch holds one Task: a PR whose base is another Task's branch merges into that branch, never into `main`.
 2. For a Fix, if you or the Maintainer want a review, have your subagent review the diff once.
-3. Open the PR.
+3. Open the PR. Its body names its Door, one-way or two-way, and why.
+4. If it is two-way, merge it when CI passes: `gh pr merge <pr> --merge`. If it is one-way, label it `one-way`, and the Maintainer merges it.
+5. After it merges, pull `main` in the root checkout. The `post-merge` hook builds `dist/`, which the Maintainer's `binnacle` profile runs.
+6. Remove the worktree and the branch: `git worktree remove ~/.binnacle/worktrees/<n>` and `git branch -D task/<n>`.
 
 Before you open the PR:
 
