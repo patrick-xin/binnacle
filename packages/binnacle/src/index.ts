@@ -2,10 +2,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { AppExit } from '@deepseek-ai/dsh-cmdline'
 import { readCommandLine } from './core/command-line.ts'
 import { coreActions } from './core/actions.ts'
-import { startClock } from './core/clock.ts'
 import { Drawing } from './core/drawing.ts'
 import { gestureTable } from './core/gestures.ts'
 import { Host } from './core/host.ts'
+import { coreModels } from './core/models.ts'
 import { internals } from './core/internals.ts'
 import { route } from './core/input.ts'
 import { BinnacleService } from './core/service.ts'
@@ -61,7 +61,7 @@ export function apply(ctx: Context): void {
     scroll: (notches, at) => drawing.wheel(notches, at.x, at.y),
   })
   for (const [id, action] of Object.entries(core.actions)) service.action(id, action)
-  service.model('clock', startClock(ctx))
+  for (const [named, model] of coreModels(ctx)) service.model(named, model)
   route(input, {
     answered: (sequence) => host.answered(sequence),
     focused: () => drawing.focused(),

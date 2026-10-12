@@ -44,6 +44,15 @@ export interface ClockState {
   readonly now: number
 }
 
+/** The state of the core's model `turn`. */
+export interface TurnState {
+  /**
+   * When the turn that runs started, in epoch milliseconds: the time of dsh's newest `turn/start`, so a queued turn sets it again, or when the agent began to run, until that event comes.
+   * `undefined` while the agent does not run, on a stored session, and before the session opens.
+   */
+  readonly startedAt: number | undefined
+}
+
 /** A colour of the theme's, named by what is drawn in it, as pi's themes name it. */
 export type Tone =
   | 'text'
