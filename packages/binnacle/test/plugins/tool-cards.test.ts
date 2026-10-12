@@ -1,9 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import * as transcript from '../../src/plugins/transcript/index.ts'
-import * as view from '../../src/plugins/transcript-view/index.ts'
-import * as cards from '../../src/plugins/tool-cards/index.ts'
 import type { TranscriptState } from '../../src/plugins/transcript/index.ts'
 import type {
   Card,
@@ -15,11 +12,7 @@ import type {
   CardTitleLook,
 } from '../../src/plugins/tool-cards/index.ts'
 import { frame } from '../../src/index.ts'
-import { agents } from '../support/agents.ts'
-import { mount } from '../support/mount.ts'
-import { persistence } from '../support/sessions.ts'
-
-const settled = () => new Promise((resolve) => setImmediate(resolve))
+import { mounted } from '../support/mounted.ts'
 
 const ENTER = '\r'
 const UP = '\x1b[A'
@@ -68,44 +61,28 @@ function toolsOf(tools: Readonly<Record<string, Tool>>) {
   }
 }
 
+const BUILT_INS = ['binnacle-transcript', 'binnacle-transcript-view', 'binnacle-tool-cards']
+
 async function reading(events: readonly Event[], tools: Readonly<Record<string, Tool>> = {}, rows = 16, columns = 40) {
-  const store = persistence([{ id: 'session-stored', createdAt: 1, events }])
   const service = toolsOf(tools)
-  const mounted = await mount({
-    args: ['--session', 'session-stored'],
-    columns,
-    rows,
-    provide: (ctx) => {
-      ctx.provide('sessionPersistence', store)
-      ctx.provide('tools' as never, service.service as never)
-    },
+  const mount = await mounted({
+    size: { columns, rows },
+    builtins: BUILT_INS,
+    stored: { id: 'session-stored', events: events as never },
+    provide: (ctx) => ctx.provide('tools' as never, service.service as never),
   })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(view)
-  const plugin = await mounted.ctx.plugin(cards)
-  await settled()
-  const drawn = async () => (await mounted.terminal.read()).rows
-  return { ...mounted, plugin, asked: service.asked, drawn }
+  const drawn = async () => (await mount.terminal.read()).rows
+  return { ...mount, plugin: mount.row('binnacle-tool-cards'), asked: service.asked, drawn }
 }
 
 async function talking(tools: Readonly<Record<string, Tool>> = {}, rows = 12) {
-  const dsh = agents()
   const service = toolsOf(tools)
-  const mounted = await mount({
-    columns: 40,
-    rows,
-    provide: (ctx) => {
-      dsh.provide(ctx)
-      ctx.provide('tools' as never, service.service as never)
-    },
+  const mount = await mounted({
+    size: { columns: 40, rows },
+    builtins: BUILT_INS,
+    provide: (ctx) => ctx.provide('tools' as never, service.service as never),
   })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(view)
-  await mounted.ctx.plugin(cards)
-  await settled()
-  return { ...mounted, dsh, asked: service.asked, drawn: async () => (await mounted.terminal.read()).rows }
+  return { ...mount, asked: service.asked, drawn: async () => (await mount.terminal.read()).rows }
 }
 
 const stateOf = (ctx: Context) => ctx.binnacle.modelOf<TranscriptState>('transcript')
@@ -371,11 +348,11 @@ test('a stored session draws its cards with the times they took, asks the tools 
 
 test("a live session draws the same cards as a stored one, asking the tools service with the Chat's agent", async () => {
   const events = [call(0, 'bash', '{"command":"ls"}'), result(1, 'c0', '', { meta: { output: 'a' } })]
-  const stored = await reading(events, { bash: shell }, 12)
+  const stored = await (await reading(events, { bash: shell }, 12)).drawn()
   const live = await talking({ bash: shell })
   for (const event of events) live.dsh.commit(live.ctx, event)
-  assert.deepEqual(await live.drawn(), await stored.drawn())
-  assert.deepEqual(new Set(live.asked.map(({ scope }) => scope)), new Set([live.dsh.agent]))
+  assert.deepEqual(await live.drawn(), stored)
+  assert.deepEqual(new Set(live.asked.map(({ scope }) => scope)), new Set([live.ctx.binnacleSession.agent]))
 })
 
 test('the call that streams draws through the view as ⏺ <tool>(<the arguments so far>), and the card takes its place once it commits', async () => {

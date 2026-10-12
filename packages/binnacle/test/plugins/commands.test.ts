@@ -1,15 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import * as composer from '../../src/plugins/composer/index.ts'
 import * as commands from '../../src/plugins/commands/index.ts'
 import type { CommandsState } from '../../src/plugins/commands/index.ts'
 import type { ComposerState } from '../../src/plugins/composer/index.ts'
 import { line as searchLine } from '../../src/index.ts'
 import type { ListPiece } from '../../src/index.ts'
-import { mount } from '../support/mount.ts'
-import { agents } from '../support/agents.ts'
-import { persistence } from '../support/sessions.ts'
+import { mounted } from '../support/mounted.ts'
 
 interface Definition {
   readonly name: string
@@ -50,38 +47,41 @@ function registry(ctx: Context, definitions: readonly Definition[]) {
 
 const settled = () => new Promise((resolve) => setImmediate(resolve))
 
+/** The composer and the offer of commands, over dsh's command registry. With `opens: false`, no session opens, as before dsh makes the agent. */
 async function offering(
-  options: { definitions?: readonly Definition[]; rows?: number; columns?: number; args?: string[]; provide?: (ctx: Context) => void } = {},
+  options: { definitions?: readonly Definition[]; rows?: number; columns?: number; stored?: boolean; opens?: boolean } = {},
 ) {
-  const dsh = agents()
   let dshCommands!: ReturnType<typeof registry>
-  const mounted = await mount({
-    args: options.args ?? [],
-    columns: options.columns ?? 40,
-    rows: options.rows ?? 8,
+  const mount = await mounted({
+    size: { columns: options.columns ?? 40, rows: options.rows ?? 8 },
+    builtins: ['binnacle-composer', 'binnacle-commands'],
+    ...(options.stored === true ? { stored: { id: 'session-stored', events: [] } } : {}),
     provide: (ctx) => {
-      dsh.provide(ctx)
+      if (options.opens === false) ctx.provide('agents' as never, { create: () => new Promise(() => {}) } as never)
       dshCommands = registry(ctx, options.definitions ?? [COMPACT, GOAL, PLAN])
-      options.provide?.(ctx)
     },
   })
-  mounted.ready()
-  await mounted.ctx.plugin(composer)
-  const row = mounted.ctx.plugin(commands)
-  await row
-  await settled()
+  const { app } = mount
   const typed = async (...keys: string[]) => {
     // A person types one key at a time, each after the last is drawn.
     for (const key of keys) {
-      mounted.terminal.type(key)
+      mount.terminal.type(key)
       await settled()
-      await mounted.terminal.read()
+      await mount.terminal.read()
     }
     await settled()
-    return (await mounted.terminal.read()).rows
+    return (await mount.terminal.read()).rows
   }
-  const draft = () => mounted.ctx.binnacle.modelOf<ComposerState>('composer').state?.text
-  return { ...mounted, dsh, commands: dshCommands, typed, draft, row }
+  const draft = () => mount.ctx.binnacle.modelOf<ComposerState>('composer').state?.text
+  const dsh = {
+    get sent() {
+      return app.agent.sent
+    },
+    get cancels() {
+      return app.agent.cancels
+    },
+  }
+  return { ...mount, dsh, commands: dshCommands, typed, draft }
 }
 
 async function authored(ctx: Context, author: (plugin: Context) => void) {
@@ -226,16 +226,11 @@ test('an offer that matches no command closes too when the draft stops being / a
 })
 
 test('on a stored session, or before the session opens, a draft of / offers nothing', async () => {
-  const store = persistence([{ id: 'session-stored', createdAt: 1, events: [] }])
-  const stored = await offering({ args: ['--session', 'session-stored'], provide: (ctx) => ctx.provide('sessionPersistence', store) })
+  const stored = await offering({ stored: true })
   const storedRows = await stored.typed('/')
-  const mounted = await mount({ columns: 40, rows: 8, provide: (ctx) => void registry(ctx, [COMPACT]) })
-  await mounted.ctx.plugin(composer)
-  await mounted.ctx.plugin(commands)
-  mounted.terminal.type('/')
-  await settled()
+  const beforeOpen = await offering({ definitions: [COMPACT], opens: false })
   assert.deepEqual(
-    [storedRows.slice(0, 5), (await mounted.terminal.read()).rows.slice(0, 5)],
+    [storedRows.slice(0, 5), (await beforeOpen.typed('/')).slice(0, 5)],
     [
       ['', '', '', '', ''],
       ['', '', '', '', ''],

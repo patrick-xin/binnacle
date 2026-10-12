@@ -3,22 +3,41 @@ import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
 import * as composer from '../../src/plugins/composer/index.ts'
 import type { ComposerState } from '../../src/plugins/composer/index.ts'
-import { mount } from '../support/mount.ts'
-import { agents } from '../support/agents.ts'
-import { persistence } from '../support/sessions.ts'
+import { mounted } from '../support/mounted.ts'
 
-async function chat(columns = 20, rows = 5, provide?: (ctx: Context) => void, args: string[] = []) {
-  const mounted = await mount({ args, columns, rows, ...(provide === undefined ? {} : { provide }) })
-  mounted.ready()
-  const composerFiber = mounted.ctx.plugin(composer)
-  await composerFiber
-  // The session opens after the core loads; let it settle.
-  await new Promise((resolve) => setImmediate(resolve))
+/** The composer alone. With no agent, as before dsh makes one, no session opens; `opens` gives the mount's fake agent, and `stored` a stored session. */
+async function chat(columns = 20, rows = 5, options: { opens?: boolean; stored?: boolean; provide?: (ctx: Context) => void } = {}) {
+  const mount = await mounted({
+    size: { columns, rows },
+    builtins: ['binnacle-composer'],
+    ...(options.stored === true ? { stored: { id: 'session-stored', events: [] } } : {}),
+    provide: (ctx) => {
+      if (options.opens !== true && options.stored !== true)
+        ctx.provide('agents' as never, { create: () => new Promise(() => {}) } as never)
+      options.provide?.(ctx)
+    },
+  })
+  const { app } = mount
   const typed = async (...keys: string[]) => {
-    for (const key of keys) mounted.terminal.type(key)
-    return (await mounted.terminal.read()).rows
+    for (const key of keys) mount.terminal.type(key)
+    return (await mount.terminal.read()).rows
   }
-  return { ...mounted, composerFiber, typed }
+  const dsh = {
+    agent: app.agent,
+    get sent() {
+      return app.agent.sent
+    },
+    get cancels() {
+      return app.agent.cancels
+    },
+  }
+  return {
+    ...mount,
+    dsh,
+    composerFiber: { dispose: () => app.unload('binnacle-composer') },
+    fiber: { dispose: () => app.unload('binnacle') },
+    typed,
+  }
 }
 
 const RULE = '─'.repeat(20)
@@ -29,7 +48,7 @@ test('what a person types is drawn in the composer, between its rules', async ()
 })
 
 test('enter clears the draft and keeps it in the history, and up brings it back', async () => {
-  const { typed } = await chat(20, 5, agents().provide)
+  const { typed } = await chat(20, 5, { opens: true })
   assert.deepEqual(
     [await typed('h', 'i', '\r'), await typed('\x1b[A')],
     [
@@ -50,7 +69,7 @@ test('a key that the kitty protocol reports released is not typed a second time'
 })
 
 test("shift+enter makes a new line, as the kitty protocol and modifyOtherKeys send it, and as pi-tui's fallbacks ctrl+j and a backslash before enter do", async () => {
-  const { typed } = await chat(20, 8, agents().provide)
+  const { typed } = await chat(20, 8, { opens: true })
   const rows = await typed('a', '\x1b[13;2u', 'b', '\x1b[27;2;13~', 'c', '\n', 'd', '\\', '\r', 'e')
   assert.deepEqual(rows, ['', RULE, 'a', 'b', 'c', 'd', 'e ', RULE])
 })
@@ -99,10 +118,9 @@ test("the terminal's cursor is put on the composer's cursor, for an input method
 })
 
 test('enter sends the draft to the agent as a prompt, and steers the turn that runs', async () => {
-  const dsh = agents()
-  const { typed } = await chat(20, 5, dsh.provide)
+  const { typed, dsh } = await chat(20, 5, { opens: true })
   await typed('h', 'i', '\r')
-  dsh.agent.status = 'running'
+  await dsh.agent.status('running')
   await typed('o', 'k', '\r')
   assert.deepEqual(dsh.sent, [
     { how: 'followup', text: 'hi' },
@@ -111,11 +129,11 @@ test('enter sends the draft to the agent as a prompt, and steers the turn that r
 })
 
 test('enter keeps the draft while no agent takes it: a stored session that is read, or a session not open yet', async () => {
-  const store = persistence([{ id: 'session-stored', createdAt: 1, events: [] }])
-  const { typed: typedToStored } = await chat(20, 5, (ctx) => ctx.provide('sessionPersistence', store), ['--session', 'session-stored'])
+  const { typed: typedToStored } = await chat(20, 5, { stored: true })
+  const toStored = await typedToStored('h', 'i', '\r')
   const { typed: typedBeforeOpen } = await chat()
   assert.deepEqual(
-    [await typedToStored('h', 'i', '\r'), await typedBeforeOpen('h', 'i', '\r')],
+    [toStored, await typedBeforeOpen('h', 'i', '\r')],
     [
       ['', '', RULE, 'hi ', RULE],
       ['', '', RULE, 'hi ', RULE],
@@ -132,8 +150,7 @@ test('ctrl+c on a draft clears it, and only two more on the empty draft quit', a
 })
 
 test("esc interrupts the turn that runs, keeping what was queued for it as dsh's own stop does, and leaves the draft", async () => {
-  const dsh = agents()
-  const { typed } = await chat(20, 5, dsh.provide)
+  const { typed, dsh } = await chat(20, 5, { opens: true })
   await typed('h', 'i')
   const rows = await typed('\x1b')
   // A lone escape is told from the start of a sequence once nothing follows it.
@@ -152,8 +169,7 @@ test('an action with no Place bound to ctrl+t runs while the composer has the Fo
 })
 
 test('ctrl+x interrupts the turn from the composer once an author binds it to binnacle.interrupt beside its keys', async () => {
-  const dsh = agents()
-  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  const { ctx, typed, dsh } = await chat(20, 5, { opens: true })
   await authored(ctx, (plugin) => {
     plugin.binnacle.bind('binnacle.interrupt', (keys) => [...keys, 'ctrl+x'])
   })
@@ -195,8 +211,7 @@ test("setting the draft to the draft it holds changes nothing, the cursor and a 
 })
 
 test('ctrl+s sends the draft and enter makes a new line, once an author binds composer.send and composer.newline to them', async () => {
-  const dsh = agents()
-  const { ctx, typed } = await chat(20, 6, dsh.provide)
+  const { ctx, typed, dsh } = await chat(20, 6, { opens: true })
   await authored(ctx, (plugin) => {
     plugin.binnacle.bind('composer.send', ['ctrl+s'])
     plugin.binnacle.bind('composer.newline', ['enter'])
@@ -217,8 +232,7 @@ test('a newline sequence with no key name runs composer.newline, whatever its ke
 })
 
 test("ctrl+j makes a new line though enter's sequence is the same, after an author sets composer.send", async () => {
-  const dsh = agents()
-  const { ctx, typed } = await chat(20, 6, dsh.provide)
+  const { ctx, typed, dsh } = await chat(20, 6, { opens: true })
   await authored(ctx, (plugin) => {
     plugin.binnacle.action('composer.send', { run: (_at, beneath) => beneath() })
   })
@@ -226,8 +240,7 @@ test("ctrl+j makes a new line though enter's sequence is the same, after an auth
 })
 
 test('the default composer.send takes a backslash before the cursor as a new line, wherever it is bound', async () => {
-  const dsh = agents()
-  const { ctx, typed } = await chat(20, 6, dsh.provide)
+  const { ctx, typed, dsh } = await chat(20, 6, { opens: true })
   await authored(ctx, (plugin) => {
     plugin.binnacle.bind('composer.send', ['ctrl+s'])
   })
@@ -236,15 +249,13 @@ test('the default composer.send takes a backslash before the cursor as a new lin
 })
 
 test('the default composer.send sends nothing for a draft of whitespace, and keeps it', async () => {
-  const dsh = agents()
-  const { typed } = await chat(20, 5, dsh.provide)
+  const { typed, dsh } = await chat(20, 5, { opens: true })
   const rows = await typed(' ', ' ', '\r')
   assert.deepEqual([rows, dsh.sent], [['', '', RULE, '   ', RULE], []])
 })
 
 test('an author who sets composer.send and runs beneath() keeps what it did: the draft is sent, and goes into the history', async () => {
-  const dsh = agents()
-  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  const { ctx, typed, dsh } = await chat(20, 5, { opens: true })
   const seen: string[] = []
   await authored(ctx, (plugin) => {
     plugin.binnacle.action('composer.send', {
@@ -259,8 +270,7 @@ test('an author who sets composer.send and runs beneath() keeps what it did: the
 })
 
 test('an author who sets composer.send without beneath() sends nothing, and clears the draft by setting its text', async () => {
-  const dsh = agents()
-  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  const { ctx, typed, dsh } = await chat(20, 5, { opens: true })
   const queued: string[] = []
   await authored(ctx, (plugin) => {
     plugin.binnacle.action('composer.send', {
@@ -279,8 +289,7 @@ test('an author who sets composer.send without beneath() sends nothing, and clea
 })
 
 test('an author who sets the draft and runs composer.send in one call sends the draft that was set', async () => {
-  const dsh = agents()
-  const { ctx, typed } = await chat(20, 5, dsh.provide)
+  const { ctx, typed, dsh } = await chat(20, 5, { opens: true })
   await typed('h', 'i')
   draftOf(ctx).set((state) => {
     state.text = 'set'
@@ -390,23 +399,23 @@ function registry() {
 }
 
 async function commanding(rows = 5) {
-  const dsh = agents()
   const commands = registry()
-  const mounted = await chat(20, rows, (ctx) => {
-    dsh.provide(ctx)
-    commands.provide(ctx)
-  })
-  return { ...mounted, dsh, commands }
+  return { ...(await chat(20, rows, { opens: true, provide: commands.provide })), commands }
 }
 
 test("enter on a command line gives it to dsh's commands with the Chat's agent, with only the composer's row on, and the model sees no prompt; a success clears the draft and keeps it in the history", async () => {
-  const { typed, dsh, commands } = await commanding()
+  const { ctx, typed, dsh, commands } = await commanding()
   await typed(...'/compact', '\r')
   await commands.settle(success('compacted'))
   const afterRun = await typed()
   assert.deepEqual(
     [commands.ran.map(({ agent, line, attachments }) => ({ agent, line, attachments })), dsh.sent, afterRun, await typed('\x1b[A')],
-    [[{ agent: dsh.agent, line: '/compact', attachments: [] }], [], ['', '', RULE, ' ', RULE], ['', '', RULE, '/compact', RULE]],
+    [
+      [{ agent: ctx.binnacleSession.agent, line: '/compact', attachments: [] }],
+      [],
+      ['', '', RULE, ' ', RULE],
+      ['', '', RULE, '/compact', RULE],
+    ],
   )
 })
 
@@ -438,8 +447,7 @@ test("a line whose name is no command is sent as a prompt, as a skill's /name is
 })
 
 test('with no command registry, a command line is sent as a prompt', async () => {
-  const dsh = agents()
-  const { typed } = await chat(20, 5, dsh.provide)
+  const { typed, dsh } = await chat(20, 5, { opens: true })
   await typed(...'/compact', '\r')
   assert.deepEqual(dsh.sent, [{ how: 'followup', text: '/compact' }])
 })

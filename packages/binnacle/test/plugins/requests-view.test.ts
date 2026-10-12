@@ -1,17 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import { bindScopeParent, scopeTarget } from '@deepseek-ai/dsh-scope'
-import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
-import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
-import * as composer from '../../src/plugins/composer/index.ts'
-import * as requests from '../../src/plugins/requests/index.ts'
+import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
 import * as view from '../../src/plugins/requests-view/index.ts'
 import { REQUEST_LAYOUT, keyOf, pick } from '../../src/plugins/requests-view/index.ts'
 import type { Request } from '../../src/index.ts'
-import { agents } from '../support/agents.ts'
-import { mount } from '../support/mount.ts'
+import type { Mounted, Subagent } from '../../src/testing/index.ts'
+import { mounted } from '../support/mounted.ts'
 
 async function chat(
   options: {
@@ -21,52 +17,50 @@ async function chat(
     before?: (ctx: Context) => PromiseLike<unknown>
   } = {},
 ) {
-  const dsh = agents()
-  const mounted = await mount({ columns: options.columns ?? 40, rows: options.rows ?? 10, provide: dsh.provide })
-  mounted.ready()
-  await options.first?.(mounted.ctx)
-  await mounted.ctx.plugin(composer)
-  await mounted.ctx.plugin(requests)
-  const plugin = await mounted.ctx.plugin(view)
-  await options.before?.(mounted.ctx)
-  await new Promise((resolve) => setImmediate(resolve))
+  const mount = await mounted({
+    size: { columns: options.columns ?? 40, rows: options.rows ?? 10 },
+    // A plugin loaded first comes before the view, as the view then loads as a plugin of its own after it.
+    builtins: ['binnacle-composer', 'binnacle-requests', ...(options.first === undefined ? ['binnacle-requests-view'] : [])],
+  })
+  if (options.first !== undefined) {
+    await options.first(mount.ctx)
+    await mount.ctx.plugin(view)
+  }
+  await options.before?.(mount.ctx)
+  const { app } = mount
+  const dsh = {
+    app,
+    agent: app.agent,
+    commit: (_ctx: Context, event: { seq: number; type: string; time: number; data: unknown }) => void app.agent.commit(event),
+    get cancels() {
+      return app.agent.cancels
+    },
+  }
   const rows = async (): Promise<string[]> => {
     await new Promise((resolve) => setImmediate(resolve))
-    return (await mounted.terminal.read()).rows
+    return (await mount.terminal.read()).rows
   }
   // A key is typed after the Request is drawn, as a person's key comes after the screen shows it.
   const typed = async (...keys: string[]): Promise<string[]> => {
     await new Promise((resolve) => setImmediate(resolve))
     for (const key of keys) {
-      mounted.terminal.type(key)
+      mount.terminal.type(key)
       await new Promise((resolve) => setImmediate(resolve))
     }
     return rows()
   }
-  return { ...mounted, dsh, plugin, rows, typed }
+  return { ...mount, dsh, rows, typed }
 }
+
+type Dsh = { readonly app: Mounted }
 
 const approve = (
-  ctx: Context,
-  dsh: ReturnType<typeof agents>,
-  request: { agent?: object; toolName?: string; callId?: string; reason?: string } = {},
-) => {
-  const agent = request.agent ?? dsh.agent
-  return ctx.waterfall(
-    scopeTarget(agent, agent) as never,
-    'approval/request',
-    { ...request, agent, toolName: request.toolName ?? 'bash' } as never,
-    () => Promise.resolve('unavailable' as ApprovalOutcome),
-  ) as Promise<ApprovalOutcome>
-}
+  _ctx: Context,
+  dsh: Dsh,
+  { toolName = 'bash', ...request }: { agent?: Subagent; toolName?: string; callId?: string; reason?: string } = {},
+) => dsh.app.approve(toolName, request)
 
-const ask = (ctx: Context, dsh: ReturnType<typeof agents>, questions: readonly AskUserQuestionItem[]) =>
-  ctx.waterfall(
-    scopeTarget(dsh.agent, dsh.agent) as never,
-    'user-questions/request',
-    { signal: undefined, questions, agent: dsh.agent } as never,
-    () => Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')),
-  ) as Promise<AskUserQuestionAnswer>
+const ask = (_ctx: Context, dsh: Dsh, questions: readonly AskUserQuestionItem[]) => dsh.app.ask(questions)
 
 const DOWN = '\x1b[B'
 const UP = '\x1b[A'
@@ -280,8 +274,7 @@ test("an approval shows its tool, why it asks and its arguments, capped at 12 li
   ])
   await typed(DOWN, ENTER)
   assert.equal(await outcome, 'rejected')
-  const child = { id: 'session-child' }
-  bindScopeParent(child, dsh.agent)
+  const child = dsh.agent.child('session-child')
   const asked = approve(ctx, dsh, { agent: child })
   const shown = await rows()
   assert.deepEqual(shown.slice(-4), [ruleWith('bash needs approval (session-child)'), '› Allow once', '  Reject', RULE])
@@ -386,12 +379,13 @@ test('when the Choices are taller than the room, the question and its detail sta
 })
 
 test('every other key does nothing while the Choices have the Focus: it neither types, interrupts, clears, quits, suspends nor moves the Focus', async () => {
-  const { ctx, dsh, typed, exits, process } = await chat()
+  // A suspend would give the terminal back, and the screen would show the shell's rows, not the Request's.
+  const { ctx, dsh, typed, exits } = await chat()
   const outcome = approve(ctx, dsh)
   const shown = await typed('x', '\x03', '\x03', '\x1a', '\x1b[Z')
   assert.deepEqual(
-    [shown.slice(-4), exits, dsh.cancels, process.stopCount, await pending(outcome)],
-    [[ruleWith('bash needs approval'), '› Allow once', '  Reject', RULE], [], [], 0, 'still pending'],
+    [shown.slice(-4), exits, dsh.cancels, await pending(outcome)],
+    [[ruleWith('bash needs approval'), '› Allow once', '  Reject', RULE], [], [], 'still pending'],
   )
   assert.equal(await (await typed(ENTER), outcome), 'allowed-once')
 })

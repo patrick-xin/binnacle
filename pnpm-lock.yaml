@@ -29,6 +29,9 @@ importers:
 
   packages/binnacle:
     dependencies:
+      '@xterm/headless':
+        specifier: 5.5.0
+        version: 5.5.0
       commander:
         specifier: 15.0.0
         version: 15.0.0
@@ -84,9 +87,6 @@ importers:
       '@types/node':
         specifier: 24.19.0
         version: 24.19.0
-      '@xterm/headless':
-        specifier: 5.5.0
-        version: 5.5.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2
