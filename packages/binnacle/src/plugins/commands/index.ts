@@ -10,7 +10,7 @@ export const inject = ['binnacle'] satisfies (keyof Context)[]
 
 /** A command as the offer shows it. */
 export interface CommandItem extends ListItem {
-  /** `/<name>`. */
+  /** The command's name, without its `/`: the draft above the offer shows the `/`. */
   readonly label: string
   readonly description: string
   readonly name: string
@@ -46,7 +46,7 @@ const INPUT = 'composer.input'
 const OFFERED = /^\/([\w-]*)$/
 
 const itemOf = (command: CommandDescriptor): CommandItem => ({
-  label: `/${command.name}`,
+  label: command.name,
   description: command.description,
   name: command.name,
   hint: command.input?.hint,

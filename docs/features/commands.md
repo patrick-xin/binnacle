@@ -4,7 +4,7 @@ Row `binnacle-commands` · Code `binnacle:packages/binnacle/src/plugins/commands
 
 ## What a person can do
 
-- Type `/` in the composer, and see dsh's commands above it, in the registry's order, the first marked. Each is `/<name>`, with its description in the `muted` Tone.
+- Type `/` in the composer, and see dsh's commands above it, in the registry's order, the first marked. Each is its name, without the `/` that the draft above shows, with its description in the `muted` Tone.
 - Type on, and see the offer narrow to the commands whose names match: the names that start with what is typed first, then the closest. While no command matches, the offer draws nothing.
 - Move the mark with up and down while typing. They wrap. Page up and page down move the mark by a page, and stop at the first and the last command. With more than 8 commands, the offer shows 8, and keeps the mark in view.
 - Pick a command with enter or a click. A command that takes no input runs at once. A command that takes input puts `/<name> ` in the draft, with the cursor at its end, for its input. Tab puts `/<name> ` in the draft, whichever the command.
@@ -16,7 +16,7 @@ Row `binnacle-commands` · Code `binnacle:packages/binnacle/src/plugins/commands
 
 ## What an author can change
 
-- Read the offer: the model `commands`, `binnacle.modelOf('commands')`, holds `open` and `query`, and its `items` are the commands that match, each `{ label, description, name, hint }`.
+- Read the offer: the model `commands`, `binnacle.modelOf('commands')`, holds `open` and `query`, and its `items` are the commands that match, each `{ label, description, name, hint }`. A `label` is the command's name.
 - What opening, closing, picking and completing do: set the action `commands.open`, `commands.close`, `commands.pick` or `commands.complete`. An empty `commands.open` takes the offer out.
 - How a piece of a command is drawn: the Looks `commands.list.mark`, `commands.list.label` and `commands.list.description`, then `list.mark` and the rest, each given the item with its `hint`. So `commands.list.label` draws a command's hint after its name, and the row stays the List's own.
 - How a whole command is drawn: the Look `commands.list.row`, then `list.row`. Its `beneath` is the row cut at the width.

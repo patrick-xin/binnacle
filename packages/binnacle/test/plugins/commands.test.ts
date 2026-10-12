@@ -104,7 +104,7 @@ test("a draft of / offers the commands above the composer, each with its descrip
   const rows = await typed('/')
   assert.deepEqual(
     [rows, (await terminal.styleAt(10, 3)).colour, (await terminal.styleAt(2, 3)).colour],
-    [['', RULE, '› /compact — Compact the session', '  /goal — Set a goal', '  /plan — Plan first', RULE, '/ ', RULE], 8, 'default'],
+    [['', RULE, '› compact — Compact the session', '  goal — Set a goal', '  plan — Plan first', RULE, '/ ', RULE], 8, 'default'],
   )
 })
 
@@ -115,7 +115,7 @@ test('the offer narrows as the person types, the names that start with the query
   assert.deepEqual(
     [narrowed, none],
     [
-      ['', '', RULE, '› /plan — p', '  /plan — Plan first', '  /apple — a', RULE, '/pl ', RULE].slice(1),
+      ['', '', RULE, '› plan — p', '  plan — Plan first', '  apple — a', RULE, '/pl ', RULE].slice(1),
       ['', '', '', '', '', RULE, '/plz ', RULE],
     ],
   )
@@ -129,8 +129,8 @@ test('up and down move the mark while the person types, and wrap', async () => {
   assert.deepEqual(
     [up.slice(2, 5), down.slice(2, 5)],
     [
-      ['  /compact — Compact the session', '  /goal — Set a goal', '› /plan — Plan first'],
-      ['  /compact — Compact the session', '› /goal — Set a goal', '  /plan — Plan first'],
+      ['  compact — Compact the session', '  goal — Set a goal', '› plan — Plan first'],
+      ['  compact — Compact the session', '› goal — Set a goal', '  plan — Plan first'],
     ],
   )
 })
@@ -148,11 +148,11 @@ test('with more commands than 8 rows the offer shows 8, and page down and page u
   assert.deepEqual(
     [first.slice(2, 11), marked(paged), marked(last), last[10], marked(back)],
     [
-      [RULE, ...MANY.slice(0, 8).map(({ name }, n) => `${n === 0 ? '›' : ' '} /${name} — d`)],
-      '› /c08 — d',
-      '› /c11 — d',
-      '› /c11 — d',
-      '› /c00 — d',
+      [RULE, ...MANY.slice(0, 8).map(({ name }, n) => `${n === 0 ? '›' : ' '} ${name} — d`)],
+      '› c08 — d',
+      '› c11 — d',
+      '› c11 — d',
+      '› c00 — d',
     ],
   )
 })
@@ -198,7 +198,7 @@ test('esc closes the offer and keeps the draft, and the offer opens again when t
   await esc(typed)
   assert.deepEqual(
     [closed, cancelsWhileOpen, again.slice(2, 5), dsh.cancels.length],
-    [['', '', '', '', '', RULE, '/ ', RULE], 0, [RULE, '› /plan — Plan first', '  /compact — Compact the session'], 1],
+    [['', '', '', '', '', RULE, '/ ', RULE], 0, [RULE, '› plan — Plan first', '  compact — Compact the session'], 1],
   )
 })
 
@@ -247,8 +247,8 @@ test('a command registered or removed while the offer is open shows in it, or go
   assert.deepEqual(
     [registered.slice(2, 5), (await typed()).slice(2, 5)],
     [
-      [RULE, '› /compact — Compact the session', '  /plan — Plan first'],
-      ['', RULE, '› /compact — Compact the session'],
+      [RULE, '› compact — Compact the session', '  plan — Plan first'],
+      ['', RULE, '› compact — Compact the session'],
     ],
   )
 })
@@ -281,7 +281,7 @@ test('the model `commands` holds open, query and the items that match, each { la
   const state = ctx.binnacle.modelOf<CommandsState>('commands').state!
   assert.deepEqual(
     [state.open, state.query, state.items],
-    [true, 'g', [{ label: '/goal', description: 'Set a goal', name: 'goal', hint: '<goal>' }]],
+    [true, 'g', [{ label: 'goal', description: 'Set a goal', name: 'goal', hint: '<goal>' }]],
   )
 })
 
@@ -317,7 +317,7 @@ test('the offer is the Layout commands, COMMANDS_LAYOUT, in the Chat before the 
   const rows = await typed('/', 'p', 'l')
   assert.deepEqual(
     [commands.COMMANDS_LAYOUT, rows],
-    [{ place: 'commands.list', size: { most: 9 }, border: ['top'] }, [RULE, '› /plan — Plan first', '', '', '', RULE, '/pl ', RULE]],
+    [{ place: 'commands.list', size: { most: 9 }, border: ['top'] }, [RULE, '› plan — Plan first', '', '', '', RULE, '/pl ', RULE]],
   )
 })
 
@@ -335,7 +335,7 @@ test('an author floats the offer over the transcript, framed, with COMMANDS_LAYO
     '',
     '',
     '        ╭──────────────────────╮',
-    '        │› /plan — Plan first  │',
+    '        │› plan — Plan first   │',
     '        ╰──────────────────────╯',
     '',
     '',
@@ -350,7 +350,7 @@ test('an author changes how a command is drawn with the Look commands.list.row, 
   await authored(ctx, (plugin) => {
     plugin.binnacle.look<commands.CommandRow>('commands.list.row', () => (item) => `${item.label} ${item.hint ?? ''}`.trimEnd())
   })
-  assert.deepEqual((await typed('/', 'g')).slice(3, 5), [RULE, '/goal <goal>'])
+  assert.deepEqual((await typed('/', 'g')).slice(3, 5), [RULE, 'goal <goal>'])
 })
 
 test('an author draws a command’s hint after its name with the Look commands.list.label, and the row stays the List’s own', async () => {
@@ -364,7 +364,7 @@ test('an author draws a command’s hint after its name with the Look commands.l
   const rows = (await typed('/')).slice(2, 5)
   assert.deepEqual(
     [rows, (await terminal.styleAt(2, 2)).colour, (await terminal.styleAt(8, 3)).dim],
-    [['› /compact — Compact the session', '  /goal <goal> — Set a goal', '  /plan — Plan first'], 6, true],
+    [['› compact — Compact the session', '  goal <goal> — Set a goal', '  plan — Plan first'], 6, true],
   )
 })
 
@@ -376,7 +376,7 @@ test('a command whose description is wider than the terminal draws in one line, 
   })
   assert.deepEqual(
     [cut, (await typed()).at(-4)],
-    [['─'.repeat(20), '› /compact — Compac…', '─'.repeat(20), '/c ', '─'.repeat(20)], '> /compact — Compac…'],
+    [['─'.repeat(20), '› compact — Compact…', '─'.repeat(20), '/c ', '─'.repeat(20)], '> compact — Compact…'],
   )
 })
 
@@ -397,7 +397,7 @@ test("a command that a plugin registers with dsh's register is offered and runs,
   const offered = (await typed('/')).slice(4, 5)
   const shown = await typed('\r')
   const back = await typed('\x02')
-  assert.deepEqual([offered, shown[0], back.slice(5)], [['› /settings — Show the Tones'], 'the Tones', [RULE, ' ', RULE]])
+  assert.deepEqual([offered, shown[0], back.slice(5)], [['› settings — Show the Tones'], 'the Tones', [RULE, ' ', RULE]])
 })
 
 test('an author who changes what commands.list.pick does keeps its gate, so enter runs it only while the offer draws', async () => {
@@ -430,9 +430,9 @@ test('an author adds a search line to the Places of commands.list.up, and up mov
     '',
     '',
     RULE,
-    '  /compact — Compact the session',
-    '  /goal — Set a goal',
-    '› /plan — Plan first',
+    '  compact — Compact the session',
+    '  goal — Set a goal',
+    '› plan — Plan first',
     RULE,
     '/ ',
     RULE,
