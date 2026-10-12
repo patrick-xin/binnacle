@@ -65,7 +65,9 @@ The folders, states and Hand-offs are in [`.agents/task.md`](../../task.md).
 14. Run `pnpm task land <ticket>` to open the PR, as `.agents/task.md` says.
 15. If `task land` says that the branch does not hold `origin/main`, send the Ticket back to its builder to rebase. The builder knows why its change was made. Rebase it yourself only when you built it.
 16. If you tried the branch, write in the PR what you drove and what it drew.
-17. After the PR merges or closes, run `pnpm task stop <ticket>`. After the last Ticket of a Spec merges, run `pnpm task stop <spec>`: it closes the Spec.
+17. After the PR merges or closes, run `pnpm task stop <ticket>`.
+18. After the last Ticket of a Spec merges, run its Person Trial, as [`.agents/try.md`](../../try.md) says. File each problem that it finds as a Fix, or as a Ticket of the Spec when it is larger, and build it before step 19.
+19. Run `pnpm task stop <spec>`: it closes the Spec.
 
 ## Builders and Reviewers
 
