@@ -124,10 +124,11 @@ export class Drawing {
   /** A press of the left button at the cell under the pointer, by its gesture's name. The Focus moves first, then the click reaches the Part, then the Place's actions. */
   click(x: number, y: number, gesture: string): boolean {
     const view = this.#onView()
-    const under = this.#under(x, y)
+    const hit = this.#hitAt(x, y)
+    const under = hit?.placed
     if (under === undefined) return false
     const part = view.partIn(under.place)
-    if (view.takesKeys(under.place)) view.moveFocus(under.place)
+    if (hit?.clickFocus === true && view.takesKeys(under.place)) view.moveFocus(under.place)
     const at = this.#pointIn(under, part, x, y)
     if (at !== undefined && part?.click?.(at) === true) {
       this.forget(part)
@@ -173,7 +174,11 @@ export class Drawing {
 
   /** The Place under the pointer, a float before what it covers, unless the mouse does nothing there. */
   #under(x: number, y: number): Placed | undefined {
-    return this.#hits.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)?.placed
+    return this.#hitAt(x, y)?.placed
+  }
+
+  #hitAt(x: number, y: number): Hit | undefined {
+    return this.#hits.find(({ top, left, width, height }) => y >= top && y < top + height && x >= left && x < left + width)
   }
 
   /** The Places on view that take keys, in the order of the layout. */

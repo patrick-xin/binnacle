@@ -470,6 +470,7 @@ Every node can also take:
 - `size`: `'fill'`, a share of what is left (in a column, a node that fills takes no more than its lines need while another that fills needs more, and what is left after is shared evenly); `'content'`, the cells its lines need; `{ fixed: n }`, in cells, its box included; or `{ most: n }`, the cells its lines need, up to `n`, its box included. A Place taller than a node of `{ most: n }` scrolls in it, as a Place does, so a List keeps its mark in view. A node with no size fills in a Screen's own Layout, and takes what its lines need in a Layout set by name.
 - `unless: name`: it draws nothing, and takes no cells, while the Layout or the Place by that name has a line to draw.
 - `mouse: false`: a click or the wheel inside it does nothing, and a click there moves no Focus.
+- `clickFocus: false`: a click inside it reaches its Part and its Place's actions, and moves no Focus, as for a Place that a person reads. A Place that has the Focus keeps it, and shift+tab still moves the Focus there. The Chat sets it on the transcript, so a click there leaves the keys in the composer. `binnacle.edit('chat', { replace: 'transcript', with: { place: 'transcript', size: 'fill' } })` gives the transcript its click Focus back.
 - A box: `padding` and `gap` in cells, a `border` on every side (`true`) or on the sides it names, the `edge` its border is drawn with, and a `title` set in its top edge.
 
 A `{ layout: name }` node or a `first` that has no line to draw takes no cells, its box included. A node has a line to draw while a Place in it does.

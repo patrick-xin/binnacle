@@ -1,7 +1,17 @@
 import type { Layout, Side } from '../api.ts'
-import { sliceByColumn, visibleWidth } from '../terminal/utils.ts'
+import { sliceByColumn, truncateToWidth, visibleWidth } from '../terminal/utils.ts'
 import type { Edge, Theme } from './theme.ts'
 import { toPlainText } from './view.ts'
+import type { Reach } from './arranged.ts'
+
+export const blank = (width: number): string => ' '.repeat(Math.max(0, width))
+export const fit = (row: string, width: number): string => truncateToWidth(row, width, '', true)
+
+/** What reaches a Place inside a node: the node's own `mouse: false` and `clickFocus: false` hold for each Place in it. */
+export const reachInside = (outer: Reach, node: { readonly mouse?: boolean; readonly clickFocus?: boolean }): Reach => ({
+  mouse: outer.mouse && node.mouse !== false,
+  clickFocus: outer.clickFocus && node.clickFocus !== false,
+})
 
 export type Insets = { readonly [side in Side]: number }
 

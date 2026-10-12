@@ -8,7 +8,8 @@ const deepFrozen = <T extends object>(value: T): T => {
 /** Frozen, as an author builds on it: a change to it in place would change the Chat under every plugin. */
 export const CHAT_LAYOUT: Layout & { readonly column: readonly Layout[] } = deepFrozen({
   column: [
-    { place: 'transcript', size: 'fill' },
+    // A person reads the transcript: a click there acts, and the keys stay where the person types.
+    { place: 'transcript', size: 'fill', clickFocus: false },
     { layout: 'status', size: 'content' },
     // A Request that stands is drawn in the composer's stead, by the Layout that the Requests' view sets.
     { layout: 'request', size: 'content' },
