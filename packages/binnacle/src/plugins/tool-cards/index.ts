@@ -5,6 +5,7 @@ import { toPlainText, truncateToWidth, visibleWidth } from '../../index.ts'
 import type { Tone } from '../../index.ts'
 import { callOf, failed, textOf } from '../transcript/index.ts'
 import type { EventLook, Line, TranscriptState } from '../transcript/index.ts'
+import { asWritten, fields, readable } from './json.ts'
 
 export type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 
@@ -60,12 +61,6 @@ const WHOLE: ReadonlySet<string> = new Set(['todo_write', 'ask_user_question'])
 
 const FIRST = '  ⎿ '
 const REST = '    '
-
-type Fields = Readonly<Record<string, unknown>>
-
-// An object that is not an array is keyed by strings.
-const fields = (value: unknown): Fields | undefined =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Fields) : undefined
 
 const oneLine = (text: string): string => toPlainText(text.replace(/\s*[\r\n]+\s*/g, ' '))
 
@@ -142,15 +137,27 @@ export function apply(ctx: Context): void {
   }
   // The raw arguments of each card the row makes, as parsing and serializing them again can change them, such as a number's digits.
   const raws = new WeakMap<Card, string>()
+  const dataLines = (card: Card, value: unknown, width: number): string[] =>
+    readable(value)
+      .slice(0, Math.max(0, pieces.most()(card)))
+      .map((line) => cut(oneLine(line), width))
   const generic: CardBodyLook = (card, width) => {
     const { args, call, result } = card
     if (result !== undefined) {
       const view = result.view?.card === 'generic' ? result.view : undefined
-      return [...titled(view?.title, width), ...first(card, textBlocks(view?.content) ?? result.text, width)]
+      const text = textBlocks(view?.content) ?? result.text
+      const json = asWritten(text)
+      const isData = json.parsed && typeof json.value === 'object' && json.value !== null
+      return [...titled(view?.title, width), ...(isData ? dataLines(card, json.value, width) : first(card, text, width))]
     }
-    if (call === undefined) return [cut(oneLine(raws.get(card) ?? (typeof args === 'string' ? args : JSON.stringify(args))), width)]
+    if (call === undefined) {
+      // The arguments the model wrote, which an author's card may not have: those that are not JSON draw as written.
+      const raw = raws.get(card)
+      const { value, parsed } = raw === undefined ? { value: args, parsed: true } : asWritten(raw)
+      return parsed ? dataLines(card, value, width) : [cut(oneLine(raw ?? ''), width)]
+    }
     if (call.card !== 'generic' || call.rawInput === undefined) return []
-    return [cut(oneLine(JSON.stringify(call.rawInput) ?? ''), width)]
+    return dataLines(card, call.rawInput, width)
   }
   const terminal: CardBodyLook = (card, width) => {
     const { call, result } = card

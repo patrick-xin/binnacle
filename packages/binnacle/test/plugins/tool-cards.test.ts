@@ -105,7 +105,7 @@ test("a card's first line is ⏺ and the call view's title, or the tool's name, 
     [call(0, 'bash', '{"command":"a very long command that goes on and on"}'), result(1, 'c0', '', { meta: {} }), call(2, 'mystery', '{}')],
     { bash: shell },
   )
-  assert.deepEqual((await drawn()).slice(0, 4), ['⏺ a very long command that goes … · 1.0s', '', '⏺ mystery', '  ⎿ {}'])
+  assert.deepEqual((await drawn()).slice(0, 4), ['⏺ a very long command that goes … · 1.0s', '', '⏺ mystery', ''])
 })
 
 test('the ⏺ is in the accent Tone while the call runs, success when it is done, and error when it failed, and the time is muted', async () => {
@@ -243,7 +243,7 @@ test("the result view's card chooses how the body is drawn, whatever the call vi
   assert.deepEqual((await drawn()).slice(0, 2), ['⏺ run · 1.0s', '  ⎿ 0 lines of 3'])
 })
 
-test('while a call runs, its body draws what its call view says: a terminal its description and directory, a diff a line for each file, a generic its rawInput', async () => {
+test('while a call runs, its body draws what its call view says: a terminal its description and directory, a diff a line for each file, a generic its rawInput as key: value lines', async () => {
   const write: Tool = {
     presentCall: () => ({ card: 'diff', title: 'Write a.ts', diffs: [{ path: 'a.ts', oldText: null, newText: 'x\n' }] }),
   }
@@ -253,7 +253,7 @@ test('while a call runs, its body draws what its call view says: a terminal its 
     write,
     job,
   })
-  assert.deepEqual((await drawn()).slice(0, 9), [
+  assert.deepEqual((await drawn()).slice(0, 10), [
     '⏺ ls',
     '  ⎿ List the files',
     '    /repo',
@@ -262,16 +262,17 @@ test('while a call runs, its body draws what its call view says: a terminal its 
     '  ⎿ a.ts +1 -0',
     '',
     '⏺ Job',
-    '  ⎿ {"id":"j1","lines":["a","b"]}',
+    '  ⎿ id: j1',
+    '    lines: a, b',
   ])
 })
 
-test('a running call with no view draws its raw arguments as one line cut at the width, and one whose body has no line draws its first line alone with nothing to fold', async () => {
+test('a running call with no view draws its arguments as key: value lines cut at the width, and one whose body has no line draws its first line alone with nothing to fold', async () => {
   const quiet: Tool = { presentCall: () => ({ card: 'generic', title: 'Quiet' }) }
   const { drawn, ctx, terminal } = await reading([call(0, 'read', '{"path":"a/very/long/path/to/a/file.ts"}'), call(1, 'quiet', '{}')], {
     quiet,
   })
-  assert.deepEqual((await drawn()).slice(0, 5), ['⏺ read', '  ⎿ {"path":"a/very/long/path/to/a/file…', '', '⏺ Quiet', ''])
+  assert.deepEqual((await drawn()).slice(0, 5), ['⏺ read', '  ⎿ path: a/very/long/path/to/a/file.ts', '', '⏺ Quiet', ''])
   terminal.type(clickAt(0, 3))
   await drawn()
   assert.deepEqual(stateOf(ctx).state?.folded, ['1'])
@@ -305,7 +306,7 @@ test('a result whose call is not in the session draws as the readable transcript
   assert.deepEqual((await drawn()).slice(0, 2), ['⎿ orphan', ''])
 })
 
-test('an unknown tool, or a presenter that throws or gives none, draws the raw arguments while it runs, and its result from the result view all the same', async () => {
+test('an unknown tool, or a presenter that throws or gives none, draws its arguments while it runs, and its result from the result view all the same', async () => {
   const throws: Tool = {
     presentCall: () => {
       throw new Error('no')
@@ -321,10 +322,10 @@ test('an unknown tool, or a presenter that throws or gives none, draws the raw a
     '  ⎿ 0 lines of 9',
     '',
     '⏺ throws',
-    '  ⎿ {"b":2}',
+    '  ⎿ b: 2',
     '',
     '⏺ unknown',
-    '  ⎿ {"c":3}',
+    '  ⎿ c: 3',
     '',
   ])
 })
@@ -369,7 +370,7 @@ test('the call that streams draws through the view as ⏺ <tool>(<the arguments 
   assert.deepEqual((await drawn()).slice(0, 1), ['⏺ ls({"a)'])
   dsh.commit(ctx, at(0, 'assistant/message', { turn: 1, step: 1, message: { role: 'assistant', content: [] }, stream: [] }))
   dsh.commit(ctx, call(1, 'ls', '{"a":1}'))
-  assert.deepEqual((await drawn()).slice(0, 2), ['⏺ ls', '  ⎿ {"a":1}'])
+  assert.deepEqual((await drawn()).slice(0, 2), ['⏺ ls', '  ⎿ a: 1'])
 })
 
 test('with the row binnacle-tool-cards off, a call and its result draw as two lines again', async () => {
@@ -439,14 +440,14 @@ test('an author counts a running time on a card with transcript.card.time and th
   assert.deepEqual((await drawn()).slice(0, 1), ['⏺ ls · 2s'])
 })
 
-test('a running call with no view draws its raw arguments as the model wrote them, its digits and its quotes kept, while an author is given them parsed', async () => {
+test('a running call with no view draws each number of its arguments as the model wrote it, its digits kept, while an author is given them parsed', async () => {
   const { drawn, ctx } = await reading([call(0, 'unknown', '{"n":9007199254740993}'), call(1, 'unknown', '"hello"')])
   const given: unknown[] = []
   ctx.binnacle.look<CardLook>('transcript.card', (beneath) => (card, where) => {
     given.push(card.args)
     return beneath(card, where)
   })
-  assert.deepEqual((await drawn()).slice(0, 6), ['⏺ unknown', '  ⎿ {"n":9007199254740993}', '', '⏺ unknown', '  ⎿ "hello"', ''])
+  assert.deepEqual((await drawn()).slice(0, 6), ['⏺ unknown', '  ⎿ n: 9007199254740993', '', '⏺ unknown', '  ⎿ hello', ''])
   assert.deepEqual(given.slice(-2), [{ n: 9007199254740992 }, 'hello'])
 })
 
@@ -576,4 +577,20 @@ test('a click on the first line of a todo or an ask card folds nothing, and the 
   terminal.type(clickAt(2, 0))
   terminal.type(clickAt(2, 5))
   assert.deepEqual([(await drawn()).slice(0, 8), stateOf(ctx).state?.folded], [before, []])
+})
+
+test('a generic result whose text is JSON draws a line for each key, a list of values joined, anything deeper as compact JSON, and at most transcript.card.most lines', async () => {
+  const goal = JSON.stringify({ id: 'g1', done: false, tags: ['a', 'b'], owner: { name: 'x' } })
+  const many = JSON.stringify(Object.fromEntries(Array.from({ length: 14 }, (_, n) => [`k${n}`, n])))
+  const { drawn } = await reading([call(0, 'get_goal', '{}'), result(1, 'c0', goal), call(2, 'many', '{}'), result(3, 'c2', many)], {}, 30)
+  const rows = await drawn()
+  assert.deepEqual(rows.slice(0, 6), [
+    '⏺ get_goal · 1.0s',
+    '  ⎿ id: g1',
+    '    done: false',
+    '    tags: a, b',
+    '    owner: {"name":"x"}',
+    '',
+  ])
+  assert.deepEqual([rows[6], rows[7], rows[18], rows[19]], ['⏺ many · 1.0s', '  ⎿ k0: 0', '    k11: 11', ''])
 })
