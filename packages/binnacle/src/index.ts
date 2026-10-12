@@ -1,8 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { AppExit } from '@deepseek-ai/dsh-cmdline'
 import { readCommandLine } from './core/command-line.ts'
 import { coreActions } from './core/actions.ts'
 import { Drawing } from './core/drawing.ts'
+import { endingExit } from './core/exit.ts'
 import { gestureTable } from './core/gestures.ts'
 import { Host } from './core/host.ts'
 import { coreModels } from './core/models.ts'
@@ -51,7 +51,7 @@ export function apply(ctx: Context): void {
     colorMode: () => internals.colorMode(),
     places: drawing,
   })
-  const exit: AppExit = ctx.appExit!
+  const exit = endingExit(ctx.appExit!, internals.process)
   const core = coreActions({
     now: () => internals.now(),
     quit: () => exit(0),

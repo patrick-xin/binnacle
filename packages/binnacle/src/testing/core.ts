@@ -7,6 +7,7 @@ import { XtermTerminal } from './terminal.ts'
 export class FakeProcess {
   readonly #listeners = new Map<string, Set<() => void>>()
   stopCount = 0
+  readonly endsWithin: number[] = []
   on(event: string, listener: () => void): void {
     const set = this.#listeners.get(event) ?? new Set()
     set.add(listener)
@@ -17,6 +18,9 @@ export class FakeProcess {
   }
   stop(): void {
     this.stopCount++
+  }
+  endWithin(ms: number): void {
+    this.endsWithin.push(ms)
   }
   emit(event: string): void {
     for (const listener of this.#listeners.get(event) ?? []) listener()

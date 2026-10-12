@@ -16,6 +16,8 @@ export interface Process {
   on(event: ProcessEvent, listener: () => void): void
   off(event: ProcessEvent, listener: () => void): void
   stop(): void
+  /** Ends the process `ms` from now, with the exit code it has then, unless it ends before. It keeps nothing alive. */
+  endWithin(ms: number): void
 }
 
 export interface Size {

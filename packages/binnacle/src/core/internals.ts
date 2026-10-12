@@ -32,6 +32,10 @@ export const internals: {
     stop: () => {
       process.kill(process.pid, 'SIGSTOP')
     },
+    // dsh's appExit clears its own forced exit once it has disposed, and a socket left open, such as a proxy's, then keeps the process alive.
+    endWithin: (ms) => {
+      setTimeout(() => process.exit(), ms).unref()
+    },
   },
   streams: { stdout: process.stdout, stderr: process.stderr },
 }
