@@ -129,3 +129,12 @@ test('the packed AUTHORING.md names every member of the author API, every export
     [],
   )
 })
+
+test('the packed `binnacle/testing` mounts the packed built-ins with no terminal, and AUTHORING.md shows how to test a plugin with it', async () => {
+  const exports = JSON.parse(read('package.json')).exports as Record<string, { default: string }>
+  const testing = await import(pathToFileURL(join(unpacked, exports['./testing']!.default)).href)
+  const mounted = await testing.mount({ size: { columns: 30, rows: 5 } })
+  const rows = await mounted.screen()
+  await mounted.close()
+  assert.deepEqual([rows[1], read('AUTHORING.md').includes("import { mount } from 'binnacle/testing'")], ['idle · deepseek-v4', true])
+})

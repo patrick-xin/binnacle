@@ -1,17 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import * as transcript from '../../src/plugins/transcript/index.ts'
-import * as view from '../../src/plugins/transcript-view/index.ts'
 import type { TranscriptState } from '../../src/plugins/transcript/index.ts'
 import { callOf, textOf } from '../../src/plugins/transcript/index.ts'
 import type { CallLook, NoticeLook, TextLook } from '../../src/plugins/transcript-view/index.ts'
 import { wrap } from '../../src/index.ts'
-import { agents } from '../support/agents.ts'
-import { mount } from '../support/mount.ts'
-import { persistence } from '../support/sessions.ts'
-
-const settled = () => new Promise((resolve) => setImmediate(resolve))
+import { mounted } from '../support/mounted.ts'
 
 const ENTER = '\r'
 const UP = '\x1b[A'
@@ -40,30 +34,17 @@ const result = (seq: number, text: string, isError = false) =>
     message: { role: 'tool', toolCallId: 'c', isError, content: text === '' ? [] : [{ type: 'text', text }] },
   })
 
+const BUILT_INS = ['binnacle-transcript', 'binnacle-transcript-view']
+
 async function reading(events: readonly Event[], rows = 12, columns = 40) {
-  const store = persistence([{ id: 'session-stored', createdAt: 1, events }])
-  const mounted = await mount({
-    args: ['--session', 'session-stored'],
-    columns,
-    rows,
-    provide: (ctx) => ctx.provide('sessionPersistence', store),
-  })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  const plugin = await mounted.ctx.plugin(view)
-  await settled()
-  const drawn = async () => (await mounted.terminal.read()).rows
-  return { ...mounted, plugin, drawn }
+  const mount = await mounted({ size: { columns, rows }, builtins: BUILT_INS, stored: { id: 'session-stored', events: events as never } })
+  const drawn = async () => (await mount.terminal.read()).rows
+  return { ...mount, plugin: mount.row('binnacle-transcript-view'), drawn }
 }
 
 async function talking(rows = 12) {
-  const dsh = agents()
-  const mounted = await mount({ columns: 40, rows, provide: dsh.provide })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(view)
-  await settled()
-  return { ...mounted, dsh, drawn: async () => (await mounted.terminal.read()).rows }
+  const mount = await mounted({ size: { columns: 40, rows }, builtins: BUILT_INS })
+  return { ...mount, drawn: async () => (await mount.terminal.read()).rows }
 }
 
 const stateOf = (ctx: Context) => ctx.binnacle.modelOf<TranscriptState>('transcript')
@@ -286,11 +267,11 @@ test('the answer that streams draws the rows it draws once it commits and its ca
 
 test('a stored session draws the same way as one that commits', async () => {
   const events = [prompt(0, 'hi'), answer(1, [{ type: 'text', text: 'Hello.' }]), call(2, 'ls', '{}'), result(3, 'a.ts')]
-  const stored = await reading(events)
+  const stored = await (await reading(events)).drawn()
   const live = await talking()
   for (const event of events) live.dsh.commit(live.ctx, event)
-  assert.deepEqual(await live.drawn(), await stored.drawn())
-  assert.deepEqual((await stored.drawn()).slice(0, 7), ['› hi', '', 'Hello.', '', '⏺ ls({})', '⎿ a.ts', ''])
+  assert.deepEqual(await live.drawn(), stored)
+  assert.deepEqual(stored.slice(0, 7), ['› hi', '', 'Hello.', '', '⏺ ls({})', '⎿ a.ts', ''])
 })
 
 test('with the row binnacle-transcript-view off, the transcript draws every event raw again', async () => {

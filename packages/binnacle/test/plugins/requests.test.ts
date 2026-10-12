@@ -1,48 +1,30 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import { bindScopeParent, scopeTarget } from '@deepseek-ai/dsh-scope'
-import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
-import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
 import type { ApprovalRequest, QuestionRequest, Request } from '../../src/api.ts'
-import * as requests from '../../src/plugins/requests/index.ts'
-import { agents } from '../support/agents.ts'
-import { mount } from '../support/mount.ts'
-import { persistence } from '../support/sessions.ts'
+import type { Mounted, Subagent } from '../../src/testing/index.ts'
+import { mounted } from '../support/mounted.ts'
 
-async function chat(options: { provide?: (ctx: Context) => void; args?: string[]; attached?: boolean } = {}) {
-  const dsh = agents()
-  const mounted = await mount({ args: options.args ?? [], provide: options.provide ?? dsh.provide })
-  mounted.ready()
-  const model = await mounted.ctx.plugin(requests)
-  await new Promise((resolve) => setImmediate(resolve))
-  const standing = mounted.ctx.binnacleRequests
+async function chat(options: { stored?: boolean; attached?: boolean } = {}) {
+  const { app, ctx } = await mounted({
+    builtins: ['binnacle-requests'],
+    ...(options.stored === true ? { stored: { id: 'session-stored', events: [] } } : {}),
+  })
+  const standing = ctx.binnacleRequests
   const detach = options.attached === false ? () => {} : standing.attach()
-  return { ...mounted, dsh, model, standing, detach }
+  return { ctx, dsh: app, model: { dispose: () => app.unload('binnacle-requests') }, standing, detach }
 }
 
 const approve = (
-  ctx: Context,
-  dsh: ReturnType<typeof agents>,
-  request: { toolName?: string; signal?: AbortSignal; agent?: object } = {},
-) => {
-  const agent = request.agent ?? dsh.agent
-  return ctx.waterfall(
-    scopeTarget(agent, agent) as never,
-    'approval/request',
-    { ...request, agent, toolName: request.toolName ?? 'bash' } as never,
-    () => Promise.resolve('unavailable' as ApprovalOutcome),
-  ) as Promise<ApprovalOutcome>
-}
+  _ctx: Context,
+  dsh: Mounted,
+  { toolName = 'bash', ...request }: { toolName?: string; signal?: AbortSignal; agent?: Subagent } = {},
+) => dsh.approve(toolName, request)
 
-const ask = (ctx: Context, dsh: ReturnType<typeof agents>, questions: readonly AskUserQuestionItem[], signal?: AbortSignal) =>
-  ctx.waterfall(
-    scopeTarget(dsh.agent, dsh.agent) as never,
-    'user-questions/request',
-    { signal, questions, agent: dsh.agent } as never,
-    () => Promise.reject(new UserQuestionError('no user-questions answerer accepted the request', 'NO_PROVIDER')),
-  ) as Promise<AskUserQuestionAnswer>
+const ask = (_ctx: Context, dsh: Mounted, questions: readonly AskUserQuestionItem[], signal?: AbortSignal) =>
+  dsh.ask(questions, signal === undefined ? {} : { signal })
 
 const pending = async (promise: Promise<unknown>): Promise<unknown> => Promise.race([promise, Promise.resolve('still pending')])
 
@@ -99,11 +81,7 @@ test("when the model's row unloads, an approval that still stands fails closed, 
 })
 
 test('a stored session has no Requests: each goes on to dsh, which fails it closed', async () => {
-  const store = persistence([{ id: 'session-stored', createdAt: 1, events: [] }])
-  const { ctx, dsh, standing } = await chat({
-    provide: (context) => context.provide('sessionPersistence', store),
-    args: ['--session', 'session-stored'],
-  })
+  const { ctx, dsh, standing } = await chat({ stored: true })
   const tool = approve(ctx, dsh, { agent: { id: 'session-anyone' } })
   assert.deepEqual([await tool, standing.standing], ['unavailable', 0])
 })
@@ -276,8 +254,7 @@ test('dismiss answers dsh: an approval is rejected, and a question is dismissed 
 
 test("an approval for an agent under the Chat's names that agent, and one for the Chat's own agent names none", async () => {
   const { ctx, dsh, standing } = await chat()
-  const child = { id: 'session-child' }
-  bindScopeParent(child, dsh.agent)
+  const child = dsh.agent.child('session-child')
   approve(ctx, dsh)
   approve(ctx, dsh, { agent: child })
   const own = approval(standing.shown)

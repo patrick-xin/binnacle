@@ -17,9 +17,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { Point } from '../../src/api.ts'
 import { gestureTable } from '../../src/core/gestures.ts'
 import { frame } from '../../src/index.ts'
-import { mount } from '../support/mount.ts'
-import { persistence } from '../support/sessions.ts'
-import { agents } from '../support/agents.ts'
+import { mounted } from '../support/mounted.ts'
 import type { Stored } from '../support/sessions.ts'
 
 const settled = () => new Promise((resolve) => setImmediate(resolve))
@@ -56,13 +54,18 @@ const three: Stored = {
   ],
 }
 
-async function reading(sessions: readonly Stored[], args = ['--session', 'session-stored'], rows = 8) {
-  const store = persistence(sessions)
-  const mounted = await mount({ args, columns: 40, rows, provide: (ctx) => ctx.provide('sessionPersistence', store) })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await settled()
-  return { ...mounted, store, rows: (await mounted.terminal.read()).rows }
+const TRANSCRIPT = ['binnacle-transcript']
+
+/** The stored session, read by the transcript alone, with its raw events. */
+async function reading(sessions: readonly Stored[], _args?: readonly string[], rows = 8, more: { plugins?: readonly object[] } = {}) {
+  const [session] = sessions
+  const mount = await mounted({
+    size: { columns: 40, rows },
+    builtins: TRANSCRIPT,
+    stored: { id: session!.id, events: session!.events as never },
+    plugins: (more.plugins ?? []) as never,
+  })
+  return { ...mount, rows: (await mount.terminal.read()).rows }
 }
 
 test('the transcript draws each event of the session that --session names: its seq and type, then its data as JSON', async () => {
@@ -148,18 +151,8 @@ test("as the Mark moves down within the rows shown, the transcript keeps the Mar
 })
 
 test("a click on an event's header line folds or unfolds that event, and Marks it", async () => {
-  const store = persistence([three])
-  const mounted = await mount({
-    args: ['--session', 'session-stored'],
-    columns: 40,
-    rows: 10,
-    provide: (ctx) => ctx.provide('sessionPersistence', store),
-  })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
-  await settled()
-  const { terminal } = mounted
+  const shown = await reading([three], undefined, 10, { plugins: [probe('composer', composerTakingKeys)] })
+  const { terminal } = shown
   terminal.type(clickAt(0, 0))
   assert.deepEqual((await terminal.read()).rows.slice(0, 6), ['▸ #0 test/one (1 lines)', '', '▾ #1 test/two', '{}', '', '▾ #2 test/three'])
   assert.deepEqual([await terminal.inverseAt(0, 0), await terminal.inverseAt(0, 5)], [true, false])
@@ -225,18 +218,8 @@ test('the live block is not an event: it cannot be Marked or folded', async () =
 })
 
 test('when the transcript loses the Focus, its Mark is not drawn. When it has the Focus again, the same event is Marked', async () => {
-  const store = persistence([three])
-  const mounted = await mount({
-    args: ['--session', 'session-stored'],
-    columns: 40,
-    rows: 10,
-    provide: (ctx) => ctx.provide('sessionPersistence', store),
-  })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
-  await settled()
-  const { terminal } = mounted
+  const shown = await reading([three], undefined, 10, { plugins: [probe('composer', composerTakingKeys)] })
+  const { terminal } = shown
   const marks = async () => [await terminal.inverseAt(0, 0), await terminal.inverseAt(0, 3), await terminal.inverseAt(0, 6)]
   assert.deepEqual(await marks(), [false, false, false])
   terminal.type(SHIFT_TAB)
@@ -269,13 +252,7 @@ test('the transcript takes no other key: a key that would type does nothing, and
 })
 
 test('the first event that comes after the Focus left an empty transcript keeps its Mark', async () => {
-  const dsh = agents()
-  const mounted = await mount({ columns: 40, rows: 10, provide: dsh.provide })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
-  await settled()
-  const { ctx, terminal } = mounted
+  const { ctx, dsh, terminal } = await talking(10, { plugins: [probe('composer', composerTakingKeys)] })
   terminal.type(SHIFT_TAB)
   terminal.type(SHIFT_TAB)
   dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
@@ -290,13 +267,9 @@ test("an event's type is Untrusted Text, so its colour and control sequences are
   assert.deepEqual([rows[0], await terminal.colourAt(8, 0)], ['▾ #0 test/red', 'default'])
 })
 
-async function talking(rows = 8) {
-  const dsh = agents()
-  const mounted = await mount({ columns: 40, rows, provide: dsh.provide })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await settled()
-  return { ...mounted, dsh, drawn: async () => (await mounted.terminal.read()).rows }
+async function talking(rows = 8, more: { plugins?: readonly object[] } = {}) {
+  const mount = await mounted({ size: { columns: 40, rows }, builtins: TRANSCRIPT, plugins: (more.plugins ?? []) as never })
+  return { ...mount, drawn: async () => (await mount.terminal.read()).rows }
 }
 
 test('the transcript draws each event that the session commits, as it commits it', async () => {
@@ -307,12 +280,10 @@ test('the transcript draws each event that the session commits, as it commits it
 })
 
 test('a transcript loaded after the session committed events draws them too', async () => {
-  const dsh = agents()
-  const { ctx, ready, terminal } = await mount({ columns: 40, rows: 4, provide: dsh.provide })
-  ready()
-  await settled()
+  const { ctx, dsh, terminal } = await mounted({ size: { columns: 40, rows: 4 }, builtins: [] })
   dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
   await ctx.plugin(transcript)
+  await settled()
   assert.deepEqual((await terminal.read()).rows, ['▾ #0 turn/start', '{}', '', ''])
 })
 
@@ -366,17 +337,7 @@ test("another session's events and another agent's answer, such as a subagent's,
 })
 
 test('a transcript loaded with the core, as dsh loads them, draws the session once it opens', async () => {
-  const dsh = agents()
-  const { ctx, ready, terminal } = await mount({
-    columns: 40,
-    rows: 3,
-    provide: (each) => {
-      dsh.provide(each)
-      void each.plugin(transcript)
-    },
-  })
-  ready()
-  await settled()
+  const { ctx, dsh, terminal } = await mounted({ size: { columns: 40, rows: 3 }, builtins: TRANSCRIPT })
   dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
   assert.deepEqual((await terminal.read()).rows, ['▾ #0 turn/start', '{}', ''])
 })
@@ -448,7 +409,9 @@ test('an author who watches the model and pushes each tool result onto folded ha
   const { ctx, dsh, drawn } = await talking(6)
   const model = stateOf(ctx)
   model.watch(() => {
-    const state = model.state!
+    // The model goes when the transcript unloads, and its watchers learn that too.
+    const state = model.state
+    if (state === undefined) return
     const fresh = state.events.filter((event) => event.type === 'tool/result' && !state.folded.includes(String(event.seq)))
     if (fresh.length > 0) model.set((each) => each.folded.push(...fresh.map((event) => String(event.seq))))
   })
@@ -532,18 +495,8 @@ test('an author sets transcript.fold by its id, and runs beneath() to keep the d
 })
 
 test("a click on an event's header runs transcript.click, which an author sets by its id", async () => {
-  const store = persistence([three])
-  const mounted = await mount({
-    args: ['--session', 'session-stored'],
-    columns: 40,
-    rows: 10,
-    provide: (ctx) => ctx.provide('sessionPersistence', store),
-  })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
-  await settled()
-  const { ctx, terminal } = mounted
+  const shown = await reading([three], undefined, 10, { plugins: [probe('composer', composerTakingKeys)] })
+  const { ctx, terminal } = shown
   const clicked: (number | undefined)[] = []
   ctx.binnacle.action('transcript.click', { run: (at) => clicked.push(at?.line) })
   const rows = (await terminal.read()).rows
@@ -612,18 +565,8 @@ test('the Mark holds past a reset that a Look joins with another style in one se
 })
 
 test('a click on the first line of an event that a Look draws lands on that event', async () => {
-  const store = persistence([calls])
-  const mounted = await mount({
-    args: ['--session', 'session-stored'],
-    columns: 40,
-    rows: 10,
-    provide: (each) => each.provide('sessionPersistence', store),
-  })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
-  await settled()
-  const { ctx, terminal } = mounted
+  const shown = await reading([calls], undefined, 10, { plugins: [probe('composer', composerTakingKeys)] })
+  const { ctx, terminal } = shown
   oneLine(ctx)
   await terminal.read()
   terminal.type(clickAt(0, 6))
@@ -936,18 +879,7 @@ test("an author draws the person's prompts with isPrompt and textOf, and leaves 
 })
 
 async function clicking(sessions: readonly Stored[], rows = 10) {
-  const store = persistence(sessions)
-  const mounted = await mount({
-    args: ['--session', 'session-stored'],
-    columns: 40,
-    rows,
-    provide: (each) => each.provide('sessionPersistence', store),
-  })
-  mounted.ready()
-  await mounted.ctx.plugin(transcript)
-  await mounted.ctx.plugin(probe('composer', composerTakingKeys))
-  await settled()
-  return mounted
+  return reading(sessions, undefined, rows, { plugins: [probe('composer', composerTakingKeys)] })
 }
 
 const bodied = (ctx: Context) =>
