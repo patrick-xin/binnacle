@@ -214,10 +214,12 @@ export function apply(ctx: Context): void {
   binnacle.look<CardBodyLook>('transcript.tool.todo_write', () => todos)
 
   // dsh's ask_user_question has no presenter, and its result is its answers as JSON, each by its question's id.
+  // While it waits, the Request shows its questions, so the card shows none.
   const asked: CardBodyLook = (card, width) => {
+    const { result } = card
+    if (result === undefined) return []
     const questions = fields(card.args)?.questions
     if (!Array.isArray(questions)) return generic(card, width)
-    const { result } = card
     const answers = result === undefined || result.failed ? undefined : fields(parse(result.text).args)?.answers
     if (result !== undefined && !Array.isArray(answers)) return generic(card, width)
     const answerOf = (id: unknown): string | undefined => {
@@ -250,13 +252,13 @@ export function apply(ctx: Context): void {
     const took = pieces.time()(card)
     const after = took === '' ? '' : paint('muted', ` · ${took}`)
     const body = pieces.body(card)(card, Math.max(1, width - visibleWidth(FIRST)))
-    if (body.length === 0) return [pieces.title()(card, width - visibleWidth(after)) + after]
     // A question and a checklist are read whole, so their first line is a Line that folds nothing.
     if (WHOLE.has(card.name))
       return [
         { text: pieces.title()(card, width - visibleWidth(after)) + after },
         ...body.map((line, at) => (at === 0 ? FIRST : REST) + line),
       ]
+    if (body.length === 0) return [pieces.title()(card, width - visibleWidth(after)) + after]
     const region = `${card.seq}/body`
     const folded = isFolded(region)
     const count = folded ? paint('muted', ` (${body.length} ${body.length === 1 ? 'line' : 'lines'})`) : ''
