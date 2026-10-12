@@ -513,3 +513,67 @@ test('a shell command that ends with an exit code other than 0, or with a signal
     [4, false],
   ])
 })
+
+const todoWrite: Tool = { presentCall: () => ({ card: 'generic', title: 'Update todo list', kind: 'other', rawInput: [] }) }
+const TODOS = JSON.stringify({
+  todos: [
+    { content: 'Write the test', status: 'completed' },
+    { content: 'Fix the parser', status: 'in_progress' },
+    { content: 'Ship', status: 'pending' },
+  ],
+})
+
+test('a todo card draws each item on its line, [x] and muted when completed, [ ] and accent in progress, [ ] when pending', async () => {
+  const { drawn, terminal } = await reading(
+    [call(0, 'todo_write', TODOS), result(1, 'c0', 'Updated todo list: 1 pending, 1 in progress, 1 completed.')],
+    {
+      todo_write: todoWrite,
+    },
+  )
+  assert.deepEqual((await drawn()).slice(0, 5), [
+    '⏺ Update todo list · 1.0s',
+    '  ⎿ [x] Write the test',
+    '    [ ] Fix the parser',
+    '    [ ] Ship',
+    '',
+  ])
+  assert.deepEqual(
+    [await terminal.colourAt(8, 1), await terminal.colourAt(8, 2), await terminal.colourAt(8, 3)],
+    [BRIGHT_BLACK, CYAN, 'default'],
+  )
+})
+
+const QUESTIONS = JSON.stringify({
+  questions: [
+    { id: 'db', question: 'Which database?', options: [{ label: 'Postgres' }, { label: 'SQLite' }], multi_select: true },
+    { id: 'name', question: 'Name it?' },
+  ],
+})
+
+test('an ask card draws each question while it waits, and once answered each question then → its choices and its text', async () => {
+  const waiting = (await (await reading([call(0, 'ask_user_question', QUESTIONS)])).drawn()).slice(0, 4)
+  const answers = {
+    answers: [
+      { id: 'db', selected: ['Postgres', 'SQLite'] },
+      { id: 'name', selected: [], custom: 'atlas' },
+    ],
+  }
+  const answered = await reading([call(0, 'ask_user_question', QUESTIONS), result(1, 'c0', JSON.stringify(answers))])
+  assert.deepEqual(
+    [waiting, (await answered.drawn()).slice(0, 6)],
+    [
+      ['⏺ ask_user_question', '  ⎿ Which database?', '    Name it?', ''],
+      ['⏺ ask_user_question · 1.0s', '  ⎿ Which database?', '    → Postgres, SQLite', '    Name it?', '    → atlas', ''],
+    ],
+  )
+})
+
+test('a click on the first line of a todo or an ask card folds nothing, and the card stays whole', async () => {
+  const { drawn, ctx, terminal } = await reading([call(0, 'todo_write', TODOS), call(1, 'ask_user_question', QUESTIONS)], {
+    todo_write: todoWrite,
+  })
+  const before = (await drawn()).slice(0, 8)
+  terminal.type(clickAt(2, 0))
+  terminal.type(clickAt(2, 5))
+  assert.deepEqual([(await drawn()).slice(0, 8), stateOf(ctx).state?.folded], [before, []])
+})

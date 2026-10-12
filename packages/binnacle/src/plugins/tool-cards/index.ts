@@ -56,6 +56,8 @@ export type CardMostLook = (card: Card) => number
 /** The Looks `transcript.tool.<name>` and `transcript.card.<kind>`: a card's body lines, without the `⎿` prefix, given the body's width. */
 export type CardBodyLook = (card: Card, width: number) => string[]
 
+const WHOLE: ReadonlySet<string> = new Set(['todo_write', 'ask_user_question'])
+
 const FIRST = '  ⎿ '
 const REST = '    '
 
@@ -196,6 +198,43 @@ export function apply(ctx: Context): void {
   }
   const kinds: Readonly<Record<string, CardBodyLook>> = { generic, terminal, diff, search, read, web }
 
+  // dsh's todo_write takes the whole list each time, so the arguments are the list, while it runs and once it is done.
+  const todos: CardBodyLook = (card, width) => {
+    const items = fields(card.args)?.todos
+    if (!Array.isArray(items)) return generic(card, width)
+    const { checked, unchecked } = binnacle.tokens.glyphs
+    return items.flatMap((item) => {
+      const { content, status } = fields(item) ?? {}
+      if (typeof content !== 'string') return []
+      const line = (box: string): string => cut(`${box} ${oneLine(content)}`, width)
+      if (status === 'completed') return [paint('muted', line(checked))]
+      return [status === 'in_progress' ? paint('accent', line(unchecked)) : line(unchecked)]
+    })
+  }
+  binnacle.look<CardBodyLook>('transcript.tool.todo_write', () => todos)
+
+  // dsh's ask_user_question has no presenter, and its result is its answers as JSON, each by its question's id.
+  const asked: CardBodyLook = (card, width) => {
+    const questions = fields(card.args)?.questions
+    if (!Array.isArray(questions)) return generic(card, width)
+    const { result } = card
+    const answers = result === undefined || result.failed ? undefined : fields(parse(result.text).args)?.answers
+    if (result !== undefined && !Array.isArray(answers)) return generic(card, width)
+    const answerOf = (id: unknown): string | undefined => {
+      if (!Array.isArray(answers)) return undefined
+      const { selected, custom } = fields(answers.find((answer) => fields(answer)?.id === id)) ?? {}
+      const texts = [...(Array.isArray(selected) ? selected : []), custom].filter((text) => typeof text === 'string' && text !== '')
+      return texts.join(', ')
+    }
+    return questions.flatMap((each) => {
+      const { id, question } = fields(each) ?? {}
+      if (typeof question !== 'string') return []
+      const answer = answerOf(id)
+      return [cut(oneLine(question), width), ...(answer === undefined ? [] : [cut(`→ ${oneLine(answer)}`, width)])]
+    })
+  }
+  binnacle.look<CardBodyLook>('transcript.tool.ask_user_question', () => asked)
+
   const pieces = {
     mark: () => binnacle.lookOf<CardMarkLook>(['transcript.card.mark'], mark),
     most: () => binnacle.lookOf<CardMostLook>(['transcript.card.most'], most),
@@ -212,6 +251,12 @@ export function apply(ctx: Context): void {
     const after = took === '' ? '' : paint('muted', ` · ${took}`)
     const body = pieces.body(card)(card, Math.max(1, width - visibleWidth(FIRST)))
     if (body.length === 0) return [pieces.title()(card, width - visibleWidth(after)) + after]
+    // A question and a checklist are read whole, so their first line is a Line that folds nothing.
+    if (WHOLE.has(card.name))
+      return [
+        { text: pieces.title()(card, width - visibleWidth(after)) + after },
+        ...body.map((line, at) => (at === 0 ? FIRST : REST) + line),
+      ]
     const region = `${card.seq}/body`
     const folded = isFolded(region)
     const count = folded ? paint('muted', ` (${body.length} ${body.length === 1 ? 'line' : 'lines'})`) : ''
