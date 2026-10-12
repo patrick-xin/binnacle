@@ -275,7 +275,7 @@ test('a running call with no view draws its arguments as key: value lines cut at
   assert.deepEqual((await drawn()).slice(0, 5), ['⏺ read', '  ⎿ path: a/very/long/path/to/a/file.ts', '', '⏺ Quiet', ''])
   terminal.type(clickAt(0, 3))
   await drawn()
-  assert.deepEqual(stateOf(ctx).state?.folded, ['1'])
+  assert.deepEqual(stateOf(ctx).state?.folded, [])
 })
 
 test('enter on a Marked card folds its body, its first line alone ending with (<n> lines), and again unfolds it', async () => {
