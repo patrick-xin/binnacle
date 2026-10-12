@@ -38,3 +38,5 @@ These rules apply to every file that is committed, and to issues and PRs. `pnpm 
 - A comment says why. It never says what the code does.
 - A file has no header comment, unless it holds a reason of this kind.
 - A test needs no comment: its name says the behaviour.
+- A type assertion in `packages/binnacle/src/` has a comment above it that says why it is safe, except `as const`. Remove the assertion when you can. `pnpm lint` holds this rule.
+- Never assert through `unknown`, as in `x as unknown as T`. `pnpm lint` holds this rule in every file.

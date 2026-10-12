@@ -142,7 +142,9 @@ export class BinnacleService extends Service implements Binnacle {
     let stops: (() => void)[] = []
     const restyle = (): void => this.drawn.forgetAll()
     restyle()
-    const handle = this.hold(listIn(this.looks, name), make as unknown as Make, 'binnacle: a look', restyle, () => {
+    // A Look under one name is of that name's kind, F, and `lookOf` hands it a beneath of that kind.
+    const held: Make = (beneath) => make(beneath as F)
+    const handle = this.hold(listIn(this.looks, name), held, 'binnacle: a look', restyle, () => {
       for (const stop of stops) stop()
       restyle()
     })
@@ -244,7 +246,8 @@ export class BinnacleService extends Service implements Binnacle {
   }
 
   edit(name: string, edit: Edit): Handle {
-    const plugin = (this.ctx.fiber as unknown as Fiber).runtime?.name
+    // Cordis's own type of a fiber has no `entry`, which the loader adds.
+    const plugin = (this.ctx.fiber as Fiber).runtime?.name
     return this.hold(listIn(this.edits, name), { edit, plugin }, 'binnacle: an edit')
   }
 
@@ -274,11 +277,13 @@ export class BinnacleService extends Service implements Binnacle {
     const named = (): void => {
       for (const moved of this.namings.get(name) ?? []) moved()
     }
+    // A model's `set` is called only with the state that the model itself holds.
     return this.hold(listIn(this.models, name), model as Model<object>, 'binnacle: a model named', undefined, named, named)
   }
 
   modelOf<S extends object>(name: string): Watchable & { readonly state: S | undefined; set(change: (state: S) => void): void } {
     const models = this.models
+    // The caller names the state of a model it reads by name, and nothing checks it.
     return foundModel(() => models.get(name)?.at(-1)?.item as Model<S> | undefined, listIn(this.namings, name))
   }
 
@@ -300,7 +305,7 @@ export class BinnacleService extends Service implements Binnacle {
 
   private hold<T>(list: Held<T>[], item: T, label: string, changed?: () => void, off?: (entry: Held<T>) => void, on?: () => void): Handle {
     // In a traced copy, `this.ctx` is the calling plugin's context, so its fiber is the plugin that registers.
-    const entry: Held<T> = { item, builtIn: builtIn(this.ctx.fiber as unknown as Fiber) }
+    const entry: Held<T> = { item, builtIn: builtIn(this.ctx.fiber as Fiber) }
     let held = false
     const release = (): void => {
       if (!held) return

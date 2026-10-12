@@ -14,9 +14,11 @@ export const gestureTable = new KeybindingsManager(EDITOR_KEYS)
 
 /** The keys that the Gesture Table holds for one of its names, or none for a name that is not its own. */
 export function tableKeysOf(name: string): readonly string[] {
+  // hasOwn finds the name among the table's own Keybindings.
   return Object.hasOwn(EDITOR_KEYS, name) ? gestureTable.getKeys(name as Keybinding) : []
 }
 
 export function editorActionsOf(gesture: string): string[] {
+  // Object.keys widens each Keybinding of the table to a string.
   return Object.keys(EDITOR_KEYS).filter((action) => gestureTable.matches(gesture, action as Keybinding))
 }
