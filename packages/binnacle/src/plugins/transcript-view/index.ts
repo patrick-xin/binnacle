@@ -3,7 +3,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { markdown, toPlainText, truncateToWidth, wrap } from '../../index.ts'
 import type { Binnacle, Tone } from '../../index.ts'
 import { callOf, failed, isPrompt, noticeOf, producerOf, reasoningOf, textOf } from '../transcript/index.ts'
-import type { Call, EventLook, LiveLook, Notice } from '../transcript/index.ts'
+import type { Call, EventLook, Line, LiveLook, Notice } from '../transcript/index.ts'
 
 export const name = 'binnacle-transcript-view'
 
@@ -96,15 +96,19 @@ export function apply(ctx: Context): void {
   }
 
   // The type's Look folds and spaces the event, so that a piece's Look draws only its piece.
+  // An event that does not fold, a prompt or one of one line, draws its first line as a Line that folds nothing, so a click on it only Marks.
   const typed =
-    (linesOf: (event: SessionEvent, at: PieceAt) => string[], blank: boolean): EventLook =>
+    (linesOf: (event: SessionEvent, at: PieceAt) => string[], blank: boolean, folds = true): EventLook =>
     (event, { folded, width }) => {
       const lines = linesOf(event, { width, time: event.time })
       if (lines.length === 0) return []
-      const shown =
-        folded && lines.length > 1
-          ? [lines[0]!, binnacle.paint('muted', `${binnacle.tokens.glyphs.more} ${lines.length - 1} more lines`)]
-          : lines
+      const [first = '', ...rest] = lines
+      const shown: Line[] =
+        !folds || rest.length === 0
+          ? [{ text: first }, ...rest]
+          : folded
+            ? [first, binnacle.paint('muted', `${binnacle.tokens.glyphs.more} ${rest.length} more lines`)]
+            : lines
       return blank ? [...shown, ''] : shown
     }
 
@@ -119,7 +123,7 @@ export function apply(ctx: Context): void {
 
   binnacle.look<EventLook>('transcript.event', () => () => [])
   binnacle.look<EventLook>('transcript.event.user/message', () => (event, at) => {
-    if (isPrompt(event)) return typed((each, where) => pieces.prompt()(textOf(each), where), true)(event, at)
+    if (isPrompt(event)) return typed((each, where) => pieces.prompt()(textOf(each), where), true, false)(event, at)
     const producer = producerOf(event)
     if (producer === undefined) return []
     return typed((_, where) => pieces.context()({ producer }, where), false)(event, at)
