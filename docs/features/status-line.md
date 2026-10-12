@@ -11,6 +11,7 @@ Row `binnacle-status-line` · Code `binnacle:packages/binnacle/src/plugins/statu
 ## What an author can change
 
 - One segment's look: the Look by its Place's name, `status.state` or `status.model`, is given the segment's value and returns its line. So `running` can draw in the accent colour, and the other segment stays as it was.
+- How long the turn has run, after the state: a Look of `status.state` that reads the core's models `turn` and `clock`, as AUTHORING.md shows ([Core](core.md)).
 - A segment of their own: `binnacle.edit('status', { insert: { place: 'cwd' }, after: 'status.model' })`, and a Part in `cwd`. It is joined by the theme's `divider` glyph, ` · ` by default.
 - The whole status line: the Layout `status`, set again, or built on `STATUS_LAYOUT`, which `binnacle/plugins/status-line` exports. Or turn off its row, and set the Layout `status` in their own plugin.
 - Where the status line is in the Chat: an edit of the Chat's `{ layout: 'status' }` node.
@@ -25,4 +26,4 @@ Row `binnacle-status-line` · Code `binnacle:packages/binnacle/src/plugins/statu
 
 ## Built by
 
-Stage 2 (before Specs). Spec [#224](https://github.com/patrick-xin/binnacle/issues/224) · Ticket [#226](https://github.com/patrick-xin/binnacle/issues/226): the status line made of segments, each with its Look.
+Stage 2 (before Specs). Spec [#224](https://github.com/patrick-xin/binnacle/issues/224) · Ticket [#226](https://github.com/patrick-xin/binnacle/issues/226): the status line made of segments, each with its Look. · Spec [#308](https://github.com/patrick-xin/binnacle/issues/308) · Ticket [#310](https://github.com/patrick-xin/binnacle/issues/310): how long the turn has run, from the core's model `turn`.

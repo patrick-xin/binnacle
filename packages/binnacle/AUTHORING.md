@@ -238,6 +238,32 @@ ctx.binnacle.look('status.state', (beneath) => (value) => `${beneath(value)} ${M
 - `set` on the clock does nothing.
 - The type of its state is `ClockState`.
 
+### The turn
+
+The core names the model `turn`. Its state's `startedAt` is when the turn that runs started, in epoch milliseconds, or `undefined` while the agent does not run.
+
+- It is the time of dsh's newest `turn/start` event. A turn that was queued starts while the agent runs, and sets it again.
+- When the agent runs before its turn's `turn/start` comes, it is when the agent began to run.
+- A plugin that loads while a turn runs reads that turn's start. On a stored session, and before the session opens, it is `undefined`.
+- `set` on it does nothing. The type of its state is `TurnState`.
+
+Read it with the clock to show how long the turn has run. This shows `running 1:05` in the status line ([The status line](#the-status-line)), and draws what is beneath while no turn runs:
+
+```js
+const turn = ctx.binnacle.modelOf('turn')
+const clock = ctx.binnacle.modelOf('clock')
+ctx.binnacle.look(
+  'status.state',
+  (beneath) => (value) => {
+    const { startedAt } = turn.state
+    if (startedAt === undefined) return beneath(value)
+    const seconds = Math.max(0, Math.floor((clock.state.now - startedAt) / 1000))
+    return `${beneath(value)} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  },
+  { models: [turn, clock] },
+)
+```
+
 ## The theme
 
 The theme is the tokens that everything binnacle draws is drawn with: a colour for each Tone, the glyphs, and a box's edge, padding and gap. An author changes a token once, and everything drawn with it changes.
@@ -1035,6 +1061,7 @@ The row `binnacle-status-line` sets the Layout `status`, which the Chat draws. I
   ```
 
 - Place a Part in a segment to draw it your own way. A segment draws only its Part's first line.
+- Show how long the turn has run after the state with a Look of `status.state` that reads the models `turn` and `clock`, as [The turn](#the-turn) shows.
 - `STATUS_LAYOUT`, the Layout above, frozen, is exported from `binnacle/plugins/status-line`, with the type `SegmentLook`. Build on it to set the Layout `status` again.
 
 ## Requests
