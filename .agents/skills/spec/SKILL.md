@@ -13,7 +13,7 @@ A Spec is the design of one feature of a Stage, and its slices into Tickets. The
 2. Read the code and the records that the Spec touches.
 3. Send each question about dsh, pi-tui or another Reference to the Researcher.
 4. Fill each field of the template.
-5. Walk each behaviour's edges, as *Edges* below says. Each edge gets a behaviour or a decision.
+5. Write the Journeys. Walk each behaviour's edges, as *Edges* below says. Each edge gets a behaviour or a decision.
 6. Mark each open choice under **Decisions**, with your recommendation.
 7. Slice it into Tickets under **Tickets**, with the `tickets` skill.
 8. Publish the issue with `gh issue create --label spec`.
@@ -26,6 +26,7 @@ A Spec is the design of one feature of a Stage, and its slices into Tickets. The
 | **Intent** | A link to the feature's Intent, and the product's Stage |
 | **Problem** | What a person or an author cannot do today, as they would say it |
 | **Behaviour** | What a person or an author can do after the change. Write one sentence for each behaviour, as a person would say it. Each sentence becomes the name of one test, in the Ticket that builds it. |
+| **Journeys** | What a person does with the feature in a real session under dsh, from start to end: each step that they type, click or read, and what they do next. Name the other features that share the screen on the way. The Person Trial drives each Journey. A Spec that changes nothing a person sees has none. |
 | **Seams** | Where the tests observe the change, from outside. Use the fewest seams that hold every behaviour. |
 | **Decisions** | Each choice that the build needs, with its answer |
 | **Out of scope** | What the Spec does not do, and the Spec or the Stage that does it |
@@ -48,3 +49,7 @@ Round 0's findings are most often an edge that no behaviour names. For each beha
 - **With too much:** more than the screen holds, a long line, a narrow terminal.
 - **When it goes part-way:** the thing is withdrawn, replaced or unloaded while it is shown, or while it waits.
 - **When it is another's:** another agent's, another Place's, or a stored session's.
+- **After it:** where the Focus and the keys are when it ends, and what the person does next. A person who must click or press a key only to get back to where they were is a finding.
+- **Beside another feature:** another feature that shares the screen, the keys or the clicks, such as a click on the transcript while the person types in the composer.
+
+Then hold each behaviour to what the Intent promises a person. A person reads what happens without dsh's data, such as raw JSON, and binnacle does at least what a plain terminal does, such as selecting and copying text.

@@ -32,6 +32,14 @@ Build a click with `printf`: its press and its release must both be escapes, or 
 
 binnacle scrolls the transcript itself, so the terminal's scrollback does not hold it. Read the stored session instead: `zstd -dc ~/.dsh/sessions/<cwd>/session-<id>/session.v4.jsonl.zstd`. Each line is an event; a `tool/result` holds what the tool returned.
 
+## A Person Trial
+
+After the last Ticket of a Spec merges, the Lead drives each of the Spec's Journeys on `main`, as a person would, with no author's change turned on: `pnpm try main`.
+
+1. Drive each Journey to its end, and then one step further: type in the composer, click the transcript, then type again.
+2. At each step, read the screen as a person would. A problem is anything that shows dsh's data raw, does less than a plain terminal does, leaves the Focus where the person must move it back, or reads as noise.
+3. Write the report as a comment on the Spec, under **Person Trial**: the tip that was tried, each Journey and what it drew, and each problem with the step that shows it.
+
 ## In the PR
 
 Under **Tried under dsh**: the tip that was tried, each thing driven and what it drew, the lines quoted where they show the change, and each behaviour that was not driven by hand, with what covers it.

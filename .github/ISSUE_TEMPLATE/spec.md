@@ -18,6 +18,12 @@ labels: spec
 
 1.
 
+## Journeys
+
+<!-- What a person does with the feature in a real session under dsh, from start to end, and what they do next. The Person Trial drives each one. None if a person sees no change. -->
+
+1.
+
 ## Seams
 
 <!-- Where the tests observe the change, from outside. -->

@@ -15,10 +15,12 @@ The review is blind. You do not know who built the Ticket, and you do not try to
 2. Check each claim about upstream, against its Reference in `.refs/`.
 3. Check each move between layers, against the layers file.
 4. List each decision that the build will meet and that the Spec does not answer. Walk each behaviour's edges, as the `spec` skill's *Edges* lists them.
-5. Check the **Tickets** section against the rules of the `tickets` skill: each behaviour is in one Ticket only, each edge is real, and each Ticket can be tried or tested.
-6. Write `review-0.md`.
+5. Hold each behaviour and decision to what the Intent promises a person. Quote the Intent's line beside each that falls short: one that shows a person dsh's data, such as raw JSON; one that does less than a plain terminal does, such as selecting and copying text; and one that leaves the person a click or a key only to get back to where they were.
+6. Check that the **Journeys** pass through each behaviour that a person sees, and through the other features that share its screen.
+7. Check the **Tickets** section against the rules of the `tickets` skill: each behaviour is in one Ticket only, each edge is real, and each Ticket can be tried or tested.
+8. Write `review-0.md`.
 
-In Round 0, each unanswered decision is a finding, and so is a slice that breaks a rule. Round 0 is `approved` only when the Spec answers every decision that the build will meet, and its Tickets hold every behaviour.
+In Round 0, each unanswered decision is a finding, and so is a behaviour that falls short of the Intent, a Journey that is missing, and a slice that breaks a rule. Round 0 is `approved` only when the Spec answers every decision that the build will meet, and its Tickets hold every behaviour.
 
 ## A Round after the build
 
