@@ -434,7 +434,7 @@ test('an author adds a search line to the Places of commands.list.up, and up mov
     '  goal — Set a goal',
     '› plan — Plan first',
     RULE,
-    '/ ',
+    '/',
     RULE,
     '›  ',
   ])

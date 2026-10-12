@@ -95,7 +95,7 @@ test('a Screen shown over the Chat that gives no Place the Focus gives the compo
   assert.deepEqual(
     [whileShown, await typed('y')],
     [
-      ['', '', RULE, ' ', RULE],
+      ['', '', RULE, '', RULE],
       ['', '', RULE, 'y ', RULE],
     ],
   )
@@ -496,4 +496,21 @@ async function settledLate(settlement: Execution | Error) {
 test('a composer that unloads before its command settles is changed by nothing, whether the command succeeds or throws', async () => {
   const unchanged = { state: { text: '/compact', running: true }, sent: [] }
   assert.deepEqual([await settledLate(success()), await settledLate(new Error('the handler threw'))], [unchanged, unchanged])
+})
+
+test('the composer draws its cursor only while it has the Focus', async () => {
+  const { ctx, dsh, terminal } = await mounted({
+    size: { columns: 20, rows: 6 },
+    builtins: ['binnacle-transcript', 'binnacle-composer'],
+  })
+  dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
+  const cursor = async (...keys: string[]) => {
+    for (const key of keys) terminal.type(key)
+    const { rows } = await terminal.read()
+    return terminal.inverseAt(
+      2,
+      rows.findIndex((row) => row.startsWith('hi')),
+    )
+  }
+  assert.deepEqual([await cursor('h', 'i'), await cursor('\x1b[Z'), await cursor('\x1b[Z')], [true, false, true])
 })
