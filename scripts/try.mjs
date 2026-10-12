@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 // The try runs in its own worktree and profile, so the person's `binnacle` profile keeps running the main checkout.
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const PROFILE = 'binnacle-try'
+
+// The try reports its agent to herdr, so a driver waits on the pane's state, not on what the screen shows.
+const HERDR_REPORT = join(dirname(fileURLToPath(import.meta.url)), 'herdr-report.mjs')
+const HERDR_ROW = "- insert:\n    - id: herdr-report\n      name: './plugins/herdr-report.mjs'\n"
 
 export function profileOf(checkout) {
   return {
@@ -31,7 +35,10 @@ export function tryRef(ref, { root, home, exec }) {
   writeFileSync(join(profile, 'package.json'), `${JSON.stringify(profileOf(checkout), null, 2)}\n`)
   writeFileSync(join(profile, 'cordis.yml'), '[]\n')
   const patch = join(home, '.dsh', 'profiles', 'binnacle', 'cordis.patch.yml')
-  if (existsSync(patch)) copyFileSync(patch, join(profile, 'cordis.patch.yml'))
+  const own = existsSync(patch) ? readFileSync(patch, 'utf8') : ''
+  writeFileSync(join(profile, 'cordis.patch.yml'), `${own}${own === '' || own.endsWith('\n') ? '' : '\n'}${HERDR_ROW}`)
+  mkdirSync(join(profile, 'plugins'), { recursive: true })
+  copyFileSync(HERDR_REPORT, join(profile, 'plugins', 'herdr-report.mjs'))
   if (!existsSync(join(profile, 'node_modules', 'binnacle'))) exec('pnpm', ['-C', profile, 'install'])
 
   const at = exec('git', ['-C', checkout, 'rev-parse', '--short', 'HEAD']).trim()
