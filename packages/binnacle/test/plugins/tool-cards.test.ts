@@ -550,8 +550,14 @@ const QUESTIONS = JSON.stringify({
   ],
 })
 
-test('an ask card draws each question while it waits, and once answered each question then → its choices and its text', async () => {
-  const waiting = (await (await reading([call(0, 'ask_user_question', QUESTIONS)])).drawn()).slice(0, 4)
+test('an ask card draws its first line alone while it waits, as the Request shows its questions', async () => {
+  const { drawn, ctx, terminal } = await reading([call(0, 'ask_user_question', QUESTIONS)])
+  const waiting = (await drawn()).slice(0, 2)
+  terminal.type(clickAt(0, 0))
+  assert.deepEqual([waiting, (await drawn()).slice(0, 2), stateOf(ctx).state?.folded], [['⏺ ask_user_question', ''], waiting, []])
+})
+
+test('an answered ask card draws each question then → its choices and its text', async () => {
   const answers = {
     answers: [
       { id: 'db', selected: ['Postgres', 'SQLite'] },
@@ -559,13 +565,14 @@ test('an ask card draws each question while it waits, and once answered each que
     ],
   }
   const answered = await reading([call(0, 'ask_user_question', QUESTIONS), result(1, 'c0', JSON.stringify(answers))])
-  assert.deepEqual(
-    [waiting, (await answered.drawn()).slice(0, 6)],
-    [
-      ['⏺ ask_user_question', '  ⎿ Which database?', '    Name it?', ''],
-      ['⏺ ask_user_question · 1.0s', '  ⎿ Which database?', '    → Postgres, SQLite', '    Name it?', '    → atlas', ''],
-    ],
-  )
+  assert.deepEqual((await answered.drawn()).slice(0, 6), [
+    '⏺ ask_user_question · 1.0s',
+    '  ⎿ Which database?',
+    '    → Postgres, SQLite',
+    '    Name it?',
+    '    → atlas',
+    '',
+  ])
 })
 
 test('a click on the first line of a todo or an ask card folds nothing, and the card stays whole', async () => {
