@@ -266,6 +266,15 @@ test('ctrl+c pressed twice within half a second quits; once, or twice further ap
   assert.deepEqual([pressed(0), pressed(600), pressed(900)], [[], [], [0]])
 })
 
+test('ctrl+c twice asks the process to end within 5 seconds, though a socket keeps it alive; once does not', async () => {
+  const { terminal, ready, process } = await mount()
+  ready()
+  terminal.type('\x03')
+  const once = [...process.endsWithin]
+  terminal.type('\x03')
+  assert.deepEqual([once, process.endsWithin], [[], [5000]])
+})
+
 const part = (lines: readonly string[]) => ({ lines: () => lines })
 
 test('a Part, a Layout or a Screen registered twice by one name goes only with the plugin whose registration unloads, and the one beneath it is drawn again', async () => {
