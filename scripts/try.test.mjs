@@ -50,8 +50,25 @@ test("A second try moves the same worktree, and the profile takes the person's o
   const checkout = join(home, '.binnacle', 'try')
   assert.equal(calls[1], `git -C ${checkout} switch -q --detach task/165`)
   assert.equal(calls.filter((call) => call.endsWith('binnacle-try install')).length, 0)
-  assert.equal(
-    readFileSync(join(home, '.dsh', 'profiles', 'binnacle-try', 'cordis.patch.yml'), 'utf8'),
-    '- id: binnacle-approvals\n  disabled: true\n',
+  assert.ok(
+    readFileSync(join(home, '.dsh', 'profiles', 'binnacle-try', 'cordis.patch.yml'), 'utf8').startsWith(
+      '- id: binnacle-approvals\n  disabled: true\n',
+    ),
   )
+})
+
+test("The try profile reports its agent to herdr: herdr-report in its plugins, inserted after the person's own patch", (t) => {
+  const { home, deps } = world(t)
+  const personal = join(home, '.dsh', 'profiles', 'binnacle')
+  mkdirSync(personal, { recursive: true })
+  writeFileSync(join(personal, 'cordis.patch.yml'), '- id: binnacle-approvals\n  disabled: true\n')
+
+  tryRef('task/163', deps)
+
+  const profile = join(home, '.dsh', 'profiles', 'binnacle-try')
+  assert.equal(
+    readFileSync(join(profile, 'cordis.patch.yml'), 'utf8'),
+    "- id: binnacle-approvals\n  disabled: true\n- insert:\n    - id: herdr-report\n      name: './plugins/herdr-report.mjs'\n",
+  )
+  assert.match(readFileSync(join(profile, 'plugins', 'herdr-report.mjs'), 'utf8'), /pane', 'report-agent'/)
 })

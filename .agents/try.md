@@ -6,6 +6,8 @@ The Lead tries a Ticket that changes what binnacle draws or boots, and writes in
 
 `pnpm try task/<ticket>` builds the branch in `~/.binnacle/try` and links it into the `binnacle-try` dsh profile, with the Maintainer's own `cordis.patch.yml`. The `binnacle` profile keeps running the main checkout.
 
+The profile also loads `herdr-report`, from `scripts/herdr-report.mjs`. It reports the pane's agent to herdr, as `dsh`, `idle`, `working` or `blocked`, and releases it when dsh ends. So a driver waits on the pane's state, not on what the screen shows.
+
 ## Drive it
 
 Run it in a pane of its own, and drive the pane from the shell. With herdr:
@@ -13,13 +15,16 @@ Run it in a pane of its own, and drive the pane from the shell. With herdr:
 | To | Run |
 |---|---|
 | start | `herdr tab create --cwd /tmp --label try-<n> --no-focus`, then `herdr pane run <pane> "dsh --profile binnacle-try"` |
+| wait until binnacle is up | `herdr agent wait <pane> --until idle --timeout 30000`, after a few seconds: before binnacle reports, the pane has no agent |
 | type | `herdr pane send-text <pane> "<text>"` |
+| send a prompt, and wait for its turn | type it, `herdr pane send-keys <pane> Enter`, then `herdr agent wait <pane> --until working`, then `--until idle`, or `--until blocked` for a Request. `herdr agent prompt` refuses a pane that herdr did not start |
 | press a key | `herdr pane send-keys <pane> Enter`, `Up`, `esc`, `shift+Tab`, `C-c` |
 | click at a column and a row, from 1 | `herdr pane send-text <pane> "$(printf '\033[<0;%s;%sM\033[<0;%s;%sm' $col $row $col $row)"` |
 | scroll up one notch | the same, with `64` for `0` and only the `M` half |
 | read the screen | `herdr pane read <pane> --source visible` |
 | read its styles, such as the inverse Mark | `herdr pane read <pane> --source visible --ansi`, then `grep -F $'\x1b[7m'` |
-| quit | ctrl+c twice, then `herdr tab close <tab>` |
+| quit | `herdr pane send-keys <pane> C-c` twice in one command: the second must come within 500 ms of the first, on an empty draft |
+| check that dsh ended | `herdr agent get <pane>` gives `agent_not_found`. Until it does, binnacle has the pane, and a shell command typed there is a prompt to the agent. Then `herdr tab close <tab>` |
 
 Build a click with `printf`: its press and its release must both be escapes, or the release is typed into the Place that has the Focus.
 
