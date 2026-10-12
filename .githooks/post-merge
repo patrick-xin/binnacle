@@ -1,0 +1,6 @@
+#!/bin/sh
+# The Maintainer's binnacle profile runs this checkout's dist/, so a pull on main that changes the package builds it again.
+[ "$(git branch --show-current)" = main ] || exit 0
+git diff --quiet ORIG_HEAD HEAD -- packages/binnacle && exit 0
+echo "post-merge: packages/binnacle changed; building dist/"
+exec pnpm build

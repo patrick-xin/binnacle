@@ -15,15 +15,15 @@ Run it in a pane of its own, and drive the pane from the shell. With herdr:
 | To | Run |
 |---|---|
 | start | `herdr tab create --cwd /tmp --label try-<n> --no-focus`, then `herdr pane run <pane> "dsh --profile binnacle-try"` |
-| wait until binnacle is up | `herdr agent wait <pane> --until idle --timeout 30000`, after a few seconds: before binnacle reports, the pane has no agent |
+| wait until binnacle is up | `herdr agent wait <pane> --until idle --until done --timeout 30000`, after a few seconds: before binnacle reports, the pane has no agent |
 | type | `herdr pane send-text <pane> "<text>"` |
-| send a prompt, and wait for its turn | type it, `herdr pane send-keys <pane> Enter`, then `herdr agent wait <pane> --until working`, then `--until idle`, or `--until blocked` for a Request. `herdr agent prompt` refuses a pane that herdr did not start |
+| send a prompt, and wait for its turn | type it, `herdr pane send-keys <pane> Enter`, then `herdr agent wait <pane> --until working`, then `--until idle --until done`. herdr reports a pane that is not focused as `done`, not `idle`, once its turn ends. A turn quicker than herdr's poll passes `working` unseen, and that wait times out: read the screen then. A question's Request has kept the pane `working`, so read the screen for it. `herdr agent prompt` refuses a pane that herdr did not start |
 | press a key | `herdr pane send-keys <pane> Enter`, `Up`, `esc`, `shift+Tab`, `C-c` |
 | click at a column and a row, from 1 | `herdr pane send-text <pane> "$(printf '\033[<0;%s;%sM\033[<0;%s;%sm' $col $row $col $row)"` |
 | scroll up one notch | the same, with `64` for `0` and only the `M` half |
 | read the screen | `herdr pane read <pane> --source visible` |
 | read its styles, such as the inverse Mark | `herdr pane read <pane> --source visible --ansi`, then `grep -F $'\x1b[7m'` |
-| quit | `herdr pane send-keys <pane> C-c` twice in one command: the second must come within 500 ms of the first, on an empty draft |
+| quit | `herdr pane send-keys <pane> C-c C-c`: the second must come within 500 ms of the first, on an empty draft. herdr has no key that empties a draft, so with text in it, send one `C-c` first, which clears it |
 | check that dsh ended | `herdr agent get <pane>` gives `agent_not_found`. Until it does, binnacle has the pane, and a shell command typed there is a prompt to the agent. Then `herdr tab close <tab>` |
 
 Build a click with `printf`: its press and its release must both be escapes, or the release is typed into the Place that has the Focus.
