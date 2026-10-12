@@ -159,6 +159,8 @@ interface Node extends Box {
   readonly unless?: string
   /** `false`: a click or the wheel inside it does nothing, and a click there moves no Focus. */
   readonly mouse?: boolean
+  /** `false`: a click inside it reaches its Part and its Place's actions, and moves no Focus, as for a Place that a person reads. A Place that has the Focus keeps it. */
+  readonly clickFocus?: boolean
 }
 
 interface Kinds {

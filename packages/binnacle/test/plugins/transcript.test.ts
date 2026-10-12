@@ -150,15 +150,92 @@ test("as the Mark moves down within the rows shown, the transcript keeps the Mar
   assert.deepEqual(await shown(), ['▾ #1 test/two', '{}', '', '▾ #2 test/three'])
 })
 
-test("a click on an event's header line folds or unfolds that event, and Marks it", async () => {
+test("a click on an event's header line folds or unfolds that event, and Marks it, which draws once the transcript has the Focus", async () => {
   const shown = await reading([three], undefined, 10, { plugins: [probe('composer', composerTakingKeys)] })
   const { terminal } = shown
   terminal.type(clickAt(0, 0))
   assert.deepEqual((await terminal.read()).rows.slice(0, 6), ['▸ #0 test/one (1 lines)', '', '▾ #1 test/two', '{}', '', '▾ #2 test/three'])
-  assert.deepEqual([await terminal.inverseAt(0, 0), await terminal.inverseAt(0, 5)], [true, false])
+  assert.equal(await terminal.inverseAt(0, 0), false)
   terminal.type(clickAt(0, 0))
   assert.deepEqual((await terminal.read()).rows.slice(0, 4), ['▾ #0 test/one', '{}', '', '▾ #1 test/two'])
-  assert.equal(await terminal.inverseAt(0, 0), true)
+  terminal.type(SHIFT_TAB)
+  assert.deepEqual([await terminal.inverseAt(0, 0), await terminal.inverseAt(0, 6)], [true, false])
+})
+
+/** The transcript beside the composer, as the Chat draws them, on a live session. */
+async function typing(rows = 10) {
+  const mount = await mounted({ size: { columns: 40, rows }, builtins: [...TRANSCRIPT, 'binnacle-composer'] })
+  const draft = () => mount.ctx.binnacle.modelOf<{ text: string }>('composer').state?.text
+  return { ...mount, draft }
+}
+
+test('a click on a line of the transcript while the person types folds what it lands on, and their next key types into the draft', async () => {
+  const { ctx, dsh, terminal, draft } = await typing()
+  dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
+  terminal.type('a')
+  terminal.type('b')
+  await terminal.read()
+  terminal.type(clickAt(0, 0))
+  terminal.type('c')
+  assert.deepEqual([(await terminal.read()).rows[0], draft()], ['▸ #0 turn/start (1 lines)', 'abc'])
+})
+
+test("an author who replaces the Chat's transcript node with one of no clickFocus gives a click there the Focus again", async () => {
+  const { ctx, dsh, terminal, draft } = await typing()
+  const author = ctx.plugin({
+    name: 'author',
+    inject: ['binnacle'],
+    apply: (plugin: Context) => {
+      plugin.binnacle.edit('chat', { replace: 'transcript', with: { place: 'transcript', size: 'fill' } })
+    },
+  })
+  await author
+  dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
+  dsh.commit(ctx, { seq: 1, type: 'turn/start', time: 2, data: {} })
+  terminal.type('a')
+  await terminal.read()
+  terminal.type(clickAt(0, 3))
+  terminal.type('b')
+  terminal.type(UP)
+  assert.deepEqual([draft(), await terminal.inverseAt(0, 0)], ['a', true])
+})
+
+test('a click on the transcript while a Request stands acts there, and down and enter still move and pick its Choices', async () => {
+  const mount = await mounted({
+    size: { columns: 40, rows: 14 },
+    builtins: [...TRANSCRIPT, 'binnacle-composer', 'binnacle-requests', 'binnacle-requests-view'],
+  })
+  const { ctx, dsh, terminal, app } = mount
+  dsh.commit(ctx, { seq: 0, type: 'turn/start', time: 1, data: {} })
+  const answer = app.ask([{ id: 'q1', question: 'Which?', options: [{ label: 'A' }, { label: 'B' }] }])
+  await terminal.read()
+  terminal.type(clickAt(0, 0))
+  const folded = (await terminal.read()).rows[0]
+  for (const key of [DOWN, ENTER]) {
+    terminal.type(key)
+    await terminal.read()
+  }
+  assert.deepEqual([folded, await answer], ['▸ #0 turn/start (1 lines)', { answers: [{ id: 'q1', selected: ['B'] }] }])
+})
+
+test('with the Focus moved to the transcript by shift+tab, a click there Marks the event clicked and keeps the Focus, and up and down move the Mark', async () => {
+  const { terminal } = await reading([three], undefined, 10, { plugins: [probe('composer', composerTakingKeys)] })
+  terminal.type(SHIFT_TAB)
+  const marked = async (...rows: number[]) => Promise.all(rows.map((row) => terminal.inverseAt(0, row)))
+  const first = await marked(0, 3, 6)
+  terminal.type(clickAt(0, 3))
+  const clicked = await marked(0, 3, 5)
+  terminal.type(DOWN)
+  const down = await marked(0, 3, 5)
+  assert.deepEqual(
+    [first, clicked, down],
+    [
+      [false, false, true],
+      [false, true, false],
+      [false, false, true],
+    ],
+  )
+  assert.deepEqual((await terminal.read()).rows.slice(3, 7), ['▸ #1 test/two (1 lines)', '', '▾ #2 test/three', '{}'])
 })
 
 test("a folded event's header line ends with how many of its lines it hides, counted before the core wraps them", async () => {

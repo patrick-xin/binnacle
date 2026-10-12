@@ -1,9 +1,9 @@
-import { sliceByColumn, sliceWithWidth, truncateToWidth, visibleWidth } from '../terminal/utils.ts'
+import { sliceByColumn, sliceWithWidth, visibleWidth } from '../terminal/utils.ts'
 import type { Layout } from '../api.ts'
-import type { Arranged, Hit, Placed, Places, Position } from './arranged.ts'
+import type { Arranged, Hit, Placed, Places, Position, Reach } from './arranged.ts'
 import { cut, joined, nestedSegment, placeSegment, segmentsOf } from './separated.ts'
 import type { Drawn, Segment } from './separated.ts'
-import { bordersOf, edgeRow, gapOf, insetsOf, paddingOf } from './box.ts'
+import { blank, bordersOf, edgeRow, fit, gapOf, insetsOf, paddingOf, reachInside } from './box.ts'
 import type { Spare } from './box.ts'
 import { withoutBlankEnd } from './row-end.ts'
 import { coverWidthOf, floatAt, floatWidthOf, grow, share, wantedOf } from './tree.ts'
@@ -14,8 +14,6 @@ import type { Theme } from './theme.ts'
 const SPARES: readonly Spare[] = ['nothing', 'spacing', 'borders']
 
 const RESET_STYLE = '\x1b[0m'
-const blank = (width: number): string => ' '.repeat(Math.max(0, width))
-const fit = (row: string, width: number): string => truncateToWidth(row, width, '', true)
 const separated = (tree: Tree): boolean => tree.kind === 'row' && tree.node.separator === true
 
 class Arrangement {
@@ -30,7 +28,8 @@ class Arrangement {
   readonly #named = new Map<string, Tree | undefined>()
   // The names whose lines are being asked for: an `unless` that names a Layout it is in has no lines there.
   readonly #asking = new Set<string>()
-  #mouse = true
+  // Whether a click and the wheel reach the Places being laid out, and whether a click moves the Focus there.
+  #reach: Reach = { mouse: true, clickFocus: true }
 
   constructor(places: Places, spare: Spare, theme: Theme) {
     this.#places = places
@@ -52,13 +51,7 @@ class Arrangement {
 
   draw(tree: Tree, top: number, left: number, width: number, height: number): string[] {
     if (this.#vanishes(tree, width)) return Array.from({ length: height }, () => blank(width))
-    const mouse = this.#mouse
-    if (tree.node.mouse === false) this.#mouse = false
-    try {
-      return this.#drawBox(tree, top, left, width, height)
-    } finally {
-      this.#mouse = mouse
-    }
+    return this.#within(tree, () => this.#drawBox(tree, top, left, width, height))
   }
 
   #drawBox(tree: Tree, top: number, left: number, width: number, height: number): string[] {
@@ -82,7 +75,7 @@ class Arrangement {
         shownFrom: this.#shownFrom.get(tree.place) ?? 0,
       }
       this.placed.push(placed)
-      this.hits.push({ top, left, width, height, placed: this.#mouse ? placed : undefined })
+      this.hits.push({ top, left, width, height, placed: this.#reach.mouse ? placed : undefined, clickFocus: this.#reach.clickFocus })
     }
     const paddedWidth = Math.max(0, width - borders.left - borders.right)
     const padded = [
@@ -200,7 +193,7 @@ class Arrangement {
     this.hits = [
       ...outside,
       ...this.hits,
-      { top: top + y, left: left + x, width: floatWidth, height: floatHeight, placed: undefined },
+      { top: top + y, left: left + x, width: floatWidth, height: floatHeight, placed: undefined, clickFocus: true },
       ...beneath,
     ]
     const covered = (at: Position) =>
@@ -259,18 +252,29 @@ class Arrangement {
 
   /** A child's first line, with no size and no box: a Part's before it wraps, or a node's first drawn row. */
   #segment(child: Tree, top: number, left: number, width: number): Drawn {
-    const [hitsFrom, placedFrom, cursor, mouse] = [this.hits.length, this.placed.length, this.cursor, this.#mouse]
-    if (child.node.mouse === false) this.#mouse = false
+    const [hitsFrom, placedFrom, cursor] = [this.hits.length, this.placed.length, this.cursor]
     try {
-      if (child.kind === 'place') {
-        const line = this.#places.firstLine(child.place, width) ?? ''
-        return placeSegment(child.place, line.includes('\x1b') ? line + RESET_STYLE : line, { top, left, width, height: 1 }, this.#mouse)
-      }
-      const rows = this.#drawInner(child, width, Math.max(1, this.#innerHeight(child, width)), top, left)
-      return nestedSegment(withoutBlankEnd(rows[0] ?? ''), this.hits.splice(hitsFrom), this.placed.splice(placedFrom), top, left)
+      return this.#within(child, () => {
+        if (child.kind === 'place') {
+          const line = this.#places.firstLine(child.place, width) ?? ''
+          return placeSegment(child.place, line.includes('\x1b') ? line + RESET_STYLE : line, { top, left, width, height: 1 }, this.#reach)
+        }
+        const rows = this.#drawInner(child, width, Math.max(1, this.#innerHeight(child, width)), top, left)
+        return nestedSegment(withoutBlankEnd(rows[0] ?? ''), this.hits.splice(hitsFrom), this.placed.splice(placedFrom), top, left)
+      })
     } finally {
-      this.#mouse = mouse
       this.cursor = cursor
+    }
+  }
+
+  /** Lays out what is inside the node with the node's `mouse` and `clickFocus` holding for each Place in it. */
+  #within<T>(tree: Tree, draw: () => T): T {
+    const outer = this.#reach
+    this.#reach = reachInside(outer, tree.node)
+    try {
+      return draw()
+    } finally {
+      this.#reach = outer
     }
   }
 

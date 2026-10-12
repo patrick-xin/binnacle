@@ -524,6 +524,39 @@ test('a node with `mouse: false` ignores a click and the wheel inside it, and a 
   )
 })
 
+test("a node with `clickFocus: false` gives a click inside it to its Part and its Place's actions, for each Place inside it, and moves no Focus", async () => {
+  const heard: string[] = []
+  const taking = (name: string) => ({
+    lines: () => [`${name}1`],
+    key: (data: string) => {
+      heard.push(`${name} ${data}`)
+      return true
+    },
+    click: () => {
+      heard.push(`${name} click`)
+      return false
+    },
+  })
+  const { terminal } = await drawn(12, 1, (binnacle) => {
+    binnacle.show({
+      name: 'three',
+      focus: 'c',
+      layout: { row: [{ row: [{ place: 'a' }, { place: 'b' }], size: { fixed: 8 }, clickFocus: false }, { place: 'c' }] },
+    })
+    binnacle.place('a', taking('a'))
+    binnacle.place('b', taking('b'))
+    binnacle.place('c', taking('c'))
+    binnacle.action('b.clicked', { keys: ['click'], place: 'b', run: () => heard.push('b action') })
+  })
+  terminal.type(clickAt(0, 0))
+  terminal.type(clickAt(4, 0))
+  terminal.type('k')
+  terminal.type(clickAt(9, 0))
+  terminal.type('j')
+  await terminal.read()
+  assert.deepEqual(heard, ['a click', 'b click', 'b action', 'c k', 'c click', 'c j'])
+})
+
 test("in a Layout set by name, a node with no size takes what its lines need; in a Screen's own Layout it fills, as before", async () => {
   const panel: Layout = { column: [{ place: 'a' }, { place: 'b' }] }
   const seen: string[][] = []

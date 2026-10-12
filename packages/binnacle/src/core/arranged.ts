@@ -46,6 +46,14 @@ export interface Placed {
 /** Cells that a click or the wheel lands on: a Place drawn, or none, where the mouse does nothing or a float's box covers. */
 export interface Hit extends Cells {
   readonly placed: Placed | undefined
+  /** Whether a click here moves the Focus to the Place: `false` inside a node with `clickFocus: false`. */
+  readonly clickFocus: boolean
+}
+
+/** Whether a click and the wheel reach a Place, and whether a click moves the Focus to it. */
+export interface Reach {
+  readonly mouse: boolean
+  readonly clickFocus: boolean
 }
 
 export interface Cells {
