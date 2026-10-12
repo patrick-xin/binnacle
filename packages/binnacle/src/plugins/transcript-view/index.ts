@@ -96,7 +96,8 @@ export function apply(ctx: Context): void {
   }
 
   // The type's Look folds and spaces the event, so that a piece's Look draws only its piece.
-  // An event that does not fold, a prompt or one of one line, draws its first line as a Line that folds nothing, so a click on it only Marks.
+  // An event that does not fold, a prompt, an answer or one of one line, draws its first line as a Line that folds nothing, so a click on it only Marks.
+  // An answer is what a person reads, and a fold that nothing on screen shows surprises them: an author who wants it folds it with a Look.
   const typed =
     (linesOf: (event: SessionEvent, at: PieceAt) => string[], blank: boolean, folds = true): EventLook =>
     (event, { folded, width }) => {
@@ -129,7 +130,7 @@ export function apply(ctx: Context): void {
     return typed((_, where) => pieces.context()({ producer }, where), false)(event, at)
   })
   binnacle.look<EventLook>('transcript.event.assistant/message', () =>
-    typed((event, at) => said(reasoningOf(event), textOf(event), at), true),
+    typed((event, at) => said(reasoningOf(event), textOf(event), at), true, false),
   )
   binnacle.look<EventLook>('transcript.event.tool/call', () =>
     typed((event, at) => {

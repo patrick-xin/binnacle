@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Context } from '@deepseek-ai/cordis'
-import type { TranscriptState } from '../../src/plugins/transcript/index.ts'
+import type { EventLook, TranscriptState } from '../../src/plugins/transcript/index.ts'
 import { callOf, textOf } from '../../src/plugins/transcript/index.ts'
-import type { CallLook, NoticeLook, TextLook } from '../../src/plugins/transcript-view/index.ts'
+import type { CallLook, NoticeLook, ResultLook, TextLook } from '../../src/plugins/transcript-view/index.ts'
 import { wrap } from '../../src/index.ts'
 import { mounted } from '../support/mounted.ts'
 
@@ -201,30 +201,70 @@ test('every other event draws nothing and takes no row, and the Mark passes over
 })
 
 test('a folded event with more than one line draws its first line, then … <n> more lines in the muted Tone, and one of one line draws as it was', async () => {
-  const { drawn, ctx, terminal } = await reading([
-    answer(0, [
-      { type: 'reasoning', text: 'think' },
-      { type: 'text', text: 'one\ntwo' },
-    ]),
-    call(1, 'ls', '{}'),
-  ])
+  const { drawn, ctx, terminal } = await reading([result(0, 'one\ntwo\nthree'), call(1, 'ls', '{}')])
+  ctx.binnacle.look<ResultLook>(
+    'transcript.result',
+    () =>
+      ({ text }) =>
+        text.split('\n'),
+  )
   stateOf(ctx).set((state) => state.folded.push('0', '1'))
-  assert.deepEqual((await drawn()).slice(0, 4), ['think', '… 2 more lines', '', '⏺ ls({})'])
+  assert.deepEqual((await drawn()).slice(0, 4), ['one', '… 2 more lines', '', '⏺ ls({})'])
   assert.equal(await terminal.colourAt(0, 1), BRIGHT_BLACK)
   terminal.type(ENTER)
   terminal.type(UP)
   terminal.type(ENTER)
-  assert.deepEqual((await drawn()).slice(0, 6), ['think', 'one', 'two', '', '⏺ ls({})', ''])
+  assert.deepEqual((await drawn()).slice(0, 6), ['one', 'two', 'three', '', '⏺ ls({})', ''])
 })
 
 test("a click on the first line of an event that the view draws folds it, as the view's first lines are plain strings, and a click on its next line folds nothing", async () => {
-  const { drawn, ctx, terminal } = await reading([answer(0, [{ type: 'text', text: 'one\ntwo' }]), call(1, 'ls', '{}')])
+  const { drawn, ctx, terminal } = await reading([result(0, 'one\ntwo'), call(1, 'ls', '{}')])
+  ctx.binnacle.look<ResultLook>(
+    'transcript.result',
+    () =>
+      ({ text }) =>
+        text.split('\n'),
+  )
   await drawn()
   terminal.type(clickAt(0, 1))
   await drawn()
   assert.deepEqual(stateOf(ctx).state?.folded, [])
   terminal.type(clickAt(0, 0))
   assert.deepEqual((await drawn()).slice(0, 3), ['one', '… 1 more lines', ''])
+})
+
+test("a click on an agent's answer folds nothing, and the answer Marked draws whole at enter", async () => {
+  const { drawn, ctx, terminal } = await reading([
+    answer(0, [
+      { type: 'reasoning', text: 'think' },
+      { type: 'text', text: 'one\ntwo' },
+    ]),
+  ])
+  await drawn()
+  terminal.type(clickAt(0, 0))
+  const clicked = [(await drawn()).slice(0, 4), [...(stateOf(ctx).state?.folded ?? [])]]
+  terminal.type(ENTER)
+  assert.deepEqual(
+    [clicked, (await drawn()).slice(0, 4)],
+    [
+      [['think', 'one', 'two', ''], []],
+      ['think', 'one', 'two', ''],
+    ],
+  )
+})
+
+test("an author's Look over an agent's answer folds it again at a click on its first line", async () => {
+  const { drawn, ctx, terminal } = await reading([answer(0, [{ type: 'text', text: 'one\ntwo\nthree' }])])
+  ctx.binnacle.look<EventLook>('transcript.event.assistant/message', (beneath) => (event, where) => {
+    const [first = '', ...rest] = beneath(event, where)
+    const text = typeof first === 'string' ? first : first.text
+    return where.folded
+      ? [{ text, fold: String(event.seq) }, `… ${rest.length - 1} more lines`, '']
+      : [{ text, fold: String(event.seq) }, ...rest]
+  })
+  await drawn()
+  terminal.type(clickAt(0, 0))
+  assert.deepEqual((await drawn()).slice(0, 3), ['one', '… 2 more lines', ''])
 })
 
 test('a click on a prompt folds nothing, and a prompt Marked draws whole at enter', async () => {

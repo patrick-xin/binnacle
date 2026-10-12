@@ -841,7 +841,17 @@ The row `binnacle-transcript-view` draws the transcript a person reads. A prompt
   )
   ```
 
-- The type's Look joins its pieces' lines. A folded event with more than one line draws its first line, then `… <n> more lines` in the `muted` Tone. Then a prompt, an answer and a tool result end with a blank line. A context, a call and a notice do not, so a call and its result stand together. Set `transcript.event.<type>` to space or fold an event your own way.
+- The type's Look joins its pieces' lines. A folded event with more than one line draws its first line, then `… <n> more lines` in the `muted` Tone. A prompt and an answer do not fold, as a person reads them whole: their first line is `{ text }`, so a click on it only Marks. Then a prompt, an answer and a tool result end with a blank line. A context, a call and a notice do not, so a call and its result stand together. Set `transcript.event.<type>` to space or fold an event your own way. This folds each answer again at a click on its first line:
+
+  ```js
+  ctx.binnacle.look('transcript.event.assistant/message', (beneath) => (event, at) => {
+    const [first = '', ...rest] = beneath(event, at)
+    const text = typeof first === 'string' ? first : first.text
+    const line = { text, fold: String(event.seq) }
+    // The default ends with a blank line, which the count leaves out.
+    return at.folded ? [line, `… ${rest.length - 1} more lines`, ''] : [line, ...rest]
+  })
+  ```
 - The answer that streams draws through the same pieces: its reasoning, then its text, then a blank line, then each tool call with its arguments so far.
 
 ### Tool cards
@@ -897,7 +907,7 @@ The row `binnacle-tool-cards` draws each tool call and its result as one card, w
     card.endedAt === undefined ? `${Math.floor((clock.state.now - card.startedAt) / 1000)}s` : beneath(card), { models: [clock] })
   ```
 
-- The default card's first line is `{ text, fold: '<seq>/body' }`. So enter on the Marked card, or a click on its first line, folds its body. The folded card draws its first line alone, ending with `(1 line)` or `(<n> lines)`. A card with no body has nothing to fold, and its first line is a string. Set `transcript.card` to put the fold on another line, as [The transcript](#the-transcript) says of a `Line`.
+- The default card's first line is `{ text, fold: '<seq>/body' }`. So enter on the Marked card, or a click on its first line, folds its body. The folded card draws its first line alone, ending with `(1 line)` or `(<n> lines)`. A card with no body has nothing to fold: its first line is `{ text }`, a Line that folds nothing. Set `transcript.card` to put the fold on another line, as [The transcript](#the-transcript) says of a `Line`.
 
 ## The composer
 
