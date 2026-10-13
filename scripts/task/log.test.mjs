@@ -80,6 +80,7 @@ test('a command that holds the lock releases it when it gets SIGINT', async (t) 
   t.after(() => world.remove())
   assert.equal((await started(world, 140)).code, 0)
   await run(['set', '140', 'changes', '--as', 'reviewer'], world.deps)
+  world.comment(140)
   const lock = join(world.home, 'tasks', '.lock')
 
   // The command parks inside its own writing, holding the lock.

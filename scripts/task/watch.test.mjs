@@ -45,6 +45,7 @@ test('Two changes that wait are reported by two runs of `task watch`, one each',
   world.tick()
   await run(['set', '140', 'changes', '--as', 'reviewer'], world.deps)
   world.tick()
+  world.comment(140)
   await run(['set', '140', 'spec', '--as', 'lead'], world.deps)
   world.tick()
   await run(['set', '140', 'approved', '--as', 'reviewer'], world.deps)

@@ -137,8 +137,23 @@ test('The Lead sets `spec` again after an edit of the Spec at round 0', async (t
   t.after(() => world.remove())
   assert.equal((await started(world, 141)).code, 0)
   await run(['set', '141', 'changes', '--as', 'reviewer'], world.deps)
+  world.comment(141)
 
   const again = await run(['set', '141', 'spec'], world.deps)
   assert.equal(again.code, 0)
   assert.deepEqual(logLines(world, 141).at(-1), { at: '2026-10-05T10:00:00.000Z', role: 'lead', from: 'changes', to: 'spec', round: 0 })
+})
+
+test("The Lead's `spec` is refused while the Spec has no comment since its last state, and the state does not change", async (t) => {
+  const world = makeWorld()
+  t.after(() => world.remove())
+  assert.equal((await started(world, 141)).code, 0)
+  world.comment(141)
+  world.tick()
+  await run(['set', '141', 'changes', '--as', 'reviewer'], world.deps)
+
+  const bare = await run(['set', '141', 'spec'], world.deps)
+  assert.equal(bare.code, 1)
+  assert.match(bare.stderr, /task 141: no comment on the Spec since changes; answer each finding in a comment, then set spec again/)
+  assert.deepEqual(stateOf(world, 141), { state: 'changes', round: 0 })
 })

@@ -48,6 +48,7 @@ The log governs the state: the last line is the current state and Round. If the 
 - Each agent that the tool starts gets `BINNACLE_TASK` and `BINNACLE_ROLE` in its environment. An agent leaves out the Task number and `--as`: `pnpm -C <main checkout> task set ready`.
 - The Lead, outside an agent, passes `--as <role>` when it acts for a role. A command without `--as` acts as the Lead.
 - `task set` refuses `blocked` and `stopped`: only `task ask` and `task stop` set them.
+- `task set <spec> spec` refuses until the Spec has a comment since its last change of state. The Reviewer's next pass reads that comment for why the Spec changed.
 - A command whose change of state stays, but whose Hand-off failed, exits 3. Run `pnpm task resend <n>`.
 
 Blocking edges on GitHub order the Tickets. The tool does not check them: the Lead builds a Ticket only after its blockers merge.

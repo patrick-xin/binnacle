@@ -41,6 +41,7 @@ export function makeWorld() {
   const issues = new Map()
   const titles = new Map()
   const parents = new Map()
+  const comments = new Map()
   let clock = new Date('2026-10-05T10:00:00.000Z')
   const runner = makeFakeRunner()
   const gh = makeFakeGh()
@@ -58,6 +59,7 @@ export function makeWorld() {
       },
       parentOf: async (n) => parents.get(String(n)),
       titleOf: async (n) => titles.get(String(n)) ?? `issue ${n}`,
+      commentTimes: async (n) => comments.get(String(n)) ?? [],
       subIssues: async (n) =>
         [...parents]
           .filter(([, spec]) => spec === n)
@@ -80,6 +82,9 @@ export function makeWorld() {
     },
     runner,
     gh,
+    comment(n) {
+      comments.set(String(n), [...(comments.get(String(n)) ?? []), clock.toISOString()])
+    },
     setIssue(n, body) {
       issues.set(String(n), body)
     },
