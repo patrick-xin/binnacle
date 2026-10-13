@@ -4,7 +4,7 @@ Each feature has a doc in `features/`: what a person can do, what an author can 
 
 Each feature is a plugin with a row of its own in the bundle's patch ([ADR 1](adr/0001-a-feature-is-a-cordis-plugin-on-the-binnacle-service.md)). A person turns a feature off by its row: `- id: <row>` and `disabled: true` in their profile's `cordis.patch.yml`. The core, row `binnacle`, is not a feature that can be turned off: it owns the terminal, and every feature needs it.
 
-`pnpm test` checks that this table, the docs in `features/` and the bundle's patch agree. It also checks that a branch which changes a feature's code changes its doc, by the longest path under **Code** that holds the changed file. A commit whose change leaves the doc true says so, with a line `Feature doc unchanged: <Feature>, <why>`.
+`pnpm test` checks that this table, the docs in `features/` and the bundle's patch agree. It also checks that a branch which changes a feature's code changes its doc, by the longest path under **Code** that holds the changed file. A commit whose change leaves the doc true says so, with a line `Feature doc unchanged: <Feature>, <why>`. The `commit-msg` hook checks a commit the same way, with its staged files and its message, before the commit is made.
 
 | Feature | Doc | Rows | Code |
 |---|---|---|---|
