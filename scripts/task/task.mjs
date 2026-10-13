@@ -524,6 +524,12 @@ async function setState(n, state, read, deps, say) {
       const ticket = [...readTasks(deps.home).tasks.values()].find((task) => task.spec === n)
       if (ticket !== undefined) throw new Refusal(`task ${n}: the Ticket ${ticket.n} is built from it; the Spec stays approved`)
     }
+    // The Reviewer's next pass is told that the Spec's newest comment says why it changed.
+    if (kind === 'spec' && state === 'spec') {
+      const times = await deps.commentTimes(n)
+      if (!times.some((time) => new Date(time) >= new Date(last.at)))
+        throw new Refusal(`task ${n}: no comment on the Spec since ${last.to}; answer each finding in a comment, then set spec again`)
+    }
     const round = state === 'ready' ? last.round + 1 : last.round
     appendLine(join(folder, 'log.ndjson'), {
       at: deps.now().toISOString(),
@@ -817,6 +823,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     env: process.env,
     readIssue: (n) => ghRead(['issue', 'view', String(n), '--json', 'body', '--jq', '.body'], `issue ${n}`),
     titleOf: async (n) => (await ghRead(['issue', 'view', String(n), '--json', 'title', '--jq', '.title'], `issue ${n}`)).trim(),
+    commentTimes: async (n) =>
+      (await ghRead(['issue', 'view', String(n), '--json', 'comments', '--jq', '.comments[].createdAt'], `the comments of ${n}`))
+        .split('\n')
+        .filter(Boolean),
     async parentOf(n) {
       const parent = (await ghRead(['issue', 'view', String(n), '--json', 'parent', '--jq', '.parent.number // ""'], `issue ${n}`)).trim()
       return parent === '' ? undefined : Number(parent)

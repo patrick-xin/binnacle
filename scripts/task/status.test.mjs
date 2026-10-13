@@ -23,6 +23,8 @@ test('Each change of state adds one line to `log.ndjson`: the time, the role, th
   assert.equal((await run(['start', '140'], world.deps)).code, 0)
   for (const [argv, minutes] of steps) {
     world.tick()
+    // The Lead answers the findings in a comment before it sets `spec` again.
+    if (argv[2] === 'spec') world.comment(140)
     assert.equal((await run(argv, world.deps)).code, 0, `${argv.join(' ')} at minute ${minutes}`)
   }
 

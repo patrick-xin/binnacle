@@ -115,7 +115,9 @@ test('An approved Spec goes back to `spec` for another pass of Round 0, until a 
   const world = makeWorld()
   t.after(() => world.remove())
   world.spec(SPEC)
-  await steps(world, ['start', String(SPEC)], ['set', String(SPEC), 'approved', '--as', 'reviewer'], ['set', String(SPEC), 'spec'])
+  await steps(world, ['start', String(SPEC)], ['set', String(SPEC), 'approved', '--as', 'reviewer'])
+  world.comment(SPEC)
+  await steps(world, ['set', String(SPEC), 'spec'])
 
   assert.deepEqual(logLines(world, SPEC).at(-1), { at: '2026-10-05T10:03:00.000Z', role: 'lead', from: 'approved', to: 'spec', round: 0 })
   assert.match(world.runner.prompts.at(-1).text, /^Round 0, pass 2 of #100: .*review-0-2\.md/)
