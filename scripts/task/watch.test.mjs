@@ -37,6 +37,19 @@ test('`task watch` exits with one line for the oldest change that the Lead acts 
   })
 })
 
+test('`task watch` reports nothing of a stopped Task, though no watch read its changes', async (t) => {
+  const world = makeWorld()
+  t.after(() => world.remove())
+  await approved(world, 140)
+  world.tick()
+  assert.equal((await run(['stop', '140'], world.deps)).code, 0)
+  world.tick()
+  await approved(world, 141)
+
+  const result = await run(['watch'], world.deps)
+  assert.equal(result.stdout, '141 approved round 0 (reviewer)\n')
+})
+
 test('Two changes that wait are reported by two runs of `task watch`, one each', async (t) => {
   const world = makeWorld()
   t.after(() => world.remove())

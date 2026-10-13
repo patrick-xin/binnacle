@@ -236,6 +236,8 @@ function oldestWaiting(home, counts) {
     if (oldest === undefined || entry.at < oldest.at) oldest = entry
   }
   for (const task of readTasks(home).tasks.values()) {
+    // A stopped Task waits on no one, though a Lead that never watched left its changes unread.
+    if (task.state === 'stopped') continue
     const place = counts.get(task.n) ?? { log: 0, events: 0 }
     for (let index = place.log; index < task.lines.length; index++) {
       const line = task.lines[index]
