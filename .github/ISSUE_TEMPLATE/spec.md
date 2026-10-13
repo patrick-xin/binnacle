@@ -20,7 +20,7 @@ labels: spec
 
 ## Journeys
 
-<!-- What a person does with the feature in a real session under dsh, from start to end, and what they do next. The Person Trial drives each one. None if a person sees no change. -->
+<!-- What a person does with the feature in a real session under dsh, from start to end, and what they do next. The Maintainer tries each one once the Spec merges. None if a person sees no change. -->
 
 1.
 
