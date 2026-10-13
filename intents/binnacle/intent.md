@@ -52,8 +52,9 @@ Each stage ends in something the Maintainer can try under dsh. The Lead writes t
 1. **Core.** binnacle starts under dsh and takes the terminal. The Maintainer opens a recorded session and scrolls it.
 2. **Chat.** The Maintainer types a prompt, sends it, watches the answer stream, and interrupts it.
 3. **Waiting on a person.** The Maintainer answers the agent's questions and approvals with the keyboard or the mouse, and folds the transcript. Features: Gestures, Requests, Transcript.
-4. **Plugins.** Search, the model picker, settings, and the trajectory, a screen of its own with charts, tabs and filters.
-5. **Finish.** The Maintainer resumes a session, selects and copies text, and sees a summary on exit. Colours follow the terminal, and `NO_COLOR` works. The first 0.x release follows.
+4. **Polish.** The Maintainer selects and copies text with the mouse, as in a plain terminal. The Maintainer adds what else the real tries of Stage 3 find. Features: [Select and copy](../select-and-copy/intent.md).
+5. **Plugins.** Search, the model picker, settings, and the trajectory, a screen of its own with charts, tabs and filters.
+6. **Finish.** The Maintainer resumes a session, and sees a summary on exit. Colours follow the terminal, and `NO_COLOR` works. The first 0.x release follows.
 
 Authoring gets its own stages, toward 1.0, in [its Intent](../authoring/intent.md).
 
