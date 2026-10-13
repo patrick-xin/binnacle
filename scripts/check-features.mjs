@@ -71,6 +71,24 @@ export function staleDocs(changed, map, messages) {
   )
 }
 
+const linesOf = (text) => (text ?? '').split('\n').filter(Boolean)
+
+/**
+ * The files that the branch changes and its commits' messages, from `git(...args)`, which returns stdout or undefined.
+ * `pending` is the message of a commit being written: its staged files count as the branch's.
+ */
+export function branchOf(git, pending) {
+  const from = git('merge-base', 'origin/main', 'HEAD')?.trim()
+  if (from === undefined) return undefined
+  const changed = linesOf(git('diff', '--name-only', `${from}...HEAD`))
+  let messages = git('log', '--format=%B', `${from}..HEAD`) ?? ''
+  if (pending !== undefined) {
+    changed.push(...linesOf(git('diff', '--cached', '--name-only')).filter((file) => !changed.includes(file)))
+    messages += pending
+  }
+  return { changed, messages }
+}
+
 // dsh evaluates a `!!js` value at load; the check reads only the rows, so it keeps the source.
 const DSH_SCHEMA = DEFAULT_SCHEMA.extend([new Type('tag:yaml.org,2002:js', { kind: 'scalar' })])
 
@@ -99,12 +117,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const docs = readdirSync(join(root, 'docs', 'features')).filter((file) => file.endsWith('.md'))
   const map = read('docs/features.md')
   const problems = findProblems(read('packages/binnacle/cordis.patch.yml'), map, docs)
-  const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' })
-  const base = git('merge-base', 'origin/main', 'HEAD')
-  if (base.status === 0) {
-    const from = base.stdout.trim()
-    const changed = git('diff', '--name-only', `${from}...HEAD`).stdout.split('\n').filter(Boolean)
-    problems.push(...staleDocs(changed, map, git('log', '--format=%B', `${from}..HEAD`).stdout))
+  const git = (...args) => {
+    const done = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+    return done.status === 0 ? done.stdout : undefined
+  }
+  // The commit-msg hook passes `--message <file>`, so a commit is checked before it is made.
+  const at = process.argv.indexOf('--message')
+  const branch = branchOf(git, at === -1 ? undefined : readFileSync(process.argv[at + 1], 'utf8'))
+  if (branch !== undefined) {
+    problems.push(...staleDocs(branch.changed, map, branch.messages))
   } else {
     console.log('check-features: no origin/main, so the feature docs are not checked against the branch')
   }

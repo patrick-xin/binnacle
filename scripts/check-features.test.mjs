@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { findProblems, staleDocs } from './check-features.mjs'
+import { branchOf, findProblems, staleDocs } from './check-features.mjs'
 
 const patch = `
 - insert:
@@ -75,4 +75,20 @@ test("a branch that changes a feature's code and not its doc is a problem, by th
 test('a commit that says why a feature doc stays true lets its code change alone', () => {
   const messages = 'refactor: rename a helper\n\nFeature doc unchanged: Gestures, a rename inside the table.\n'
   assert.deepEqual(staleDocs(['src/core/gestures.ts'], CODED, messages), [])
+})
+
+test('a commit being written adds its staged files and its message to the branch', () => {
+  const answers = {
+    'merge-base origin/main HEAD': 'abc\n',
+    'diff --name-only abc...HEAD': 'src/core/layout.ts\n',
+    'log --format=%B abc..HEAD': 'feat: a layout\n\nFeature doc unchanged: Core, a field it already lists.\n',
+    'diff --cached --name-only': 'src/core/gestures.ts\n',
+  }
+  const git = (...args) => answers[args.join(' ')]
+  const branch = branchOf(git, 'fix: a click\n')
+  assert.deepEqual(branch.changed, ['src/core/layout.ts', 'src/core/gestures.ts'])
+  assert.deepEqual(staleDocs(branch.changed, CODED, branch.messages), [
+    "Gestures: the branch changes src/core/gestures.ts, and not docs/features/gestures.md; say what is built now, or add `Feature doc unchanged: Gestures, <why>` to a commit's message",
+  ])
+  assert.deepEqual(staleDocs(branch.changed, CODED, branchOf(git, 'fix: a click\n\nFeature doc unchanged: Gestures, why.\n').messages), [])
 })
