@@ -45,6 +45,10 @@ An author can:
 3. Every click that works today still works, in the same place.
 4. Each part of the screen that the mouse does nothing in, by an author's choice, is left to the terminal's own selection.
 
+## Specs
+
+- [#348](https://github.com/patrick-xin/binnacle/issues/348) A drag selects in one Place, a release copies, and a click acts on its release.
+
 ## Open questions
 
 None.
