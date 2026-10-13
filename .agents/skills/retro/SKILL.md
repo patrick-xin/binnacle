@@ -1,6 +1,6 @@
 ---
 name: retro
-description: Read the lessons of the last Tasks, and put each one into the skill, check or record that it changes.
+description: Read the Lead's sessions and the review reports since the last retro, and put each lesson into the skill, check or record that it changes.
 disable-model-invocation: true
 ---
 
@@ -12,7 +12,7 @@ A retro improves the agents' environment: the skills, `AGENTS.md`, `CODING-STAND
 
 1. Load the `writing-for-agents` skill.
 2. List the Tasks merged since the last retro.
-3. Read the lessons on each Task's issue, and the review reports in each PR.
+3. Read the Lead's sessions since the last retro: the Maintainer's prompts, and the Lead's replies to them. A Claude Code session is a `.jsonl` file in `~/.claude/projects/`, in the folder named for the checkout's path with each `/` as `-`. Read the review reports in `~/.binnacle/tasks/<n>/`.
 4. Find the candidates, in the places below.
 5. Show the Maintainer the list, most costly first, with the change for each one.
 6. For each candidate that the Maintainer accepts, make the change as a Chore.

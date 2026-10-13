@@ -7,6 +7,8 @@ description: The Lead's role skill. Load it first when your prompt makes you the
 
 You turn what the Maintainer wants into Tasks, start each Task, answer its questions, and check what comes back. You build Fix and Chore Tasks, and a Ticket when the Maintainer chooses you as its builder. You hold at most three things in flight: for example one Build, one review and one Fix.
 
+The Maintainer grills with you, approves each Intent, tries what merged, and merges one-way PRs. You decide the rest: each Spec and its Tickets, each Lane, each builder, and each answer to a finding.
+
 ## From Intent to Tasks
 
 The product's Intent is `intents/binnacle/intent.md`. Each feature that is grilled gets an Intent of its own, `intents/<feature>/intent.md`, and the product's Stages name the features that serve each one.
@@ -18,15 +20,14 @@ The product's Intent is `intents/binnacle/intent.md`. Each feature that is grill
 5. Write the feature's Specs, with the `spec` skill.
 6. Slice each Spec into Tickets in its **Tickets** section, with the `tickets` skill, before its Round 0.
 7. List the Specs in the feature's Intent.
-8. When every Task of the Stage is merged, tell the Maintainer what to try.
+8. Hand the Maintainer each merged Spec or Fix to try, as *The Maintainer's try* says.
 9. If the Maintainer makes a small change to an Intent, edit it.
 10. If the change is large, use `grill` again.
 
 - An Intent says what is wanted and why, in plain words: no code, no API, no design. A word that only an engineer would use belongs in the Spec.
 - The design goes in the Specs. What is built goes in the feature's doc in `docs/features/`, with the code.
 - An answer to an open question is an edit to the Intent.
-- A decision that binds more than one Task is an ADR, written in the Task that needs it.
-- A decision that you take for the Maintainer is an ADR too.
+- A decision goes under the Spec's **Decisions**, or in a Fix's PR. It becomes an ADR only when the Maintainer picks it after the try.
 
 ## Lanes
 
@@ -34,7 +35,7 @@ Choose the Lane when you file the issue. A Task moves up a Lane, never down.
 
 | Lane | When | Builds | Review |
 |---|---|---|---|
-| **Fix** | One behaviour is wrong or missing, and you and the Maintainer agree that it is small enough. No change to the author API, no new decision, two source files at most. | You | Optional: one Round by your subagent |
+| **Fix** | One behaviour is wrong or missing, and it is small enough. No change to the author API, no new decision, two source files at most. | You | Optional: one Round by your subagent |
 | **Chore** | Records, a dependency or a check. Nothing that a person or an author sees changes. | You | The checks and CI |
 | **Build** | A Ticket of a Spec: all other work | The builder that the Maintainer chooses | Round 0 on its Spec, then Rounds on the Ticket |
 
@@ -51,27 +52,26 @@ The folders, states and Hand-offs are in [`.agents/task.md`](../../task.md).
 
 1. Run `pnpm task start <spec>`, with the Reviewer of *Builders and Reviewers* below. It sends the Reviewer Round 0.
 2. Run `pnpm task watch` in the background. When it exits, act on its line, then run it again.
-3. Change the Spec for each finding of Round 0, then run `pnpm task set <spec> spec`. The tool sends the Reviewer its next pass.
-4. When Round 0 is `approved`, show the Maintainer the Tickets. If the Door is one-way, get the Maintainer's agreement on the Spec too.
-5. Publish the Tickets, as the `tickets` skill says.
-6. For each Ticket whose blockers are merged, run `pnpm task build <ticket>`, with the builder of *Builders and Reviewers* below.
-7. If a command exits 3, or the watch says that a Hand-off failed or was not sent, run `pnpm task resend <n>`.
-8. If the watch reports a stall, read its busy processes first. Decide what to do: the tool stops no agent.
-9. If an answer changes the Spec, edit the Spec body.
-10. Link the edit in a comment on the Spec.
-11. Read each review report in full.
-12. After the third Round with findings, choose one narrow Round more, or ask the Maintainer.
-13. If the Ticket changes what binnacle draws or boots, try its branch with `pnpm try task/<ticket>`, as [`.agents/try.md`](../../try.md) says.
-14. Run `pnpm task land <ticket>` to open the PR, as `.agents/task.md` says.
-15. If `task land` says that the branch does not hold `origin/main`, send the Ticket back to its builder to rebase. The builder knows why its change was made. Rebase it yourself only when you built it.
-16. If you tried the branch, write in the PR what you drove and what it drew.
-17. After the PR merges or closes, run `pnpm task stop <ticket>`.
-18. After the last Ticket of a Spec merges, run its Person Trial, as [`.agents/try.md`](../../try.md) says. File each problem that it finds as a Fix, or as a Ticket of the Spec when it is larger, and build it before step 19.
-19. Run `pnpm task stop <spec>`: it closes the Spec.
+3. Change the Spec for each finding and question of Round 0, then run `pnpm task set <spec> spec`. The tool sends the Reviewer its next pass. You answer each one against the Intent as it was approved. Where the Intent cannot hold as written, decide, and write the decision under **Decisions**.
+4. When Round 0 is `approved`, publish the Tickets, as the `tickets` skill says.
+5. For each Ticket whose blockers are merged, run `pnpm task build <ticket>`, with the builder of *Builders and Reviewers* below.
+6. If a command exits 3, or the watch says that a Hand-off failed or was not sent, run `pnpm task resend <n>`.
+7. If the watch reports a stall, read its busy processes first. Decide what to do: the tool stops no agent.
+8. If an answer changes the Spec, edit the Spec body.
+9. Link the edit in a comment on the Spec.
+10. Read each review report in full.
+11. After the third Round with findings, choose one narrow Round more. If the findings come from the Intent, grill the Maintainer.
+12. If the Ticket changes what binnacle draws or boots, try its branch with `pnpm try task/<ticket>`, as [`.agents/try.md`](../../try.md) says.
+13. Run `pnpm task land <ticket>` to open the PR, as `.agents/task.md` says.
+14. If `task land` says that the branch does not hold `origin/main`, send the Ticket back to its builder to rebase. The builder knows why its change was made. Rebase it yourself only when you built it.
+15. If you tried the branch, write in the PR what you drove and what it drew.
+16. After the PR merges or closes, run `pnpm task stop <ticket>`.
+17. After the last Ticket of a Spec merges, hand the Maintainer its try, as *The Maintainer's try* says.
+18. When the try's Fixes and ADRs merge, run `pnpm task stop <spec>`: it closes the Spec.
 
 ## Builders and Reviewers
 
-The Maintainer names the model of each role at the start of a session, or before a builder writes code. For example: "a Claude subagent as the Implementer, pi on gpt-6.1-sol as the Reviewer". With no name, `.agents/roles.json` holds the default.
+The Maintainer names the model of each role at the start of a session, or before a builder writes code. For example: "a Claude subagent as the Implementer, pi on gpt-6.1-sol as the Reviewer". With no name, take the defaults in `.agents/roles.json` without asking.
 
 | The Maintainer names | Pass |
 |---|---|
@@ -104,19 +104,30 @@ A PR reads alone: a person or an agent knows what it does and why, with no other
 4. If it is two-way, merge it when CI passes: `gh pr merge <pr> --merge`. If it is one-way, label it `one-way`, and the Maintainer merges it.
 5. After it merges, pull `main` in the root checkout. The `post-merge` hook builds `dist/`, which the Maintainer's `binnacle` profile runs.
 6. Remove the worktree and the branch: `git worktree remove ~/.binnacle/worktrees/<n>` and `git branch -D task/<n>`.
+7. For a Fix, hand the Maintainer its try, as *The Maintainer's try* says.
 
 Before you open the PR:
 
 - `pnpm test` passes.
 - The records that the change affects are changed in the same commit.
 
+## The Maintainer's try
+
+The Maintainer tries each merged Spec and each merged Fix under dsh: this is the Person Trial.
+
+1. Pull `main`, so that the `binnacle` profile runs what merged.
+2. Tell the Maintainer what to try: `dsh --profile binnacle`, then each Journey of the Spec, or the steps that show the Fix, and what each one should draw.
+3. List the candidate ADRs: each decision of the Spec or the Fix that binds more than one Task, in one line each.
+4. File each problem that the Maintainer finds as a Fix, or as a Ticket of the Spec when it is larger. If the Intent was wrong, grill again.
+5. Write each candidate that the Maintainer picks as an ADR, in a Chore.
+6. Write what the Maintainer found as a comment on the Spec or the Fix's issue, under **Person Trial**.
+
 ## Doors
 
-A PR is **one-way** if it does one of these things:
+Before the first release, every PR is two-way. From the first release, a PR is **one-way** if it does one of these things:
 
 - changes what an author may import;
 - changes the dsh services or packages that binnacle names;
-- adds an ADR, or changes the status of an ADR;
 - moves a pin;
 - changes a format that a person keeps, such as a theme, the profile or the presets;
 - changes a release workflow;
@@ -129,5 +140,5 @@ The Maintainer merges a one-way PR. Every other PR is **two-way**, and it merges
 - Each Spec and Ticket in flight has its state in the Task tool: `pnpm task status` shows each one.
 - Each subagent in flight has ended its turn. Its Ticket is in a state that the tool holds.
 - Each Fix or Chore in flight has its branch pushed, and a note on its issue that says where it stopped.
-- Each decision that you took for the Maintainer is in an ADR.
+- Each try that you handed the Maintainer has its answer: its Fixes filed, and its picked ADRs written.
 - If the Maintainer asked for it, the `handoff` skill wrote what the next Lead needs.

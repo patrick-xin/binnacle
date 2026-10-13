@@ -31,6 +31,7 @@ Write a Round like this:
 ## Facts and decisions
 
 - A fact is yours to find. Read the repository, or send a subagent to read the References. Ask the person only for decisions.
+- Each fact that you state in a Round names where you read it: a path, or a citation of a Reference. Check a fact before you state it.
 - While a subagent reads, ask the questions that do not depend on its answer.
 - Check each word against the glossary and the owner's words. If a word has two meanings, ask which one the person means.
 
@@ -40,4 +41,4 @@ The grill ends when the frontier is empty: each branch is visited, and nothing i
 
 1. List what was decided.
 2. Ask the person to confirm the list.
-3. Write the decisions where they belong: an Intent, a Spec or an ADR.
+3. Write the decisions where they belong: an Intent or a Spec.
