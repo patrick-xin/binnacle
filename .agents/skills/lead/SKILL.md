@@ -13,7 +13,7 @@ The product's Intent is `intents/binnacle/intent.md`. Each feature that is grill
 
 1. Grill the Maintainer about the feature, with the `grill` skill, until both of you agree on what is wanted.
 2. Write `intents/<feature>/intent.md` in the Maintainer's own words: title, metadata, Problem, Proposed outcome, Affected users and systems, Constraints, Open questions.
-3. Show the Intent to the Maintainer with the doc tool.
+3. Show the Intent to the Maintainer with the doc tool: run `node ~/.binnacle/tools/doc/doc.mjs <intent.md>` in the background, and follow its `README.md` there.
 4. Change the Intent until the Maintainer approves it.
 5. Write the feature's Specs, with the `spec` skill.
 6. Slice each Spec into Tickets in its **Tickets** section, with the `tickets` skill, before its Round 0.
