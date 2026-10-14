@@ -67,7 +67,7 @@ The move showed these frictions in the structure of the project. Each one names 
 
 1. **The package's name is in many places.** The rename touched the row names in `cordis.patch.yml`, the check in `service.ts` that knows a built-in by its name, `testing/index.ts`, the tests and AUTHORING.md. binnacle reads the name from one place. *Stage 2.*
 2. **dsh's version has two pins.** `references.json` pins `.refs/dsh`, and the package's peers pin dsh's packages. Nothing keeps them the same. The CI job of Constraint 13 changes both, or a check compares them. *Stage 2.*
-3. **The workflow's words have no workflow.** Spec and Journey moved, but the process that made Specs stayed behind. The new repository says how a feature is designed now, or drops the words. *Stage 2.*
+3. **The workflow's words have no workflow.** Spec and Journey moved, but the process that made Specs stayed behind. The new repository says how a feature is designed now, or drops the words. *Stage 2.* Done: a Spec is `intents/<slug>/spec.md` beside its Intent, and its parts replace its Tickets. Issues hold the gaps and the bugs.
 4. **AUTHORING.md has about 1,200 lines.** Its built-ins part, about 500 lines, repeats `docs/features/*.md`. It splits into pages when the docs folder is made: start, concepts, components and built-ins. Three test files read the one file, so they then read the folder. *Stage 3.*
 5. **The docs hold paths.** `docs/features.md` lists the files of each feature, and a move breaks the paths with no failure. The notes beside the code (outcome 5) take this job. *Stage 3.*
 6. **The package carries only its own folder.** `files` takes no path outside `packages/binnacle`, so the docs folder lives in the package, or a step copies it in when the package is packed. *Stage 3.*
